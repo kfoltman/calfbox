@@ -53,7 +53,7 @@ void mono_sine_process_event(void *user_data, const uint8_t *data, uint32_t len)
         {
             int key = data[1] & 127;
             m->keymasks[key >> 5] |= 1 << (key & 31);
-            if (m->percussion < 0)
+            if (m->percussion < 0 && key >= 36)
                 m->percussion = 16.0;
         }
         if (data[0] == 0x80)
