@@ -104,7 +104,7 @@ inline int tonegenidx(int note, int shift)
     
     // harmonic foldback in the first octave of the manual
     if (note < 12 && shift < 12)
-        return note + shift;
+        return note + 12;
     
     while (note + shift > 90)
         note -= 12;
@@ -140,7 +140,7 @@ static void set_tonewheels(struct mono_sine_module *m, int tonegens[92])
                     tonegens[tgalt] += manual_drawbar_settings[i] * 1;
             }
             if (m->percussion > 0)
-                tonegens[tonegenidx(n, 24+7)] += m->percussion * 32;
+                tonegens[tonegenidx(n, 24+7)] += m->percussion * 16;
         }
     }
 }
@@ -169,9 +169,11 @@ void mono_sine_process_block(void *user_data, cbox_sample_t **inputs, cbox_sampl
     {
         if (tonegens[n] > 0)
         {
-            int iamp = tonegens[n] * m->amp_scaling[n] >> 10;
+            int iamp = tonegens[n];
             if (iamp > 512)
                 iamp = 512 + ((iamp - 512) >> 1);
+            
+            iamp = (iamp * m->amp_scaling[n]) >> 10;
             
             int *table = n < 12 ? complex_table : sine_table;
             uint32_t phase = m->phase[n];
@@ -209,7 +211,7 @@ void mono_sine_process_block(void *user_data, cbox_sample_t **inputs, cbox_sampl
         y1 = (x0 + x1) + y1 - (b1 * y1 >> 14);
         x1 = x0;
         y1 += (y1 == -1);
-        int64_t out = ((int64_t)y1) * a01 >> (16 - 2);
+        int64_t out = ((int64_t)y1) * a01 >> 16;
         if (out < -32768)
             out = -32768;
         if (out > 32767)
@@ -310,9 +312,14 @@ struct cbox_module *mono_sine_create(void *user_data)
     for (i = 0; i < 91; i++)
     {
         float freq_hz = 440 * pow(2.0, (i - 45) / 12.0);
+        float scaling = freq_hz / 60.0;
+        if (scaling < 1)
+            scaling = 1;
+        if (scaling > 32)
+            scaling = 32;
         m->frequency[i] = (uint32_t)(freq_hz * 65536 * 65536 / 44100);
         m->phase[i] = 0;
-        m->amp_scaling[i] = (int)(1024 * sqrt(m->frequency[i] / m->frequency[0]));
+        m->amp_scaling[i] = (int)(1024 * scaling);
     }
     for (i = 0; i < 4; i++)
         m->keymasks[i] = 0;
