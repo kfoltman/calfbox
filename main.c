@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
         printf("Cannot initialise sound I/O\n");
         return 1;
     }
-    process.module = (*mono_sine_module.create)(&mono_sine_module);
+    process.module = (*tonewheel_organ_module.create)(&tonewheel_organ_module);
     cbox_io_start(&io, &cbs);
     fgets(buf, 2, stdin);
     cbox_io_stop(&io);

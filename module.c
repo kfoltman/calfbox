@@ -40,7 +40,7 @@ struct biquad
     int y2;
 };
 
-struct mono_sine_module
+struct tonewheel_organ_module
 {
     struct cbox_module module;
 
@@ -60,9 +60,9 @@ static const int drawbars[9] = {0, 19, 12, 24, 24 + 7, 36, 36 + 4, 36 + 7, 48};
 static int pedal_drawbar_settings[2] = {8, 2};
 static int manual_drawbar_settings[9] = {8, 3, 8, 0, 0, 0, 0, 0, 3};
 
-void mono_sine_process_event(void *user_data, const uint8_t *data, uint32_t len)
+void tonewheel_organ_process_event(void *user_data, const uint8_t *data, uint32_t len)
 {
-    struct mono_sine_module *m = user_data;
+    struct tonewheel_organ_module *m = user_data;
     if (len > 0)
     {
         if (data[0] == 0x90)
@@ -128,7 +128,7 @@ inline int tonegenidx(int note, int shift)
     return note + shift;
 }
 
-static void set_tonewheels(struct mono_sine_module *m, int tonegens[92])
+static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[92])
 {
     int n, i;
     
@@ -161,9 +161,9 @@ static void set_tonewheels(struct mono_sine_module *m, int tonegens[92])
     }
 }
 
-void mono_sine_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
+void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
-    struct mono_sine_module *m = user_data;
+    struct tonewheel_organ_module *m = user_data;
     int n, i;
     //float a01, b1, x1, y1, x, q;
     int a01, b1, x1, y1;
@@ -296,7 +296,7 @@ static void biquad_init(struct biquad *bq)
     bq->x1 = bq->y1 = bq->x2 = bq->y2 = 0;
 }
 
-struct cbox_module *mono_sine_create(void *user_data)
+struct cbox_module *tonewheel_organ_create(void *user_data)
 {
     static int inited = 0;
     int i;
@@ -311,10 +311,10 @@ struct cbox_module *mono_sine_create(void *user_data)
         inited = 1;
     }
     
-    struct mono_sine_module *m = malloc(sizeof(struct mono_sine_module));
+    struct tonewheel_organ_module *m = malloc(sizeof(struct tonewheel_organ_module));
     m->module.user_data = m;
-    m->module.process_event = mono_sine_process_event;
-    m->module.process_block = mono_sine_process_block;
+    m->module.process_event = tonewheel_organ_process_event;
+    m->module.process_block = tonewheel_organ_process_block;
     m->lowpass_x1 = 0;
     m->lowpass_y1 = 0;
     m->percussion = -1;
@@ -343,4 +343,4 @@ struct cbox_module *mono_sine_create(void *user_data)
     return &m->module;
 }
 
-struct cbox_module_manifest mono_sine_module = { NULL, 0, 2, mono_sine_create };
+struct cbox_module_manifest tonewheel_organ_module = { NULL, 0, 2, tonewheel_organ_create };

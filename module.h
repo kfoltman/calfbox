@@ -39,4 +39,4 @@ struct cbox_module_manifest
     struct cbox_module *(*create)(void *user_data);
 };
 
-extern struct cbox_module_manifest mono_sine_module;
+extern struct cbox_module_manifest tonewheel_organ_module;
