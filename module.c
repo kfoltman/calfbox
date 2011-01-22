@@ -138,8 +138,8 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[92])
     {
         if (check_keymask(m->keymasks, n))
         {
-            tonegens[tonegenidx_pedals(n, 0)] += 4 * 16 * pedal_drawbar_settings[0];
-            tonegens[tonegenidx_pedals(n, 12)] += 4 * 16 * pedal_drawbar_settings[1];
+            tonegens[tonegenidx_pedals(n, 0)] += 3 * 16 * pedal_drawbar_settings[0];
+            tonegens[tonegenidx_pedals(n, 12)] += 3 * 16 * pedal_drawbar_settings[1];
         }
     }
     // manual
@@ -151,13 +151,16 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[92])
             {
                 int tg = tonegenidx(n, drawbars[i]);
                 tonegens[tg] += manual_drawbar_settings[i] * 16;
-                int tgalt = tg >= 48 ? tg - 48 : tg + 48;
-                if (tgalt < 91)
-                    tonegens[tgalt] += manual_drawbar_settings[i] * 1;
             }
             if (m->percussion > 0)
-                tonegens[tonegenidx(n, 24+7)] += m->percussion * 16;
+                tonegens[tonegenidx(n, 24+7)] += m->percussion * 8;
         }
+    }
+    for (n = 0; n < 91; n++)
+    {
+        int tgalt = n >= 48 ? n - 48 : n + 48;
+        if (tgalt < 91)
+            tonegens[tgalt] += tonegens[n] >> 5;
     }
 }
 
@@ -187,7 +190,7 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
         {
             int iamp = tonegens[n];
             if (iamp > 512)
-                iamp = 512 + ((iamp - 512) >> 1);
+                iamp = 512 + 3 * ((iamp - 512) >> 2);
             
             iamp = (iamp * m->amp_scaling[n]) >> 10;
             
@@ -332,7 +335,7 @@ struct cbox_module *tonewheel_organ_create(void *user_data)
         if (scaling < 1)
             scaling = 1;
         if (scaling > 32)
-            scaling = 32;
+            scaling = 32 + ((scaling - 32) / 2.0);
         m->frequency[i] = (uint32_t)(freq_hz * 65536 * 65536 / 44100);
         m->phase[i] = 0;
         m->amp_scaling[i] = (int)(1024 * scaling);
