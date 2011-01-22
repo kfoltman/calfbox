@@ -1,4 +1,20 @@
-// Copyright (C) 2010 Krzysztof Foltman. All rights reserved.
+/*
+Calf Box, an open source musical instrument.
+Copyright (C) 2010 Krzysztof Foltman
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include "io.h"
 
@@ -36,8 +52,9 @@ int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
     jack_set_process_callback(io->client, process_cb, io);
     jack_activate(io->client);
 
-    jack_connect(io->client, "cbox:out_l", "system:playback_1");
-    jack_connect(io->client, "cbox:out_r", "system:playback_2");
+    /* This is here for my testing. It will be removed once there are better facilities for configurable auto-connect. */
+    jack_connect(io->client, "cbox:out_l", "calf:rotaryspeaker_in_l");
+    jack_connect(io->client, "cbox:out_r", "calf:rotaryspeaker_in_r");
     jack_connect(io->client, "alsa_pcm:E-MU-Xboard25/midi_capture_1", "cbox:midi");
     jack_connect(io->client, "alsa_pcm:E-MU-XMidi2X2/midi_capture_2", "cbox:midi");
     
