@@ -346,4 +346,10 @@ struct cbox_module *tonewheel_organ_create(void *user_data)
     return &m->module;
 }
 
-struct cbox_module_manifest tonewheel_organ_module = { NULL, 0, 2, tonewheel_organ_create };
+struct cbox_module_keyrange_metadata tonewheel_organ_keyranges[] = {
+    { 1, 24, 35, "Pedal keyboard" },
+    { 1, 36, 36 + 60, "Manual" },
+};
+
+DEFINE_MODULE(tonewheel_organ, 0, 2)
+

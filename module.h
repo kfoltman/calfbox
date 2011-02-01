@@ -22,6 +22,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 typedef float cbox_sample_t;
 
+struct cbox_module_keyrange_metadata
+{
+    uint8_t channel;
+    uint8_t low_key;
+    uint8_t high_key;
+    const char *name;
+};
+
+enum cbox_module_livecontroller_class
+{
+    cmlc_continuous,
+    cmlc_discrete,
+    cmlc_enum
+};
+
+struct cbox_module_livecontroller_metadata
+{
+    uint8_t channel;
+    enum cbox_module_livecontroller_class controller_class:8;
+    uint16_t controller;
+    const char *name;
+    void *extra_info;
+};
+
+struct cbox_module_voicingparam_metadata
+{
+};
+
+struct cbox_module_metadata
+{
+    struct cbox_module_keyrange_metadata *keyranges;
+    int num_keyranges;
+
+    struct cbox_module_livecontroller_metadata *live_controllers;
+    int num_live_controllers;
+
+    struct cbox_module_voicingparam_metadata *voicing_params;
+    int num_voicing_params;
+};
+
 struct cbox_module
 {
     void *user_data;
@@ -35,8 +75,13 @@ struct cbox_module_manifest
     void *user_data;
     int inputs;
     int outputs;
+    struct cbox_module_metadata *metadata;
     
     struct cbox_module *(*create)(void *user_data);
 };
+
+#define DEFINE_MODULE(name, ninputs, noutputs) \
+    struct cbox_module_metadata name##_metadata = { name##_keyranges, sizeof(name##_keyranges)/sizeof(name##_keyranges[0]), NULL, 0, NULL, 0 }; \
+    struct cbox_module_manifest name##_module = { NULL, .inputs = ninputs, .outputs = noutputs, .metadata = &name##_metadata, .create = name##_create };
 
 extern struct cbox_module_manifest tonewheel_organ_module;
