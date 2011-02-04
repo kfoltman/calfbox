@@ -1,33 +1,56 @@
-/*
-Calf Box, an open source musical instrument.
-Copyright (C) 2010 Krzysztof Foltman
+/* config.h.  Generated from config.h.in by configure.  */
+/* config.h.in.  Generated from configure.ac by autoheader.  */
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+/* Define to 1 if you have the <inttypes.h> header file. */
+#define HAVE_INTTYPES_H 1
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+/* Define to 1 if you have the <memory.h> header file. */
+#define HAVE_MEMORY_H 1
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* Define to 1 if you have the <stdint.h> header file. */
+#define HAVE_STDINT_H 1
 
-extern void cbox_config_init();
+/* Define to 1 if you have the <stdlib.h> header file. */
+#define HAVE_STDLIB_H 1
 
-extern int cbox_config_has_section(const char *section);
+/* Define to 1 if you have the <strings.h> header file. */
+#define HAVE_STRINGS_H 1
 
-extern char *cbox_config_get_string(const char *section, const char *key);
+/* Define to 1 if you have the <string.h> header file. */
+#define HAVE_STRING_H 1
 
-extern char *cbox_config_get_string_with_default(const char *section, const char *key, char *def_value);
+/* Define to 1 if you have the <sys/stat.h> header file. */
+#define HAVE_SYS_STAT_H 1
 
-extern int cbox_config_get_int(const char *section, const char *key, int def_value);
+/* Define to 1 if you have the <sys/types.h> header file. */
+#define HAVE_SYS_TYPES_H 1
 
-extern float cbox_config_get_float(const char *section, const char *key, float def_value);
+/* Define to 1 if you have the <unistd.h> header file. */
+#define HAVE_UNISTD_H 1
 
-extern void cbox_config_shutdown();
+/* Name of package */
+#define PACKAGE "calfbox"
 
+/* Define to the address where bug reports for this package should be sent. */
+#define PACKAGE_BUGREPORT "wdev@foltman.com"
 
+/* Define to the full name of this package. */
+#define PACKAGE_NAME "calfbox"
+
+/* Define to the full name and version of this package. */
+#define PACKAGE_STRING "calfbox 0.0.2"
+
+/* Define to the one symbol short name of this package. */
+#define PACKAGE_TARNAME "calfbox"
+
+/* Define to the home page for this package. */
+#define PACKAGE_URL ""
+
+/* Define to the version of this package. */
+#define PACKAGE_VERSION "0.0.2"
+
+/* Define to 1 if you have the ANSI C header files. */
+#define STDC_HEADERS 1
+
+/* Version number of package */
+#define VERSION "0.0.2"
