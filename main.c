@@ -89,7 +89,8 @@ int main(int argc, char *argv[])
     char buf[3];
     struct process_struct process;
     struct cbox_io_callbacks cbs = { &process, dummy_process };
-    
+
+    cbox_config_init();
     if (!cbox_io_init(&io, &params))
     {
         printf("Cannot initialise sound I/O\n");
