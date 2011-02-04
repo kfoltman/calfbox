@@ -2,9 +2,9 @@ INCLUDES = -I$(srcdir)
 
 bin_PROGRAMS = calfbox
 
-calfbox_SOURCES = io.c main.c module.c
+calfbox_SOURCES = config.c io.c main.c tonewheel.c
 calfbox_LDADD = $(JACK_DEPS_LIBS) $(GLIB_DEPS_LIBS)
 
-AM_CXXFLAGS = $(JACK_DEPS_CFLAGS) $(GLIB_DEPS_CFLAGS)
+AM_CFLAGS = $(JACK_DEPS_CFLAGS) $(GLIB_DEPS_CFLAGS)
 
-noinst_HEADERS = dspmath.h io.h module.h
+noinst_HEADERS = config.h dspmath.h io.h module.h
