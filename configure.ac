@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.63)
-AC_INIT([calfbox],[0.0.1],[wdev@foltman.com])
+AC_INIT([calfbox],[0.0.2],[wdev@foltman.com])
 AC_CONFIG_HEADER([config.h])
 LT_LANG([C])
 
