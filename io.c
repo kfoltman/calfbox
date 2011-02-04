@@ -16,7 +16,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config.h"
 #include "io.h"
+
+#include <stdlib.h>
+#include <string.h>
+#include <glib.h>
+
+static const char *io_section = "io";
 
 int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
 {
@@ -46,17 +53,60 @@ static int process_cb(jack_nframes_t frames, void *arg)
     return 0;
 }
 
+static void autoconnect(jack_client_t *client, const char *port, const char *config_var, int is_cbox_input, int is_midi)
+{
+    char *name, *orig_name, *dpos;
+    const char *use_name;
+    
+    orig_name = cbox_config_get_string(io_section, config_var);
+    if (orig_name)
+    {
+        name = orig_name;
+        do {
+            dpos = strchr(name, ';');
+            if (dpos)
+                *dpos = '\0';
+            
+            use_name = name;
+            if (use_name[0] == '#')
+            {
+                char *endptr = NULL;
+                long port = strtol(use_name + 1, &endptr, 10);
+                if (endptr == use_name + strlen(use_name))
+                {
+                    const char **names = jack_get_ports(client, ".*", is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
+                    int i;
+                    for (i = 0; i < port && names[i]; i++)
+                        ;
+                    
+                    if (names[i])
+                        use_name = names[i];
+                }
+            }
+            if (is_cbox_input)
+                jack_connect(client, use_name, port);
+            else
+                jack_connect(client, port, use_name);    
+            g_message("Connect: %s %s %s", port, is_cbox_input ? "<-" : "->", use_name);
+            if (dpos)
+                name = dpos + 1;
+        } while(dpos);
+        g_free(orig_name);
+    }
+}
+
 int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
 {
     io->cb = cb;
     jack_set_process_callback(io->client, process_cb, io);
     jack_activate(io->client);
 
-    /* This is here for my testing. It will be removed once there are better facilities for configurable auto-connect. */
-    jack_connect(io->client, "cbox:out_l", "calf:rotaryspeaker_in_l");
-    jack_connect(io->client, "cbox:out_r", "calf:rotaryspeaker_in_r");
-    jack_connect(io->client, "alsa_pcm:E-MU-Xboard25/midi_capture_1", "cbox:midi");
-    jack_connect(io->client, "alsa_pcm:E-MU-XMidi2X2/midi_capture_2", "cbox:midi");
+    if (cbox_config_has_section(io_section))
+    {
+        autoconnect(io->client, "cbox:out_l", "out_left", 0, 0);
+        autoconnect(io->client, "cbox:out_r", "out_right", 0, 0);
+        autoconnect(io->client, "cbox:midi", "midi", 1, 1);
+    }
     
     return 1;
 }
