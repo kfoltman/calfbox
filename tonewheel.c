@@ -48,7 +48,8 @@ struct tonewheel_organ_module
 
     uint32_t frequency[91];
     uint32_t phase[91];
-    uint32_t keymasks[4];
+    uint64_t pedalmasks;
+    uint64_t upper_manual, lower_manual;
     int amp_scaling[91];
     struct biquad scanner_delay[18];
     int lowpass_x1, lowpass_y1;
@@ -59,35 +60,63 @@ struct tonewheel_organ_module
 };
 
 static const int drawbars[9] = {0, 19, 12, 24, 24 + 7, 36, 36 + 4, 36 + 7, 48};
-static int pedal_drawbar_settings[2] = {4, 4};
-static int manual_drawbar_settings[9] = {8, 3, 8, 0, 0, 0, 0, 0, 0};
+static int pedal_drawbar_settings[2] = {8, 2};
+static int upper_manual_drawbar_settings[9] = {8, 8, 8, 0, 0, 0, 0, 0, 0};
+static int lower_manual_drawbar_settings[9] = {8, 3, 8, 0, 0, 0, 0, 0, 0};
+
+static void set_keymask(struct tonewheel_organ_module *m, int channel, int key, int value)
+{
+    uint64_t mask = 0;
+    uint64_t *manual = NULL;
+    if (key >= 24 && key < 36)
+    {
+        mask = 1 << (key - 24);
+        manual = &m->pedalmasks;
+    }
+    else if (key >= 36 && key < 36 + 61)
+    {
+        manual = (channel == 0) ? &m->upper_manual : &m->lower_manual;
+        mask = ((int64_t)1) << (key - 36);
+    }
+    else
+        return;
+    
+    if (value)
+        *manual |= mask;
+    else
+        *manual &= ~mask;
+}
 
 void tonewheel_organ_process_event(void *user_data, const uint8_t *data, uint32_t len)
 {
     struct tonewheel_organ_module *m = user_data;
     if (len > 0)
     {
-        if (data[0] == 0x90)
+        int cmd = data[0] >> 4;
+        if (cmd == 9)
         {
+            int channel = data[0] & 0x0F;
             int key = data[1] & 127;
-            m->keymasks[key >> 5] |= 1 << (key & 31);
+            set_keymask(m, channel, key, 1);
             if (m->percussion < 0 && key >= 36)
                 m->percussion = 16.0;
         }
-        if (data[0] == 0x80)
+        if (cmd == 8)
         {
+            int channel = data[0] & 0x0F;
             int key = data[1] & 127;
-            m->keymasks[key >> 5] &= ~(1 << (key & 31));
+            set_keymask(m, channel, key, 0);
             
-            if (!(m->keymasks[1] & 0xFFFFFFF0) && !m->keymasks[2] && !m->keymasks[3])
+            if (channel == 0 && !m->upper_manual)
                 m->percussion = -1;
         }
-        if (data[0] == 0xB0)
+        if (cmd == 11)
         {
-            if (data[1] >= 21 && data[1] <= 28)
-                manual_drawbar_settings[data[1] - 21] = data[2] * 8 / 127;
+            int *drawbars = (data[0] & 0xF0) != 0 ? lower_manual_drawbar_settings : upper_manual_drawbar_settings;
+            if (data[1] >= 21 && data[1] <= 29)
+                drawbars[data[1] - 21] = data[2] * 8 / 127;
             if (data[1] == 82)
-                manual_drawbar_settings[8] = data[2] * 8 / 127;
+                drawbars[8] = data[2] * 8 / 127;
             if (data[1] == 64)
                 m->do_filter = data[2] >= 64;
             if (data[1] == 91)
@@ -96,11 +125,15 @@ void tonewheel_organ_process_event(void *user_data, const uint8_t *data, uint32_
     }
 }
 
-inline int check_keymask(uint32_t *keymasks, int note)
+inline int check_keymask(uint64_t keymasks, int note)
 {
     if (note < 0 || note > 127)
         return 0;
-    return 0 != (keymasks[note >> 5] & (1 << (note & 31)));
+    if (note >= 24 && note < 36)
+        return 0 != (keymasks & (1 << (note - 24)));
+    if (note >= 36 && note < 36 + 61)
+        return 0 != (keymasks & (1ULL << (note - 36)));
+    return 0;
 }
 
 inline int tonegenidx_pedals(int note, int shift)
@@ -138,7 +171,7 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92]
     // pedalboard
     for (n = 24; n < 24 + 12; n++)
     {
-        if (check_keymask(m->keymasks, n))
+        if (check_keymask(m->pedalmasks, n))
         {
             tonegens[0][tonegenidx_pedals(n, 0)] += 3 * 16 * pedal_drawbar_settings[0];
             tonegens[0][tonegenidx_pedals(n, 12)] += 3 * 16 * pedal_drawbar_settings[1];
@@ -147,15 +180,23 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92]
     // manual
     for (n = 36; n < 36 + 61; n++)
     {
-        if (check_keymask(m->keymasks, n))
+        if (check_keymask(m->upper_manual, n))
         {
             for (i = 0; i < 9; i++)
             {
                 int tg = tonegenidx(n, drawbars[i]);
-                tonegens[1][tg] += manual_drawbar_settings[i] * 16;
+                tonegens[1][tg] += upper_manual_drawbar_settings[i] * 16;
             }
             if (m->percussion > 0)
                 tonegens[0][tonegenidx(n, 24+7)] += m->percussion * 8;
+        }
+        if (check_keymask(m->lower_manual, n))
+        {
+            for (i = 0; i < 9; i++)
+            {
+                int tg = tonegenidx(n, drawbars[i]);
+                tonegens[0][tg] += lower_manual_drawbar_settings[i] * 16;
+            }
         }
     }
     for (n = 0; n < 91; n++)
@@ -163,8 +204,9 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92]
         int tgalt = n >= 48 ? n - 48 : n + 48;
         if (tgalt < 91)
         {
-            tonegens[0][tgalt] += tonegens[0][n] >> 5;
-            tonegens[1][tgalt] += tonegens[1][n] >> 5;
+            int shf = 7;
+            tonegens[0][tgalt] += tonegens[0][n] >> shf;
+            tonegens[1][tgalt] += tonegens[1][n] >> shf;
         }
     }
 }
@@ -382,8 +424,9 @@ struct cbox_module *tonewheel_organ_create(void *user_data)
         m->phase[i] = 0;
         m->amp_scaling[i] = (int)(1024 * scaling);
     }
-    for (i = 0; i < 4; i++)
-        m->keymasks[i] = 0;
+    m->upper_manual = 0;
+    m->lower_manual = 0;
+    m->pedalmasks = 0;
     
     return &m->module;
 }
