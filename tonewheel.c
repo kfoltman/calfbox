@@ -425,11 +425,11 @@ struct cbox_module *tonewheel_organ_create(void *user_data)
     for (i = 0; i < 91; i++)
     {
         float freq_hz = 440 * pow(2.0, (i - 45) / 12.0);
-        float scaling = freq_hz / 60.0;
+        float scaling = freq_hz / 120.0;
         if (scaling < 1)
             scaling = 1;
-        if (scaling > 32)
-            scaling = 32 + ((scaling - 32) / 2.0);
+        if (scaling > 24)
+            scaling = 24 + ((scaling - 24) / 3.0);
         m->frequency[i] = (uint32_t)(freq_hz * 65536 * 65536 / 44100);
         m->phase[i] = 0;
         m->amp_scaling[i] = (int)(1024 * scaling);
