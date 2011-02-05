@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config-api.h"
 #include "io.h"
 #include "module.h"
 
@@ -33,6 +34,8 @@ void dummy_process(void *user_data, struct cbox_io *io, uint32_t nframes)
 {
     struct process_struct *ps = user_data;
     struct cbox_module *module = ps->module;
+    if (!module)
+        return;
     uint32_t i;
     float *out_l = jack_port_get_buffer(io->output_l, nframes);
     float *out_r = jack_port_get_buffer(io->output_r, nframes);
@@ -87,19 +90,38 @@ int main(int argc, char *argv[])
     struct cbox_io io;
     struct cbox_open_params params;
     char buf[3];
-    struct process_struct process;
-    struct cbox_io_callbacks cbs = { &process, dummy_process };
+    struct process_struct process = { NULL };
+    struct cbox_io_callbacks cbs = { &process, dummy_process};
+    const char *module = NULL;
+    struct cbox_module_manifest **mptr;
 
     cbox_config_init();
-    if (!cbox_io_init(&io, &params))
+
+    module = cbox_config_get_string_with_default("main", "module", "tonewheel_organ");
+    
+    for (mptr = cbox_module_list; *mptr; mptr++)
     {
-        printf("Cannot initialise sound I/O\n");
+        if (!strcmp((*mptr)->name, module))
+        {
+            process.module = (*(*mptr)->create)(&tonewheel_organ_module);
+            break;
+        }
+    }
+    if (!process.module)
+    {
+        fprintf(stderr, "Cannot find module %s\n", module);
         return 1;
     }
-    process.module = (*tonewheel_organ_module.create)(&tonewheel_organ_module);
+
+    if (!cbox_io_init(&io, &params))
+    {
+        fprintf(stderr, "Cannot initialise sound I/O\n");
+        return 1;
+    }
     cbox_io_start(&io, &cbs);
     fgets(buf, 2, stdin);
     cbox_io_stop(&io);
     cbox_io_close(&io);
+    cbox_config_close();
     return 0;
 }

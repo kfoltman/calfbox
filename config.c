@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config.h"
+#include "config-api.h"
 
 #include <glib.h>
 #include <stdlib.h>
@@ -98,7 +98,7 @@ float cbox_config_get_float(const char *section, const char *key, float def_valu
     return result;
 }    
 
-void cbox_config_shutdown()
+void cbox_config_close()
 {
     if (config_keyfile)
     {

@@ -24,7 +24,7 @@ typedef float cbox_sample_t;
 
 struct cbox_module_keyrange_metadata
 {
-    uint8_t channel;
+    uint8_t channel; // 0 = omni
     uint8_t low_key;
     uint8_t high_key;
     const char *name;
@@ -73,6 +73,7 @@ struct cbox_module
 struct cbox_module_manifest
 {
     void *user_data;
+    const char *name;
     int inputs;
     int outputs;
     struct cbox_module_metadata *metadata;
@@ -82,6 +83,7 @@ struct cbox_module_manifest
 
 #define DEFINE_MODULE(name, ninputs, noutputs) \
     struct cbox_module_metadata name##_metadata = { name##_keyranges, sizeof(name##_keyranges)/sizeof(name##_keyranges[0]), NULL, 0, NULL, 0 }; \
-    struct cbox_module_manifest name##_module = { NULL, .inputs = ninputs, .outputs = noutputs, .metadata = &name##_metadata, .create = name##_create };
+    struct cbox_module_manifest name##_module = { NULL, #name, .inputs = ninputs, .outputs = noutputs, .metadata = &name##_metadata, .create = name##_create };
 
 extern struct cbox_module_manifest tonewheel_organ_module;
+extern struct cbox_module_manifest *cbox_module_list[];
