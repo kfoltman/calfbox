@@ -163,9 +163,19 @@ inline int tonegenidx(int note, int shift)
     return note + shift;
 }
 
+static int drawbar_amp_mapping[9] = { 0, 1, 2, 3, 4, 6, 8, 12, 16 };
+
 static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92])
 {
     int n, i;
+    
+    int upper_manual_drawbar_amp[9], lower_manual_drawbar_amp[9];
+    
+    for (i = 0; i < 9; i++)
+    {
+        upper_manual_drawbar_amp[i] = drawbar_amp_mapping[upper_manual_drawbar_settings[i]] * 8;
+        lower_manual_drawbar_amp[i] = drawbar_amp_mapping[lower_manual_drawbar_settings[i]] * 8;
+    }
     
     memset(tonegens, 0, 2 * 92 * sizeof(tonegens[0][0]));
     // pedalboard
@@ -185,7 +195,7 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92]
             for (i = 0; i < 9; i++)
             {
                 int tg = tonegenidx(n, drawbars[i]);
-                tonegens[1][tg] += upper_manual_drawbar_settings[i] * 16;
+                tonegens[1][tg] += upper_manual_drawbar_amp[i];
             }
             if (m->percussion > 0)
                 tonegens[0][tonegenidx(n, 24+7)] += m->percussion * 8;
@@ -195,7 +205,7 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92]
             for (i = 0; i < 9; i++)
             {
                 int tg = tonegenidx(n, drawbars[i]);
-                tonegens[0][tg] += lower_manual_drawbar_settings[i] * 16;
+                tonegens[0][tg] += lower_manual_drawbar_amp[i];
             }
         }
     }
