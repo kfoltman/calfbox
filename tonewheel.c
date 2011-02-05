@@ -163,7 +163,7 @@ inline int tonegenidx(int note, int shift)
     return note + shift;
 }
 
-static int drawbar_amp_mapping[9] = { 0, 1, 2, 3, 4, 6, 8, 12, 16 };
+static int drawbar_amp_mapping[9] = { 0, 1, 2, 3, 4, 6, 8, 11, 16 };
 
 static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92])
 {
