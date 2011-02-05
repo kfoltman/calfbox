@@ -59,8 +59,8 @@ struct tonewheel_organ_module
 };
 
 static const int drawbars[9] = {0, 19, 12, 24, 24 + 7, 36, 36 + 4, 36 + 7, 48};
-static int pedal_drawbar_settings[2] = {8, 2};
-static int manual_drawbar_settings[9] = {8, 3, 8, 0, 0, 0, 0, 0, 3};
+static int pedal_drawbar_settings[2] = {4, 4};
+static int manual_drawbar_settings[9] = {8, 3, 8, 0, 0, 0, 0, 0, 0};
 
 void tonewheel_organ_process_event(void *user_data, const uint8_t *data, uint32_t len)
 {
@@ -130,18 +130,18 @@ inline int tonegenidx(int note, int shift)
     return note + shift;
 }
 
-static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[92])
+static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92])
 {
     int n, i;
     
-    memset(tonegens, 0, 92 * sizeof(tonegens[0]));
+    memset(tonegens, 0, 2 * 92 * sizeof(tonegens[0][0]));
     // pedalboard
     for (n = 24; n < 24 + 12; n++)
     {
         if (check_keymask(m->keymasks, n))
         {
-            tonegens[tonegenidx_pedals(n, 0)] += 3 * 16 * pedal_drawbar_settings[0];
-            tonegens[tonegenidx_pedals(n, 12)] += 3 * 16 * pedal_drawbar_settings[1];
+            tonegens[0][tonegenidx_pedals(n, 0)] += 3 * 16 * pedal_drawbar_settings[0];
+            tonegens[0][tonegenidx_pedals(n, 12)] += 3 * 16 * pedal_drawbar_settings[1];
         }
     }
     // manual
@@ -152,17 +152,20 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[92])
             for (i = 0; i < 9; i++)
             {
                 int tg = tonegenidx(n, drawbars[i]);
-                tonegens[tg] += manual_drawbar_settings[i] * 16;
+                tonegens[1][tg] += manual_drawbar_settings[i] * 16;
             }
             if (m->percussion > 0)
-                tonegens[tonegenidx(n, 24+7)] += m->percussion * 8;
+                tonegens[0][tonegenidx(n, 24+7)] += m->percussion * 8;
         }
     }
     for (n = 0; n < 91; n++)
     {
         int tgalt = n >= 48 ? n - 48 : n + 48;
         if (tgalt < 91)
-            tonegens[tgalt] += tonegens[n] >> 5;
+        {
+            tonegens[0][tgalt] += tonegens[0][n] >> 5;
+            tonegens[1][tgalt] += tonegens[1][n] >> 5;
+        }
     }
 }
 
@@ -175,26 +178,38 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
     
     static const uint32_t frac_mask = (1 << 21) - 1;
     
+    int internal_out_for_vibrato[CBOX_BLOCK_SIZE];
     int internal_out[CBOX_BLOCK_SIZE];
     
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         internal_out[i] = 0;
+        internal_out_for_vibrato[i] = 0;
     }
     // 91 tonewheels + 1 dummy
-    int tonegens[92];
+    int tonegens[2][92];
     set_tonewheels(m, tonegens);
     if (m->percussion > 0)
         m->percussion *= 0.99f;
     for (n = 0; n < 91; n++)
     {
-        if (tonegens[n] > 0)
+        if (tonegens[0][n] > 0 || tonegens[1][n])
         {
-            int iamp = tonegens[n];
-            if (iamp > 512)
-                iamp = 512 + 3 * ((iamp - 512) >> 2);
+            int iamp1, iamp2, scaling;
             
-            iamp = (iamp * m->amp_scaling[n]) >> 10;
+            scaling = m->amp_scaling[n];
+            
+            iamp1 = tonegens[0][n];
+            if (iamp1 > 512)
+                iamp1 = 512 + 3 * ((iamp1 - 512) >> 2);
+            
+            iamp1 = (iamp1 * scaling) >> 10;
+            
+            iamp2 = tonegens[1][n];
+            if (iamp2 > 512)
+                iamp2 = 512 + 3 * ((iamp2 - 512) >> 2);
+            
+            iamp2 = (iamp2 * scaling) >> 10;
             
             int *table = n < 12 ? complex_table : sine_table;
             uint32_t phase = m->phase[n];
@@ -206,7 +221,8 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
                 // phase & frac_mask has 21 bits of resolution, but we only have 14 bits of headroom here
                 int frac_14bit = (phase & frac_mask) >> (21-14);
                 int val = (val1 * frac_14bit + val0 * ((1 << 14) - frac_14bit)) >> 14;
-                internal_out[i] += val * iamp;
+                internal_out[i] += val * iamp1;
+                internal_out_for_vibrato[i] += val * iamp2;
                 phase += m->frequency[n];
             }
         }
@@ -220,7 +236,7 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
         static const int v2[] = { 0, 1, 2, 4, 6, 8, 9, 10, 12 };
         static const int v3[] = { 0, 1, 3, 6, 11, 12, 15, 17, 18, 18, 18 };
         const int *dmap = v3;
-        int x0 = internal_out[i];
+        int x0 = internal_out_for_vibrato[i];
         int delay[19];
         int64_t accum;
         uint32_t vphase = m->vibrato_phase;
@@ -260,7 +276,7 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
         accum += delay[dmap[vphint]] * ((1ULL << 28) - (vphase & ~0xF0000000));
         accum += delay[dmap[vphint + 1]] * (vphase & ~0xF0000000ULL);
         
-        internal_out[i] = accum >> 29;
+        internal_out[i] += accum >> 29;
     }
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
@@ -288,8 +304,10 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
     a01 = x*q;
     b1 = a01 - q;
     However, I had to adapt them for fixed point (including refactoring of b1 as 1 - value for easier multiplication)
+    
+    And then I multiplied a01 by 2, arbitrarily, to raise the cutoff point to 120-ish Hz
     */
-    a01 = (int)(0.5 + 0.002133 * 65536);
+    a01 = (int)(0.5 + 0.002133 * 65536 * 2);
     b1 = (int)(0.5 + (1 - 0.995735) * 16384);
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
