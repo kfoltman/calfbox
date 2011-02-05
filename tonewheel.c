@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <math.h>
 #include <memory.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // a0 a1 a2 b1 b2 for scanner vibrato filter @4kHz with sr=44.1:    0.057198 0.114396 0.057198 -1.218829 0.447620
 
@@ -31,6 +32,7 @@ static int64_t scanner_b2 = (int64_t)(0.447620 * 1048576);
 
 static int sine_table[2048];
 static int complex_table[2048];
+static int distortion_table[8192];
 
 struct biquad
 {
@@ -210,33 +212,7 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
         }
         m->phase[n] += m->frequency[n] * CBOX_BLOCK_SIZE;
     }
-    x1 = m->lowpass_x1;
-    y1 = m->lowpass_y1;
     
-    /*
-    This is where the coeffs came from:
-    x = tan (M_PI * 60 / (2 * 44100));
-    q = 1/(1+x);
-    a01 = x*q;
-    b1 = a01 - q;
-    However, I had to adapt them for fixed point (including refactoring of b1 as 1 - value for easier multiplication)
-    */
-    a01 = (int)(0.5 + 0.002133 * 65536);
-    b1 = (int)(0.5 + (1 - 0.995735) * 16384);
-    
-    for (i = 0; i < CBOX_BLOCK_SIZE; i++)
-    {
-        int x0 = internal_out[i] >> 12; // ~ -32768 to 32767
-        y1 = (x0 + x1) + y1 - (b1 * y1 >> 14);
-        x1 = x0;
-        y1 += (y1 == -1);
-        int64_t out = ((int64_t)y1) * a01 >> 16;
-        if (out < -32768)
-            out = -32768;
-        if (out > 32767)
-            out = 32767;
-        internal_out[i] = out;
-    }
     int32_t vibrato_dphase = (int)(6.6 / 44100 * 65536 * 65536);
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
@@ -286,11 +262,54 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
         
         internal_out[i] = accum >> 29;
     }
+    for (i = 0; i < CBOX_BLOCK_SIZE; i++)
+    {
+        int value = (internal_out[i] >> 12);
+        int sign = (value >= 0 ? 1 : -1);
+        int result;
+        int a, b, idx;
+        
+        value = abs(value);
+        if (value > 8192 * 8 - 2 * 8) 
+            value = 8192 * 8 - 2 * 8;
+        idx = value >> 3;
+        a = distortion_table[idx];
+        b = distortion_table[idx + 1];
+        internal_out[i] = sign * (a + ((b - a) * (value & 7) >> 3));
+        //internal_out[i] = 32767 * value2;
+    }
+    x1 = m->lowpass_x1;
+    y1 = m->lowpass_y1;
+    
+    /*
+    This is where the coeffs came from:
+    x = tan (M_PI * 60 / (2 * 44100));
+    q = 1/(1+x);
+    a01 = x*q;
+    b1 = a01 - q;
+    However, I had to adapt them for fixed point (including refactoring of b1 as 1 - value for easier multiplication)
+    */
+    a01 = (int)(0.5 + 0.002133 * 65536);
+    b1 = (int)(0.5 + (1 - 0.995735) * 16384);
+    for (i = 0; i < CBOX_BLOCK_SIZE; i++)
+    {
+        int x0 = internal_out[i]; // ~ -32768 to 32767
+        y1 = (x0 + x1) + y1 - (b1 * y1 >> 14);
+        x1 = x0;
+        y1 += (y1 == -1);
+        int64_t out = ((int64_t)y1) * a01 >> 16;
+        if (out < -32768)
+            out = -32768;
+        if (out > 32767)
+            out = 32767;
+        internal_out[i] = out;
+    }
     m->lowpass_x1 = x1;
     m->lowpass_y1 = y1;
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
-        outputs[1][i] = outputs[0][i] = internal_out[i] * (1.0 / 32768.0);
+        float value = internal_out[i]* (1.0 / 32768.0);
+        outputs[1][i] = outputs[0][i] = value;
     }
 }
 
@@ -310,6 +329,11 @@ struct cbox_module *tonewheel_organ_create(void *user_data)
             float ph = i * M_PI / 1024;
             sine_table[i] = (int)(32000 * sin(ph));
             complex_table[i] = (int)(32000 * (sin(ph) + sin(3 * ph) / 3 + sin(5 * ph) / 5 + sin(7 * ph) / 7 + sin(9 * ph) / 9 + sin(11 * ph) / 11));
+        }
+        for (i = 0; i < 8192; i++)
+        {
+            float value = atan(sqrt(i * (4.0 / 8192)));
+            distortion_table[i] = ((int)(i * 4 + 32767 * value * value)) >> 1;
         }
         inited = 1;
     }
