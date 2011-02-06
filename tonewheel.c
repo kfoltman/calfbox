@@ -165,6 +165,21 @@ inline int tonegenidx(int note, int shift)
 
 static int drawbar_amp_mapping[9] = { 0, 1, 2, 3, 4, 6, 8, 11, 16 };
 
+static void calc_crosstalk(int *wheel1, int *wheel2)
+{
+    int w1 = *wheel1;
+    int w2 = *wheel2;
+    *wheel1 += w2 >> 8;
+    *wheel2 += w1 >> 8;
+}
+
+static int compress_amp(int iamp, int scaling)
+{
+    if (iamp > 512)
+        iamp = 512 + 3 * ((iamp - 512) >> 2);        
+    return (iamp * scaling) >> 10;
+}
+
 static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92])
 {
     int n, i;
@@ -211,13 +226,14 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92]
     }
     for (n = 0; n < 91; n++)
     {
-        int tgalt = n >= 48 ? n - 48 : n + 48;
-        if (tgalt < 91)
-        {
-            int shf = 7;
-            tonegens[0][tgalt] += tonegens[0][n] >> shf;
-            tonegens[1][tgalt] += tonegens[1][n] >> shf;
-        }
+        int scaling = m->amp_scaling[n];
+        tonegens[0][n] = compress_amp(tonegens[0][n], scaling);
+        tonegens[1][n] = compress_amp(tonegens[1][n], scaling);
+    }
+    for (n = 0; n < 36; n++)
+    {
+        calc_crosstalk(&tonegens[0][n], &tonegens[0][n + 48]);
+        calc_crosstalk(&tonegens[1][n], &tonegens[1][n + 48]);
     }
 }
 
@@ -249,19 +265,8 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
         {
             int iamp1, iamp2, scaling;
             
-            scaling = m->amp_scaling[n];
-            
             iamp1 = tonegens[0][n];
-            if (iamp1 > 512)
-                iamp1 = 512 + 3 * ((iamp1 - 512) >> 2);
-            
-            iamp1 = (iamp1 * scaling) >> 10;
-            
             iamp2 = tonegens[1][n];
-            if (iamp2 > 512)
-                iamp2 = 512 + 3 * ((iamp2 - 512) >> 2);
-            
-            iamp2 = (iamp2 * scaling) >> 10;
             
             int *table = n < 12 ? complex_table : sine_table;
             uint32_t phase = m->phase[n];
