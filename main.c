@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <jack/midiport.h>
 
 struct process_struct
@@ -97,13 +98,13 @@ int main(int argc, char *argv[])
 
     cbox_config_init();
 
-    module = cbox_config_get_string_with_default("main", "module", "tonewheel_organ");
+    module = cbox_config_get_string_with_default("instrument:default", "engine", "tonewheel_organ");
     
     for (mptr = cbox_module_list; *mptr; mptr++)
     {
         if (!strcmp((*mptr)->name, module))
         {
-            process.module = (*(*mptr)->create)(&tonewheel_organ_module);
+            process.module = (*(*mptr)->create)(&tonewheel_organ_module, "instrument:default");
             break;
         }
     }

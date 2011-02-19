@@ -78,12 +78,13 @@ struct cbox_module_manifest
     int outputs;
     struct cbox_module_metadata *metadata;
     
-    struct cbox_module *(*create)(void *user_data);
+    struct cbox_module *(*create)(void *user_data, const char *cfg_section);
 };
 
 #define DEFINE_MODULE(name, ninputs, noutputs) \
     struct cbox_module_metadata name##_metadata = { name##_keyranges, sizeof(name##_keyranges)/sizeof(name##_keyranges[0]), NULL, 0, NULL, 0 }; \
     struct cbox_module_manifest name##_module = { NULL, #name, .inputs = ninputs, .outputs = noutputs, .metadata = &name##_metadata, .create = name##_create };
 
+extern struct cbox_module_manifest fluidsynth_module;
 extern struct cbox_module_manifest tonewheel_organ_module;
 extern struct cbox_module_manifest *cbox_module_list[];

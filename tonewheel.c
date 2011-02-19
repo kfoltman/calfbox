@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "dspmath.h"
 #include "module.h"
+#include <glib.h>
 #include <malloc.h>
 #include <math.h>
 #include <memory.h>
@@ -57,12 +58,18 @@ struct tonewheel_organ_module
     int do_filter;
     int cc91;
     uint32_t vibrato_phase;
+    
+    int pedal_drawbar_settings[2];
+    int upper_manual_drawbar_settings[9];
+    int lower_manual_drawbar_settings[9];
 };
 
 static const int drawbars[9] = {0, 19, 12, 24, 24 + 7, 36, 36 + 4, 36 + 7, 48};
+/*
 static int pedal_drawbar_settings[2] = {8, 2};
 static int upper_manual_drawbar_settings[9] = {8, 8, 8, 0, 0, 0, 0, 0, 0};
 static int lower_manual_drawbar_settings[9] = {8, 3, 8, 0, 0, 0, 0, 0, 0};
+*/
 
 static void set_keymask(struct tonewheel_organ_module *m, int channel, int key, int value)
 {
@@ -112,7 +119,7 @@ void tonewheel_organ_process_event(void *user_data, const uint8_t *data, uint32_
         }
         if (cmd == 11)
         {
-            int *drawbars = (data[0] & 0xF0) != 0 ? lower_manual_drawbar_settings : upper_manual_drawbar_settings;
+            int *drawbars = (data[0] & 0xF0) != 0 ? m->lower_manual_drawbar_settings : m->upper_manual_drawbar_settings;
             if (data[1] >= 21 && data[1] <= 29)
                 drawbars[data[1] - 21] = data[2] * 8 / 127;
             if (data[1] == 82)
@@ -188,8 +195,8 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92]
     
     for (i = 0; i < 9; i++)
     {
-        upper_manual_drawbar_amp[i] = drawbar_amp_mapping[upper_manual_drawbar_settings[i]] * 8;
-        lower_manual_drawbar_amp[i] = drawbar_amp_mapping[lower_manual_drawbar_settings[i]] * 8;
+        upper_manual_drawbar_amp[i] = drawbar_amp_mapping[m->upper_manual_drawbar_settings[i]] * 8;
+        lower_manual_drawbar_amp[i] = drawbar_amp_mapping[m->lower_manual_drawbar_settings[i]] * 8;
     }
     
     memset(tonegens, 0, 2 * 92 * sizeof(tonegens[0][0]));
@@ -198,8 +205,8 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92]
     {
         if (check_keymask(m->pedalmasks, n))
         {
-            tonegens[0][tonegenidx_pedals(n, 0)] += 3 * 16 * pedal_drawbar_settings[0];
-            tonegens[0][tonegenidx_pedals(n, 12)] += 3 * 16 * pedal_drawbar_settings[1];
+            tonegens[0][tonegenidx_pedals(n, 0)] += 3 * 16 * m->pedal_drawbar_settings[0];
+            tonegens[0][tonegenidx_pedals(n, 12)] += 3 * 16 * m->pedal_drawbar_settings[1];
         }
     }
     // manual
@@ -393,7 +400,28 @@ static void biquad_init(struct biquad *bq)
     bq->x1 = bq->y1 = bq->x2 = bq->y2 = 0;
 }
 
-struct cbox_module *tonewheel_organ_create(void *user_data)
+static void read_drawbars(int *drawbars, int count, const char *registration)
+{
+    int i;
+    
+    memset(drawbars, 0, count * sizeof(int));
+    for (i = 0; i < count; i++)
+    {
+        if (!registration[i])
+        {
+            g_error("registration too short: %s (%d digits required)", registration, count);
+            break;
+        }
+        if (registration[i] < '0' || registration[i] > '8')
+        {
+            g_error("registration invalid: %s (%c is not in 0..8)", registration, registration[i]);
+            break;
+        }
+        drawbars[i] = registration[i] - '0';
+    }
+}
+
+struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_section)
 {
     static int inited = 0;
     int i;
@@ -423,6 +451,9 @@ struct cbox_module *tonewheel_organ_create(void *user_data)
     m->do_filter = 0;
     m->cc91 = 0;
     m->vibrato_phase = 0;
+    read_drawbars(m->upper_manual_drawbar_settings, 9, cbox_config_get_string_with_default(cfg_section, "upper_drawbars", "888000000"));
+    read_drawbars(m->lower_manual_drawbar_settings, 9, cbox_config_get_string_with_default(cfg_section, "lower_drawbars", "888800000"));
+    read_drawbars(m->pedal_drawbar_settings, 2, cbox_config_get_string_with_default(cfg_section, "pedal_drawbars", "82"));
     for (i = 0; i < 18; i++)
     {
         biquad_init(&m->scanner_delay[i]);

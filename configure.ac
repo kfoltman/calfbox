@@ -22,6 +22,7 @@ AC_HEADER_STDC
 PKG_CHECK_MODULES(JACK_DEPS, jack >= 0.116.0, true, AC_MSG_ERROR([JACK is required]))
 AC_CHECK_HEADER(jack/jack.h, true, AC_MSG_ERROR([JACK is required]))
 PKG_CHECK_MODULES(GLIB_DEPS, glib-2.0 >= 2.6, true, AC_MSG_ERROR([libglib-2.0 is required]))
+PKG_CHECK_MODULES(FLUIDSYNTH_DEPS, fluidsynth >= 1.1.3, true, AC_MSG_ERROR([fluidsynth 1.1.3 is required]))
 
 AC_CONFIG_FILES([Makefile])
 
