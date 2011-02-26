@@ -67,11 +67,6 @@ struct tonewheel_organ_module
 };
 
 static const int drawbars[9] = {0, 19, 12, 24, 24 + 7, 36, 36 + 4, 36 + 7, 48};
-/*
-static int pedal_drawbar_settings[2] = {8, 2};
-static int upper_manual_drawbar_settings[9] = {8, 8, 8, 0, 0, 0, 0, 0, 0};
-static int lower_manual_drawbar_settings[9] = {8, 3, 8, 0, 0, 0, 0, 0, 0};
-*/
 
 static void set_keymask(struct tonewheel_organ_module *m, int channel, int key, int value)
 {
