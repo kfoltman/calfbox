@@ -16,11 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_MODULE_H
+#define CBOX_MODULE_H
+
 #include <stdint.h>
 
-#define CBOX_BLOCK_SIZE 16
-
-typedef float cbox_sample_t;
+#include "dspmath.h"
 
 struct cbox_module_keyrange_metadata
 {
@@ -88,3 +89,5 @@ struct cbox_module_manifest
 extern struct cbox_module_manifest fluidsynth_module;
 extern struct cbox_module_manifest tonewheel_organ_module;
 extern struct cbox_module_manifest *cbox_module_list[];
+
+#endif

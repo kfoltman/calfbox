@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config-api.h"
 #include "dspmath.h"
 #include "module.h"
+#include "onepole-int.h"
 #include <glib.h>
 #include <malloc.h>
 #include <math.h>
@@ -55,8 +56,10 @@ struct tonewheel_organ_module
     uint64_t upper_manual, lower_manual;
     int amp_scaling[91];
     struct biquad scanner_delay[18];
-    int lowpass_x1, lowpass_y1;
+    struct cbox_onepole_state filter_anticlick, filter_overdrive;
+    struct cbox_onepole_coeffs filter_anticlick_coeffs, filter_overdrive_coeffs;
     float percussion;
+    int enable_percussion, enable_vibrato_upper, enable_vibrato_lower, vibrato_mode, vibrato_mix, percussion_3rd;
     int do_filter;
     int cc91;
     uint32_t vibrato_phase;
@@ -102,7 +105,7 @@ void tonewheel_organ_process_event(void *user_data, const uint8_t *data, uint32_
             int channel = data[0] & 0x0F;
             int key = data[1] & 127;
             set_keymask(m, channel, key, 1);
-            if (m->percussion < 0 && key >= 36)
+            if (m->percussion < 0 && key >= 36 && m->enable_percussion && channel == 0)
                 m->percussion = 16.0;
         }
         if (cmd == 8)
@@ -125,6 +128,10 @@ void tonewheel_organ_process_event(void *user_data, const uint8_t *data, uint32_
                 m->do_filter = data[2] >= 64;
             if (data[1] == 91)
                 m->cc91 = data[2];
+            if (data[1] == 93)
+                m->vibrato_mix = data[2] > 0;
+            //if (data[1] == 6)
+            //    cbox_onepole_set_lowpass(&m->filter_overdrive_coeffs, hz2w(data[2] * 10000 / 127, 44100.0));
         }
     }
 }
@@ -173,8 +180,8 @@ static void calc_crosstalk(int *wheel1, int *wheel2)
 {
     int w1 = *wheel1;
     int w2 = *wheel2;
-    *wheel1 += w2 >> 8;
-    *wheel2 += w1 >> 8;
+    *wheel1 += w2 >> 9;
+    *wheel2 += w1 >> 9;
 }
 
 static int compress_amp(int iamp, int scaling)
@@ -187,6 +194,7 @@ static int compress_amp(int iamp, int scaling)
 static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92])
 {
     int n, i;
+    int pshift = m->percussion_3rd ? 24 + 7 : 24;
     
     int upper_manual_drawbar_amp[9], lower_manual_drawbar_amp[9];
     
@@ -211,20 +219,22 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92]
     {
         if (check_keymask(m->upper_manual, n))
         {
+            int tgf = m->enable_vibrato_upper;
             for (i = 0; i < 9; i++)
             {
                 int tg = tonegenidx(n, drawbars[i]);
-                tonegens[1][tg] += upper_manual_drawbar_amp[i];
+                tonegens[tgf][tg] += upper_manual_drawbar_amp[i];
             }
             if (m->percussion > 0)
-                tonegens[0][tonegenidx(n, 24+7)] += m->percussion * 8;
+                tonegens[0][tonegenidx(n, pshift)] += m->percussion * 10;
         }
         if (check_keymask(m->lower_manual, n))
         {
+            int tgf = m->enable_vibrato_lower;
             for (i = 0; i < 9; i++)
             {
                 int tg = tonegenidx(n, drawbars[i]);
-                tonegens[0][tg] += lower_manual_drawbar_amp[i];
+                tonegens[tgf][tg] += lower_manual_drawbar_amp[i];
             }
         }
     }
@@ -282,8 +292,8 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
                 // phase & frac_mask has 21 bits of resolution, but we only have 14 bits of headroom here
                 int frac_14bit = (phase & frac_mask) >> (21-14);
                 int val = (val1 * frac_14bit + val0 * ((1 << 14) - frac_14bit)) >> 14;
-                internal_out[i] += val * iamp1;
-                internal_out_for_vibrato[i] += val * iamp2;
+                internal_out[i] += val * iamp1 >> 3;
+                internal_out_for_vibrato[i] += val * iamp2 >> 3;
                 phase += m->frequency[n];
             }
         }
@@ -291,19 +301,17 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
     }
     
     int32_t vibrato_dphase = (int)(6.6 / 44100 * 65536 * 65536);
+    static const int v1[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 8 };
+    static const int v2[] = { 0, 1, 2, 4, 6, 8, 9, 10, 12 };
+    static const int v3[] = { 0, 1, 3, 6, 11, 12, 15, 17, 18, 18, 18 };
+    static const int *vtypes[] = { v1, v2, v3 };
+    const int *dmap = vtypes[m->vibrato_mode];
+    int32_t mix = m->vibrato_mix;
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
-        static const int v1[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 8 };
-        static const int v2[] = { 0, 1, 2, 4, 6, 8, 9, 10, 12 };
-        static const int v3[] = { 0, 1, 3, 6, 11, 12, 15, 17, 18, 18, 18 };
-        const int *dmap = v3;
-        int x0 = internal_out_for_vibrato[i];
+        int x0 = internal_out_for_vibrato[i] >> 1;
         int delay[19];
         int64_t accum;
-        uint32_t vphase = m->vibrato_phase;
-        uint32_t vphint;
-        if (vphase >= 0x80000000)
-            vphase = ~vphase;
         delay[0] = x0;
         for (n = 0; n < 18; n++)
         {
@@ -322,26 +330,26 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
         }
         m->vibrato_phase += vibrato_dphase;
         
-        vphint = vphase >> 28;
-        accum = 0;
-        accum += ((int64_t)delay[0]) << 28;
-        accum += delay[dmap[vphint]] * ((1ULL << 28) - (vphase & ~0xF0000000));
-        accum += delay[dmap[vphint + 1]] * (vphase & ~0xF0000000ULL);
-        
-        vphase = m->vibrato_phase + (1 << 27);
+        uint32_t vphase = m->vibrato_phase;
         if (vphase >= 0x80000000)
-            vphase = ~vphase;        
-        vphint = vphase >> 28;
+            vphase = ~vphase;
+        uint32_t vphint = vphase >> 28;
+        
         accum = 0;
-        accum += ((int64_t)delay[0]) << 28;
+        
         accum += delay[dmap[vphint]] * ((1ULL << 28) - (vphase & ~0xF0000000));
         accum += delay[dmap[vphint + 1]] * (vphase & ~0xF0000000ULL);
         
-        internal_out[i] += accum >> 29;
+
+        internal_out[i] += (accum >> 28) + mix * delay[0];
     }
+
+    int32_t filtered[CBOX_BLOCK_SIZE];
+    cbox_onepole_process_to(&m->filter_overdrive, &m->filter_overdrive_coeffs, internal_out, filtered);
+    
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
-        int value = (internal_out[i] >> 12);
+        int value = filtered[i] >> 9;
         int sign = (value >= 0 ? 1 : -1);
         int result;
         int a, b, idx;
@@ -352,42 +360,16 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
         idx = value >> 3;
         a = distortion_table[idx];
         b = distortion_table[idx + 1];
-        internal_out[i] = sign * (a + ((b - a) * (value & 7) >> 3));
+        internal_out[i] = (internal_out[i] >> 11) + sign * (a + ((b - a) * (value & 7) >> 3));
         //internal_out[i] = 32767 * value2;
     }
-    x1 = m->lowpass_x1;
-    y1 = m->lowpass_y1;
     
-    /*
-    This is where the coeffs came from:
-    x = tan (M_PI * 60 / (2 * 44100));
-    q = 1/(1+x);
-    a01 = x*q;
-    b1 = a01 - q;
-    However, I had to adapt them for fixed point (including refactoring of b1 as 1 - value for easier multiplication)
+    int prev = internal_out[0];
+    cbox_onepole_process(&m->filter_anticlick, &m->filter_anticlick_coeffs, internal_out);
     
-    And then I multiplied a01 by 2, arbitrarily, to raise the cutoff point to 120-ish Hz
-    */
-    a01 = (int)(0.5 + 0.002133 * 65536 * 2);
-    b1 = (int)(0.5 + (1 - 0.995735) * 16384);
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
-        int x0 = internal_out[i]; // ~ -32768 to 32767
-        y1 = (x0 + x1) + y1 - (b1 * y1 >> 14);
-        x1 = x0;
-        y1 += (y1 == -1);
-        int64_t out = ((int64_t)y1) * a01 >> 16;
-        if (out < -32768)
-            out = -32768;
-        if (out > 32767)
-            out = 32767;
-        internal_out[i] = out;
-    }
-    m->lowpass_x1 = x1;
-    m->lowpass_y1 = y1;
-    for (i = 0; i < CBOX_BLOCK_SIZE; i++)
-    {
-        float value = internal_out[i]* (1.0 / 32768.0);
+        float value = internal_out[i] * (1.0 / 32768.0);
         outputs[1][i] = outputs[0][i] = value;
     }
 }
@@ -422,6 +404,7 @@ struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_sect
 {
     static int inited = 0;
     int i;
+    const char *vibrato_mode;
     if (!inited)
     {
         for (i = 0; i < 2048; i++)
@@ -433,7 +416,7 @@ struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_sect
         for (i = 0; i < 8192; i++)
         {
             float value = atan(sqrt(i * (4.0 / 8192)));
-            distortion_table[i] = ((int)(i * 4 + 32767 * value * value)) >> 1;
+            distortion_table[i] = ((int)(i * 2 + 32767 * value * value)) >> 1;
         }
         inited = 1;
     }
@@ -442,8 +425,10 @@ struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_sect
     m->module.user_data = m;
     m->module.process_event = tonewheel_organ_process_event;
     m->module.process_block = tonewheel_organ_process_block;
-    m->lowpass_x1 = 0;
-    m->lowpass_y1 = 0;
+    cbox_onepole_reset(&m->filter_anticlick);
+    cbox_onepole_reset(&m->filter_overdrive);
+    cbox_onepole_set_lowpass(&m->filter_anticlick_coeffs, hz2w(180.0, 44100.0));
+    cbox_onepole_set_lowpass(&m->filter_overdrive_coeffs, hz2w(2500.0, 44100.0));
     m->percussion = -1;
     m->do_filter = 0;
     m->cc91 = 0;
@@ -451,6 +436,29 @@ struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_sect
     read_drawbars(m->upper_manual_drawbar_settings, 9, cbox_config_get_string_with_default(cfg_section, "upper_drawbars", "888000000"));
     read_drawbars(m->lower_manual_drawbar_settings, 9, cbox_config_get_string_with_default(cfg_section, "lower_drawbars", "888800000"));
     read_drawbars(m->pedal_drawbar_settings, 2, cbox_config_get_string_with_default(cfg_section, "pedal_drawbars", "82"));
+    m->enable_percussion = cbox_config_get_int(cfg_section, "percussion", 1);
+    m->enable_vibrato_upper = cbox_config_get_int(cfg_section, "vibrato_upper", 1);
+    m->enable_vibrato_lower = cbox_config_get_int(cfg_section, "vibrato_lower", 0);
+    m->percussion_3rd = cbox_config_get_int(cfg_section, "percussion_3rd", 1);
+    
+    vibrato_mode = cbox_config_get_string_with_default(cfg_section, "vibrato_mode", "c3");
+    if (vibrato_mode[0] == 'c')
+        m->vibrato_mix = 1;
+    else if (vibrato_mode[0] == 'v')
+        m->vibrato_mix = 0;
+    else
+    {
+        g_error("Unknown vibrato mode: %s (allowed: v1, v2, v3, c1, c2, c3)", vibrato_mode);
+        m->vibrato_mix = 0;
+    }
+    if (vibrato_mode[1] >= '1' && vibrato_mode[1] <= '3')
+        m->vibrato_mode = vibrato_mode[1] - '1';
+    else
+    {
+        g_error("Unknown vibrato mode: %s (allowed: v1, v2, v3, c1, c2, c3)", vibrato_mode);
+        m->vibrato_mode = 2;
+    }
+    
     for (i = 0; i < 18; i++)
     {
         biquad_init(&m->scanner_delay[i]);
@@ -462,7 +470,7 @@ struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_sect
         if (scaling < 1)
             scaling = 1;
         if (scaling > 24)
-            scaling = 24 + ((scaling - 24) / 3.0);
+            scaling = 24 + ((scaling - 24) / 2.5);
         m->frequency[i] = (uint32_t)(freq_hz * 65536 * 65536 / 44100);
         m->phase[i] = 0;
         m->amp_scaling[i] = (int)(1024 * scaling);

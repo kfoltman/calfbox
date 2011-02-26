@@ -15,6 +15,20 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#ifndef CBOX_DSPMATH_H
+#define CBOX_DSPMATH_H
+
+#define CBOX_BLOCK_SIZE 16
+
+#include <stdlib.h>
+#include <math.h>
+
+typedef float cbox_sample_t;
+
+inline float hz2w(float hz, float sr)
+{
+    return M_PI * hz / (2 * sr);
+}
 
 inline float cerp_naive(float v0, float v1, float v2, float v3, float f)
 {
@@ -53,3 +67,4 @@ inline float cerp(float v0, float v1, float v2, float v3, float f)
     return y;
 }
 
+#endif
