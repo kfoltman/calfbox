@@ -44,7 +44,11 @@ struct cbox_midi_buffer
     uint8_t long_data[CBOX_MIDI_MAX_LONG_DATA];
 };
 
-extern struct cbox_midi_buffer *cbox_midi_buffer_new();
+static inline void cbox_midi_buffer_init(struct cbox_midi_buffer *buffer)
+{
+    buffer->count = 0;
+    buffer->long_data_size = 0;
+}
 
 static inline void cbox_midi_buffer_clear(struct cbox_midi_buffer *buffer)
 {

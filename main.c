@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config-api.h"
 #include "io.h"
+#include "midi.h"
 #include "module.h"
 
 #include <math.h>
@@ -31,19 +32,47 @@ struct process_struct
     struct cbox_module *module;
 };
 
+int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_midi_buffer *buf)
+{
+    void *midi = jack_port_get_buffer(port, nframes);
+    uint32_t i;
+    uint32_t event_count = jack_midi_get_event_count(midi);
+    int ok = 1;
+
+    cbox_midi_buffer_clear(buf);
+    
+    for (i = 0; i < event_count; i++)
+    {
+        jack_midi_event_t event;
+        
+        if (!jack_midi_event_get(&event, midi, i))
+        {
+            if (!cbox_midi_buffer_write_event(buf, event.time, event.buffer, event.size))
+                return -i;
+        }
+        else
+            return -i;
+    }
+    
+    return event_count;
+}
+
 void dummy_process(void *user_data, struct cbox_io *io, uint32_t nframes)
 {
     struct process_struct *ps = user_data;
     struct cbox_module *module = ps->module;
     if (!module)
         return;
+    struct cbox_midi_buffer midi_buf;
+    cbox_midi_buffer_init(&midi_buf);
     uint32_t i;
     float *out_l = jack_port_get_buffer(io->output_l, nframes);
     float *out_r = jack_port_get_buffer(io->output_r, nframes);
-    void *midi = jack_port_get_buffer(io->midi, nframes);
-    int event_count = jack_midi_get_event_count(midi);
+    int event_count = 0;
     int cur_event = 0;
     uint32_t highwatermark = 0;
+
+    event_count = abs(convert_midi_from_jack(io->midi, nframes, &midi_buf));
     
     for (i = 0; i < nframes; i += 16)
     {
@@ -53,14 +82,14 @@ void dummy_process(void *user_data, struct cbox_io *io, uint32_t nframes)
         {
             while(cur_event < event_count)
             {
-                jack_midi_event_t event;
-                if (!jack_midi_event_get(&event, midi, cur_event))
+                struct cbox_midi_event *event = cbox_midi_buffer_get_event(&midi_buf, cur_event);
+                if (event)
                 {
-                    if (event.time <= i)
-                        (*module->process_event)(module->user_data, event.buffer, event.size);
+                    if (event->time <= i)
+                        (*module->process_event)(module->user_data, cbox_midi_event_get_data(event), event->size);
                     else
                     {
-                        highwatermark = event.time;
+                        highwatermark = event->time;
                         break;
                     }
                 }
@@ -74,10 +103,10 @@ void dummy_process(void *user_data, struct cbox_io *io, uint32_t nframes)
     }
     while(cur_event < event_count)
     {
-        jack_midi_event_t event;
-        if (!jack_midi_event_get(&event, midi, cur_event))
+        struct cbox_midi_event *event = cbox_midi_buffer_get_event(&midi_buf, cur_event);
+        if (event)
         {
-            (*module->process_event)(module->user_data, event.buffer, event.size);
+            (*module->process_event)(module->user_data, cbox_midi_event_get_data(event), event->size);
         }
         else
             break;
