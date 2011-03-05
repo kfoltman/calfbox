@@ -29,8 +29,6 @@ struct cbox_module_manifest *cbox_module_list[] = {
 
 void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
 {
-    struct cbox_module_metadata *metadata = manifest->metadata;
-    
     static const char *ctl_classes[] = { "Switch CC#", "Continuous CC#", "Cont. Param", "Discrete Param", "Enum" };
     int i = 0;
     printf("Module: %s\n", manifest->name);
@@ -39,9 +37,9 @@ void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
     printf("Live controllers:\n");
     printf("Ch#             Type Number Name                          \n");
     printf("---- --------------- ------ ------------------------------\n");
-    for (i = 0; i < metadata->num_live_controllers; i++)
+    for (i = 0; i < manifest->num_live_controllers; i++)
     {
-        struct cbox_module_livecontroller_metadata *lc = &metadata->live_controllers[i];
+        struct cbox_module_livecontroller_metadata *lc = &manifest->live_controllers[i];
         printf("%-4d %15s %-6d %-30s\n", lc->channel, ctl_classes[lc->controller_class], lc->controller, lc->name);
     }
 }

@@ -53,18 +53,6 @@ struct cbox_module_voicingparam_metadata
 {
 };
 
-struct cbox_module_metadata
-{
-    struct cbox_module_keyrange_metadata *keyranges;
-    int num_keyranges;
-
-    struct cbox_module_livecontroller_metadata *live_controllers;
-    int num_live_controllers;
-
-    struct cbox_module_voicingparam_metadata *voicing_params;
-    int num_voicing_params;
-};
-
 struct cbox_module
 {
     void *user_data;
@@ -79,14 +67,31 @@ struct cbox_module_manifest
     const char *name;
     int inputs;
     int outputs;
-    struct cbox_module_metadata *metadata;
+    
+    struct cbox_module_keyrange_metadata *keyranges;
+    int num_keyranges;
+
+    struct cbox_module_livecontroller_metadata *live_controllers;
+    int num_live_controllers;
+
+    struct cbox_module_voicingparam_metadata *voicing_params;
+    int num_voicing_params;
     
     struct cbox_module *(*create)(void *user_data, const char *cfg_section);
 };
 
-#define DEFINE_MODULE(name, ninputs, noutputs) \
-    struct cbox_module_metadata name##_metadata = { name##_keyranges, sizeof(name##_keyranges)/sizeof(name##_keyranges[0]), name##_controllers, sizeof(name##_controllers)/sizeof(name##_controllers[0]), NULL, 0 }; \
-    struct cbox_module_manifest name##_module = { NULL, #name, .inputs = ninputs, .outputs = noutputs, .metadata = &name##_metadata, .create = name##_create };
+#define DEFINE_MODULE(modname, ninputs, noutputs) \
+    struct cbox_module_manifest modname##_module = { \
+        NULL, \
+        .name = #modname, \
+        .inputs = ninputs, \
+        .outputs = noutputs, \
+        .keyranges = modname##_keyranges, \
+        .num_keyranges = sizeof(modname##_keyranges)/sizeof(modname##_keyranges[0]), \
+        .live_controllers = modname##_controllers, \
+        .num_live_controllers = sizeof(modname##_controllers)/sizeof(modname##_controllers[0]), \
+        .create = modname##_create \
+    };
 
 extern struct cbox_module_manifest fluidsynth_module;
 extern struct cbox_module_manifest tonewheel_organ_module;
