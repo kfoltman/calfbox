@@ -24,10 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 static GKeyFile *config_keyfile;
 static gchar *keyfile_name;
 
-void cbox_config_init()
+void cbox_config_init(const char *override_file)
 {
     const gchar *keyfiledirs[3];
     const gchar *keyfilename = ".cboxrc";
+    GKeyFileFlags flags = G_KEY_FILE_KEEP_COMMENTS | G_KEY_FILE_KEEP_TRANSLATIONS;
     GError *error = NULL;
     if (config_keyfile)
         return;
@@ -37,7 +38,22 @@ void cbox_config_init()
     keyfiledirs[1] = NULL;
     // XXXKF add proper error handling
     
-    if (!g_key_file_load_from_dirs(config_keyfile, keyfilename, keyfiledirs, &keyfile_name, G_KEY_FILE_KEEP_COMMENTS | G_KEY_FILE_KEEP_TRANSLATIONS, &error))
+    if (override_file)
+    {
+        if (!g_key_file_load_from_file(config_keyfile, override_file, flags, &error))
+        {
+            g_warning("Could not read user config: %s", error->message);
+            g_error_free(error);
+        }
+        else
+        {
+            keyfile_name = g_strdup(override_file);
+            g_message("User config pathname is %s", keyfile_name);
+            return;
+        }
+    }
+    
+    if (!g_key_file_load_from_dirs(config_keyfile, keyfilename, keyfiledirs, &keyfile_name, flags, &error))
     {
         g_warning("Could not read cboxrc: %s, search dir = %s, filename = %s", error->message, keyfiledirs[0], keyfilename);
         g_error_free(error);

@@ -21,6 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "midi.h"
 #include "module.h"
 
+#include <glib.h>
+#include <getopt.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -115,6 +117,21 @@ void dummy_process(void *user_data, struct cbox_io *io, uint32_t nframes)
     }
 }
 
+static const char *short_options = "i:c:h";
+
+static struct option long_options[] = {
+    {"help", 0, 0, 'h'},
+    {"instrument", 0, 0, 'i'},
+    {"config", 0, 0, 'c'},
+    {0,0,0,0},
+};
+
+void print_help(char *progname)
+{
+    printf("Usage: %s [--help] [--instrument <name>] [--config <name>]\n", progname);
+    exit(0);
+}
+
 int main(int argc, char *argv[])
 {
     struct cbox_io io;
@@ -124,17 +141,42 @@ int main(int argc, char *argv[])
     struct cbox_io_callbacks cbs = { &process, dummy_process};
     const char *module = NULL;
     struct cbox_module_manifest **mptr;
+    const char *config_name = NULL;
+    const char *instrument_name = "default";
+    char *instr_section;
 
-    cbox_config_init();
+    while(1)
+    {
+        int option_index;
+        int c = getopt_long(argc, argv, short_options, long_options, &option_index);
+        if (c == -1)
+            break;
+        switch (c)
+        {
+            case 'c':
+                config_name = optarg;
+                break;
+            case 'i':
+                instrument_name = optarg;
+                break;
+            case 'h':
+            case '?':
+                print_help(argv[0]);
+                return 0;
+        }
+    }
 
-    module = cbox_config_get_string_with_default("instrument:default", "engine", "tonewheel_organ");
+    cbox_config_init(config_name);
+
+    instr_section = g_strdup_printf("instrument:%s", instrument_name);
+    module = cbox_config_get_string_with_default(instr_section, "engine", "tonewheel_organ");
     
     for (mptr = cbox_module_list; *mptr; mptr++)
     {
         if (!strcmp((*mptr)->name, module))
         {
             cbox_module_manifest_dump(*mptr);
-            process.module = (*(*mptr)->create)((*mptr)->user_data, "instrument:default");
+            process.module = (*(*mptr)->create)((*mptr)->user_data, instr_section);
             break;
         }
     }
@@ -154,5 +196,7 @@ int main(int argc, char *argv[])
     cbox_io_stop(&io);
     cbox_io_close(&io);
     cbox_config_close();
+    g_free(instr_section);
+    
     return 0;
 }
