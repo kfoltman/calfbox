@@ -123,7 +123,6 @@ static int try_soundcard(const char *name)
             
             if (fscanf(f, "%x:%x", &tvid, &tpid) == 2)
             {
-                printf("found:%x:%x vs %x:%x\n", tvid, tpid, vid, pid);
                 if (vid == tvid && pid == tpid)
                 {
                     gchar *fn = g_strdup_printf("%d", i);
