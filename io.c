@@ -18,8 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config.h"
 #include "config-api.h"
+#include "hwcfg.h"
 #include "io.h"
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
@@ -91,13 +93,30 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
                     
                     if (names[i])
                         use_name = names[i];
+                    else
+                        use_name = NULL;
                 }
             }
-            if (is_cbox_input)
-                jack_connect(client, use_name, port);
+            else if (use_name[0] == '~')
+            {
+                const char **names = jack_get_ports(client, use_name + 1, is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
+                
+                if (names && names[0])
+                    use_name = names[0];
+                else
+                    use_name = NULL;
+            }
+            if (use_name)
+            {
+                int res;
+                if (is_cbox_input)
+                    res = jack_connect(client, use_name, port);
+                else
+                    res = jack_connect(client, port, use_name);    
+                g_message("Connect: %s %s %s (%s)", port, is_cbox_input ? "<-" : "->", use_name, res == 0 ? "success" : (res == EEXIST ? "already connected" : "failed"));
+            }
             else
-                jack_connect(client, port, use_name);    
-            g_message("Connect: %s %s %s", port, is_cbox_input ? "<-" : "->", use_name);
+                g_message("Connect: unmatched name %s", name);
             if (dpos)
                 name = dpos + 1;
         } while(dpos);
