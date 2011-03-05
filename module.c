@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "module.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 struct cbox_module_manifest *cbox_module_list[] = {
@@ -25,3 +26,22 @@ struct cbox_module_manifest *cbox_module_list[] = {
     &fluidsynth_module,
     NULL
 };
+
+void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
+{
+    struct cbox_module_metadata *metadata = manifest->metadata;
+    
+    static const char *ctl_classes[] = { "Switch CC#", "Continuous CC#", "Cont. Param", "Discrete Param", "Enum" };
+    int i = 0;
+    printf("Module: %s\n", manifest->name);
+    printf("Audio I/O: %d inputs, %d outputs\n", manifest->inputs, manifest->outputs);
+    
+    printf("Live controllers:\n");
+    printf("Ch#             Type Number Name                          \n");
+    printf("---- --------------- ------ ------------------------------\n");
+    for (i = 0; i < metadata->num_live_controllers; i++)
+    {
+        struct cbox_module_livecontroller_metadata *lc = &metadata->live_controllers[i];
+        printf("%-4d %15s %-6d %-30s\n", lc->channel, ctl_classes[lc->controller_class], lc->controller, lc->name);
+    }
+}

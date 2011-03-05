@@ -133,6 +133,7 @@ int main(int argc, char *argv[])
     {
         if (!strcmp((*mptr)->name, module))
         {
+            cbox_module_manifest_dump(*mptr);
             process.module = (*(*mptr)->create)((*mptr)->user_data, "instrument:default");
             break;
         }
