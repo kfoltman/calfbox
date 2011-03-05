@@ -117,7 +117,7 @@ void fluidsynth_process_event(void *user_data, const uint8_t *data, uint32_t len
                 break;
 
             case 14:
-                fluid_synth_pitch_bend(m->synth, chn, data[1] + 128 * data[2] - 8192);
+                fluid_synth_pitch_bend(m->synth, chn, data[1] + 128 * data[2]);
                 break;
 
             }
