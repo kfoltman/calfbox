@@ -3,7 +3,7 @@ out_left=#0
 out_right=#1
 ;#midi=alsa_pcm:E-MU-XMidi2X2/midi_capture_2;alsa_pcm:E-MU-Xboard25/midi_capture_1
 ;midi=alsa_pcm:E-MU-XMidi2X2/midi_capture_2;alsa_pcm:E-MU-XMidi2X2/midi_capture_1
-midi=alsa_pcm:in-hw-1-0-0-E-MU-XMidi2X2-MIDI-1;alsa_pcm:in-hw-1-0-1-E-MU-XMidi2X2-MIDI-2
+midi=~alsa_pcm:in-.*-E-MU-XMidi2X2-MIDI-1;~alsa_pcm:in-.*-E-MU-XMidi2X2-MIDI-2;~alsa_pcm:in-.*-padKONTROL-MIDI-2
 
 [instrument:default]
 engine=tonewheel_organ
