@@ -29,7 +29,16 @@ static const char *io_section = "io";
 int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
 {
     jack_status_t status = 0;
-    io->client = jack_client_open("cbox", 0, &status);
+    io->client = jack_client_open("cbox", JackNoStartServer, &status);
+    if (io->client == NULL)
+    {
+        if (!cbox_hwcfg_setup_jack())
+            return 0;
+        
+        status = 0;
+        io->client = jack_client_open("cbox", 0, &status);
+    }
+    
     io->cb = NULL;
     
     if (io->client == NULL)
