@@ -125,13 +125,13 @@ void fluidsynth_process_event(void *user_data, const uint8_t *data, uint32_t len
 }
 
 struct cbox_module_livecontroller_metadata fluidsynth_controllers[] = {
-    { 0, cmlc_continuouscc, 1, "Modulation", NULL},
-    { 0, cmlc_continuouscc, 7, "Volume", NULL},
-    { 0, cmlc_continuouscc, 10, "Pan", NULL},
-    { 0, cmlc_continuouscc, 91, "Reverb", NULL},
-    { 0, cmlc_continuouscc, 93, "Chorus", NULL},
-    { 0, cmlc_onoffcc, 64, "Hold", NULL},
-    { 0, cmlc_onoffcc, 66, "Sostenuto", NULL},
+    { -1, cmlc_continuouscc, 1, "Modulation", NULL},
+    { -1, cmlc_continuouscc, 7, "Volume", NULL},
+    { -1, cmlc_continuouscc, 10, "Pan", NULL},
+    { -1, cmlc_continuouscc, 91, "Reverb", NULL},
+    { -1, cmlc_continuouscc, 93, "Chorus", NULL},
+    { -1, cmlc_onoffcc, 64, "Hold", NULL},
+    { -1, cmlc_onoffcc, 66, "Sostenuto", NULL},
 };
 
 struct cbox_module_keyrange_metadata fluidsynth_keyranges[] = {

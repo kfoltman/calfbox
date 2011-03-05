@@ -40,6 +40,13 @@ void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
     for (i = 0; i < manifest->num_live_controllers; i++)
     {
         struct cbox_module_livecontroller_metadata *lc = &manifest->live_controllers[i];
-        printf("%-4d %15s %-6d %-30s\n", lc->channel, ctl_classes[lc->controller_class], lc->controller, lc->name);
+        if (lc->channel == -1)
+            printf("ALL  ");
+        else
+        if (!lc->channel)
+            printf("ANY  ");
+        else
+            printf("%-4d ", lc->channel);
+        printf("%15s %-6d %-30s\n", ctl_classes[lc->controller_class], lc->controller, lc->name);
     }
 }
