@@ -33,6 +33,8 @@ struct cbox_module_keyrange_metadata
 
 enum cbox_module_livecontroller_class
 {
+    cmlc_onoffcc,
+    cmlc_continuouscc,
     cmlc_continuous,
     cmlc_discrete,
     cmlc_enum
@@ -83,7 +85,7 @@ struct cbox_module_manifest
 };
 
 #define DEFINE_MODULE(name, ninputs, noutputs) \
-    struct cbox_module_metadata name##_metadata = { name##_keyranges, sizeof(name##_keyranges)/sizeof(name##_keyranges[0]), NULL, 0, NULL, 0 }; \
+    struct cbox_module_metadata name##_metadata = { name##_keyranges, sizeof(name##_keyranges)/sizeof(name##_keyranges[0]), name##_controllers, sizeof(name##_controllers)/sizeof(name##_controllers[0]), NULL, 0 }; \
     struct cbox_module_manifest name##_module = { NULL, #name, .inputs = ninputs, .outputs = noutputs, .metadata = &name##_metadata, .create = name##_create };
 
 extern struct cbox_module_manifest fluidsynth_module;

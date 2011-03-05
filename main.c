@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
     {
         if (!strcmp((*mptr)->name, module))
         {
-            process.module = (*(*mptr)->create)(&tonewheel_organ_module, "instrument:default");
+            process.module = (*(*mptr)->create)(mptr, "instrument:default");
             break;
         }
     }

@@ -488,5 +488,29 @@ struct cbox_module_keyrange_metadata tonewheel_organ_keyranges[] = {
     { 2, 36, 36 + 60, "Lower Manual" },
 };
 
+struct cbox_module_livecontroller_metadata tonewheel_organ_controllers[] = {
+    { 0, cmlc_onoffcc, 93, "Vib/Chr", NULL},
+    
+    { 1, cmlc_continuouscc, 21, "Upper Drawbar 1", NULL},
+    { 1, cmlc_continuouscc, 22, "Upper Drawbar 2", NULL},
+    { 1, cmlc_continuouscc, 23, "Upper Drawbar 3", NULL},
+    { 1, cmlc_continuouscc, 24, "Upper Drawbar 4", NULL},
+    { 1, cmlc_continuouscc, 25, "Upper Drawbar 5", NULL},
+    { 1, cmlc_continuouscc, 26, "Upper Drawbar 6", NULL},
+    { 1, cmlc_continuouscc, 27, "Upper Drawbar 7", NULL},
+    { 1, cmlc_continuouscc, 28, "Upper Drawbar 8", NULL},
+    { 1, cmlc_continuouscc, 29, "Upper Drawbar 9", NULL},
+    
+    { 2, cmlc_continuouscc, 21, "Lower Drawbar 1", NULL},
+    { 2, cmlc_continuouscc, 22, "Lower Drawbar 2", NULL},
+    { 2, cmlc_continuouscc, 23, "Lower Drawbar 3", NULL},
+    { 2, cmlc_continuouscc, 24, "Lower Drawbar 4", NULL},
+    { 2, cmlc_continuouscc, 25, "Lower Drawbar 5", NULL},
+    { 2, cmlc_continuouscc, 26, "Lower Drawbar 6", NULL},
+    { 2, cmlc_continuouscc, 27, "Lower Drawbar 7", NULL},
+    { 2, cmlc_continuouscc, 28, "Lower Drawbar 8", NULL},
+    { 2, cmlc_continuouscc, 29, "Lower Drawbar 9", NULL},
+};
+
 DEFINE_MODULE(tonewheel_organ, 0, 2)
 
