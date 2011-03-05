@@ -121,8 +121,8 @@ static const char *short_options = "i:c:h";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
-    {"instrument", 0, 0, 'i'},
-    {"config", 0, 0, 'c'},
+    {"instrument", 1, 0, 'i'},
+    {"config", 1, 0, 'c'},
     {0,0,0,0},
 };
 
