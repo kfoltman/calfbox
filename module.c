@@ -40,7 +40,7 @@ void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
     for (i = 0; i < manifest->num_live_controllers; i++)
     {
         struct cbox_module_livecontroller_metadata *lc = &manifest->live_controllers[i];
-        if (lc->channel == -1)
+        if (lc->channel == 255)
             printf("ALL  ");
         else
         if (!lc->channel)
