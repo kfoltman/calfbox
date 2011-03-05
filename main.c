@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
     {
         if (!strcmp((*mptr)->name, module))
         {
-            process.module = (*(*mptr)->create)(mptr, "instrument:default");
+            process.module = (*(*mptr)->create)((*mptr)->user_data, "instrument:default");
             break;
         }
     }
