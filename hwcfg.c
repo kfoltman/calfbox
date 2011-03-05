@@ -60,11 +60,11 @@ static void generate_jack_config(const char *section, const char *id)
         }
     }
     
-    fprintf(f, "%s %s -d alsa -d hw:%s %s\n", 
-        cfg("autojack", "jackd", "/usr/bin/jackd"),
-        cfg("autojack", "jack_options", "-R -T"),
+    fprintf(f, "%s %s -d alsa -d hw:%s -r 44100 %s\n", 
+        cfg(section, "jackd", "/usr/bin/jackd"),
+        cfg(section, "jack_options", "-R -T"),
         id,
-        cfg("autojack", "alsa_options", ""));
+        cfg(section, "alsa_options", ""));
     fclose(f);
 }
 
@@ -123,6 +123,7 @@ static int try_soundcard(const char *name)
             
             if (fscanf(f, "%x:%x", &tvid, &tpid) == 2)
             {
+                printf("found:%x:%x vs %x:%x\n", tvid, tpid, vid, pid);
                 if (vid == tvid && pid == tpid)
                 {
                     gchar *fn = g_strdup_printf("%d", i);
