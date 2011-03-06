@@ -72,7 +72,40 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section)
     fluid_synth_set_reverb_on(m->synth, cbox_config_get_int(cfg_section, "reverb", 1));
     fluid_synth_set_chorus_on(m->synth, cbox_config_get_int(cfg_section, "chorus", 1));
     for (i = 0; i < 16; i++)
+    {
+        gchar *key = g_strdup_printf("channel%d", i + 1);
+        gchar *preset = cbox_config_get_string(cfg_section, key);
         fluid_synth_sfont_select(m->synth, i, m->sfid);
+        if (preset)
+        {
+            int found = 0;
+            
+            fluid_sfont_t* sfont = fluid_synth_get_sfont(m->synth, 0);
+            fluid_preset_t tmp;
+
+            sfont->iteration_start(sfont);            
+            while(sfont->iteration_next(sfont, &tmp))
+            {
+                // trailing spaces are common in some SF2s
+                const char *pname = tmp.get_name(&tmp);
+                int len = strlen(pname);
+                while (len > 0 && pname[len - 1] == ' ')
+                    len--;
+                    
+                if (!strncmp(pname, preset, len) && preset[len] == '\0')
+                {
+                    fluid_synth_bank_select(m->synth, i, tmp.get_banknum(&tmp));
+                    fluid_synth_program_change(m->synth, i, tmp.get_num(&tmp));
+                    found = 1;
+                    break;
+                }
+            }
+            
+            if (!found)
+                g_error("Preset not found: %s", preset);
+        }
+        g_free(key);
+    }
     
     return &m->module;
 }
