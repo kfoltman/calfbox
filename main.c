@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010 Krzysztof Foltman
+Copyright (C) 2010-2011 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "io.h"
 #include "midi.h"
 #include "module.h"
+#include "procmain.h"
 
 #include <glib.h>
 #include <getopt.h>
@@ -27,95 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <jack/midiport.h>
-
-struct process_struct
-{
-    struct cbox_module *module;
-};
-
-int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_midi_buffer *buf)
-{
-    void *midi = jack_port_get_buffer(port, nframes);
-    uint32_t i;
-    uint32_t event_count = jack_midi_get_event_count(midi);
-    int ok = 1;
-
-    cbox_midi_buffer_clear(buf);
-    
-    for (i = 0; i < event_count; i++)
-    {
-        jack_midi_event_t event;
-        
-        if (!jack_midi_event_get(&event, midi, i))
-        {
-            if (!cbox_midi_buffer_write_event(buf, event.time, event.buffer, event.size))
-                return -i;
-        }
-        else
-            return -i;
-    }
-    
-    return event_count;
-}
-
-void dummy_process(void *user_data, struct cbox_io *io, uint32_t nframes)
-{
-    struct process_struct *ps = user_data;
-    struct cbox_module *module = ps->module;
-    if (!module)
-        return;
-    struct cbox_midi_buffer midi_buf;
-    cbox_midi_buffer_init(&midi_buf);
-    uint32_t i;
-    float *out_l = jack_port_get_buffer(io->output_l, nframes);
-    float *out_r = jack_port_get_buffer(io->output_r, nframes);
-    int event_count = 0;
-    int cur_event = 0;
-    uint32_t highwatermark = 0;
-
-    event_count = abs(convert_midi_from_jack(io->midi, nframes, &midi_buf));
-    
-    for (i = 0; i < nframes; i += 16)
-    {
-        cbox_sample_t *outputs[2] = {out_l + i, out_r + i};
-        
-        if (i >= highwatermark)
-        {
-            while(cur_event < event_count)
-            {
-                struct cbox_midi_event *event = cbox_midi_buffer_get_event(&midi_buf, cur_event);
-                if (event)
-                {
-                    if (event->time <= i)
-                        (*module->process_event)(module->user_data, cbox_midi_event_get_data(event), event->size);
-                    else
-                    {
-                        highwatermark = event->time;
-                        break;
-                    }
-                }
-                else
-                    break;
-                
-                cur_event++;
-            }
-        }
-        (*module->process_block)(module->user_data, NULL, outputs);
-    }
-    while(cur_event < event_count)
-    {
-        struct cbox_midi_event *event = cbox_midi_buffer_get_event(&midi_buf, cur_event);
-        if (event)
-        {
-            (*module->process_event)(module->user_data, cbox_midi_event_get_data(event), event->size);
-        }
-        else
-            break;
-        
-        cur_event++;
-    }
-}
 
 static const char *short_options = "i:c:h";
 
@@ -132,13 +44,18 @@ void print_help(char *progname)
     exit(0);
 }
 
+void run_ui()
+{
+    char buf[3];
+    fgets(buf, 2, stdin);
+}
+
 int main(int argc, char *argv[])
 {
     struct cbox_io io;
     struct cbox_open_params params;
-    char buf[3];
-    struct process_struct process = { NULL };
-    struct cbox_io_callbacks cbs = { &process, dummy_process};
+    struct cbox_process_struct process = { NULL };
+    struct cbox_io_callbacks cbs = { &process, main_process};
     const char *module = NULL;
     struct cbox_module_manifest **mptr;
     const char *config_name = NULL;
@@ -192,7 +109,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     cbox_io_start(&io, &cbs);
-    fgets(buf, 2, stdin);
+    run_ui();
     cbox_io_stop(&io);
     cbox_io_close(&io);
     cbox_config_close();
