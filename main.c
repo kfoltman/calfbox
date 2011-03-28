@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config-api.h"
 #include "io.h"
+#include "menu.h"
 #include "midi.h"
 #include "module.h"
 #include "procmain.h"
@@ -44,10 +45,28 @@ void print_help(char *progname)
     exit(0);
 }
 
+int cmd_quit(struct cbox_menu_item *item, void *context)
+{
+    return 1;
+}
+
 void run_ui()
 {
-    char buf[3];
-    fgets(buf, 2, stdin);
+    int var1 = 42;
+    double var2 = 1.5;
+    static struct cbox_menu_item_extras_int mx_int_var1 = { 0, 127, "%d" };
+    static struct cbox_menu_item_extras_double mx_double_var2 = { 0, 127, "%f", NULL, 0 };
+    static struct cbox_menu_item_extras_command mx_cmd_quit = { cmd_quit };
+    struct cbox_menu_item menu_items_main[] = {
+        { "foo", menu_item_value_int, &mx_int_var1, &var1 },
+        { "bar", menu_item_value_double, &mx_double_var2, &var2 },
+        { "Quit", menu_item_command, &mx_cmd_quit, NULL },
+    };
+    FIXED_MENU(main);
+    
+    cbox_ui_start();
+    cbox_ui_run_menu(&menu_main, NULL);
+    cbox_ui_stop();
 }
 
 int main(int argc, char *argv[])
