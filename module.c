@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct cbox_module_manifest *cbox_module_list[] = {
     &tonewheel_organ_module,
     &fluidsynth_module,
+    &stream_player_module,
     NULL
 };
 

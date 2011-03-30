@@ -95,6 +95,7 @@ struct cbox_module_manifest
 
 extern struct cbox_module_manifest fluidsynth_module;
 extern struct cbox_module_manifest tonewheel_organ_module;
+extern struct cbox_module_manifest stream_player_module;
 extern struct cbox_module_manifest *cbox_module_list[];
 
 extern void cbox_module_manifest_dump(struct cbox_module_manifest *manifest);
