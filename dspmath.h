@@ -67,4 +67,18 @@ inline float cerp(float v0, float v1, float v2, float v3, float f)
     return y;
 }
 
+inline float sanef(float v)
+{
+    if (fabs(v) < (1.0 / (65536.0 * 65536.0)))
+        return 0;
+    return v;
+}
+
+inline void sanebf(float *buf)
+{
+    int i;
+    for (i = 0; i < CBOX_BLOCK_SIZE; i++)
+        buf[i] = sanef(buf[i]);
+}
+
 #endif
