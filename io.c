@@ -65,6 +65,16 @@ static int process_cb(jack_nframes_t frames, void *arg)
     return 0;
 }
 
+static void autoconnect_port(jack_client_t *client, const char *port, const char *use_name, int is_cbox_input)
+{
+    int res;
+    if (is_cbox_input)
+        res = jack_connect(client, use_name, port);
+    else
+        res = jack_connect(client, port, use_name);    
+    g_message("Connect: %s %s %s (%s)", port, is_cbox_input ? "<-" : "->", use_name, res == 0 ? "success" : (res == EEXIST ? "already connected" : "failed"));
+}
+
 static void autoconnect(jack_client_t *client, const char *port, const char *config_var, int is_cbox_input, int is_midi)
 {
     char *name, *orig_name, *dpos;
@@ -83,40 +93,41 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
             if (use_name[0] == '#')
             {
                 char *endptr = NULL;
-                long port = strtol(use_name + 1, &endptr, 10);
+                long portidx = strtol(use_name + 1, &endptr, 10);
                 if (endptr == use_name + strlen(use_name))
                 {
                     const char **names = jack_get_ports(client, ".*", is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
                     int i;
-                    for (i = 0; i < port && names[i]; i++)
+                    for (i = 0; i < portidx && names[i]; i++)
                         ;
                     
                     if (names[i])
-                        use_name = names[i];
+                        autoconnect_port(client, port, names[i], is_cbox_input);
                     else
-                        use_name = NULL;
+                        g_message("Connect: unmatched port index %d", (int)portidx);
                 }
             }
-            else if (use_name[0] == '~')
+            else if (use_name[0] == '~' || use_name[0] == '*')
             {
                 const char **names = jack_get_ports(client, use_name + 1, is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
                 
                 if (names && names[0])
-                    use_name = names[0];
+                {
+                    if (use_name[0] == '*')
+                    {
+                        int i;
+                        for (i = 0; names[i]; i++)
+                            autoconnect_port(client, port, names[i], is_cbox_input);
+                    }
+                    else
+                        autoconnect_port(client, port, names[0], is_cbox_input);
+                }
                 else
-                    use_name = NULL;
-            }
-            if (use_name)
-            {
-                int res;
-                if (is_cbox_input)
-                    res = jack_connect(client, use_name, port);
-                else
-                    res = jack_connect(client, port, use_name);    
-                g_message("Connect: %s %s %s (%s)", port, is_cbox_input ? "<-" : "->", use_name, res == 0 ? "success" : (res == EEXIST ? "already connected" : "failed"));
+                    g_message("Connect: unmatched port regexp %s", use_name);
             }
             else
-                g_message("Connect: unmatched name %s", name);
+                autoconnect_port(client, port, use_name, is_cbox_input);
+
             if (dpos)
                 name = dpos + 1;
         } while(dpos);
