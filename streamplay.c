@@ -46,7 +46,7 @@ void stream_player_process_event(void *user_data, const uint8_t *data, uint32_t 
 void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct stream_player_module *m = user_data;
-    if (m->readptr == (uint32_t)-1)
+    if (m->readptr >= (uint32_t)m->info.frames)
     {
         for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
         {
@@ -54,16 +54,40 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
         }
         return;
     }
-    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+
+    uint32_t pos = m->readptr;
+    uint32_t count = m->info.frames - m->readptr;
+    if (count > CBOX_BLOCK_SIZE)
+        count = CBOX_BLOCK_SIZE;
+    
+    if (m->info.channels == 1)
     {
-        float value = m->data[(m->readptr++) * m->info.channels];
-        if (m->readptr >= m->info.frames)
+        for (int i = 0; i < count; i++)
         {
-            m->readptr = -1;
-            break;
+            outputs[0][i] = outputs[1][i] = m->data[pos + i];
         }
-        outputs[0][i] = outputs[1][i] = value;
     }
+    else
+    if (m->info.channels == 2)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            outputs[0][i] = m->data[pos << 1];
+            outputs[1][i] = m->data[(pos << 1)];
+            pos++;
+        }
+    }
+    else
+    {
+        uint32_t ch = m->info.channels;
+        for (int i = 0; i < count; i++)
+        {
+            outputs[0][i] = m->data[pos * ch];
+            outputs[1][i] = m->data[pos * ch + 1];
+            pos++;
+        }
+    }
+    m->readptr += count;
 }
 
 struct cbox_module *stream_player_create(void *user_data, const char *cfg_section)
