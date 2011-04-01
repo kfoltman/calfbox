@@ -47,6 +47,8 @@ void stream_player_process_event(void *user_data, const uint8_t *data, uint32_t 
 void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct stream_player_module *m = user_data;
+    int i;
+    
     if (m->readptr >= (uint32_t)m->info.frames)
     {
         for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
@@ -63,7 +65,7 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
     
     if (m->info.channels == 1)
     {
-        for (int i = 0; i < count; i++)
+        for (i = 0; i < count; i++)
         {
             outputs[0][i] = outputs[1][i] = m->data[pos + i];
         }
@@ -71,7 +73,7 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
     else
     if (m->info.channels == 2)
     {
-        for (int i = 0; i < count; i++)
+        for (i = 0; i < count; i++)
         {
             outputs[0][i] = m->data[pos << 1];
             outputs[1][i] = m->data[(pos << 1)];
@@ -81,7 +83,7 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
     else
     {
         uint32_t ch = m->info.channels;
-        for (int i = 0; i < count; i++)
+        for (i = 0; i < count; i++)
         {
             outputs[0][i] = m->data[pos * ch];
             outputs[1][i] = m->data[pos * ch + 1];
