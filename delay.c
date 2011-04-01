@@ -59,12 +59,12 @@ void delay_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t 
         
         float wet[2] = { dry[0] + wetamt * delayed[0], dry[1] + wetamt * delayed[1] };
         float fb[2] = { dry[0] + fbamt * delayed[0], dry[1] + fbamt * delayed[1] };
-        outputs[0][i] = wet[0];
-        outputs[1][i] = wet[1];
+        outputs[0][i] = sanef(wet[0]);
+        outputs[1][i] = sanef(wet[1]);
         
         float *wcell = &m->storage[(pos + dv) & (MAX_DELAY_LENGTH - 1)][0];
-        wcell[0] = fb[0];
-        wcell[1] = fb[1];
+        wcell[0] = sanef(fb[0]);
+        wcell[1] = sanef(fb[1]);
         pos++;
     }
     m->pos = pos;
