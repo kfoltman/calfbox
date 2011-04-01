@@ -26,6 +26,7 @@ struct cbox_io;
 struct cbox_process_struct
 {
     struct cbox_module *module;
+    struct cbox_module *effect;
 };
 
 extern void main_process(void *user_data, struct cbox_io *io, uint32_t nframes);

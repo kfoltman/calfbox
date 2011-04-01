@@ -30,11 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:h";
+static const char *short_options = "i:c:e:h";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
     {"instrument", 1, 0, 'i'},
+    {"effect", 1, 0, 'e'},
     {"config", 1, 0, 'c'},
     {0,0,0,0},
 };
@@ -73,12 +74,13 @@ int main(int argc, char *argv[])
 {
     struct cbox_io io;
     struct cbox_open_params params;
-    struct cbox_process_struct process = { NULL };
+    struct cbox_process_struct process = { .module = NULL, .effect = NULL };
     struct cbox_io_callbacks cbs = { &process, main_process};
     const char *module = NULL;
     struct cbox_module_manifest *mptr;
     const char *config_name = NULL;
     const char *instrument_name = "default";
+    const char *effect_module_name = NULL;
     char *instr_section;
 
     while(1)
@@ -95,6 +97,9 @@ int main(int argc, char *argv[])
             case 'i':
                 instrument_name = optarg;
                 break;
+            case 'e':
+                effect_module_name = optarg;
+                break;
             case 'h':
             case '?':
                 print_help(argv[0]);
@@ -109,11 +114,32 @@ int main(int argc, char *argv[])
     
     mptr = cbox_module_get_by_name(module);
     cbox_module_manifest_dump(mptr);
+    if (!mptr)
+    {
+        fprintf(stderr, "Cannot find module %s\n", module);
+        return 1;
+    }
     process.module = (*mptr->create)(mptr->user_data, instr_section);
     if (!process.module)
     {
         fprintf(stderr, "Cannot find module %s\n", module);
         return 1;
+    }
+    if (effect_module_name && *effect_module_name)
+    {
+        mptr = cbox_module_get_by_name(effect_module_name);
+        cbox_module_manifest_dump(mptr);
+        if (!mptr)
+        {
+            fprintf(stderr, "Cannot find module %s\n", effect_module_name);
+            return 1;
+        }
+        process.effect = (*mptr->create)(mptr->user_data, instr_section);
+        if (!process.effect)
+        {
+            fprintf(stderr, "Cannot find effect %s\n", effect_module_name);
+            return 1;
+        }
     }
 
     if (!cbox_io_init(&io, &params))

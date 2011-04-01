@@ -53,6 +53,7 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
 {
     struct cbox_process_struct *ps = user_data;
     struct cbox_module *module = ps->module;
+    struct cbox_module *effect = ps->effect;
     if (!module)
         return;
     struct cbox_midi_buffer midi_buf;
@@ -91,7 +92,15 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
                 cur_event++;
             }
         }
-        (*module->process_block)(module->user_data, NULL, outputs);
+        if (effect)
+        {
+            cbox_sample_t left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
+            cbox_sample_t *bufs[2] = {left, right};
+            (*module->process_block)(module->user_data, NULL, bufs);
+            (*effect->process_block)(effect->user_data, bufs, outputs);
+        }
+        else
+            (*module->process_block)(module->user_data, NULL, outputs);
     }
     while(cur_event < event_count)
     {
@@ -105,5 +114,6 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
         
         cur_event++;
     }
+    
 }
 
