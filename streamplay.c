@@ -132,7 +132,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     sf_close(m->sndfile);
     
     m->readptr = 0;
-    m->restart = 0;
+    m->restart = cbox_config_get_int(cfg_section, "loop", -1);
     
     return &m->module;
 }
