@@ -36,6 +36,7 @@ struct stream_player_module
     SF_INFO info;
     float *data;
     uint32_t readptr;
+    uint32_t restart;
 };
 
 void stream_player_process_event(void *user_data, const uint8_t *data, uint32_t len)
@@ -88,6 +89,10 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
         }
     }
     m->readptr += count;
+    if (m->readptr >= (uint32_t)m->info.frames)
+    {
+        m->readptr = m->restart;
+    }
 }
 
 struct cbox_module *stream_player_create(void *user_data, const char *cfg_section)
@@ -125,6 +130,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     sf_close(m->sndfile);
     
     m->readptr = 0;
+    m->restart = 0;
     
     return &m->module;
 }
