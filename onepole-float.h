@@ -91,7 +91,7 @@ static inline void cbox_onepolef_process(struct cbox_onepolef_state *state, stru
     state->y1 = sanef(state->y1);
 }
 
-static inline void cbox_onepole_process_to(struct cbox_onepolef_state *state, struct cbox_onepolef_coeffs *coeffs, float *buffer_in, float *buffer_out)
+static inline void cbox_onepolef_process_to(struct cbox_onepolef_state *state, struct cbox_onepolef_coeffs *coeffs, float *buffer_in, float *buffer_out)
 {
     int i;
     float a0 = coeffs->a0;
