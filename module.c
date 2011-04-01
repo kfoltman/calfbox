@@ -26,12 +26,14 @@ extern struct cbox_module_manifest fluidsynth_module;
 extern struct cbox_module_manifest tonewheel_organ_module;
 extern struct cbox_module_manifest stream_player_module;
 extern struct cbox_module_manifest tone_control_module;
+extern struct cbox_module_manifest delay_module;
 
 struct cbox_module_manifest *cbox_module_list[] = {
     &tonewheel_organ_module,
     &fluidsynth_module,
     &stream_player_module,
     &tone_control_module,
+    &delay_module,
     NULL
 };
 
