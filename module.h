@@ -93,11 +93,9 @@ struct cbox_module_manifest
         .create = modname##_create \
     };
 
-extern struct cbox_module_manifest fluidsynth_module;
-extern struct cbox_module_manifest tonewheel_organ_module;
-extern struct cbox_module_manifest stream_player_module;
 extern struct cbox_module_manifest *cbox_module_list[];
 
 extern void cbox_module_manifest_dump(struct cbox_module_manifest *manifest);
+extern struct cbox_module_manifest *cbox_module_get_by_name(const char *name);
 
 #endif

@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
     struct cbox_process_struct process = { NULL };
     struct cbox_io_callbacks cbs = { &process, main_process};
     const char *module = NULL;
-    struct cbox_module_manifest **mptr;
+    struct cbox_module_manifest *mptr;
     const char *config_name = NULL;
     const char *instrument_name = "default";
     char *instr_section;
@@ -107,15 +107,9 @@ int main(int argc, char *argv[])
     instr_section = g_strdup_printf("instrument:%s", instrument_name);
     module = cbox_config_get_string_with_default(instr_section, "engine", "tonewheel_organ");
     
-    for (mptr = cbox_module_list; *mptr; mptr++)
-    {
-        if (!strcmp((*mptr)->name, module))
-        {
-            cbox_module_manifest_dump(*mptr);
-            process.module = (*(*mptr)->create)((*mptr)->user_data, instr_section);
-            break;
-        }
-    }
+    mptr = cbox_module_get_by_name(module);
+    cbox_module_manifest_dump(mptr);
+    process.module = (*mptr->create)(mptr->user_data, instr_section);
     if (!process.module)
     {
         fprintf(stderr, "Cannot find module %s\n", module);

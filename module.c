@@ -20,11 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+extern struct cbox_module_manifest fluidsynth_module;
+extern struct cbox_module_manifest tonewheel_organ_module;
+extern struct cbox_module_manifest stream_player_module;
+extern struct cbox_module_manifest tone_control_module;
 
 struct cbox_module_manifest *cbox_module_list[] = {
     &tonewheel_organ_module,
     &fluidsynth_module,
     &stream_player_module,
+    &tone_control_module,
     NULL
 };
 
@@ -50,4 +57,16 @@ void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
             printf("%-4d ", lc->channel);
         printf("%15s %-6d %-30s\n", ctl_classes[lc->controller_class], lc->controller, lc->name);
     }
+}
+
+struct cbox_module_manifest *cbox_module_get_by_name(const char *name)
+{
+    struct cbox_module_manifest **mptr;
+    
+    for (mptr = cbox_module_list; *mptr; mptr++)
+    {
+        if (!strcmp((*mptr)->name, name))
+            return *mptr;
+    }
+    return NULL;
 }
