@@ -113,12 +113,12 @@ int main(int argc, char *argv[])
     module = cbox_config_get_string_with_default(instr_section, "engine", "tonewheel_organ");
     
     mptr = cbox_module_get_by_name(module);
-    cbox_module_manifest_dump(mptr);
     if (!mptr)
     {
         fprintf(stderr, "Cannot find module %s\n", module);
         return 1;
     }
+    cbox_module_manifest_dump(mptr);
     process.module = (*mptr->create)(mptr->user_data, instr_section);
     if (!process.module)
     {
@@ -128,16 +128,16 @@ int main(int argc, char *argv[])
     if (effect_module_name && *effect_module_name)
     {
         mptr = cbox_module_get_by_name(effect_module_name);
-        cbox_module_manifest_dump(mptr);
         if (!mptr)
         {
-            fprintf(stderr, "Cannot find module %s\n", effect_module_name);
+            fprintf(stderr, "Cannot create module %s\n", effect_module_name);
             return 1;
         }
+        cbox_module_manifest_dump(mptr);
         process.effect = (*mptr->create)(mptr->user_data, instr_section);
         if (!process.effect)
         {
-            fprintf(stderr, "Cannot find effect %s\n", effect_module_name);
+            fprintf(stderr, "Cannot create effect %s\n", effect_module_name);
             return 1;
         }
     }
