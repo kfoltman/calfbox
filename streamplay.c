@@ -212,10 +212,48 @@ static void request_next(struct stream_player_module *m, uint64_t pos)
     }
 }
 
+static void copy_samples(struct stream_player_module *m, cbox_sample_t **outputs, float *data, int count, int ofs, int pos)
+{
+    int i;
+    
+    if (m->info.channels == 1)
+    {
+        for (i = 0; i < count; i++)
+        {
+            outputs[0][ofs + i] = outputs[1][ofs + i] = data[pos + i];
+        }
+    }
+    else
+    if (m->info.channels == 2)
+    {
+        for (i = 0; i < count; i++)
+        {
+            outputs[0][ofs + i] = data[pos << 1];
+            outputs[1][ofs + i] = data[(pos << 1)];
+            pos++;
+        }
+    }
+    else
+    {
+        uint32_t ch = m->info.channels;
+        for (i = 0; i < count; i++)
+        {
+            outputs[0][ofs + i] = data[pos * ch];
+            outputs[1][ofs + i] = data[pos * ch + 1];
+            pos++;
+        }
+    }
+    m->readptr += count;
+    if (m->readptr >= (uint32_t)m->info.frames)
+    {
+        m->readptr = m->restart;
+    }
+}
+
 void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct stream_player_module *m = user_data;
-    int i;
+    int i, optr;
     unsigned char buf_idx;
     
     if (m->readptr >= (uint32_t)m->info.frames)
@@ -233,69 +271,51 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
         m->cp_readahead_ready[buf_idx] = 1;
     }
     
-    if (m->pcp_current && !is_contained(m->pcp_current, m->readptr))
-        m->pcp_current = NULL;
-    if (!m->pcp_current)
-        m->pcp_current = get_cue(m, m->readptr);
-    
-    if (!m->pcp_current)
-    {
-        // Underrun; generate empty output in any case
-        for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+    optr = 0;
+    do {
+        if (m->pcp_current && !is_contained(m->pcp_current, m->readptr))
+            m->pcp_current = NULL;
+        
+        if (!m->pcp_current)
         {
-            outputs[0][i] = outputs[1][i] = 0;
+            if (m->pcp_next && is_contained(m->pcp_next, m->readptr))
+            {
+                m->pcp_current = m->pcp_next;
+                m->pcp_next = NULL;
+            }
+            else
+                m->pcp_current = get_cue(m, m->readptr);
         }
         
-        request_next(m, m->readptr);
-        return;
-    }
-    assert(!m->pcp_current->queued);
-    
-    uint64_t data_end = m->pcp_current->position + m->pcp_current->length;
-    uint32_t data_left = data_end - m->readptr;
-    
-    // If we're close to running out of space, prefetch the next bit
-    if (data_left < PREFETCH_THRESHOLD && data_end < m->info.frames)
-        request_next(m, data_end);
-    
-    float *data = m->pcp_current->data;
-    uint32_t pos = m->readptr - m->pcp_current->position;
-    uint32_t count = data_end - m->readptr;
-    if (count > CBOX_BLOCK_SIZE)
-        count = CBOX_BLOCK_SIZE;
-    
-    if (m->info.channels == 1)
-    {
-        for (i = 0; i < count; i++)
+        if (!m->pcp_current)
         {
-            outputs[0][i] = outputs[1][i] = data[pos + i];
+            // Underrun; generate empty output in any case
+            for (i = optr; i < CBOX_BLOCK_SIZE; i++)
+            {
+                outputs[0][i] = outputs[1][i] = 0;
+            }
+            
+            request_next(m, m->readptr);
+            return;
         }
-    }
-    else
-    if (m->info.channels == 2)
-    {
-        for (i = 0; i < count; i++)
-        {
-            outputs[0][i] = data[pos << 1];
-            outputs[1][i] = data[(pos << 1)];
-            pos++;
-        }
-    }
-    else
-    {
-        uint32_t ch = m->info.channels;
-        for (i = 0; i < count; i++)
-        {
-            outputs[0][i] = data[pos * ch];
-            outputs[1][i] = data[pos * ch + 1];
-            pos++;
-        }
-    }
-    m->readptr += count;
-    if (m->readptr >= (uint32_t)m->info.frames)
-    {
-        m->readptr = m->restart;
-    }
+        assert(!m->pcp_current->queued);
+        
+        uint64_t data_end = m->pcp_current->position + m->pcp_current->length;
+        uint32_t data_left = data_end - m->readptr;
+        
+        // If we're close to running out of space, prefetch the next bit
+        if (data_left < PREFETCH_THRESHOLD && data_end < m->info.frames)
+            request_next(m, data_end);
+        
+        float *data = m->pcp_current->data;
+        uint32_t pos = m->readptr - m->pcp_current->position;
+        uint32_t count = data_end - m->readptr;
+        if (count > CBOX_BLOCK_SIZE - optr)
+            count = CBOX_BLOCK_SIZE - optr;
+        
+        copy_samples(m, outputs, data, count, optr, pos);
+        optr += count;
+    } while(optr < CBOX_BLOCK_SIZE);
 }
 
 struct cbox_module *stream_player_create(void *user_data, const char *cfg_section)
