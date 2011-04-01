@@ -16,17 +16,36 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "assert.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
 #include "module.h"
+#include <errno.h>
 #include <glib.h>
+#include <jack/ringbuffer.h>
 #include <malloc.h>
 #include <math.h>
 #include <memory.h>
+#include <pthread.h>
 #include <sndfile.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+
+#define CUE_BUFFER_SIZE 16000
+#define PREFETCH_THRESHOLD (CUE_BUFFER_SIZE / 4)
+#define MAX_READAHEAD_BUFFERS 4
+
+#define NO_SAMPLE_LOOP ((uint64_t)-1ULL)
+
+struct stream_player_cue_point
+{
+    volatile uint64_t position;
+    volatile uint32_t size, length;
+    float *data;
+    int queued;
+};
 
 struct stream_player_module
 {
@@ -34,20 +53,170 @@ struct stream_player_module
 
     SNDFILE *sndfile;
     SF_INFO info;
-    float *data;
     uint32_t readptr;
     uint32_t restart;
+    
+    volatile int buffer_in_use;
+    
+    struct stream_player_cue_point cp_start, cp_loop, cp_readahead[MAX_READAHEAD_BUFFERS];
+    int cp_readahead_ready[MAX_READAHEAD_BUFFERS];
+    struct stream_player_cue_point *pcp_current, *pcp_next;
+    
+    jack_ringbuffer_t *rb_for_reading, *rb_just_read;
+    
+    pthread_t thr_preload;
 };
+
+static void init_cue(struct stream_player_module *m, struct stream_player_cue_point *pt, uint32_t size, uint64_t pos)
+{
+    pt->data = malloc(size * sizeof(float) * m->info.channels);
+    pt->size = size;
+    pt->length = 0;
+    pt->queued = 0;
+    pt->position = pos;
+}
+
+static void load_at_cue(struct stream_player_module *m, struct stream_player_cue_point *pt)
+{
+    if (pt->position != NO_SAMPLE_LOOP)
+    {
+        sf_seek(m->sndfile, pt->position, 0);
+        pt->length = sf_readf_float(m->sndfile, pt->data, pt->size);
+    }
+    pt->queued = 0;
+}
+
+static int is_contained(struct stream_player_cue_point *pt, uint64_t ofs)
+{
+    return pt->position != NO_SAMPLE_LOOP && ofs >= pt->position && ofs < pt->position + pt->length;
+}
+
+static int is_queued(struct stream_player_cue_point *pt, uint64_t ofs)
+{
+    return pt->queued && pt->position != NO_SAMPLE_LOOP && ofs >= pt->position && ofs < pt->position + pt->size;
+}
+
+struct stream_player_cue_point *get_cue(struct stream_player_module *m, uint64_t pos)
+{
+    int i;
+    
+    if (is_contained(&m->cp_start, pos))
+        return &m->cp_start;
+    if (is_contained(&m->cp_loop, pos))
+        return &m->cp_loop;
+    
+    for (i = 0; i < MAX_READAHEAD_BUFFERS; i++)
+    {
+        if (m->cp_readahead_ready[i] && is_contained(&m->cp_readahead[i], pos))
+            return &m->cp_readahead[i];
+    }
+    return NULL;
+}
+
+struct stream_player_cue_point *get_queued_buffer(struct stream_player_module *m, uint64_t pos)
+{
+    int i;
+    
+    for (i = 0; i < MAX_READAHEAD_BUFFERS; i++)
+    {
+        if (!m->cp_readahead_ready[i] && is_queued(&m->cp_readahead[i], pos))
+            return &m->cp_readahead[i];
+    }
+    return NULL;
+}
+
+void request_load(struct stream_player_module *m, int buf_idx, uint64_t pos)
+{
+    unsigned char cidx = (unsigned char)buf_idx;
+    struct stream_player_cue_point *pt = &m->cp_readahead[buf_idx];
+    int wlen = 0;
+    
+    m->cp_readahead_ready[buf_idx] = 0;    
+    pt->position = pos;
+    pt->length = 0;
+    pt->queued = 1;
+
+    wlen = jack_ringbuffer_write(m->rb_for_reading, &cidx, 1);
+    assert(wlen);
+}
+
+int get_unused_buffer(struct stream_player_module *m)
+{
+    int i = 0;
+    
+    // return first buffer that is not currently played or in queue; XXXKF this is a very primitive strategy, a good one would at least use the current play position
+    for (i = 0; i < MAX_READAHEAD_BUFFERS; i++)
+    {
+        if (&m->cp_readahead[i] == m->pcp_current)
+            continue;
+        if (m->cp_readahead[i].queued)
+            continue;
+        return i;
+    }
+    return -1;
+}
+
+void *sample_preload_thread(void *user_data)
+{
+    struct stream_player_module *m = user_data;
+    
+    do {
+        unsigned char buf_idx;
+        if (!jack_ringbuffer_read(m->rb_for_reading, &buf_idx, 1))
+        {
+            usleep(5000);
+            continue;
+        }
+        if (buf_idx == 255)
+            break;
+        // fprintf(stderr, "Preload: %d, %lld\n", (int)buf_idx, (long long)m->cp_readahead[buf_idx].position);
+        load_at_cue(m, &m->cp_readahead[buf_idx]);
+        // fprintf(stderr, "Preloaded\n", (int)buf_idx, (long long)m->cp_readahead[buf_idx].position);
+        jack_ringbuffer_write(m->rb_just_read, &buf_idx, 1);
+    } while(1);
+        
+}
 
 void stream_player_process_event(void *user_data, const uint8_t *data, uint32_t len)
 {
     struct stream_player_module *m = user_data;
 }
 
+static void request_next(struct stream_player_module *m, uint64_t pos)
+{
+    // Check if we've requested a next buffer, if not, request it
+    
+    // First verify if our idea of 'next' buffer is correct
+    if (m->pcp_next && (is_contained(m->pcp_next, pos) || is_queued(m->pcp_next, pos)))
+    {
+        // We're still waiting for the requested buffer, but that's OK
+        return;
+    }
+    
+    // We don't know the next buffer, or the next buffer doesn't contain
+    // the sample we're looking for.
+    m->pcp_next = get_queued_buffer(m, pos);
+    if (!m->pcp_next)
+    {
+        // It hasn't even been requested - request it
+        int buf_idx = get_unused_buffer(m);
+        if(buf_idx == -1)
+        {
+            printf("Ran out of buffers\n");
+            return;
+        }
+        request_load(m, buf_idx, pos);
+        m->pcp_next = &m->cp_readahead[buf_idx];
+        
+        // printf("Requested load into buffer %d at %lld\n", buf_idx, (long long) pos);
+    }
+}
+
 void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct stream_player_module *m = user_data;
     int i;
+    unsigned char buf_idx;
     
     if (m->readptr >= (uint32_t)m->info.frames)
     {
@@ -58,8 +227,40 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
         return;
     }
 
-    uint32_t pos = m->readptr;
-    uint32_t count = m->info.frames - m->readptr;
+    // receive buffer completion messages from the queue
+    while(jack_ringbuffer_read(m->rb_just_read, &buf_idx, 1))
+    {
+        m->cp_readahead_ready[buf_idx] = 1;
+    }
+    
+    if (m->pcp_current && !is_contained(m->pcp_current, m->readptr))
+        m->pcp_current = NULL;
+    if (!m->pcp_current)
+        m->pcp_current = get_cue(m, m->readptr);
+    
+    if (!m->pcp_current)
+    {
+        // Underrun; generate empty output in any case
+        for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+        {
+            outputs[0][i] = outputs[1][i] = 0;
+        }
+        
+        request_next(m, m->readptr);
+        return;
+    }
+    assert(!m->pcp_current->queued);
+    
+    uint64_t data_end = m->pcp_current->position + m->pcp_current->length;
+    uint32_t data_left = data_end - m->readptr;
+    
+    // If we're close to running out of space, prefetch the next bit
+    if (data_left < PREFETCH_THRESHOLD && data_end < m->info.frames)
+        request_next(m, data_end);
+    
+    float *data = m->pcp_current->data;
+    uint32_t pos = m->readptr - m->pcp_current->position;
+    uint32_t count = data_end - m->readptr;
     if (count > CBOX_BLOCK_SIZE)
         count = CBOX_BLOCK_SIZE;
     
@@ -67,7 +268,7 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
     {
         for (i = 0; i < count; i++)
         {
-            outputs[0][i] = outputs[1][i] = m->data[pos + i];
+            outputs[0][i] = outputs[1][i] = data[pos + i];
         }
     }
     else
@@ -75,8 +276,8 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
     {
         for (i = 0; i < count; i++)
         {
-            outputs[0][i] = m->data[pos << 1];
-            outputs[1][i] = m->data[(pos << 1)];
+            outputs[0][i] = data[pos << 1];
+            outputs[1][i] = data[(pos << 1)];
             pos++;
         }
     }
@@ -85,8 +286,8 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
         uint32_t ch = m->info.channels;
         for (i = 0; i < count; i++)
         {
-            outputs[0][i] = m->data[pos * ch];
-            outputs[1][i] = m->data[pos * ch + 1];
+            outputs[0][i] = data[pos * ch];
+            outputs[1][i] = data[pos * ch + 1];
             pos++;
         }
     }
@@ -99,7 +300,9 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
 
 struct cbox_module *stream_player_create(void *user_data, const char *cfg_section)
 {
+    int i;
     static int inited = 0;
+    
     if (!inited)
     {
         inited = 1;
@@ -125,18 +328,46 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     }
     g_message("Frames %d channels %d", (int)m->info.frames, (int)m->info.channels);
     
-    m->data = malloc(m->info.frames * m->info.channels * sizeof(float));
-    
-    sf_readf_float(m->sndfile, m->data, m->info.frames);
-    
-    sf_close(m->sndfile);
+    m->rb_for_reading = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
+    m->rb_just_read = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
     
     m->readptr = 0;
     m->restart = cbox_config_get_int(cfg_section, "loop", -1);
+    m->pcp_current = &m->cp_start;
+    // for testing
+    m->pcp_current = NULL;
+    m->pcp_next = NULL;
+    
+    init_cue(m, &m->cp_start, CUE_BUFFER_SIZE, 0);
+    load_at_cue(m, &m->cp_start);
+    init_cue(m, &m->cp_loop, CUE_BUFFER_SIZE, m->restart);
+    load_at_cue(m, &m->cp_loop);
+    for (i = 0; i < MAX_READAHEAD_BUFFERS; i++)
+        init_cue(m, &m->cp_readahead[i], CUE_BUFFER_SIZE, NO_SAMPLE_LOOP);
+    
+    if (pthread_create(&m->thr_preload, NULL, sample_preload_thread, m))
+    {
+        g_error("Failed to create audio prefetch thread", strerror(errno));
+        return NULL;
+    }
+    
     
     return &m->module;
 }
 
+// XXXKF not used yet, I'll add it to the API some day
+void stream_player_destroy(void *user_data)
+{
+    struct stream_player_module *m = user_data;
+    unsigned char cmd = 255;
+    
+    jack_ringbuffer_write(m->rb_for_reading, &cmd, 1);
+    pthread_join(m->thr_preload, NULL);
+    
+    jack_ringbuffer_free(m->rb_for_reading);
+    jack_ringbuffer_free(m->rb_just_read);
+    sf_close(m->sndfile);
+}
 
 struct cbox_module_keyrange_metadata stream_player_keyranges[] = {
 };
