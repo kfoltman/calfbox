@@ -55,8 +55,8 @@ static inline void cbox_onepolef_set_highpass(struct cbox_onepolef_coeffs *coeff
     float a01 = x*q;
     float b1 = a01 - q;
     
-    coeffs->a0 = a01;
-    coeffs->a1 = -a01;
+    coeffs->a0 = q;
+    coeffs->a1 = -q;
     coeffs->b1 = b1;
 }
 
