@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib.h>
 #include <getopt.h>
 #include <math.h>
+#include <ncurses.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -63,10 +64,15 @@ void run_ui()
         { "bar", menu_item_value_double, &mx_double_var2, &var2 },
         { "Quit", menu_item_command, &mx_cmd_quit, NULL },
     };
+    struct cbox_menu_state *st = NULL;
     FIXED_MENU(main);
     
     cbox_ui_start();
-    cbox_ui_run_menu(&menu_main, NULL);
+    cbox_ui_menu_init(&st, &menu_main, NULL);
+    do {
+        if (cbox_ui_menu_key(st, getch()) > 0)
+            break;
+    } while(1);
     cbox_ui_stop();
 }
 

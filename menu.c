@@ -29,6 +29,7 @@ struct cbox_menu_state
     int cursor;
     int label_width, value_width;
     WINDOW *window;
+    void *context;
 };
 
 void cbox_ui_start()
@@ -116,90 +117,98 @@ void cbox_ui_draw_menu(struct cbox_menu_state *menu_state)
     wrefresh(menu_state->window);
 }
 
-int cbox_ui_run_menu(struct cbox_menu *menu, void *context)
+int cbox_ui_menu_init(struct cbox_menu_state **pst, struct cbox_menu *menu, void *context)
 {
-    struct cbox_menu_state st = { .menu = menu, .cursor = 0, .window = stdscr };
-    int ch;
+    struct cbox_menu_state *st = malloc(sizeof(struct cbox_menu_state));
+    *pst = st;
+    st->menu = menu;
+    st->cursor = 0;
+    st->window = stdscr;
+    st->context = context;
     
-    cbox_ui_size_menu(&st);
-    cbox_ui_draw_menu(&st);
-    while(1)
-    {
-        struct cbox_menu_item *item = NULL;
-        if (st.cursor >= 0 && st.cursor < menu->item_count)
-            item = &menu->items[st.cursor];
-            
-        ch = getch();
-        if (ch == 10)
-        {
-            if (item)
-            {
-                int exit_menu = 0;
-                if (item->type == menu_item_command)
-                {
-                    struct cbox_menu_item_extras_command *cmd = item->extras;
-                    if (cmd && cmd->execute)
-                        exit_menu = cmd->execute(item, context);
-                }
-                if (item->on_change)
-                    exit_menu = item->on_change(item, context) || exit_menu;
-                
-                if (exit_menu)
-                    return exit_menu;
-            }
-            continue;
-        }
-        if (ch == 27)
-            break;
-        switch(ch)
-        {
-        case KEY_LEFT:
-            if (!item || !item->extras || !item->value)
-                continue;
-            if (item->type == menu_item_value_int)
-            {
-                struct cbox_menu_item_extras_int *ix = item->extras;
-                int *pv = item->value;
-                if (*pv > ix->vmin)
-                {
-                    (*pv)--;
-                    if (item->on_change)
-                        item->on_change(item, context);
-                    cbox_ui_size_menu(&st);
-                    cbox_ui_draw_menu(&st);
-                }
-            }
-            continue;
-        case KEY_RIGHT:
-            if (!item || !item->extras || !item->value)
-                continue;
-            if (item->type == menu_item_value_int)
-            {
-                struct cbox_menu_item_extras_int *ix = item->extras;
-                int *pv = item->value;
-                if (*pv < ix->vmax)
-                {
-                    (*pv)++;
-                    if (item->on_change)
-                        item->on_change(item, context);
-                    cbox_ui_size_menu(&st);
-                    cbox_ui_draw_menu(&st);
-                }
-            }
-            continue;
-            
-        case KEY_UP:
-            if (st.cursor > 0)
-                st.cursor--;
-            cbox_ui_draw_menu(&st);
-            continue;
-        case KEY_DOWN:
-            if (st.cursor < menu->item_count - 1)
-                st.cursor++;
-            cbox_ui_draw_menu(&st);
-            continue;
-        }
-    }
-    return 27;
+    cbox_ui_size_menu(st);
+    cbox_ui_draw_menu(st);
 }
 
+int cbox_ui_menu_key(struct cbox_menu_state *st, int ch)
+{
+    struct cbox_menu *menu = st->menu;
+    struct cbox_menu_item *item = NULL;
+    if (st->cursor >= 0 && st->cursor < menu->item_count)
+        item = &menu->items[st->cursor];
+        
+    if (ch == 10)
+    {
+        if (item)
+        {
+            int exit_menu = 0;
+            if (item->type == menu_item_command)
+            {
+                struct cbox_menu_item_extras_command *cmd = item->extras;
+                if (cmd && cmd->execute)
+                    exit_menu = cmd->execute(item, st->context);
+            }
+            if (item->on_change)
+                exit_menu = item->on_change(item, st->context) || exit_menu;
+            
+            if (exit_menu)
+                return exit_menu;
+        }
+        return 0;
+    }
+    switch(ch)
+    {
+    case 27:
+        return ch;
+    case KEY_LEFT:
+        if (!item || !item->extras || !item->value)
+            return 0;
+        if (item->type == menu_item_value_int)
+        {
+            struct cbox_menu_item_extras_int *ix = item->extras;
+            int *pv = item->value;
+            if (*pv > ix->vmin)
+            {
+                (*pv)--;
+                if (item->on_change)
+                    item->on_change(item, st->context);
+                cbox_ui_size_menu(st);
+                cbox_ui_draw_menu(st);
+            }
+        }
+        return 0;
+    case KEY_RIGHT:
+        if (!item || !item->extras || !item->value)
+            return 0;
+        if (item->type == menu_item_value_int)
+        {
+            struct cbox_menu_item_extras_int *ix = item->extras;
+            int *pv = item->value;
+            if (*pv < ix->vmax)
+            {
+                (*pv)++;
+                if (item->on_change)
+                    item->on_change(item, st->context);
+                cbox_ui_size_menu(st);
+                cbox_ui_draw_menu(st);
+            }
+        }
+        return 0;
+        
+    case KEY_UP:
+        if (st->cursor > 0)
+            st->cursor--;
+        cbox_ui_draw_menu(st);
+        return 0;
+    case KEY_DOWN:
+        if (st->cursor < menu->item_count - 1)
+            st->cursor++;
+        cbox_ui_draw_menu(st);
+        return 0;
+    }
+}
+
+extern void cbox_ui_menu_done(struct cbox_menu_state *st)
+{
+    free(st);
+}

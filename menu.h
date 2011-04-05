@@ -74,6 +74,11 @@ struct cbox_menu
 
 extern void cbox_ui_start();
 extern void cbox_ui_stop();
-extern int cbox_ui_run_menu(struct cbox_menu *menu, void *context);
+
+struct cbox_menu_state;
+
+extern int cbox_ui_menu_init(struct cbox_menu_state **st, struct cbox_menu *menu, void *context);
+extern int cbox_ui_menu_key(struct cbox_menu_state *st, int ch);
+extern void cbox_ui_menu_done(struct cbox_menu_state *st);
 
 #endif
