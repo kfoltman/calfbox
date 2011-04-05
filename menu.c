@@ -17,34 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "menu.h"
+#include "ui.h"
 
 #include <assert.h>
 #include <glib.h>
+#include <malloc.h>
 #include <ncurses.h>
 #include <string.h>
 
 struct cbox_menu_state
 {
+    struct cbox_ui_page page;
     struct cbox_menu *menu;
     int cursor;
     int label_width, value_width;
     WINDOW *window;
     void *context;
 };
-
-void cbox_ui_start()
-{
-    initscr();
-    cbreak();
-    noecho();
-    start_color();    
-    keypad(stdscr, TRUE);
-}
-
-void cbox_ui_stop()
-{
-    endwin();    
-}
 
 gchar *cbox_menu_item_value_format(const struct cbox_menu_item *item)
 {
@@ -117,7 +106,21 @@ void cbox_ui_draw_menu(struct cbox_menu_state *menu_state)
     wrefresh(menu_state->window);
 }
 
-int cbox_ui_menu_init(struct cbox_menu_state **pst, struct cbox_menu *menu, void *context)
+static int cbox_menu_on_key(struct cbox_menu_state *st, int ch);
+
+static int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
+{
+    return cbox_menu_on_key((struct cbox_menu_state *)p, ch);
+}
+
+static void cbox_menu_page_draw(struct cbox_ui_page *p)
+{
+    struct cbox_menu_state *st = (struct cbox_menu_state *)p;
+    cbox_ui_size_menu(st);
+    cbox_ui_draw_menu(st);
+}
+
+struct cbox_ui_page *cbox_menu_init(struct cbox_menu_state **pst, struct cbox_menu *menu, void *context)
 {
     struct cbox_menu_state *st = malloc(sizeof(struct cbox_menu_state));
     *pst = st;
@@ -125,12 +128,14 @@ int cbox_ui_menu_init(struct cbox_menu_state **pst, struct cbox_menu *menu, void
     st->cursor = 0;
     st->window = stdscr;
     st->context = context;
+    st->page.draw = cbox_menu_page_draw;
+    st->page.on_key = cbox_menu_page_on_key;
+    st->page.on_idle = NULL;
     
-    cbox_ui_size_menu(st);
-    cbox_ui_draw_menu(st);
+    return &st->page;
 }
 
-int cbox_ui_menu_key(struct cbox_menu_state *st, int ch)
+int cbox_menu_on_key(struct cbox_menu_state *st, int ch)
 {
     struct cbox_menu *menu = st->menu;
     struct cbox_menu_item *item = NULL;
@@ -208,7 +213,7 @@ int cbox_ui_menu_key(struct cbox_menu_state *st, int ch)
     }
 }
 
-extern void cbox_ui_menu_done(struct cbox_menu_state *st)
+extern void cbox_menu_done(struct cbox_menu_state *st)
 {
     free(st);
 }

@@ -72,13 +72,9 @@ struct cbox_menu
 #define FIXED_MENU(name) \
     struct cbox_menu menu_##name = { menu_items_##name, sizeof(menu_items_##name) / sizeof(struct cbox_menu_item), NULL };
 
-extern void cbox_ui_start();
-extern void cbox_ui_stop();
-
 struct cbox_menu_state;
 
-extern int cbox_ui_menu_init(struct cbox_menu_state **st, struct cbox_menu *menu, void *context);
-extern int cbox_ui_menu_key(struct cbox_menu_state *st, int ch);
-extern void cbox_ui_menu_done(struct cbox_menu_state *st);
+extern struct cbox_ui_page *cbox_menu_init(struct cbox_menu_state **st, struct cbox_menu *menu, void *context);
+extern void cbox_menu_done(struct cbox_menu_state *st);
 
 #endif

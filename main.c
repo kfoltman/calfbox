@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "midi.h"
 #include "module.h"
 #include "procmain.h"
+#include "ui.h"
 
 #include <glib.h>
 #include <getopt.h>
@@ -52,6 +53,25 @@ int cmd_quit(struct cbox_menu_item *item, void *context)
     return 1;
 }
 
+int main_on_key(struct cbox_ui_page *page, int ch)
+{
+    if (ch == 27)
+        return 27;
+    return 0;
+}
+
+void main_draw(struct cbox_ui_page *page)
+{
+    box(stdscr, 0, 0);
+}
+
+int main_on_idle(struct cbox_ui_page *page)
+{
+    box(stdscr, 0, 0);
+    mvwprintw(stdscr, 3, 3, "%d", time(NULL));
+    return 0;
+}
+
 void run_ui()
 {
     int var1 = 42;
@@ -65,14 +85,17 @@ void run_ui()
         { "Quit", menu_item_command, &mx_cmd_quit, NULL },
     };
     struct cbox_menu_state *st = NULL;
+    struct cbox_ui_page *page = NULL;
+    struct cbox_ui_page page2;
     FIXED_MENU(main);
+    page = cbox_menu_init(&st, &menu_main, NULL);
+
+    page2.on_key = main_on_key;
+    page2.on_idle = main_on_idle;
+    page2.draw = main_draw;
     
     cbox_ui_start();
-    cbox_ui_menu_init(&st, &menu_main, NULL);
-    do {
-        if (cbox_ui_menu_key(st, getch()) > 0)
-            break;
-    } while(1);
+    cbox_ui_run(&page2);
     cbox_ui_stop();
 }
 
