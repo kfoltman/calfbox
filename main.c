@@ -141,6 +141,12 @@ int main(int argc, char *argv[])
     instr_section = g_strdup_printf("instrument:%s", instrument_name);
     module = cbox_config_get_string_with_default(instr_section, "engine", "tonewheel_organ");
     
+    if (!cbox_io_init(&io, &params))
+    {
+        fprintf(stderr, "Cannot initialise sound I/O\n");
+        return 1;
+    }
+    
     mptr = cbox_module_get_by_name(module);
     if (!mptr)
     {
@@ -148,7 +154,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     cbox_module_manifest_dump(mptr);
-    process.module = (*mptr->create)(mptr->user_data, instr_section);
+    process.module = (*mptr->create)(mptr->user_data, instr_section, cbox_io_get_sample_rate(&io));
     if (!process.module)
     {
         fprintf(stderr, "Cannot find module %s\n", module);
@@ -163,7 +169,7 @@ int main(int argc, char *argv[])
             return 1;
         }
         cbox_module_manifest_dump(mptr);
-        process.effect = (*mptr->create)(mptr->user_data, instr_section);
+        process.effect = (*mptr->create)(mptr->user_data, instr_section, cbox_io_get_sample_rate(&io));
         if (!process.effect)
         {
             fprintf(stderr, "Cannot create effect %s\n", effect_module_name);
@@ -171,11 +177,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (!cbox_io_init(&io, &params))
-    {
-        fprintf(stderr, "Cannot initialise sound I/O\n");
-        return 1;
-    }
     cbox_io_start(&io, &cbs);
     run_ui();
     cbox_io_stop(&io);

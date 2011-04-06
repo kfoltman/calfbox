@@ -36,6 +36,7 @@ struct delay_module
 
     float storage[MAX_DELAY_LENGTH][2];
     int pos;
+    int length;
 };
 
 void delay_process_event(void *user_data, const uint8_t *data, uint32_t len)
@@ -48,7 +49,7 @@ void delay_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t 
     struct delay_module *m = user_data;
     
     int pos = m->pos ;
-    int dv = 44100 / 4;
+    int dv = m->length;
     float wetamt = 0.5f;
     float fbamt = 0.25f;
     
@@ -70,7 +71,7 @@ void delay_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t 
     m->pos = pos;
 }
 
-struct cbox_module *delay_create(void *user_data, const char *cfg_section)
+struct cbox_module *delay_create(void *user_data, const char *cfg_section, int srate)
 {
     static int inited = 0;
     int i;
@@ -84,6 +85,7 @@ struct cbox_module *delay_create(void *user_data, const char *cfg_section)
     m->module.process_event = delay_process_event;
     m->module.process_block = delay_process_block;
     m->pos = 0;
+    m->length = srate / 4;
     for (i = 0; i < MAX_DELAY_LENGTH; i++)
         m->storage[i][0] = m->storage[i][1] = 0.f;
     

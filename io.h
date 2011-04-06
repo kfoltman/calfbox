@@ -43,4 +43,5 @@ struct cbox_io_callbacks
 extern int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params);
 extern int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb);
 extern int cbox_io_stop(struct cbox_io *io);
+extern int cbox_io_get_sample_rate(struct cbox_io *io);
 extern void cbox_io_close(struct cbox_io *io);

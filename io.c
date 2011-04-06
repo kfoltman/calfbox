@@ -135,6 +135,11 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
     }
 }
 
+int cbox_io_get_sample_rate(struct cbox_io *io)
+{
+    return jack_get_sample_rate(io->client);
+}
+
 int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
 {
     io->cb = cb;

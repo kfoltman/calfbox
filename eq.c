@@ -60,7 +60,7 @@ void parametric_eq_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
     }
 }
 
-struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_section)
+struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_section, int srate)
 {
     int b, c;
     
@@ -75,10 +75,10 @@ struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_sectio
     m->module.process_event = parametric_eq_process_event;
     m->module.process_block = parametric_eq_process_block;
     
-    cbox_biquadf_set_peakeq_rbj(&m->coeffs[0], 150, 0.5, 3, 44100);
-    cbox_biquadf_set_peakeq_rbj(&m->coeffs[1], 400, 0.7, 0.125, 44100);
-    cbox_biquadf_set_peakeq_rbj(&m->coeffs[2], 1600, 2, 4, 44100);
-    cbox_biquadf_set_peakeq_rbj(&m->coeffs[3], 6400, 1, 4, 44100);
+    cbox_biquadf_set_peakeq_rbj(&m->coeffs[0], 150, 0.5, 3, srate);
+    cbox_biquadf_set_peakeq_rbj(&m->coeffs[1], 400, 0.7, 0.125, srate);
+    cbox_biquadf_set_peakeq_rbj(&m->coeffs[2], 1600, 2, 4, srate);
+    cbox_biquadf_set_peakeq_rbj(&m->coeffs[3], 6400, 1, 4, srate);
     
     for (b = 0; b < NO_BANDS; b++)
         for (c = 0; c < 2; c++)

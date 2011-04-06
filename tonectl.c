@@ -53,7 +53,7 @@ void tone_control_process_block(void *user_data, cbox_sample_t **inputs, cbox_sa
     cbox_onepolef_process(&m->highpass_state[1], &m->highpass_coeffs, outputs[1]);
 }
 
-struct cbox_module *tone_control_create(void *user_data, const char *cfg_section)
+struct cbox_module *tone_control_create(void *user_data, const char *cfg_section, int srate)
 {
     static int inited = 0;
     if (!inited)
@@ -66,7 +66,7 @@ struct cbox_module *tone_control_create(void *user_data, const char *cfg_section
     m->module.process_event = tone_control_process_event;
     m->module.process_block = tone_control_process_block;
     
-    float tpdsr = 2 * M_PI / 44100.0;
+    float tpdsr = 2 * M_PI / srate;
     
     cbox_onepolef_set_lowpass(&m->lowpass_coeffs, 3000 * tpdsr);
     cbox_onepolef_set_highpass(&m->highpass_coeffs, 300 * tpdsr);

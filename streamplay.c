@@ -336,7 +336,7 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
     }
 }
 
-struct cbox_module *stream_player_create(void *user_data, const char *cfg_section)
+struct cbox_module *stream_player_create(void *user_data, const char *cfg_section, int srate)
 {
     int i;
     int rest;

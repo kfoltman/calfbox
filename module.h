@@ -77,7 +77,7 @@ struct cbox_module_manifest
     struct cbox_module_voicingparam_metadata *voicing_params;
     int num_voicing_params;
     
-    struct cbox_module *(*create)(void *user_data, const char *cfg_section);
+    struct cbox_module *(*create)(void *user_data, const char *cfg_section, int srate);
 };
 
 #define DEFINE_MODULE(modname, ninputs, noutputs) \

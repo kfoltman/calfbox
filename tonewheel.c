@@ -62,7 +62,7 @@ struct tonewheel_organ_module
     int enable_percussion, enable_vibrato_upper, enable_vibrato_lower, vibrato_mode, vibrato_mix, percussion_3rd;
     int do_filter;
     int cc91;
-    uint32_t vibrato_phase;
+    uint32_t vibrato_phase, vibrato_dphase;
     
     int pedal_drawbar_settings[2];
     int upper_manual_drawbar_settings[9];
@@ -300,7 +300,6 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
         m->phase[n] += m->frequency[n] * CBOX_BLOCK_SIZE;
     }
     
-    int32_t vibrato_dphase = (int)(6.6 / 44100 * 65536 * 65536);
     static const int v1[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 8 };
     static const int v2[] = { 0, 1, 2, 4, 6, 8, 9, 10, 12 };
     static const int v3[] = { 0, 1, 3, 6, 11, 12, 15, 17, 18, 18, 18 };
@@ -328,7 +327,7 @@ void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox
             
             delay[1 + n] = x0 = accum;
         }
-        m->vibrato_phase += vibrato_dphase;
+        m->vibrato_phase += m->vibrato_dphase;
         
         uint32_t vphase = m->vibrato_phase;
         if (vphase >= 0x80000000)
@@ -400,7 +399,7 @@ static void read_drawbars(int *drawbars, int count, const char *registration)
     }
 }
 
-struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_section)
+struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_section, int srate)
 {
     static int inited = 0;
     int i;
@@ -427,8 +426,8 @@ struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_sect
     m->module.process_block = tonewheel_organ_process_block;
     cbox_onepole_reset(&m->filter_anticlick);
     cbox_onepole_reset(&m->filter_overdrive);
-    cbox_onepole_set_lowpass(&m->filter_anticlick_coeffs, hz2w(180.0, 44100.0));
-    cbox_onepole_set_lowpass(&m->filter_overdrive_coeffs, hz2w(2500.0, 44100.0));
+    cbox_onepole_set_lowpass(&m->filter_anticlick_coeffs, hz2w(180.0, srate));
+    cbox_onepole_set_lowpass(&m->filter_overdrive_coeffs, hz2w(2500.0, srate));
     m->percussion = -1;
     m->do_filter = 0;
     m->cc91 = 0;
@@ -440,6 +439,7 @@ struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_sect
     m->enable_vibrato_upper = cbox_config_get_int(cfg_section, "vibrato_upper", 1);
     m->enable_vibrato_lower = cbox_config_get_int(cfg_section, "vibrato_lower", 0);
     m->percussion_3rd = cbox_config_get_int(cfg_section, "percussion_3rd", 1);
+    m->vibrato_dphase = (int)(6.6 / srate * 65536 * 65536);
     
     vibrato_mode = cbox_config_get_string_with_default(cfg_section, "vibrato_mode", "c3");
     if (vibrato_mode[0] == 'c')
@@ -471,7 +471,7 @@ struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_sect
             scaling = 1;
         if (scaling > 24)
             scaling = 24 + ((scaling - 24) / 2.5);
-        m->frequency[i] = (uint32_t)(freq_hz * 65536 * 65536 / 44100);
+        m->frequency[i] = (uint32_t)(freq_hz * 65536 * 65536 / srate);
         m->phase[i] = 0;
         m->amp_scaling[i] = (int)(1024 * scaling);
     }

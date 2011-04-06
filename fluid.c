@@ -39,7 +39,7 @@ struct fluidsynth_module
     int sfid;
 };
 
-struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section)
+struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, int srate)
 {
     int result = 0;
     int i;
@@ -60,6 +60,7 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section)
     m->module.process_event = fluidsynth_process_event;
     m->module.process_block = fluidsynth_process_block;
     m->settings = new_fluid_settings();
+    fluid_settings_setnum(m->settings, "synth.sample-rate", srate);
     m->synth = new_fluid_synth(m->settings);
     g_message("Loading soundfont %s", bankname);
     result = fluid_synth_sfload(m->synth, bankname, 1);
