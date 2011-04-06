@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define CUE_BUFFER_SIZE 16000
 #define PREFETCH_THRESHOLD (CUE_BUFFER_SIZE / 4)
-#define MAX_READAHEAD_BUFFERS 4
+#define MAX_READAHEAD_BUFFERS 3
 
 #define NO_SAMPLE_LOOP ((uint64_t)-1ULL)
 
@@ -53,8 +53,8 @@ struct stream_player_module
 
     SNDFILE *sndfile;
     SF_INFO info;
-    uint32_t readptr;
-    uint32_t restart;
+    uint64_t readptr;
+    uint64_t restart;
     
     volatile int buffer_in_use;
     
@@ -100,10 +100,10 @@ struct stream_player_cue_point *get_cue(struct stream_player_module *m, uint64_t
 {
     int i;
     
-    if (is_contained(&m->cp_start, pos))
-        return &m->cp_start;
     if (is_contained(&m->cp_loop, pos))
         return &m->cp_loop;
+    if (is_contained(&m->cp_start, pos))
+        return &m->cp_start;
     
     for (i = 0; i < MAX_READAHEAD_BUFFERS; i++)
     {
@@ -143,17 +143,27 @@ void request_load(struct stream_player_module *m, int buf_idx, uint64_t pos)
 int get_unused_buffer(struct stream_player_module *m)
 {
     int i = 0;
+    int notbad = -1;
     
     // return first buffer that is not currently played or in queue; XXXKF this is a very primitive strategy, a good one would at least use the current play position
     for (i = 0; i < MAX_READAHEAD_BUFFERS; i++)
     {
+        int64_t rel;
         if (&m->cp_readahead[i] == m->pcp_current)
             continue;
         if (m->cp_readahead[i].queued)
             continue;
-        return i;
+        // If there's any unused buffer, return it
+        if (m->cp_readahead[i].position == NO_SAMPLE_LOOP)
+            return i;
+        // If this has already been played, return it
+        rel = m->readptr - m->cp_readahead[i].position;
+        if (rel >= m->cp_readahead[i].length)
+            return i;
+        // Use as second chance
+        notbad = i;
     }
-    return -1;
+    return notbad;
 }
 
 void *sample_preload_thread(void *user_data)
@@ -187,6 +197,9 @@ static void request_next(struct stream_player_module *m, uint64_t pos)
     // Check if we've requested a next buffer, if not, request it
     
     // First verify if our idea of 'next' buffer is correct
+    // XXXKF This is technically incorrect, it won't tell whether the next "block" that's there
+    // isn't actually a single sample. I worked it around by ensuring end of blocks are always
+    // at CUE_BUFFER_SIZE boundary, and this works well, but causes buffers to be of uneven size.
     if (m->pcp_next && (is_contained(m->pcp_next, pos) || is_queued(m->pcp_next, pos)))
     {
         // We're still waiting for the requested buffer, but that's OK
@@ -208,7 +221,7 @@ static void request_next(struct stream_player_module *m, uint64_t pos)
         request_load(m, buf_idx, pos);
         m->pcp_next = &m->cp_readahead[buf_idx];
         
-        // printf("Requested load into buffer %d at %lld\n", buf_idx, (long long) pos);
+        // printf("@%lld: Requested load into buffer %d at %lld\n", (long long)m->readptr, buf_idx, (long long) pos);
     }
 }
 
@@ -256,7 +269,7 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
     int i, optr;
     unsigned char buf_idx;
     
-    if (m->readptr >= (uint32_t)m->info.frames)
+    if (m->readptr == NO_SAMPLE_LOOP)
     {
         for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
         {
@@ -273,6 +286,9 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
     
     optr = 0;
     do {
+        if (m->readptr == NO_SAMPLE_LOOP)
+            break;
+
         if (m->pcp_current && !is_contained(m->pcp_current, m->readptr))
             m->pcp_current = NULL;
         
@@ -289,14 +305,10 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
         
         if (!m->pcp_current)
         {
-            // Underrun; generate empty output in any case
-            for (i = optr; i < CBOX_BLOCK_SIZE; i++)
-            {
-                outputs[0][i] = outputs[1][i] = 0;
-            }
-            
+            printf("Underrun at %d\n", (int)m->readptr);
+            // Underrun; request/wait for next block and output zeros
             request_next(m, m->readptr);
-            return;
+            break;
         }
         assert(!m->pcp_current->queued);
         
@@ -313,14 +325,21 @@ void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_s
         if (count > CBOX_BLOCK_SIZE - optr)
             count = CBOX_BLOCK_SIZE - optr;
         
+        // printf("Copy samples: copying %d, optr %d, %lld = %d @ [%lld - %lld], left %d\n", count, optr, (long long)m->readptr, pos, (long long)m->pcp_current->position, (long long)data_end, (int)data_left);
         copy_samples(m, outputs, data, count, optr, pos);
         optr += count;
     } while(optr < CBOX_BLOCK_SIZE);
+    
+    for (i = optr; i < CBOX_BLOCK_SIZE; i++)
+    {
+        outputs[0][i] = outputs[1][i] = 0;
+    }
 }
 
 struct cbox_module *stream_player_create(void *user_data, const char *cfg_section)
 {
     int i;
+    int rest;
     static int inited = 0;
     
     if (!inited)
@@ -352,7 +371,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     m->rb_just_read = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
     
     m->readptr = 0;
-    m->restart = cbox_config_get_int(cfg_section, "loop", -1);
+    m->restart = (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", -1);
     m->pcp_current = &m->cp_start;
     // for testing
     m->pcp_current = NULL;
@@ -360,7 +379,10 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     
     init_cue(m, &m->cp_start, CUE_BUFFER_SIZE, 0);
     load_at_cue(m, &m->cp_start);
-    init_cue(m, &m->cp_loop, CUE_BUFFER_SIZE, m->restart);
+    if (m->restart > 0 && (m->restart % CUE_BUFFER_SIZE) > 0)
+        init_cue(m, &m->cp_loop, CUE_BUFFER_SIZE + (CUE_BUFFER_SIZE - (m->restart % CUE_BUFFER_SIZE)), m->restart);
+    else
+        init_cue(m, &m->cp_loop, CUE_BUFFER_SIZE, m->restart);
     load_at_cue(m, &m->cp_loop);
     for (i = 0; i < MAX_READAHEAD_BUFFERS; i++)
         init_cue(m, &m->cp_readahead[i], CUE_BUFFER_SIZE, NO_SAMPLE_LOOP);
