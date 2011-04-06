@@ -47,24 +47,17 @@ void parametric_eq_process_event(void *user_data, const uint8_t *data, uint32_t 
 void parametric_eq_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct parametric_eq_module *m = user_data;
-    int b, i, c;
+    int b, c;
     
-    float data[2][CBOX_BLOCK_SIZE];
     for (c = 0; c < 2; c++)
-        for (i = 0; i < CBOX_BLOCK_SIZE; i++)
-            data[c][i] = inputs[c][i];
-    
-    for (b = 0; b < NO_BANDS; b++)
     {
-        for (c = 0; c < 2; c++)
+        cbox_biquadf_process_to(&m->state[0][c], &m->coeffs[0], inputs[c], outputs[c]);
+    
+        for (b = 1; b < NO_BANDS; b++)
         {
-            cbox_biquadf_process(&m->state[b][c], &m->coeffs[b], &data[c][0]);
+            cbox_biquadf_process(&m->state[b][c], &m->coeffs[b], outputs[c]);
         }
     }
-
-    for (c = 0; c < 2; c++)
-        for (i = 0; i < CBOX_BLOCK_SIZE; i++)
-            outputs[c][i] = data[c][i];
 }
 
 struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_section)
