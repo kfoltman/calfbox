@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <stdlib.h>
 #include <math.h>
+#include <memory.h>
 
 typedef float cbox_sample_t;
 
@@ -79,6 +80,11 @@ inline void sanebf(float *buf)
     int i;
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
         buf[i] = sanef(buf[i]);
+}
+
+inline void copybf(float *to, float *from)
+{
+    memcpy(to, from, sizeof(float) * CBOX_BLOCK_SIZE);
 }
 
 #endif
