@@ -242,7 +242,7 @@ static void copy_samples(struct stream_player_module *m, cbox_sample_t **outputs
         for (i = 0; i < count; i++)
         {
             outputs[0][ofs + i] = data[pos << 1];
-            outputs[1][ofs + i] = data[(pos << 1)];
+            outputs[1][ofs + i] = data[(pos << 1) + 1];
             pos++;
         }
     }
