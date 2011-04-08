@@ -28,6 +28,8 @@ extern struct cbox_module_manifest stream_player_module;
 extern struct cbox_module_manifest tone_control_module;
 extern struct cbox_module_manifest delay_module;
 extern struct cbox_module_manifest parametric_eq_module;
+extern struct cbox_module_manifest phaser_module;
+extern struct cbox_module_manifest chorus_module;
 
 struct cbox_module_manifest *cbox_module_list[] = {
     &tonewheel_organ_module,
@@ -36,6 +38,8 @@ struct cbox_module_manifest *cbox_module_list[] = {
     &tone_control_module,
     &delay_module,
     &parametric_eq_module,
+    &phaser_module,
+    &chorus_module,
     NULL
 };
 

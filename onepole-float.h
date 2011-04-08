@@ -72,6 +72,15 @@ static inline void cbox_onepolef_set_allpass(struct cbox_onepolef_coeffs *coeffs
     coeffs->b1 = b1;
 }
 
+static inline float cbox_onepolef_process_sample(struct cbox_onepolef_state *state, struct cbox_onepolef_coeffs *coeffs, float in)
+{
+    float out = sanef(coeffs->a0 * in + coeffs->a1 * state->x1 - coeffs->b1 * state->y1);
+    
+    state->x1 = in;
+    state->y1 = out;
+    return out;
+}
+
 static inline void cbox_onepolef_process(struct cbox_onepolef_state *state, struct cbox_onepolef_coeffs *coeffs, float *buffer)
 {
     int i;
