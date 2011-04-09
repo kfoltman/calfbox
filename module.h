@@ -59,8 +59,9 @@ struct cbox_module
     cbox_sample_t *input_samples;
     cbox_sample_t *output_samples;
     
-    void (*process_event)(struct cbox_module *user_data, const uint8_t *data, uint32_t len);
-    void (*process_block)(struct cbox_module *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs);
+    void (*process_event)(struct cbox_module *module, const uint8_t *data, uint32_t len);
+    void (*process_block)(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
+    void (*destroy)(struct cbox_module *module);
 };
 
 struct cbox_module_manifest

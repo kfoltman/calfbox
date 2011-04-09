@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <fluidsynth.h>
 
 static void fluidsynth_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
-
 static void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
+static void fluidsynth_destroy(struct cbox_module *module);
 
 struct fluidsynth_module
 {
@@ -59,6 +59,7 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
     m->module.user_data = m;
     m->module.process_event = fluidsynth_process_event;
     m->module.process_block = fluidsynth_process_block;
+    m->module.destroy = fluidsynth_destroy;
     m->settings = new_fluid_settings();
     fluid_settings_setnum(m->settings, "synth.sample-rate", srate);
     m->synth = new_fluid_synth(m->settings);
@@ -156,6 +157,14 @@ void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, u
 
             }
     }
+}
+
+void fluidsynth_destroy(struct cbox_module *module)
+{
+    struct fluidsynth_module *m = (struct fluidsynth_module *)module;
+    
+    delete_fluid_settings(m->settings);
+    delete_fluid_synth(m->synth);
 }
 
 struct cbox_module_livecontroller_metadata fluidsynth_controllers[] = {

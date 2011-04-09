@@ -84,6 +84,7 @@ struct cbox_module *delay_create(void *user_data, const char *cfg_section, int s
     m->module.user_data = m;
     m->module.process_event = delay_process_event;
     m->module.process_block = delay_process_block;
+    m->module.destroy = NULL;
     m->pos = 0;
     m->length = srate / 4;
     for (i = 0; i < MAX_DELAY_LENGTH; i++)
@@ -91,7 +92,6 @@ struct cbox_module *delay_create(void *user_data, const char *cfg_section, int s
     
     return &m->module;
 }
-
 
 struct cbox_module_keyrange_metadata delay_keyranges[] = {
 };

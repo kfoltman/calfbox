@@ -93,6 +93,7 @@ struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int 
     m->module.user_data = m;
     m->module.process_event = chorus_process_event;
     m->module.process_block = chorus_process_block;
+    m->module.destroy = NULL;
     m->pos = 0;
     m->length = srate / 4;
     m->phase = 0;

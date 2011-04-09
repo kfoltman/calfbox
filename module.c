@@ -95,4 +95,6 @@ void cbox_module_destroy(struct cbox_module *module)
 {
     free(module->input_samples);
     free(module->output_samples);
+    if (module->destroy)
+        module->destroy(module);
 }

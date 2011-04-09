@@ -336,6 +336,19 @@ void stream_player_process_block(struct cbox_module *module, cbox_sample_t **inp
     }
 }
 
+void stream_player_destroy(struct cbox_module *module)
+{
+    struct stream_player_module *m = (struct stream_player_module *)module;
+    unsigned char cmd = 255;
+    
+    jack_ringbuffer_write(m->rb_for_reading, &cmd, 1);
+    pthread_join(m->thr_preload, NULL);
+    
+    jack_ringbuffer_free(m->rb_for_reading);
+    jack_ringbuffer_free(m->rb_just_read);
+    sf_close(m->sndfile);
+}
+
 struct cbox_module *stream_player_create(void *user_data, const char *cfg_section, int srate)
 {
     int i;
@@ -357,6 +370,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     m->module.user_data = m;
     m->module.process_event = stream_player_process_event;
     m->module.process_block = stream_player_process_block;
+    m->module.destroy = stream_player_destroy;
     
     m->sndfile = sf_open(filename, SFM_READ, &m->info);
     
@@ -385,7 +399,10 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
         init_cue(m, &m->cp_loop, CUE_BUFFER_SIZE, m->restart);
     load_at_cue(m, &m->cp_loop);
     for (i = 0; i < MAX_READAHEAD_BUFFERS; i++)
+    {
         init_cue(m, &m->cp_readahead[i], CUE_BUFFER_SIZE, NO_SAMPLE_LOOP);
+        m->cp_readahead_ready[i] = 0;
+    }
     
     if (pthread_create(&m->thr_preload, NULL, sample_preload_thread, m))
     {
@@ -395,20 +412,6 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     
     
     return &m->module;
-}
-
-// XXXKF not used yet, I'll add it to the API some day
-void stream_player_destroy(void *user_data)
-{
-    struct stream_player_module *m = user_data;
-    unsigned char cmd = 255;
-    
-    jack_ringbuffer_write(m->rb_for_reading, &cmd, 1);
-    pthread_join(m->thr_preload, NULL);
-    
-    jack_ringbuffer_free(m->rb_for_reading);
-    jack_ringbuffer_free(m->rb_just_read);
-    sf_close(m->sndfile);
 }
 
 struct cbox_module_keyrange_metadata stream_player_keyranges[] = {

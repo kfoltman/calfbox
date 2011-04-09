@@ -74,6 +74,7 @@ struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_sectio
     m->module.user_data = m;
     m->module.process_event = parametric_eq_process_event;
     m->module.process_block = parametric_eq_process_block;
+    m->module.destroy = NULL;
     
     cbox_biquadf_set_peakeq_rbj(&m->coeffs[0], 150, 0.5, 3, srate);
     cbox_biquadf_set_peakeq_rbj(&m->coeffs[1], 400, 0.7, 0.125, srate);

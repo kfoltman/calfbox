@@ -89,6 +89,7 @@ struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int 
     m->module.user_data = m;
     m->module.process_event = phaser_process_event;
     m->module.process_block = phaser_process_block;
+    m->module.destroy = NULL;
     m->tpdsr = 2.0 * M_PI / srate;
     
     for (b = 0; b < NO_STAGES; b++)
