@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "config-api.h"
+#include "instr.h"
 #include "io.h"
 #include "menu.h"
 #include "midi.h"
@@ -138,31 +139,22 @@ int main(int argc, char *argv[])
 
     cbox_config_init(config_name);
 
-    instr_section = g_strdup_printf("instrument:%s", instrument_name);
-    module = cbox_config_get_string_with_default(instr_section, "engine", "tonewheel_organ");
-    
     if (!cbox_io_init(&io, &params))
     {
         fprintf(stderr, "Cannot initialise sound I/O\n");
         return 1;
     }
     
-    mptr = cbox_module_get_by_name(module);
-    if (!mptr)
-    {
-        fprintf(stderr, "Cannot find module %s\n", module);
-        return 1;
-    }
-    cbox_module_manifest_dump(mptr);
-    process.module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(&io));
+    cbox_instruments_init(&io);
+    
+    process.module = cbox_instruments_get_by_name(instrument_name);
+
     if (!process.module)
-    {
-        fprintf(stderr, "Cannot create module %s\n", module);
-        return 1;
-    }
+        goto fail;
+
     if (effect_module_name && *effect_module_name)
     {
-        mptr = cbox_module_get_by_name(effect_module_name);
+        mptr = cbox_module_manifest_get_by_name(effect_module_name);
         if (!mptr)
         {
             fprintf(stderr, "Cannot find effect %s\n", effect_module_name);
@@ -181,6 +173,9 @@ int main(int argc, char *argv[])
     run_ui();
     cbox_io_stop(&io);
     cbox_io_close(&io);
+
+fail:
+    cbox_instruments_close();
     cbox_config_close();
     
     if (process.effect)

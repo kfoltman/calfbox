@@ -67,7 +67,7 @@ void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
     }
 }
 
-struct cbox_module_manifest *cbox_module_get_by_name(const char *name)
+struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char *name)
 {
     struct cbox_module_manifest **mptr;
     
