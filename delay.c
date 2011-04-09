@@ -39,14 +39,14 @@ struct delay_module
     int length;
 };
 
-void delay_process_event(void *user_data, const uint8_t *data, uint32_t len)
+void delay_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct delay_module *m = user_data;
+    struct delay_module *m = (struct delay_module *)module;
 }
 
-void delay_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
+void delay_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
-    struct delay_module *m = user_data;
+    struct delay_module *m = (struct delay_module *)module;
     
     int pos = m->pos ;
     int dv = m->length;

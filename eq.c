@@ -39,14 +39,14 @@ struct parametric_eq_module
     struct cbox_biquadf_coeffs coeffs[NO_BANDS];
 };
 
-void parametric_eq_process_event(void *user_data, const uint8_t *data, uint32_t len)
+void parametric_eq_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct parametric_eq_module *m = user_data;
+    struct parametric_eq_module *m = (struct parametric_eq_module *)module;
 }
 
-void parametric_eq_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
+void parametric_eq_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
-    struct parametric_eq_module *m = user_data;
+    struct parametric_eq_module *m = (struct parametric_eq_module *)module;
     int b, c;
     
     for (c = 0; c < 2; c++)

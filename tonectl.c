@@ -38,14 +38,14 @@ struct tone_control_module
     struct cbox_onepolef_state lowpass_state[2], highpass_state[2];
 };
 
-void tone_control_process_event(void *user_data, const uint8_t *data, uint32_t len)
+void tone_control_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct tone_control_module *m = user_data;
+    struct tone_control_module *m = (struct tone_control_module *)module;
 }
 
-void tone_control_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
+void tone_control_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
-    struct tone_control_module *m = user_data;
+    struct tone_control_module *m = (struct tone_control_module *)module;
     
     cbox_onepolef_process_to(&m->lowpass_state[0], &m->lowpass_coeffs, inputs[0], outputs[0]);
     cbox_onepolef_process_to(&m->lowpass_state[1], &m->lowpass_coeffs, inputs[1], outputs[1]);

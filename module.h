@@ -57,8 +57,8 @@ struct cbox_module
 {
     void *user_data;
     
-    void (*process_event)(void *user_data, const uint8_t *data, uint32_t len);
-    void (*process_block)(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs);
+    void (*process_event)(struct cbox_module *user_data, const uint8_t *data, uint32_t len);
+    void (*process_block)(struct cbox_module *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs);
 };
 
 struct cbox_module_manifest

@@ -40,14 +40,14 @@ struct chorus_module
     int phase, dphase;
 };
 
-void chorus_process_event(void *user_data, const uint8_t *data, uint32_t len)
+void chorus_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct chorus_module *m = user_data;
+    struct chorus_module *m = (struct chorus_module *)module;
 }
 
-void chorus_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
+void chorus_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
-    struct chorus_module *m = user_data;
+    struct chorus_module *m = (struct chorus_module *)module;
     
     int dv = m->length;
     float dry_amt = 0.5f;

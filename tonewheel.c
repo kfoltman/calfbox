@@ -94,9 +94,9 @@ static void set_keymask(struct tonewheel_organ_module *m, int channel, int key, 
         *manual &= ~mask;
 }
 
-void tonewheel_organ_process_event(void *user_data, const uint8_t *data, uint32_t len)
+void tonewheel_organ_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct tonewheel_organ_module *m = user_data;
+    struct tonewheel_organ_module *m = (struct tonewheel_organ_module *)module;
     if (len > 0)
     {
         int cmd = data[0] >> 4;
@@ -251,9 +251,9 @@ static void set_tonewheels(struct tonewheel_organ_module *m, int tonegens[2][92]
     }
 }
 
-void tonewheel_organ_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
+void tonewheel_organ_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
-    struct tonewheel_organ_module *m = user_data;
+    struct tonewheel_organ_module *m = (struct tonewheel_organ_module *)module;
     int n, i;
     //float a01, b1, x1, y1, x, q;
     int a01, b1, x1, y1;

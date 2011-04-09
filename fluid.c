@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <fluidsynth.h>
 
-static void fluidsynth_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs);
+static void fluidsynth_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 
-static void fluidsynth_process_event(void *user_data, const uint8_t *data, uint32_t len);
+static void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 
 struct fluidsynth_module
 {
@@ -111,15 +111,15 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
     return &m->module;
 }
 
-void fluidsynth_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
+void fluidsynth_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
-    struct fluidsynth_module *m = user_data;
+    struct fluidsynth_module *m = (struct fluidsynth_module *)module;
     fluid_synth_write_float(m->synth, CBOX_BLOCK_SIZE, outputs[0], 0, 1, outputs[1], 0, 1);
 }
 
-void fluidsynth_process_event(void *user_data, const uint8_t *data, uint32_t len)
+void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct fluidsynth_module *m = user_data;
+    struct fluidsynth_module *m = (struct fluidsynth_module *)module;
     if (len > 0)
     {
         int cmd = data[0] >> 4;

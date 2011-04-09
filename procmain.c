@@ -79,7 +79,7 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
                 if (event)
                 {
                     if (event->time <= i)
-                        (*module->process_event)(module->user_data, cbox_midi_event_get_data(event), event->size);
+                        (*module->process_event)(module, cbox_midi_event_get_data(event), event->size);
                     else
                     {
                         highwatermark = event->time;
@@ -96,18 +96,18 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
         {
             cbox_sample_t left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
             cbox_sample_t *bufs[2] = {left, right};
-            (*module->process_block)(module->user_data, NULL, bufs);
-            (*effect->process_block)(effect->user_data, bufs, outputs);
+            (*module->process_block)(module, NULL, bufs);
+            (*effect->process_block)(effect, bufs, outputs);
         }
         else
-            (*module->process_block)(module->user_data, NULL, outputs);
+            (*module->process_block)(module, NULL, outputs);
     }
     while(cur_event < event_count)
     {
         struct cbox_midi_event *event = cbox_midi_buffer_get_event(&midi_buf, cur_event);
         if (event)
         {
-            (*module->process_event)(module->user_data, cbox_midi_event_get_data(event), event->size);
+            (*module->process_event)(module, cbox_midi_event_get_data(event), event->size);
         }
         else
             break;

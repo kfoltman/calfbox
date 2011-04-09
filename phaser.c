@@ -41,14 +41,14 @@ struct phaser_module
     float tpdsr;
 };
 
-void phaser_process_event(void *user_data, const uint8_t *data, uint32_t len)
+void phaser_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct phaser_module *m = user_data;
+    struct phaser_module *m = (struct phaser_module *)module;
 }
 
-void phaser_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
+void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
-    struct phaser_module *m = user_data;
+    struct phaser_module *m = (struct phaser_module *)module;
     int s, c, i;
     int stages = NO_STAGES;
     float center = 600;

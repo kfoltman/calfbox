@@ -187,9 +187,9 @@ void *sample_preload_thread(void *user_data)
         
 }
 
-void stream_player_process_event(void *user_data, const uint8_t *data, uint32_t len)
+void stream_player_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct stream_player_module *m = user_data;
+    struct stream_player_module *m = (struct stream_player_module *)module;
 }
 
 static void request_next(struct stream_player_module *m, uint64_t pos)
@@ -263,9 +263,9 @@ static void copy_samples(struct stream_player_module *m, cbox_sample_t **outputs
     }
 }
 
-void stream_player_process_block(void *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs)
+void stream_player_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
-    struct stream_player_module *m = user_data;
+    struct stream_player_module *m = (struct stream_player_module *)module;
     int i, optr;
     unsigned char buf_idx;
     
