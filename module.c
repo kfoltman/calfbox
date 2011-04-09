@@ -78,3 +78,21 @@ struct cbox_module_manifest *cbox_module_get_by_name(const char *name)
     }
     return NULL;
 }
+
+struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate)
+{
+    struct cbox_module *module = manifest->create(manifest->user_data, cfg_section, srate);
+    if (!module)
+        return NULL;
+    
+    module->input_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * manifest->inputs);
+    module->output_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * manifest->outputs);
+    
+    return module;
+}
+
+void cbox_module_destroy(struct cbox_module *module)
+{
+    free(module->input_samples);
+    free(module->output_samples);
+}

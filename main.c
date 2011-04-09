@@ -154,10 +154,10 @@ int main(int argc, char *argv[])
         return 1;
     }
     cbox_module_manifest_dump(mptr);
-    process.module = (*mptr->create)(mptr->user_data, instr_section, cbox_io_get_sample_rate(&io));
+    process.module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(&io));
     if (!process.module)
     {
-        fprintf(stderr, "Cannot find module %s\n", module);
+        fprintf(stderr, "Cannot create module %s\n", module);
         return 1;
     }
     if (effect_module_name && *effect_module_name)
@@ -165,11 +165,11 @@ int main(int argc, char *argv[])
         mptr = cbox_module_get_by_name(effect_module_name);
         if (!mptr)
         {
-            fprintf(stderr, "Cannot create module %s\n", effect_module_name);
+            fprintf(stderr, "Cannot find effect %s\n", effect_module_name);
             return 1;
         }
         cbox_module_manifest_dump(mptr);
-        process.effect = (*mptr->create)(mptr->user_data, instr_section, cbox_io_get_sample_rate(&io));
+        process.effect = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(&io));
         if (!process.effect)
         {
             fprintf(stderr, "Cannot create effect %s\n", effect_module_name);
@@ -182,6 +182,11 @@ int main(int argc, char *argv[])
     cbox_io_stop(&io);
     cbox_io_close(&io);
     cbox_config_close();
+    
+    if (process.effect)
+        cbox_module_destroy(process.effect);
+    cbox_module_destroy(process.module);
+    
     g_free(instr_section);
     
     return 0;

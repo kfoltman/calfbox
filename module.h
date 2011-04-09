@@ -56,6 +56,8 @@ struct cbox_module_voicingparam_metadata
 struct cbox_module
 {
     void *user_data;
+    cbox_sample_t *input_samples;
+    cbox_sample_t *output_samples;
     
     void (*process_event)(struct cbox_module *user_data, const uint8_t *data, uint32_t len);
     void (*process_block)(struct cbox_module *user_data, cbox_sample_t **inputs, cbox_sample_t **outputs);
@@ -97,5 +99,8 @@ extern struct cbox_module_manifest *cbox_module_list[];
 
 extern void cbox_module_manifest_dump(struct cbox_module_manifest *manifest);
 extern struct cbox_module_manifest *cbox_module_get_by_name(const char *name);
+extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate);
+
+extern void cbox_module_destroy(struct cbox_module *module);
 
 #endif
