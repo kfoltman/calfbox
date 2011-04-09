@@ -424,6 +424,7 @@ struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_sect
     m->module.user_data = m;
     m->module.process_event = tonewheel_organ_process_event;
     m->module.process_block = tonewheel_organ_process_block;
+    m->module.destroy = NULL;
     cbox_onepole_reset(&m->filter_anticlick);
     cbox_onepole_reset(&m->filter_overdrive);
     cbox_onepole_set_lowpass(&m->filter_anticlick_coeffs, hz2w(180.0, srate));
