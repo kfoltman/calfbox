@@ -5,6 +5,20 @@ out_right=#1
 ;midi=alsa_pcm:E-MU-XMidi2X2/midi_capture_2;alsa_pcm:E-MU-XMidi2X2/midi_capture_1
 midi=~alsa_pcm:in-.*-E-MU-XMidi2X2-MIDI-1;~alsa_pcm:in-.*-E-MU-XMidi2X2-MIDI-2;~alsa_pcm:in-.*-padKONTROL-MIDI-2
 
+[scene:example]
+layer1=organ
+layer2=piano
+
+[layer:piano]
+instrument=progmega
+out_channel=1
+low_note=C3
+
+[layer:organ]
+instrument=default
+out_channel=1
+high_note=B2
+
 [instrument:default]
 engine=tonewheel_organ
 percussion=1
