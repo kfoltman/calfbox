@@ -113,14 +113,9 @@ static inline int note_from_string(const char *note)
     for (pos = 1; note[pos] == 'b' || note[pos] == '#'; pos++)
         nv += (note[pos] == 'b') ? -1 : +1;
     
-    if (note[pos] == '-' && note[pos + 1] >= '1' && note[pos + 1] <= '2')
+    if ((note[pos] == '-' && note[pos + 1] >= '1' && note[pos + 1] <= '2' && note[pos + 2] == '\0') || (note[pos] >= '0' && note[pos] <= '9' && note[pos + 1] == '\0'))
     {
-        return nv + 12 * (3 - (note[pos + 1] - '0'));
-    }
-    else
-    if (note[pos] >= '0' && note[pos] <= '9')
-    {
-        return nv + 12 * (3 + note[pos] - '0');
+        return nv + 12 * (2 + atoi(note + pos));
     }
     
     return -1;
