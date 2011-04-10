@@ -65,6 +65,8 @@ struct stream_player_module
     jack_ringbuffer_t *rb_for_reading, *rb_just_read;
     
     pthread_t thr_preload;
+    
+    float gain;
 };
 
 static void init_cue(struct stream_player_module *m, struct stream_player_cue_point *pt, uint32_t size, uint64_t pos)
@@ -228,12 +230,13 @@ static void request_next(struct stream_player_module *m, uint64_t pos)
 static void copy_samples(struct stream_player_module *m, cbox_sample_t **outputs, float *data, int count, int ofs, int pos)
 {
     int i;
+    float gain = m->gain;
     
     if (m->info.channels == 1)
     {
         for (i = 0; i < count; i++)
         {
-            outputs[0][ofs + i] = outputs[1][ofs + i] = data[pos + i];
+            outputs[0][ofs + i] = outputs[1][ofs + i] = gain * data[pos + i];
         }
     }
     else
@@ -241,8 +244,8 @@ static void copy_samples(struct stream_player_module *m, cbox_sample_t **outputs
     {
         for (i = 0; i < count; i++)
         {
-            outputs[0][ofs + i] = data[pos << 1];
-            outputs[1][ofs + i] = data[(pos << 1) + 1];
+            outputs[0][ofs + i] = gain * data[pos << 1];
+            outputs[1][ofs + i] = gain * data[(pos << 1) + 1];
             pos++;
         }
     }
@@ -251,8 +254,8 @@ static void copy_samples(struct stream_player_module *m, cbox_sample_t **outputs
         uint32_t ch = m->info.channels;
         for (i = 0; i < count; i++)
         {
-            outputs[0][ofs + i] = data[pos * ch];
-            outputs[1][ofs + i] = data[pos * ch + 1];
+            outputs[0][ofs + i] = gain * data[pos * ch];
+            outputs[1][ofs + i] = gain * data[pos * ch + 1];
             pos++;
         }
     }
@@ -390,6 +393,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     // for testing
     m->pcp_current = NULL;
     m->pcp_next = NULL;
+    m->gain = pow(2.0, cbox_config_get_float(cfg_section, "gain", 0.f) / 6.0);
     
     init_cue(m, &m->cp_start, CUE_BUFFER_SIZE, 0);
     load_at_cue(m, &m->cp_start);
