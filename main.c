@@ -48,7 +48,7 @@ static struct option long_options[] = {
 
 void print_help(char *progname)
 {
-    printf("Usage: %s [--help] [--instrument <name>] [--config <name>]\n", progname);
+    printf("Usage: %s [--help] [--instrument <name>] [--scene <name>] [--config <name>]\n", progname);
     exit(0);
 }
 
