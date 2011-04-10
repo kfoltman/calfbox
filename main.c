@@ -19,10 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config-api.h"
 #include "instr.h"
 #include "io.h"
+#include "layer.h"
 #include "menu.h"
 #include "midi.h"
 #include "module.h"
 #include "procmain.h"
+#include "scene.h"
 #include "ui.h"
 
 #include <glib.h>
@@ -33,11 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:e:h";
+static const char *short_options = "i:c:e:s:h";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
     {"instrument", 1, 0, 'i'},
+    {"scene", 1, 0, 's'},
     {"effect", 1, 0, 'e'},
     {"config", 1, 0, 'c'},
     {0,0,0,0},
@@ -104,12 +107,14 @@ int main(int argc, char *argv[])
 {
     struct cbox_io io;
     struct cbox_open_params params;
-    struct cbox_process_struct process = { .module = NULL, .effect = NULL };
+    struct cbox_process_struct process = { .scene = NULL, .effect = NULL };
     struct cbox_io_callbacks cbs = { &process, main_process};
     const char *module = NULL;
     struct cbox_module_manifest *mptr;
+    struct cbox_layer *layer;
     const char *config_name = NULL;
     const char *instrument_name = "default";
+    const char *scene_name = NULL;
     const char *effect_module_name = NULL;
     char *instr_section;
 
@@ -126,6 +131,9 @@ int main(int argc, char *argv[])
                 break;
             case 'i':
                 instrument_name = optarg;
+                break;
+            case 's':
+                scene_name = optarg;
                 break;
             case 'e':
                 effect_module_name = optarg;
@@ -147,10 +155,21 @@ int main(int argc, char *argv[])
     
     cbox_instruments_init(&io);
     
-    process.module = cbox_instruments_get_by_name(instrument_name);
+    if (scene_name)
+    {
+        process.scene = cbox_scene_load(scene_name);        
+        if (!process.scene)
+            goto fail;
+    }
+    else
+    {
+        process.scene = cbox_scene_new();
+        layer = cbox_layer_new(instrument_name);
+        if (!layer)
+            goto fail;
 
-    if (!process.module)
-        goto fail;
+        cbox_scene_add_layer(process.scene, layer);
+    }
 
     if (effect_module_name && *effect_module_name)
     {
@@ -175,12 +194,13 @@ int main(int argc, char *argv[])
     cbox_io_close(&io);
 
 fail:
-    cbox_instruments_close();
-    cbox_config_close();
-    
     if (process.effect)
         cbox_module_destroy(process.effect);
-    cbox_module_destroy(process.module);
+    if (process.scene)
+        cbox_scene_destroy(process.scene);
+    
+    cbox_instruments_close();
+    cbox_config_close();
     
     g_free(instr_section);
     

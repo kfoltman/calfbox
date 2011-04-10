@@ -59,7 +59,7 @@ struct cbox_module
     void *user_data;
     cbox_sample_t *input_samples;
     cbox_sample_t *output_samples;
-    struct cbox_midi_buffer *midi_input;
+    struct cbox_midi_buffer midi_input;
     
     void (*process_event)(struct cbox_module *module, const uint8_t *data, uint32_t len);
     void (*process_block)(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);

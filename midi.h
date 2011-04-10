@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_MIDI_H
 #define CBOX_MIDI_H
 
+#include <ctype.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -95,6 +96,33 @@ static inline int cbox_midi_buffer_write_event(struct cbox_midi_buffer *buffer, 
         buffer->long_data_size += size;
     }
     return 1;
+}
+
+static inline int note_from_string(const char *note)
+{
+    int pos;
+    int nn = tolower(note[0]);
+    int nv;
+    if (nn >= '0' || nn <= '9')
+        return atoi(note);
+    if (nn < 'a' && nn > 'g')
+        return -1;
+    nv = nn - 'a' - 2;
+    
+    for (pos = 1; note[pos] == 'b' || note[pos] == '#'; pos++)
+        nv += (note[pos] == 'b') ? -1 : +1;
+    
+    if (note[pos] == '-' && note[pos + 1] >= '1' && note[pos + 1] <= '2')
+    {
+        return nv + 12 * (3 - (note[pos + 1] - '0'));
+    }
+    else
+    if (note[pos] >= '0' && note[pos] <= '9')
+    {
+        return nv + 12 * (3 + note[pos] - '0');
+    }
+    
+    return -1;
 }
 
 #endif

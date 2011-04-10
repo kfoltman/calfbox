@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010-2011 Krzysztof Foltman
+Copyright (C) 2010 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,20 +16,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CBOX_PROCMAIN_H
-#define CBOX_PROCMAIN_H
-
 #include <stdint.h>
 
-struct cbox_scene;
-struct cbox_io;
+struct cbox_module;
 
-struct cbox_process_struct
+struct cbox_layer
 {
-    struct cbox_scene *scene;
-    struct cbox_module *effect;
+    struct cbox_module *output;
+    int8_t in_channel; // -1 for Omni
+    int8_t out_channel; // -1 for Omni
+    uint8_t low_note;
+    uint8_t high_note;
+    int8_t transpose;
+    int8_t fixed_note;
 };
 
-extern void main_process(void *user_data, struct cbox_io *io, uint32_t nframes);
+extern struct cbox_layer *cbox_layer_new(const char *name);
+extern struct cbox_layer *cbox_layer_load(const char *module_name);
 
-#endif

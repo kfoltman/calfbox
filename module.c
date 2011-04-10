@@ -87,6 +87,7 @@ struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manife
     
     module->input_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * manifest->inputs);
     module->output_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * manifest->outputs);
+    cbox_midi_buffer_init(&module->midi_input);
     
     return module;
 }
