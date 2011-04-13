@@ -39,6 +39,13 @@ struct phaser_module
     struct cbox_onepolef_coeffs coeffs[2];
     float fb[2];
     float tpdsr;
+    
+    float center;
+    float mdepth;
+    float fb_amt;
+    float lfo_freq;
+    float phase, sphase;
+    int stages;
 };
 
 void phaser_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
@@ -50,16 +57,15 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
 {
     struct phaser_module *m = (struct phaser_module *)module;
     int s, c, i;
-    int stages = NO_STAGES;
-    float center = 600;
-    float mdepth = 580;
-    float fb_amt = 0;
-    float dphase = M_PI / 2;
-    static float phase = 0;
+    int stages = m->stages;
+    float fb_amt = m->fb_amt;
+    float phase = 0;
+    if (stages < 0 || stages > NO_STAGES)
+        stages = 0;
 
-    cbox_onepolef_set_allpass(&m->coeffs[0], m->tpdsr * (center + mdepth * sin(phase)));
-    cbox_onepolef_set_allpass(&m->coeffs[1], m->tpdsr * (center + mdepth * sin(phase + dphase)));
-    phase += 0.002;
+    cbox_onepolef_set_allpass(&m->coeffs[0], m->tpdsr * (m->center + m->mdepth * sin(m->phase)));
+    cbox_onepolef_set_allpass(&m->coeffs[1], m->tpdsr * (m->center + m->mdepth * sin(m->phase + m->sphase)));
+    m->phase += m->lfo_freq * CBOX_BLOCK_SIZE * m->tpdsr;
     
     for (c = 0; c < 2; c++)
     {
@@ -91,6 +97,13 @@ struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int 
     m->module.process_block = phaser_process_block;
     m->module.destroy = NULL;
     m->tpdsr = 2.0 * M_PI / srate;
+    m->phase = 0;
+    m->sphase = cbox_config_get_float(cfg_section, "stereo_phase", 1.f) * 2 * M_PI / 360;
+    m->lfo_freq = cbox_config_get_float(cfg_section, "lfo_freq", 1.f);
+    m->center = cbox_config_get_float(cfg_section, "center_freq", 1500.f);
+    m->mdepth = cbox_config_get_float(cfg_section, "mod_depth", 500.f);
+    m->fb_amt = cbox_config_get_float(cfg_section, "feedback", 0.f);
+    m->stages = cbox_config_get_int(cfg_section, "stages", NO_STAGES);
     
     for (b = 0; b < NO_STAGES; b++)
         for (c = 0; c < 2; c++)
