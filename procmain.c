@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "instr.h"
 #include "io.h"
 #include "layer.h"
 #include "midi.h"
@@ -36,7 +37,7 @@ int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_scen
 
     for (i = 0; i < scene->instrument_count; i++)
     {
-        cbox_midi_buffer_clear(&scene->instruments[i]->midi_input);
+        cbox_midi_buffer_clear(&scene->instruments[i]->module->midi_input);
     }
     for (i = 0; i < event_count; i++)
     {
@@ -82,7 +83,7 @@ int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_scen
                         }
                     }
                 }
-                if (!cbox_midi_buffer_write_event(&lp->output->midi_input, event.time, data, event.size))
+                if (!cbox_midi_buffer_write_event(&lp->instrument->module->midi_input, event.time, data, event.size))
                     return -i;
             }
         }
@@ -113,8 +114,10 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
     
     for (n = 0; n < scene->instrument_count; n++)
     {
-        struct cbox_module *module = scene->instruments[n];
-        int event_count = module->midi_input.count;
+        struct cbox_instrument *instr = scene->instruments[n];
+        struct cbox_module *module = instr->module;
+        struct cbox_module *effect = instr->insert;
+        int event_count = instr->module->midi_input.count;
         int cur_event = 0;
         uint32_t highwatermark = 0;
         
@@ -145,6 +148,10 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
                 }
             }
             (*module->process_block)(module, NULL, outputs);
+            if (effect)
+            {
+                (*effect->process_block)(effect, outputs, outputs);
+            }
             for (j = 0; j < CBOX_BLOCK_SIZE; j++)
             {
                 out_l[i + j] += left[j];

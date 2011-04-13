@@ -19,11 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MAX_LAYERS_PER_SCENE 16
 #define MAX_MODULES_PER_SCENE 16
 
+struct cbox_instrument;
+
 struct cbox_scene
 {
     struct cbox_layer *layers[MAX_LAYERS_PER_SCENE];
     int layer_count;
-    struct cbox_module *instruments[MAX_MODULES_PER_SCENE];
+    struct cbox_instrument *instruments[MAX_MODULES_PER_SCENE];
     int instrument_count;
 };
 

@@ -26,7 +26,7 @@ struct cbox_layer *cbox_layer_load(const char *name)
 {
     struct cbox_layer *l = malloc(sizeof(struct cbox_layer));
     const char *cv = NULL;
-    struct cbox_module *m = NULL;
+    struct cbox_instrument *instr = NULL;
     gchar *section = g_strdup_printf("layer:%s", name);
     
     if (!cbox_config_has_section(section))
@@ -41,13 +41,13 @@ struct cbox_layer *cbox_layer_load(const char *name)
         g_error("Instrument not specified for layer %s", name);
         goto error;
     }
-    m = cbox_instruments_get_by_name(cv);
-    if (!m)
+    instr = cbox_instruments_get_by_name(cv);
+    if (!instr)
     {
         g_error("Missing instrument %s for layer %s", cv, name);
         goto error;
     }
-    l->output = m;
+    l->instrument = instr;
 
     l->low_note = 0;
     l->high_note = 127;
@@ -79,16 +79,16 @@ extern struct cbox_layer *cbox_layer_new(const char *module_name)
 {
     struct cbox_layer *l = malloc(sizeof(struct cbox_layer));
     const char *cv = NULL;
-    struct cbox_module *m = NULL;
+    struct cbox_instrument *instr = NULL;
     
-    m = cbox_instruments_get_by_name(module_name);
-    if (!m)
+    instr = cbox_instruments_get_by_name(module_name);
+    if (!instr)
     {
         g_error("Missing instrument %s for new layer", module_name);
         goto error;
     }
 
-    l->output = m;
+    l->instrument = instr;
     l->low_note = 0;
     l->high_note = 127;
     

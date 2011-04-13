@@ -32,15 +32,17 @@ static struct cbox_instruments instruments;
 
 void cbox_instruments_init(struct cbox_io *io)
 {
-    // XXXKF needs to use 'full' version with g_free for key and NULL for value
+    // XXXKF needs to use 'full' version with g_free for key and value
     instruments.hash = g_hash_table_new(g_str_hash, g_str_equal);
     instruments.io = io;
 }
 
-extern struct cbox_module *cbox_instruments_get_by_name(const char *name)
+extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
 {
     struct cbox_module_manifest *mptr = NULL;
+    struct cbox_instrument *instr = NULL;
     struct cbox_module *module = NULL;
+    struct cbox_module *effect = NULL;
     gchar *instr_section = NULL;
     gpointer value = g_hash_table_lookup(instruments.hash, name);
     const char *cv;
@@ -50,7 +52,7 @@ extern struct cbox_module *cbox_instruments_get_by_name(const char *name)
     
     instr_section = g_strdup_printf("instrument:%s", name);
     
-    cv = cbox_config_get_string_with_default(instr_section, "engine", "tonewheel_organ");
+    cv = cbox_config_get_string(instr_section, "engine");
     if (!cv)
     {
         g_error("Engine not specified in instrument %s", name);
@@ -73,15 +75,60 @@ extern struct cbox_module *cbox_instruments_get_by_name(const char *name)
         goto error;
     }
     
+    effect = NULL;
+    cv = cbox_config_get_string(instr_section, "insert");
+    if (cv)
+    {
+        gchar *section2 = g_strdup_printf("fxpreset:%s", cv);
+        const char *engine;
+        struct cbox_module_manifest *mptr;
+        
+        if (!cbox_config_has_section(section2))
+        {
+            g_error("No FX preset called '%s'", cv);
+            goto fxpreset_error;
+        }
+        engine = cbox_config_get_string(section2, "engine");
+        if (!engine)
+        {
+            g_error("FX engine not specified for preset '%s'", cv);
+            goto fxpreset_error;
+        }
+        mptr = cbox_module_manifest_get_by_name(engine);
+        if (!mptr)
+        {
+            g_error("FX preset '%s' refers to non-existing engine '%s'", cv, engine);
+            goto fxpreset_error;
+        }
+        effect = cbox_module_manifest_create_module(mptr, section2, cbox_io_get_sample_rate(cbox_instruments_get_io()));
+        if (!effect)
+        {
+            g_error("Could not instantiate FX preset '%s'", cv);
+            goto fxpreset_error;
+        }
+        
+    fxpreset_error:
+        g_free(section2);
+    }
+
     free(instr_section);
     
-    g_hash_table_insert(instruments.hash, g_strdup(name), module);
+    instr = malloc(sizeof(struct cbox_instrument));
+    instr->module = module;
+    instr->insert = effect;
     
-    return module;
+    g_hash_table_insert(instruments.hash, g_strdup(name), instr);
+    
+    return instr;
     
 error:
     free(instr_section);
     return NULL;
+}
+
+struct cbox_io *cbox_instruments_get_io()
+{
+    return instruments.io;
 }
 
 void cbox_instruments_close()

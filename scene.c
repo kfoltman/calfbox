@@ -79,11 +79,11 @@ void cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer)
     
     for (i = 0; i < scene->layer_count; i++)
     {
-        if (scene->layers[i]->output == layer->output)
+        if (scene->layers[i]->instrument == layer->instrument)
             break;
     }
     if (i == scene->layer_count)
-        scene->instruments[scene->instrument_count++] = layer->output;
+        scene->instruments[scene->instrument_count++] = layer->instrument;
     scene->layers[scene->layer_count++] = layer;
 }
 
