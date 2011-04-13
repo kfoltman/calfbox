@@ -37,6 +37,7 @@ struct delay_module
     float storage[MAX_DELAY_LENGTH][2];
     int pos;
     int length;
+    float wetamt, dryamt, fbamt;
 };
 
 void delay_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
@@ -50,15 +51,16 @@ void delay_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbo
     
     int pos = m->pos ;
     int dv = m->length;
-    float wetamt = 0.5f;
-    float fbamt = 0.25f;
+    float dryamt = m->dryamt;
+    float wetamt = m->wetamt;
+    float fbamt = m->fbamt;
     
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         float dry[2] = { inputs[0][i], inputs[1][i] };
         float *delayed = &m->storage[pos & (MAX_DELAY_LENGTH - 1)][0];
         
-        float wet[2] = { dry[0] + wetamt * delayed[0], dry[1] + wetamt * delayed[1] };
+        float wet[2] = { dryamt * dry[0] + wetamt * delayed[0], dryamt * dry[1] + wetamt * delayed[1] };
         float fb[2] = { dry[0] + fbamt * delayed[0], dry[1] + fbamt * delayed[1] };
         outputs[0][i] = sanef(wet[0]);
         outputs[1][i] = sanef(wet[1]);
@@ -86,7 +88,10 @@ struct cbox_module *delay_create(void *user_data, const char *cfg_section, int s
     m->module.process_block = delay_process_block;
     m->module.destroy = NULL;
     m->pos = 0;
-    m->length = srate / 4;
+    m->length = cbox_config_get_float(cfg_section, "delay", 250) * srate / 1000;
+    m->dryamt = pow(2.0, cbox_config_get_float(cfg_section, "dry_gain", 0.f) / 6.0);
+    m->wetamt = pow(2.0, cbox_config_get_float(cfg_section, "wet_gain", -6.f) / 6.0);
+    m->fbamt = pow(2.0, cbox_config_get_float(cfg_section, "feedback_gain", -12.f) / 6.0);
     for (i = 0; i < MAX_DELAY_LENGTH; i++)
         m->storage[i][0] = m->storage[i][1] = 0.f;
     
