@@ -60,9 +60,20 @@ void parametric_eq_process_block(struct cbox_module *module, cbox_sample_t **inp
     }
 }
 
+static float get_band_param(const char *cfg_section, int band, const char *param_name, float def_value)
+{
+    gchar *key = g_strdup_printf("band%d_%s", band, param_name);
+    float value = cbox_config_get_float(cfg_section, key, def_value);
+    g_free(key);
+    return value;
+}
+
 struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_section, int srate)
 {
     int b, c;
+    static const float freqs[] = { 150, 400, 1600, 6400 };
+    static const float qs[] = { 0.7, 0.7, 0.7, 0.7 };
+    static const float gains[] = { 12, -12, 6, 6 };
     
     static int inited = 0;
     if (!inited)
@@ -76,10 +87,14 @@ struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_sectio
     m->module.process_block = parametric_eq_process_block;
     m->module.destroy = NULL;
     
-    cbox_biquadf_set_peakeq_rbj(&m->coeffs[0], 150, 0.5, 3, srate);
-    cbox_biquadf_set_peakeq_rbj(&m->coeffs[1], 400, 0.7, 0.125, srate);
-    cbox_biquadf_set_peakeq_rbj(&m->coeffs[2], 1600, 2, 4, srate);
-    cbox_biquadf_set_peakeq_rbj(&m->coeffs[3], 6400, 1, 4, srate);
+    for (b = 0; b < NO_BANDS; b++)
+    {
+        cbox_biquadf_set_peakeq_rbj(&m->coeffs[b], 
+            get_band_param(cfg_section, b, "freq", freqs[b]),
+            get_band_param(cfg_section, b, "q", qs[b]),
+            pow(2.0, get_band_param(cfg_section, b, "gain", gains[b]) / 6.0),
+            srate);
+    }
     
     for (b = 0; b < NO_BANDS; b++)
         for (c = 0; c < 2; c++)

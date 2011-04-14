@@ -30,14 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define MAX_CHORUS_LENGTH 4096
 
+static float sine_table[2049];
+
 struct chorus_module
 {
     struct cbox_module module;
 
     float storage[MAX_CHORUS_LENGTH][2];
     int pos;
-    int length;
-    int phase, dphase;
+    float lfo_freq;
+    float min_delay;
+    float mod_depth;
+    float dryamt;
+    float wetamt;
+    float tp32dsr;
+    uint32_t phase, sphase;
 };
 
 void chorus_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
@@ -49,19 +56,30 @@ void chorus_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
 {
     struct chorus_module *m = (struct chorus_module *)module;
     
-    int dv = m->length;
-    float dry_amt = 0.5f;
-    float wet_amt = 0.5f;
+    float min_delay = m->min_delay;
+    float mod_depth = m->mod_depth;
+    float dryamt = m->dryamt;
+    float wetamt = m->wetamt;
     int i, c;
     int mask = MAX_CHORUS_LENGTH - 1;
+    uint32_t dphase = (uint32_t)(m->lfo_freq * m->tp32dsr);
+    const int fracbits = 32 - 11;
+    const int fracscale = 1 << fracbits;
     
     for (c = 0; c < 2; c++)
     {
         int pos = m->pos;
+        uint32_t phase = m->phase + c * m->sphase;
         for (i = 0; i < CBOX_BLOCK_SIZE; i++)
         {
             float dry = inputs[c][i];
-            float dva = 21 + (c ? -20 : 20) * sin(2 * M_PI / (65536.0 * 65536.0) * (m->phase + i * m->dphase));
+            float v0 = sine_table[phase >> fracbits];
+            float v1 = sine_table[1 + (phase >> fracbits)];
+            float lfo = v0 + (v1 - v0) * ((phase & (fracscale - 1)) * (1.0 / fracscale));
+
+            m->storage[pos & mask][c] = dry;
+
+            float dva = min_delay + mod_depth * lfo;
             int dv = (int)dva;
             float frac = dva - dv;
             float smp0 = m->storage[(pos - dv - 1) & mask][c];
@@ -69,14 +87,14 @@ void chorus_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
             
             float smp = smp0 + (smp1 - smp0) * frac;
             
-            outputs[c][i] = sanef(dry * dry_amt + smp * wet_amt);
+            outputs[c][i] = sanef(dry * dryamt + smp * wetamt);
 
-            m->storage[pos & mask][c] = dry;
             pos++;
+            phase += dphase;
         }
     }
     
-    m->phase += CBOX_BLOCK_SIZE * m->dphase;
+    m->phase += CBOX_BLOCK_SIZE * dphase;
     m->pos += CBOX_BLOCK_SIZE;
 }
 
@@ -87,6 +105,8 @@ struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int 
     if (!inited)
     {
         inited = 1;
+        for (i = 0; i < 2049; i++)
+            sine_table[i] = sin(i * M_PI / 1024);
     }
     
     struct chorus_module *m = malloc(sizeof(struct chorus_module));
@@ -95,9 +115,13 @@ struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int 
     m->module.process_block = chorus_process_block;
     m->module.destroy = NULL;
     m->pos = 0;
-    m->length = srate / 4;
     m->phase = 0;
-    m->dphase = (uint32_t)(65536.0 * 65536.0 / srate);
+    m->tp32dsr = 65536.0 * 65536.0 / srate;
+    m->lfo_freq = cbox_config_get_float(cfg_section, "lfo_freq", 1.f);
+    m->min_delay = cbox_config_get_float(cfg_section, "min_delay", 20.f);
+    m->mod_depth = cbox_config_get_float(cfg_section, "mod_depth", 15.f);
+    m->dryamt = pow(2.0, cbox_config_get_float(cfg_section, "dry_gain", 0.f) / 6.0);
+    m->wetamt = pow(2.0, cbox_config_get_float(cfg_section, "wet_gain", -6.f) / 6.0);
     for (i = 0; i < MAX_CHORUS_LENGTH; i++)
         m->storage[i][0] = m->storage[i][1] = 0.f;
     
