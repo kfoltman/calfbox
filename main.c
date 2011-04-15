@@ -35,6 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
+static struct cbox_io io;
+
 static const char *short_options = "i:c:e:s:h";
 
 static struct option long_options[] = {
@@ -71,8 +73,11 @@ void main_draw(struct cbox_ui_page *page)
 
 int main_on_idle(struct cbox_ui_page *page)
 {
+    struct cbox_bbt bbt;
+    cbox_master_to_bbt(&io.master, &bbt);
     box(stdscr, 0, 0);
-    mvwprintw(stdscr, 3, 3, "%d", time(NULL));
+    mvwprintw(stdscr, 3, 3, "%d", (int)io.master.song_pos_samples);
+    mvwprintw(stdscr, 5, 3, "%d:%d:%d", bbt.bar, bbt.beat, bbt.tick);
     return 0;
 }
 
@@ -105,7 +110,6 @@ void run_ui()
 
 int main(int argc, char *argv[])
 {
-    struct cbox_io io;
     struct cbox_open_params params;
     struct cbox_process_struct process = { .scene = NULL, .effect = NULL };
     struct cbox_io_callbacks cbs = { &process, main_process};
@@ -189,6 +193,7 @@ int main(int argc, char *argv[])
     }
 
     cbox_io_start(&io, &cbs);
+    cbox_master_play(&io.master);
     run_ui();
     cbox_io_stop(&io);
     cbox_io_close(&io);

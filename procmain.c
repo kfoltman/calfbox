@@ -121,7 +121,7 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
         int cur_event = 0;
         uint32_t highwatermark = 0;
         
-        for (i = 0; i < nframes; i += 16)
+        for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
         {
             cbox_sample_t left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
             cbox_sample_t *outputs[2] = {left, right};
@@ -173,7 +173,7 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
     }
     if (effect)
     {
-        for (i = 0; i < nframes; i += 16)
+        for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
         {
             cbox_sample_t left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
             cbox_sample_t *in_bufs[2] = {out_l + i, out_r + i};
@@ -185,6 +185,8 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
                 out_r[i + j] = right[j];
             }
         }
-    }    
+    }
+    if (io->master.state == CMTS_ROLLING)
+        io->master.song_pos_samples += nframes;
 }
 

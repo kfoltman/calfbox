@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <jack/jack.h>
+#include "master.h"
 
 struct cbox_io_callbacks;
 
@@ -31,6 +32,7 @@ struct cbox_io
     jack_port_t *midi;
     
     struct cbox_io_callbacks *cb;
+    struct cbox_master master;
 };
 
 struct cbox_io_callbacks
