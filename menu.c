@@ -248,6 +248,7 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
         cbox_menu_state_draw(st);
         return 0;
     }
+    return 0;
 }
 
 extern void cbox_menu_state_destroy(struct cbox_menu_state *st)
