@@ -32,7 +32,6 @@ struct cbox_io
     jack_port_t *midi;
     
     struct cbox_io_callbacks *cb;
-    struct cbox_master master;
 };
 
 struct cbox_io_callbacks

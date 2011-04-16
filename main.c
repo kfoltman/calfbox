@@ -103,9 +103,9 @@ void main_draw(struct cbox_ui_page *page)
 int main_on_idle(struct cbox_ui_page *page)
 {
     struct cbox_bbt bbt;
-    cbox_master_to_bbt(&io.master, &bbt);
+    cbox_master_to_bbt(rt->master, &bbt);
     box(stdscr, 0, 0);
-    mvwprintw(stdscr, 3, 3, "%d", (int)io.master.song_pos_samples);
+    mvwprintw(stdscr, 3, 3, "%d", (int)rt->master->song_pos_samples);
     mvwprintw(stdscr, 5, 3, "%d:%d:%d", bbt.bar, bbt.beat, bbt.tick);
     return 0;
 }
@@ -243,7 +243,7 @@ int main(int argc, char *argv[])
     }
 
     cbox_rt_start(rt, &io);
-    cbox_master_play(&io.master);
+    cbox_master_play(rt->master);
     cbox_rt_set_scene(rt, scene);
     run_ui();
     scene = cbox_rt_set_scene(rt, NULL);

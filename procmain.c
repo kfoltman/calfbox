@@ -219,8 +219,8 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     }
         
     // Update transport
-    if (io->master.state == CMTS_ROLLING)
-        io->master.song_pos_samples += nframes;
+    if (rt->master->state == CMTS_ROLLING)
+        rt->master->song_pos_samples += nframes;
 }
 
 void cbox_rt_start(struct cbox_rt *rt, struct cbox_io *io)
@@ -229,15 +229,19 @@ void cbox_rt_start(struct cbox_rt *rt, struct cbox_io *io)
     rt->cbs = malloc(sizeof(struct cbox_io_callbacks));
     rt->cbs->user_data = rt;
     rt->cbs->process = cbox_rt_process;
-    
-    cbox_io_start(io, rt->cbs);    
+    rt->master = malloc(sizeof(struct cbox_master));
+    cbox_master_init(rt->master, jack_get_sample_rate(io->client));
+
+    cbox_io_start(io, rt->cbs);        
 }
 
 void cbox_rt_stop(struct cbox_rt *rt)
 {
     cbox_io_stop(rt->io);
+    free(rt->master);
     free(rt->cbs);
     rt->cbs = NULL;
+    rt->master = NULL;
     rt->io = NULL;
 }
 

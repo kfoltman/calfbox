@@ -53,8 +53,6 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
     if (!io->output_l || !io->output_r || !io->midi)
         return 0;
     
-    cbox_master_init(&io->master, jack_get_sample_rate(io->client));
-    
     return 1;
 };
 

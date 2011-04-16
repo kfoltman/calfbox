@@ -44,6 +44,7 @@ struct cbox_rt
     
     struct cbox_io *io;
     struct cbox_io_callbacks *cbs;
+    struct cbox_master *master;
     
     jack_ringbuffer_t *rb_execute, *rb_cleanup;
 };
