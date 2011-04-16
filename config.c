@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 static GKeyFile *config_keyfile;
 static gchar *keyfile_name;
+static GStringChunk *cfg_strings = NULL;
 
 void cbox_config_init(const char *override_file)
 {
@@ -62,6 +63,7 @@ void cbox_config_init(const char *override_file)
     {
         g_message("Config pathname is %s", keyfile_name);
     }
+    cfg_strings = g_string_chunk_new(100);
 }
 
 int cbox_config_has_section(const char *section)
@@ -71,18 +73,21 @@ int cbox_config_has_section(const char *section)
 
 char *cbox_config_get_string(const char *section, const char *key)
 {
-    return g_key_file_get_string(config_keyfile, section, key, NULL);
+    return cbox_config_get_string_with_default(section, key, NULL);
 }
 
 char *cbox_config_get_string_with_default(const char *section, const char *key, char *def_value)
 {
     if (g_key_file_has_key(config_keyfile, section, key, NULL))
     {
-        return g_key_file_get_string(config_keyfile, section, key, NULL);
+        gchar *tmp = g_key_file_get_string(config_keyfile, section, key, NULL);
+        gchar *perm = g_string_chunk_insert(cfg_strings, tmp);
+        g_free(tmp);
+        return perm;
     }
     else
     {
-        return def_value;
+        return def_value ? g_string_chunk_insert(cfg_strings, def_value) : NULL;
     }
 }
 
@@ -120,6 +125,11 @@ void cbox_config_close()
     {
         g_key_file_free(config_keyfile);
         config_keyfile = NULL;
+    }
+    if (cfg_strings)
+    {
+        g_string_chunk_free(cfg_strings);
+        cfg_strings = NULL;
     }
 }
 

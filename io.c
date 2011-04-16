@@ -133,7 +133,6 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
             if (dpos)
                 name = dpos + 1;
         } while(dpos);
-        g_free(orig_name);
     }
 }
 
