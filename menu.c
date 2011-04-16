@@ -31,6 +31,9 @@ struct cbox_menu
     GStringChunk *strings;
 };
 
+static int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch);
+static int cbox_menu_page_on_idle(struct cbox_ui_page *p);
+
 struct cbox_menu *cbox_menu_new()
 {
     struct cbox_menu *menu = malloc(sizeof(struct cbox_menu));
@@ -71,10 +74,15 @@ struct cbox_menu_state
     void *context;
 };
 
-gchar *cbox_menu_item_value_format(const struct cbox_menu_item *item)
+gchar *cbox_menu_item_value_format(const struct cbox_menu_item *item, void *context)
 {
     switch(item->type)
     {
+        case menu_item_static:
+            if (item->extras)
+                return ((struct cbox_menu_item_extras_static *)(item->extras))->format_value(item, context);
+            else
+                return g_strdup_printf("");
         case menu_item_submenu:
             return g_strdup_printf("...");
         case menu_item_command:
@@ -108,7 +116,7 @@ void cbox_menu_state_size(struct cbox_menu_state *menu_state)
     for (i = 0; i < menu->items->len; i++)
     {
         const struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
-        gchar *value = cbox_menu_item_value_format(item);
+        gchar *value = cbox_menu_item_value_format(item, menu_state->context);
         
         int len = strlen(item->label);
         int len2 = strlen(value);
@@ -132,23 +140,37 @@ void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
     for (i = 0; i < menu->items->len; i++)
     {
         const struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
-        gchar *str = cbox_menu_item_value_format(item);
+        gchar *str = cbox_menu_item_value_format(item, menu_state->context);
         if (menu_state->cursor == i)
             wattron(menu_state->window, A_REVERSE);
-        mvwprintw(menu_state->window, i + 1, 1, "%-*s %*s", menu_state->label_width, item->label, menu_state->value_width, str);
+        if (item->type == menu_item_static && item->extras == NULL)
+        {
+            wattron(menu_state->window, A_BOLD);
+            mvwprintw(menu_state->window, i + 1, 1, "%-*s %*s", menu_state->label_width, item->label, menu_state->value_width, str);
+            wattroff(menu_state->window, A_BOLD);
+        }
+        else
+        {
+            mvwprintw(menu_state->window, i + 1, 1, "%-*s %*s", menu_state->label_width, item->label, menu_state->value_width, str);
+        }
         wattroff(menu_state->window, A_REVERSE);
         g_free(str);
     }
     wrefresh(menu_state->window);
 }
 
-static int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch);
-
 static void cbox_menu_page_draw(struct cbox_ui_page *p)
 {
     struct cbox_menu_state *st = p->user_data;
     cbox_menu_state_size(st);
     cbox_menu_state_draw(st);
+}
+
+static int cbox_menu_is_item_enabled(struct cbox_menu *menu, int item)
+{
+    assert(item >= 0 && item < menu->items->len);
+    
+    return ((struct cbox_menu_item *)g_ptr_array_index(menu->items, item))->type != menu_item_static;
 }
 
 struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu *menu, WINDOW *window, void *context)
@@ -161,7 +183,10 @@ struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu *menu, WINDOW *wind
     st->page.user_data = st;
     st->page.draw = cbox_menu_page_draw;
     st->page.on_key = cbox_menu_page_on_key;
-    st->page.on_idle = NULL;
+    st->page.on_idle = cbox_menu_page_on_idle;
+    
+    while(st->cursor < menu->items->len - 1 && !cbox_menu_is_item_enabled(menu, st->cursor))
+        st->cursor++;
     
     return st;
 }
@@ -171,11 +196,20 @@ struct cbox_ui_page *cbox_menu_state_get_page(struct cbox_menu_state *state)
     return &state->page;
 }
 
+int cbox_menu_page_on_idle(struct cbox_ui_page *p)
+{
+    struct cbox_menu_state *st = p->user_data;
+    cbox_menu_state_size(st);
+    cbox_menu_state_draw(st);
+    return 0;
+}
+
 int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
 {
     struct cbox_menu_state *st = p->user_data;
     struct cbox_menu *menu = st->menu;
     struct cbox_menu_item *item = NULL;
+    int pos = st->cursor;
     if (st->cursor >= 0 && st->cursor < menu->items->len)
         item = g_ptr_array_index(menu->items, st->cursor);
         
@@ -238,13 +272,24 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
         return 0;
         
     case KEY_UP:
-        if (st->cursor > 0)
-            st->cursor--;
-        cbox_menu_state_draw(st);
+        pos = st->cursor - 1;
+        while(pos >= 0 && !cbox_menu_is_item_enabled(menu, pos))
+            pos--;
+        if (pos >= 0)
+        {
+            st->cursor = pos;
+            cbox_menu_state_draw(st);
+        }
         return 0;
     case KEY_DOWN:
-        if (st->cursor < menu->items->len - 1)
-            st->cursor++;
+        pos = st->cursor + 1;
+        while(pos < menu->items->len && !cbox_menu_is_item_enabled(menu, pos))
+            pos++;
+        if (pos < menu->items->len)
+        {
+            st->cursor = pos;
+            cbox_menu_state_draw(st);
+        }
         cbox_menu_state_draw(st);
         return 0;
     }

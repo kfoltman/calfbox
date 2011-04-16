@@ -28,7 +28,8 @@ enum cbox_menu_item_type
     menu_item_value_int,
     menu_item_value_double,
     menu_item_value_enum,
-    menu_item_submenu
+    menu_item_submenu,
+    menu_item_static
 };
 
 struct cbox_menu_item;
@@ -50,6 +51,11 @@ struct cbox_menu_item_extras_double
     const char *fmt;
     double (*step)(struct cbox_menu_item_extras_double *item, double value, int where);
     double step_arg;
+};
+
+struct cbox_menu_item_extras_static
+{
+    char *(*format_value)(const struct cbox_menu_item *item, void *context);
 };
 
 struct cbox_menu_item
