@@ -62,18 +62,12 @@ struct cbox_menu_item
     /* TODO: is_active? */
 };
 
-struct cbox_menu
-{
-    struct cbox_menu_item *items;
-    int item_count;
-    
-    void (*destroy)(struct cbox_menu *);
-};
-
-#define FIXED_MENU(name) \
-    struct cbox_menu menu_##name = { menu_items_##name, sizeof(menu_items_##name) / sizeof(struct cbox_menu_item), NULL };
-
+struct cbox_menu;
 struct cbox_menu_state;
+
+extern struct cbox_menu *cbox_menu_new();
+extern struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, const char *label, enum cbox_menu_item_type, void *extras, void *value);
+extern void cbox_menu_destroy(struct cbox_menu *menu);
 
 extern struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu *menu, WINDOW *window, void *context);
 extern struct cbox_ui_page *cbox_menu_state_get_page(struct cbox_menu_state *st);

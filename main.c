@@ -89,18 +89,17 @@ void run_ui()
     static struct cbox_menu_item_extras_int mx_int_var1 = { 0, 127, "%d" };
     static struct cbox_menu_item_extras_double mx_double_var2 = { 0, 127, "%f", NULL, 0 };
     static struct cbox_menu_item_extras_command mx_cmd_quit = { cmd_quit };
-    struct cbox_menu_item menu_items_main[] = {
-        { "foo", menu_item_value_int, &mx_int_var1, &var1 },
-        { "bar", menu_item_value_double, &mx_double_var2, &var2 },
-        { "Quit", menu_item_command, &mx_cmd_quit, NULL },
-    };
     struct cbox_menu_state *st = NULL;
     struct cbox_ui_page *page = NULL;
     struct cbox_ui_page page2;
-    FIXED_MENU(main);
+    struct cbox_menu *main_menu = cbox_menu_new();
     cbox_ui_start();
+    
+    cbox_menu_add_item(main_menu, "foo", menu_item_value_int, &mx_int_var1, &var1);
+    cbox_menu_add_item(main_menu, "bar", menu_item_value_double, &mx_double_var2, &var2);
+    cbox_menu_add_item(main_menu, "Quit", menu_item_command, &mx_cmd_quit, NULL);
 
-    st = cbox_menu_state_new(&menu_main, stdscr, NULL);
+    st = cbox_menu_state_new(main_menu, stdscr, NULL);
     page = cbox_menu_state_get_page(st);
 
     page2.on_key = main_on_key;

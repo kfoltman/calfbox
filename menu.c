@@ -25,6 +25,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <ncurses.h>
 #include <string.h>
 
+struct cbox_menu
+{
+    GPtrArray *items;
+    GStringChunk *strings;
+};
+
+struct cbox_menu *cbox_menu_new()
+{
+    struct cbox_menu *menu = malloc(sizeof(struct cbox_menu));
+    
+    menu->items = g_ptr_array_new();
+    menu->strings = g_string_chunk_new(100);
+    return menu;
+}
+
+struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, const char *label, enum cbox_menu_item_type type, void *extras, void *value)
+{
+    struct cbox_menu_item *item = malloc(sizeof(struct cbox_menu_item));
+    item->label = g_string_chunk_insert(menu->strings, label);
+    item->type = type;
+    item->extras = extras;
+    item->value = value;
+    item->on_change = NULL;
+    
+    g_ptr_array_add(menu->items, item);
+}
+
+void cbox_menu_destroy(struct cbox_menu *menu)
+{
+    // XXXKF free individual items
+    
+    g_ptr_array_free(menu->items, TRUE);
+    g_string_chunk_free(menu->strings);
+}
+
+
 struct cbox_menu_state
 {
     struct cbox_ui_page page;
@@ -69,9 +105,9 @@ void cbox_menu_state_size(struct cbox_menu_state *menu_state)
     int value_width = 0;
     int i;
     
-    for (i = 0; i < menu->item_count; i++)
+    for (i = 0; i < menu->items->len; i++)
     {
-        const struct cbox_menu_item *item = menu->items + i;
+        const struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
         gchar *value = cbox_menu_item_value_format(item);
         
         int len = strlen(item->label);
@@ -93,9 +129,9 @@ void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
     int i;
     
     box(menu_state->window, 0, 0);
-    for (i = 0; i < menu->item_count; i++)
+    for (i = 0; i < menu->items->len; i++)
     {
-        const struct cbox_menu_item *item = menu->items + i;
+        const struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
         gchar *str = cbox_menu_item_value_format(item);
         if (menu_state->cursor == i)
             wattron(menu_state->window, A_REVERSE);
@@ -140,8 +176,8 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
     struct cbox_menu_state *st = p->user_data;
     struct cbox_menu *menu = st->menu;
     struct cbox_menu_item *item = NULL;
-    if (st->cursor >= 0 && st->cursor < menu->item_count)
-        item = &menu->items[st->cursor];
+    if (st->cursor >= 0 && st->cursor < menu->items->len)
+        item = g_ptr_array_index(menu->items, st->cursor);
         
     if (ch == 10)
     {
@@ -207,7 +243,7 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
         cbox_menu_state_draw(st);
         return 0;
     case KEY_DOWN:
-        if (st->cursor < menu->item_count - 1)
+        if (st->cursor < menu->items->len - 1)
             st->cursor++;
         cbox_menu_state_draw(st);
         return 0;
