@@ -71,6 +71,7 @@ struct cbox_scene *cbox_scene_new()
 {
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
     s->layer_count = 0;
+    s->instrument_count = 0;
     return s;
 }
 
