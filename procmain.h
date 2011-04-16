@@ -24,12 +24,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct cbox_scene;
 struct cbox_io;
 
-struct cbox_process_struct
+struct cbox_rt_cmd
+{
+    void *user_data;
+    void (*prepare)(struct cbox_rt_cmd *cmd);
+    void (*execute)(struct cbox_rt_cmd *cmd);
+    void (*cleanup)(struct cbox_rt_cmd *cmd);
+};
+
+struct cbox_rt
 {
     struct cbox_scene *scene;
     struct cbox_module *effect;
 };
 
-extern void main_process(void *user_data, struct cbox_io *io, uint32_t nframes);
+extern struct cbox_rt *cbox_rt_new();
+extern void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes);
+
+extern void cbox_rt_cmd_execute_sync(struct cbox_rt_cmd *cmd);
+extern void cbox_rt_cmd_execute_async(struct cbox_rt_cmd *cmd);
+extern void cbox_rt_destroy(struct cbox_rt *);
 
 #endif

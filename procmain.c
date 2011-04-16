@@ -27,6 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <jack/types.h>
 #include <jack/midiport.h>
 
+struct cbox_rt *cbox_rt_new()
+{
+    struct cbox_rt *rt = malloc(sizeof(struct cbox_rt));
+    
+    rt->scene = NULL;
+    rt->effect = NULL;
+    return rt;
+}
+
+
 int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_scene *scene)
 {
     void *midi = jack_port_get_buffer(port, nframes);
@@ -94,11 +104,11 @@ int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_scen
     return event_count;
 }
 
-void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
+void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
 {
-    struct cbox_process_struct *ps = user_data;
-    struct cbox_scene *scene = ps->scene;
-    struct cbox_module *effect = ps->effect;
+    struct cbox_rt *rt = user_data;
+    struct cbox_scene *scene = rt->scene;
+    struct cbox_module *effect = rt->effect;
     if (!scene)
         return;
     uint32_t i, j, n;
@@ -190,3 +200,7 @@ void main_process(void *user_data, struct cbox_io *io, uint32_t nframes)
         io->master.song_pos_samples += nframes;
 }
 
+void cbox_rt_destroy(struct cbox_rt *rt)
+{
+    free(rt);
+}

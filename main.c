@@ -124,8 +124,8 @@ void run_ui()
 int main(int argc, char *argv[])
 {
     struct cbox_open_params params;
-    struct cbox_process_struct process = { .scene = NULL, .effect = NULL };
-    struct cbox_io_callbacks cbs = { &process, main_process};
+    struct cbox_rt *rt = cbox_rt_new();
+    struct cbox_io_callbacks cbs = { .user_data = rt, .process = cbox_rt_process };
     const char *module = NULL;
     struct cbox_module_manifest *mptr;
     struct cbox_layer *layer;
@@ -174,18 +174,18 @@ int main(int argc, char *argv[])
     
     if (scene_name)
     {
-        process.scene = cbox_scene_load(scene_name);        
-        if (!process.scene)
+        rt->scene = cbox_scene_load(scene_name);        
+        if (!rt->scene)
             goto fail;
     }
     else
     {
-        process.scene = cbox_scene_new();
+        rt->scene = cbox_scene_new();
         layer = cbox_layer_new(instrument_name);
         if (!layer)
             goto fail;
 
-        cbox_scene_add_layer(process.scene, layer);
+        cbox_scene_add_layer(rt->scene, layer);
     }
 
     if (effect_module_name && *effect_module_name)
@@ -194,14 +194,14 @@ int main(int argc, char *argv[])
         if (!mptr)
         {
             fprintf(stderr, "Cannot find effect %s\n", effect_module_name);
-            return 1;
+            goto fail;
         }
         cbox_module_manifest_dump(mptr);
-        process.effect = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(&io));
-        if (!process.effect)
+        rt->effect = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(&io));
+        if (!rt->effect)
         {
             fprintf(stderr, "Cannot create effect %s\n", effect_module_name);
-            return 1;
+            goto fail;
         }
     }
 
@@ -212,10 +212,12 @@ int main(int argc, char *argv[])
     cbox_io_close(&io);
 
 fail:
-    if (process.effect)
-        cbox_module_destroy(process.effect);
-    if (process.scene)
-        cbox_scene_destroy(process.scene);
+    if (rt->effect)
+        cbox_module_destroy(rt->effect);
+    if (rt->scene)
+        cbox_scene_destroy(rt->scene);
+    
+    cbox_rt_destroy(rt);
     
     cbox_instruments_close();
     cbox_config_close();
