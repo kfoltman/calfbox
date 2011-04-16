@@ -37,6 +37,7 @@ struct cbox_scene *cbox_scene_load(const char *name)
     }
     
     s->layer_count = 0;
+    s->instrument_count = 0;
     
     for (i = 1; ; i++)
     {
