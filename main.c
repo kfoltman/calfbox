@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 
 static struct cbox_io io;
+static struct cbox_rt *rt;
 
 static const char *short_options = "i:c:e:s:h";
 
@@ -58,6 +59,33 @@ void print_help(char *progname)
 int cmd_quit(struct cbox_menu_item *item, void *context)
 {
     return 1;
+}
+
+int cmd_load_scene(struct cbox_menu_item *item, void *context)
+{
+    struct cbox_scene *scene = cbox_scene_load(item->value);
+    struct cbox_scene *old = cbox_rt_set_scene(rt, scene);
+    if (old)
+        cbox_scene_destroy(old);
+    return 0;
+}
+
+int cmd_load_instrument(struct cbox_menu_item *item, void *context)
+{
+    struct cbox_scene *scene = cbox_scene_new();
+    struct cbox_layer *layer = cbox_layer_new((char *)item->value);
+    
+    if (layer)
+    {
+        cbox_scene_add_layer(scene, layer);
+        
+        struct cbox_scene *old = cbox_rt_set_scene(rt, scene);
+        if (old)
+            cbox_scene_destroy(old);
+    }
+    else
+        cbox_scene_destroy(scene);
+    return 0;
 }
 
 int main_on_key(struct cbox_ui_page *page, int ch)
@@ -85,9 +113,17 @@ int main_on_idle(struct cbox_ui_page *page)
 static void config_key_process(struct cbox_config_section_cb *section, const char *key)
 {
     struct cbox_menu *menu = section->user_data;
-    static struct cbox_menu_item_extras_command mx_cmd_quit = { cmd_quit };
+    static struct cbox_menu_item_extras_command mx_cmd_load_scene = { cmd_load_scene };
+    static struct cbox_menu_item_extras_command mx_cmd_load_instrument = { cmd_load_instrument };
     
-    cbox_menu_add_item(menu, key, menu_item_command, &mx_cmd_quit, NULL);
+    if (!strncmp(key, "scene:", 6))
+    {    
+        cbox_menu_add_item(menu, key, menu_item_command, &mx_cmd_load_scene, strdup(key + 6));
+    }
+    if (!strncmp(key, "instrument:", 11))
+    {    
+        cbox_menu_add_item(menu, key, menu_item_command, &mx_cmd_load_instrument, strdup(key + 11));
+    }
 }
 
 void run_ui()
@@ -104,10 +140,10 @@ void run_ui()
     struct cbox_config_section_cb cb = { .process = config_key_process, .user_data = main_menu };
     cbox_ui_start();
     
+    cbox_config_foreach_section(&cb);
     cbox_menu_add_item(main_menu, "foo", menu_item_value_int, &mx_int_var1, &var1);
     cbox_menu_add_item(main_menu, "bar", menu_item_value_double, &mx_double_var2, &var2);
     cbox_menu_add_item(main_menu, "Quit", menu_item_command, &mx_cmd_quit, NULL);
-    cbox_config_foreach_section(&cb);
 
     st = cbox_menu_state_new(main_menu, stdscr, NULL);
     page = cbox_menu_state_get_page(st);
@@ -124,8 +160,6 @@ void run_ui()
 int main(int argc, char *argv[])
 {
     struct cbox_open_params params;
-    struct cbox_rt *rt = cbox_rt_new();
-    struct cbox_io_callbacks cbs = { .user_data = rt, .process = cbox_rt_process };
     const char *module = NULL;
     struct cbox_module_manifest *mptr;
     struct cbox_layer *layer;
@@ -133,7 +167,10 @@ int main(int argc, char *argv[])
     const char *instrument_name = "default";
     const char *scene_name = NULL;
     const char *effect_module_name = NULL;
-    char *instr_section;
+    char *instr_section = NULL;
+    struct cbox_scene *scene = NULL;
+    
+    rt = cbox_rt_new();
 
     while(1)
     {
@@ -174,18 +211,18 @@ int main(int argc, char *argv[])
     
     if (scene_name)
     {
-        rt->scene = cbox_scene_load(scene_name);        
-        if (!rt->scene)
+        scene = cbox_scene_load(scene_name);        
+        if (!scene)
             goto fail;
     }
     else
     {
-        rt->scene = cbox_scene_new();
+        scene = cbox_scene_new();
         layer = cbox_layer_new(instrument_name);
         if (!layer)
             goto fail;
 
-        cbox_scene_add_layer(rt->scene, layer);
+        cbox_scene_add_layer(scene, layer);
     }
 
     if (effect_module_name && *effect_module_name)
@@ -205,10 +242,12 @@ int main(int argc, char *argv[])
         }
     }
 
-    cbox_io_start(&io, &cbs);
+    cbox_rt_start(rt, &io);
     cbox_master_play(&io.master);
+    cbox_rt_set_scene(rt, scene);
     run_ui();
-    cbox_io_stop(&io);
+    scene = cbox_rt_set_scene(rt, NULL);
+    cbox_rt_stop(rt);
     cbox_io_close(&io);
 
 fail:

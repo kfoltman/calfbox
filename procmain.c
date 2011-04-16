@@ -26,6 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/midiport.h>
+#include <unistd.h>
+
+struct cbox_rt_cmd_instance
+{
+    struct cbox_rt_cmd_definition *definition;
+    void *user_data;
+};
 
 struct cbox_rt *cbox_rt_new()
 {
@@ -33,9 +40,11 @@ struct cbox_rt *cbox_rt_new()
     
     rt->scene = NULL;
     rt->effect = NULL;
+    rt->rb_execute = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS);
+    rt->rb_cleanup = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS * 2);
+    rt->io = NULL;
     return rt;
 }
-
 
 int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_scene *scene)
 {
@@ -104,25 +113,27 @@ int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_scen
     return event_count;
 }
 
-void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
+static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
 {
     struct cbox_rt *rt = user_data;
     struct cbox_scene *scene = rt->scene;
     struct cbox_module *effect = rt->effect;
-    if (!scene)
-        return;
+    struct cbox_rt_cmd_instance cmd;
+    int cost;
     uint32_t i, j, n;
+    
     float *out_l = jack_port_get_buffer(io->output_l, nframes);
     float *out_r = jack_port_get_buffer(io->output_r, nframes);
 
-    convert_midi_from_jack(io->midi, nframes, scene);
+    if (scene)
+        convert_midi_from_jack(io->midi, nframes, scene);
     
     for (i = 0; i < nframes; i ++)
     {
         out_l[i] = out_r[i] = 0.f;
     }
     
-    for (n = 0; n < scene->instrument_count; n++)
+    for (n = 0; scene && n < scene->instrument_count; n++)
     {
         struct cbox_instrument *instr = scene->instruments[n];
         struct cbox_module *module = instr->module;
@@ -181,6 +192,8 @@ void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
             cur_event++;
         }
     }
+    
+    // Process "master" effect
     if (effect)
     {
         for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
@@ -196,11 +209,145 @@ void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
             }
         }
     }
+    
+    // Process command queue
+    cost = 0;
+    while(cost < RT_MAX_COST_PER_CALL && jack_ringbuffer_read(rt->rb_execute, (char *)&cmd, sizeof(cmd)))
+    {
+        cost += (cmd.definition->execute)(cmd.user_data);
+        jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
+    }
+        
+    // Update transport
     if (io->master.state == CMTS_ROLLING)
         io->master.song_pos_samples += nframes;
 }
 
+void cbox_rt_start(struct cbox_rt *rt, struct cbox_io *io)
+{
+    rt->io = io;
+    rt->cbs = malloc(sizeof(struct cbox_io_callbacks));
+    rt->cbs->user_data = rt;
+    rt->cbs->process = cbox_rt_process;
+    
+    cbox_io_start(io, rt->cbs);    
+}
+
+void cbox_rt_stop(struct cbox_rt *rt)
+{
+    cbox_io_stop(rt->io);
+    free(rt->cbs);
+    rt->cbs = NULL;
+    rt->io = NULL;
+}
+
+void cbox_rt_cmd_handle_queue(struct cbox_rt *rt)
+{
+    struct cbox_rt_cmd_instance cmd;
+    
+    while(jack_ringbuffer_read(rt->rb_cleanup, (char *)&cmd, sizeof(cmd)))
+    {
+        cmd.definition->cleanup(cmd.user_data);
+    }
+}
+
+void cbox_rt_cmd_execute_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
+{
+    struct cbox_rt_cmd_instance cmd;
+    
+    if (def->prepare)
+        if (def->prepare(user_data))
+            return;
+        
+    // No realtime thread - do it all in the main thread
+    if (!rt->io)
+    {
+        def->execute(user_data);
+        if (def->cleanup)
+            def->cleanup(user_data);
+        return;
+    }
+    
+    cmd.definition = def;
+    cmd.user_data = user_data;
+    
+    jack_ringbuffer_write(rt->rb_execute, (const char *)&cmd, sizeof(cmd));
+    do
+    {
+        struct cbox_rt_cmd_instance cmd2;
+    
+        if (!jack_ringbuffer_read(rt->rb_cleanup, (char *)&cmd2, sizeof(cmd2)))
+        {
+            // still no result in cleanup queue - wait
+            usleep(10000);
+            continue;
+        }
+        if (!memcmp(&cmd, &cmd2, sizeof(cmd)))
+        {
+            if (def->cleanup)
+                def->cleanup(user_data);
+            break;
+        }
+        // async command - clean it up
+        if (cmd2.definition->cleanup)
+            cmd2.definition->cleanup(cmd2.user_data);
+    } while(1);
+}
+
+void cbox_rt_cmd_execute_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
+{
+    struct cbox_rt_cmd_instance cmd = { def, user_data };
+    
+    if (def->prepare)
+    {
+        if (def->prepare(user_data))
+            return;
+    }
+    // No realtime thread - do it all in the main thread
+    if (!rt->io)
+    {
+        def->execute(user_data);
+        if (def->cleanup)
+            def->cleanup(user_data);
+        return;
+    }
+    
+    jack_ringbuffer_write(rt->rb_execute, (const char *)&cmd, sizeof(cmd));
+    
+    // will be cleaned up by next sync call or by cbox_rt_cmd_handle_queue
+}
+
+struct set_scene_command
+{
+    struct cbox_rt *rt;
+    struct cbox_scene *new_scene, *old_scene;
+};
+
+static int set_scene_command_execute(void *user_data)
+{
+    struct set_scene_command *cmd = user_data;
+    
+    cmd->old_scene = cmd->rt->scene;
+    cmd->rt->scene = cmd->new_scene;
+    
+    return 1;
+}
+
+struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scene)
+{
+    static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = set_scene_command_execute, .cleanup = NULL };
+    
+    struct set_scene_command sc = { rt, scene, NULL };
+    
+    cbox_rt_cmd_execute_sync(rt, &scdef, &sc);
+    
+    return sc.old_scene;
+}
+
+
 void cbox_rt_destroy(struct cbox_rt *rt)
 {
+    jack_ringbuffer_free(rt->rb_execute);
+    jack_ringbuffer_free(rt->rb_cleanup);
     free(rt);
 }
