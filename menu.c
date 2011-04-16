@@ -272,7 +272,8 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
         return 0;
         
     case KEY_UP:
-        pos = st->cursor - 1;
+    case KEY_END:
+        pos = ch == KEY_END ? menu->items->len - 1 : st->cursor - 1;
         while(pos >= 0 && !cbox_menu_is_item_enabled(menu, pos))
             pos--;
         if (pos >= 0)
@@ -281,8 +282,9 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
             cbox_menu_state_draw(st);
         }
         return 0;
+    case KEY_HOME:
     case KEY_DOWN:
-        pos = st->cursor + 1;
+        pos = ch == KEY_HOME ? 0 : st->cursor + 1;
         while(pos < menu->items->len && !cbox_menu_is_item_enabled(menu, pos))
             pos++;
         if (pos < menu->items->len)
