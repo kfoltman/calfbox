@@ -56,7 +56,7 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
     }
     
     struct fluidsynth_module *m = malloc(sizeof(struct fluidsynth_module));
-    m->module.user_data = m;
+    cbox_module_init(&m->module, m);
     m->module.process_event = fluidsynth_process_event;
     m->module.process_block = fluidsynth_process_block;
     m->module.destroy = fluidsynth_destroy;

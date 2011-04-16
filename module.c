@@ -92,6 +92,17 @@ struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manife
     return module;
 }
 
+void cbox_module_init(struct cbox_module *module, void *user_data)
+{
+    module->user_data = user_data;
+    module->input_samples = NULL;
+    module->output_samples = NULL;
+    
+    module->process_event = NULL;
+    module->process_block = NULL;
+    module->destroy = NULL;
+}
+
 void cbox_module_destroy(struct cbox_module *module)
 {
     free(module->input_samples);

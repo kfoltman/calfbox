@@ -104,6 +104,7 @@ extern void cbox_module_manifest_dump(struct cbox_module_manifest *manifest);
 extern struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char *name);
 extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate);
 
+extern void cbox_module_init(struct cbox_module *module, void *user_data);
 extern void cbox_module_destroy(struct cbox_module *module);
 
 #endif

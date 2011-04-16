@@ -82,10 +82,9 @@ struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_sectio
     }
     
     struct parametric_eq_module *m = malloc(sizeof(struct parametric_eq_module));
-    m->module.user_data = m;
+    cbox_module_init(&m->module, m);
     m->module.process_event = parametric_eq_process_event;
     m->module.process_block = parametric_eq_process_block;
-    m->module.destroy = NULL;
     
     for (b = 0; b < NO_BANDS; b++)
     {

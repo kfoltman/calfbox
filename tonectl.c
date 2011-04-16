@@ -62,10 +62,9 @@ struct cbox_module *tone_control_create(void *user_data, const char *cfg_section
     }
     
     struct tone_control_module *m = malloc(sizeof(struct tone_control_module));
-    m->module.user_data = m;
+    cbox_module_init(&m->module, m);
     m->module.process_event = tone_control_process_event;
     m->module.process_block = tone_control_process_block;
-    m->module.destroy = NULL;
     
     float tpdsr = 2 * M_PI / srate;
     

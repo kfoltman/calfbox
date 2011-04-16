@@ -83,10 +83,9 @@ struct cbox_module *delay_create(void *user_data, const char *cfg_section, int s
     }
     
     struct delay_module *m = malloc(sizeof(struct delay_module));
-    m->module.user_data = m;
+    cbox_module_init(&m->module, m);
     m->module.process_event = delay_process_event;
     m->module.process_block = delay_process_block;
-    m->module.destroy = NULL;
     m->pos = 0;
     m->length = cbox_config_get_float(cfg_section, "delay", 250) * srate / 1000;
     m->dryamt = pow(2.0, cbox_config_get_float(cfg_section, "dry_gain", 0.f) / 6.0);

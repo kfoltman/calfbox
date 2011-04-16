@@ -92,10 +92,9 @@ struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int 
     }
     
     struct phaser_module *m = malloc(sizeof(struct phaser_module));
-    m->module.user_data = m;
+    cbox_module_init(&m->module, m);
     m->module.process_event = phaser_process_event;
     m->module.process_block = phaser_process_block;
-    m->module.destroy = NULL;
     m->tpdsr = 2.0 * M_PI / srate;
     m->phase = 0;
     m->sphase = cbox_config_get_float(cfg_section, "stereo_phase", 1.f) * 2 * M_PI / 360;

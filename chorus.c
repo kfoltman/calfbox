@@ -110,10 +110,9 @@ struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int 
     }
     
     struct chorus_module *m = malloc(sizeof(struct chorus_module));
-    m->module.user_data = m;
+    cbox_module_init(&m->module, m);
     m->module.process_event = chorus_process_event;
     m->module.process_block = chorus_process_block;
-    m->module.destroy = NULL;
     m->pos = 0;
     m->phase = 0;
     m->tp32dsr = 65536.0 * 65536.0 / srate;

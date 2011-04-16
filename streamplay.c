@@ -370,7 +370,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
         g_error("%s: filename not specified", cfg_section);
         return NULL;
     }
-    m->module.user_data = m;
+    cbox_module_init(&m->module, m);
     m->module.process_event = stream_player_process_event;
     m->module.process_block = stream_player_process_block;
     m->module.destroy = stream_player_destroy;
