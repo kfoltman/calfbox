@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_MENU_H
 #define CBOX_MENU_H
 
+#include <ncurses.h>
 #include <stdint.h>
 
 enum cbox_menu_item_type
@@ -74,7 +75,8 @@ struct cbox_menu
 
 struct cbox_menu_state;
 
-extern struct cbox_ui_page *cbox_menu_init(struct cbox_menu_state **st, struct cbox_menu *menu, void *context);
-extern void cbox_menu_done(struct cbox_menu_state *st);
+extern struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu *menu, WINDOW *window, void *context);
+extern struct cbox_ui_page *cbox_menu_state_get_page(struct cbox_menu_state *st);
+extern void cbox_menu_state_destroy(struct cbox_menu_state *st);
 
 #endif

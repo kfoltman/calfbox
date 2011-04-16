@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "ui.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <ncurses.h>
 

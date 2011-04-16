@@ -62,7 +62,7 @@ gchar *cbox_menu_item_value_format(const struct cbox_menu_item *item)
     return NULL;
 }
 
-void cbox_ui_size_menu(struct cbox_menu_state *menu_state)
+void cbox_menu_state_size(struct cbox_menu_state *menu_state)
 {
     struct cbox_menu *menu = menu_state->menu;
     int label_width = 0;
@@ -87,7 +87,7 @@ void cbox_ui_size_menu(struct cbox_menu_state *menu_state)
     menu_state->value_width = value_width;
 }
 
-void cbox_ui_draw_menu(struct cbox_menu_state *menu_state)
+void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
 {
     struct cbox_menu *menu = menu_state->menu;
     int i;
@@ -106,37 +106,38 @@ void cbox_ui_draw_menu(struct cbox_menu_state *menu_state)
     wrefresh(menu_state->window);
 }
 
-static int cbox_menu_on_key(struct cbox_menu_state *st, int ch);
-
-static int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
-{
-    return cbox_menu_on_key((struct cbox_menu_state *)p, ch);
-}
+static int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch);
 
 static void cbox_menu_page_draw(struct cbox_ui_page *p)
 {
-    struct cbox_menu_state *st = (struct cbox_menu_state *)p;
-    cbox_ui_size_menu(st);
-    cbox_ui_draw_menu(st);
+    struct cbox_menu_state *st = p->user_data;
+    cbox_menu_state_size(st);
+    cbox_menu_state_draw(st);
 }
 
-struct cbox_ui_page *cbox_menu_init(struct cbox_menu_state **pst, struct cbox_menu *menu, void *context)
+struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu *menu, WINDOW *window, void *context)
 {
     struct cbox_menu_state *st = malloc(sizeof(struct cbox_menu_state));
-    *pst = st;
     st->menu = menu;
     st->cursor = 0;
-    st->window = stdscr;
+    st->window = window;
     st->context = context;
+    st->page.user_data = st;
     st->page.draw = cbox_menu_page_draw;
     st->page.on_key = cbox_menu_page_on_key;
     st->page.on_idle = NULL;
     
-    return &st->page;
+    return st;
 }
 
-int cbox_menu_on_key(struct cbox_menu_state *st, int ch)
+struct cbox_ui_page *cbox_menu_state_get_page(struct cbox_menu_state *state)
 {
+    return &state->page;
+}
+
+int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
+{
+    struct cbox_menu_state *st = p->user_data;
     struct cbox_menu *menu = st->menu;
     struct cbox_menu_item *item = NULL;
     if (st->cursor >= 0 && st->cursor < menu->item_count)
@@ -177,8 +178,8 @@ int cbox_menu_on_key(struct cbox_menu_state *st, int ch)
                 (*pv)--;
                 if (item->on_change)
                     item->on_change(item, st->context);
-                cbox_ui_size_menu(st);
-                cbox_ui_draw_menu(st);
+                cbox_menu_state_size(st);
+                cbox_menu_state_draw(st);
             }
         }
         return 0;
@@ -194,8 +195,8 @@ int cbox_menu_on_key(struct cbox_menu_state *st, int ch)
                 (*pv)++;
                 if (item->on_change)
                     item->on_change(item, st->context);
-                cbox_ui_size_menu(st);
-                cbox_ui_draw_menu(st);
+                cbox_menu_state_size(st);
+                cbox_menu_state_draw(st);
             }
         }
         return 0;
@@ -203,17 +204,17 @@ int cbox_menu_on_key(struct cbox_menu_state *st, int ch)
     case KEY_UP:
         if (st->cursor > 0)
             st->cursor--;
-        cbox_ui_draw_menu(st);
+        cbox_menu_state_draw(st);
         return 0;
     case KEY_DOWN:
         if (st->cursor < menu->item_count - 1)
             st->cursor++;
-        cbox_ui_draw_menu(st);
+        cbox_menu_state_draw(st);
         return 0;
     }
 }
 
-extern void cbox_menu_done(struct cbox_menu_state *st)
+extern void cbox_menu_state_destroy(struct cbox_menu_state *st)
 {
     free(st);
 }

@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct cbox_ui_page
 {
+    void *user_data;
     void (*draw)(struct cbox_ui_page *page);
     int (*on_key)(struct cbox_ui_page *page, int ch);
     int (*on_idle)(struct cbox_ui_page *page);

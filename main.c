@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "scene.h"
 #include "ui.h"
 
+#include <assert.h>
 #include <glib.h>
 #include <getopt.h>
 #include <math.h>
@@ -97,15 +98,18 @@ void run_ui()
     struct cbox_ui_page *page = NULL;
     struct cbox_ui_page page2;
     FIXED_MENU(main);
-    page = cbox_menu_init(&st, &menu_main, NULL);
+    cbox_ui_start();
+
+    st = cbox_menu_state_new(&menu_main, stdscr, NULL);
+    page = cbox_menu_state_get_page(st);
 
     page2.on_key = main_on_key;
     page2.on_idle = main_on_idle;
     page2.draw = main_draw;
     
-    cbox_ui_start();
-    cbox_ui_run(&page2);
+    cbox_ui_run(page);
     cbox_ui_stop();
+    cbox_menu_state_destroy(st);
 }
 
 int main(int argc, char *argv[])
