@@ -16,12 +16,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+struct cbox_config_section_cb
+{
+    void *user_data;
+    void (*process)(struct cbox_config_section_cb *section, const char *key);
+};
+
 extern void cbox_config_init(const char *override_file);
 extern int cbox_config_has_section(const char *section);
 extern char *cbox_config_get_string(const char *section, const char *key);
 extern char *cbox_config_get_string_with_default(const char *section, const char *key, char *def_value);
 extern int cbox_config_get_int(const char *section, const char *key, int def_value);
 extern float cbox_config_get_float(const char *section, const char *key, float def_value);
+extern void cbox_config_foreach_section(struct cbox_config_section_cb *cb);
 extern void cbox_config_close();
 
 

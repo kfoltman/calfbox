@@ -119,6 +119,17 @@ float cbox_config_get_float(const char *section, const char *key, float def_valu
     return result;
 }    
 
+void cbox_config_foreach_section(struct cbox_config_section_cb *cb)
+{
+    gsize i, length = 0;
+    gchar **groups = g_key_file_get_groups (config_keyfile, &length);
+    for (i = 0; i < length; i++)
+    {
+        cb->process(cb, groups[i]);
+    }
+    g_strfreev(groups);
+}
+
 void cbox_config_close()
 {
     if (config_keyfile)

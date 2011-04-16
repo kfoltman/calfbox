@@ -82,6 +82,14 @@ int main_on_idle(struct cbox_ui_page *page)
     return 0;
 }
 
+static void config_key_process(struct cbox_config_section_cb *section, const char *key)
+{
+    struct cbox_menu *menu = section->user_data;
+    static struct cbox_menu_item_extras_command mx_cmd_quit = { cmd_quit };
+    
+    cbox_menu_add_item(menu, key, menu_item_command, &mx_cmd_quit, NULL);
+}
+
 void run_ui()
 {
     int var1 = 42;
@@ -93,11 +101,13 @@ void run_ui()
     struct cbox_ui_page *page = NULL;
     struct cbox_ui_page page2;
     struct cbox_menu *main_menu = cbox_menu_new();
+    struct cbox_config_section_cb cb = { .process = config_key_process, .user_data = main_menu };
     cbox_ui_start();
     
     cbox_menu_add_item(main_menu, "foo", menu_item_value_int, &mx_int_var1, &var1);
     cbox_menu_add_item(main_menu, "bar", menu_item_value_double, &mx_double_var2, &var2);
     cbox_menu_add_item(main_menu, "Quit", menu_item_command, &mx_cmd_quit, NULL);
+    cbox_config_foreach_section(&cb);
 
     st = cbox_menu_state_new(main_menu, stdscr, NULL);
     page = cbox_menu_state_get_page(st);
