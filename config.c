@@ -68,7 +68,7 @@ void cbox_config_init(const char *override_file)
 
 int cbox_config_has_section(const char *section)
 {
-    return g_key_file_has_group(config_keyfile, section);
+    return section && g_key_file_has_group(config_keyfile, section);
 }
 
 char *cbox_config_get_string(const char *section, const char *key)
@@ -78,7 +78,7 @@ char *cbox_config_get_string(const char *section, const char *key)
 
 char *cbox_config_get_string_with_default(const char *section, const char *key, char *def_value)
 {
-    if (g_key_file_has_key(config_keyfile, section, key, NULL))
+    if (section && key && g_key_file_has_key(config_keyfile, section, key, NULL))
     {
         gchar *tmp = g_key_file_get_string(config_keyfile, section, key, NULL);
         gchar *perm = g_string_chunk_insert(cfg_strings, tmp);
@@ -96,6 +96,8 @@ int cbox_config_get_int(const char *section, const char *key, int def_value)
     GError *error = NULL;
     int result;
     
+    if (!section || !key)
+        return def_value;
     result = g_key_file_get_integer(config_keyfile, section, key, &error);
     if (error)
     {
@@ -110,6 +112,8 @@ float cbox_config_get_float(const char *section, const char *key, float def_valu
     GError *error = NULL;
     float result;
     
+    if (!section || !key)
+        return def_value;
     result = g_key_file_get_double(config_keyfile, section, key, &error);
     if (error)
     {
