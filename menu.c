@@ -136,6 +136,7 @@ void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
     struct cbox_menu *menu = menu_state->menu;
     int i;
     
+    wclear(menu_state->window);
     box(menu_state->window, 0, 0);
     for (i = 0; i < menu->items->len; i++)
     {
