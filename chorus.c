@@ -82,8 +82,8 @@ void chorus_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
             float dva = min_delay + mod_depth * lfo;
             int dv = (int)dva;
             float frac = dva - dv;
-            float smp0 = m->storage[(pos - dv - 1) & mask][c];
-            float smp1 = m->storage[(pos - dv) & mask][c];
+            float smp0 = m->storage[(pos - dv) & mask][c];
+            float smp1 = m->storage[(pos - dv - 1) & mask][c];
             
             float smp = smp0 + (smp1 - smp0) * frac;
             
