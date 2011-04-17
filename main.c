@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 static struct cbox_io io;
 static struct cbox_rt *rt;
+static gchar *current_scene_name = NULL;
 
 static const char *short_options = "i:c:e:s:h";
 
@@ -66,7 +67,11 @@ int cmd_load_scene(struct cbox_menu_item *item, void *context)
     struct cbox_scene *scene = cbox_scene_load(item->value);
     struct cbox_scene *old = cbox_rt_set_scene(rt, scene);
     if (old)
+    {
         cbox_scene_destroy(old);
+        g_free(current_scene_name);
+        current_scene_name = g_strdup_printf("scene:%s", (char *)item->value);
+    }
     return 0;
 }
 
@@ -81,18 +86,26 @@ int cmd_load_instrument(struct cbox_menu_item *item, void *context)
         
         struct cbox_scene *old = cbox_rt_set_scene(rt, scene);
         if (old)
+        {
             cbox_scene_destroy(old);
+            g_free(current_scene_name);
+            current_scene_name = g_strdup_printf("instrument:%s", (char *)item->value);
+        }
     }
     else
         cbox_scene_destroy(scene);
     return 0;
 }
 
+gchar *scene_format_value(const struct cbox_menu_item *item, void *context)
+{
+    return strdup(current_scene_name);
+}
+
 gchar *transport_format_value(const struct cbox_menu_item *item, void *context)
 {
     struct cbox_bbt bbt;
     cbox_master_to_bbt(rt->master, &bbt);
-    box(stdscr, 0, 0);
     if (!strcmp((const char *)item->value, "pos"))
         return g_strdup_printf("%d", (int)rt->master->song_pos_samples);
     else
@@ -123,6 +136,7 @@ void run_ui()
     static struct cbox_menu_item_extras_double mx_double_var2 = { 0, 127, "%f", NULL, 0 };
     static struct cbox_menu_item_extras_command mx_cmd_quit = { cmd_quit };
     static struct cbox_menu_item_extras_static mx_format_transport = { transport_format_value };
+    static struct cbox_menu_item_extras_static mx_format_scene = { scene_format_value };
     struct cbox_menu_state *st = NULL;
     struct cbox_ui_page *page = NULL;
     struct cbox_menu *main_menu = cbox_menu_new();
@@ -130,12 +144,13 @@ void run_ui()
     cbox_ui_start();
     
     cbox_menu_add_item(main_menu, "Scenes and layers", menu_item_static, NULL, NULL);
+    cbox_menu_add_item(main_menu, "Current:", menu_item_static, &mx_format_scene, NULL);
     cbox_config_foreach_section(&cb);
     cbox_menu_add_item(main_menu, "Variables", menu_item_static, NULL, NULL);
-    cbox_menu_add_item(main_menu, "foo", menu_item_value_int, &mx_int_var1, &var1);
-    cbox_menu_add_item(main_menu, "bar", menu_item_value_double, &mx_double_var2, &var2);
-    cbox_menu_add_item(main_menu, "pos", menu_item_static, &mx_format_transport, "pos");
-    cbox_menu_add_item(main_menu, "bbt", menu_item_static, &mx_format_transport, "bbt");
+    cbox_menu_add_item(main_menu, "foo:", menu_item_value_int, &mx_int_var1, &var1);
+    cbox_menu_add_item(main_menu, "bar:", menu_item_value_double, &mx_double_var2, &var2);
+    cbox_menu_add_item(main_menu, "pos:", menu_item_static, &mx_format_transport, "pos");
+    cbox_menu_add_item(main_menu, "bbt:", menu_item_static, &mx_format_transport, "bbt");
     cbox_menu_add_item(main_menu, "Commands", menu_item_static, NULL, NULL);
     cbox_menu_add_item(main_menu, "Quit", menu_item_command, &mx_cmd_quit, NULL);
 
@@ -201,12 +216,14 @@ int main(int argc, char *argv[])
     
     if (scene_name)
     {
+        current_scene_name = g_strdup_printf("scene:%s", scene_name);
         scene = cbox_scene_load(scene_name);        
         if (!scene)
             goto fail;
     }
     else
     {
+        current_scene_name = g_strdup_printf("instrument:%s", instrument_name);
         scene = cbox_scene_new();
         layer = cbox_layer_new(instrument_name);
         if (!layer)
