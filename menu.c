@@ -105,7 +105,7 @@ void cbox_menu_state_size(struct cbox_menu_state *menu_state)
         gchar *value = item->item_class->format_value(item, menu_state);
         
         int len = strlen(item->label);
-        int len2 = strlen(value);
+        int len2 = value ? strlen(value) : 0;
         if (len > label_width)
             label_width = len;
         if (len2 > value_width)

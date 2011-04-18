@@ -73,7 +73,7 @@ static gchar *static_format(const struct cbox_menu_item *item, struct cbox_menu_
 {
     struct cbox_menu_item_static *sitem = (struct cbox_menu_item_static *)item;
     if (!sitem->format_value)
-        return g_strdup("");
+        return NULL;
     return sitem->format_value(sitem, state->context);
 }
 
