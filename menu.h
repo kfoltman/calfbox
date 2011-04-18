@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010 Krzysztof Foltman
+Copyright (C) 2010-2011 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,57 +22,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <ncurses.h>
 #include <stdint.h>
 
-enum cbox_menu_item_type
-{
-    menu_item_command,
-    menu_item_value_int,
-    menu_item_value_double,
-    menu_item_value_enum,
-    menu_item_submenu,
-    menu_item_static
-};
-
-struct cbox_menu_item;
-
-struct cbox_menu_item_extras_command
-{
-    int (*execute)(struct cbox_menu_item *item, void *context);
-};
-
-struct cbox_menu_item_extras_int
-{
-    int vmin, vmax;
-    const char *fmt;
-};
-
-struct cbox_menu_item_extras_double
-{
-    double vmin, vmax;
-    const char *fmt;
-    double (*step)(struct cbox_menu_item_extras_double *item, double value, int where);
-    double step_arg;
-};
-
-struct cbox_menu_item_extras_static
-{
-    char *(*format_value)(const struct cbox_menu_item *item, void *context);
-};
-
-struct cbox_menu_item
-{
-    const char *label;
-    enum cbox_menu_item_type type;
-    void *extras;
-    void *value;
-    int (*on_change)(struct cbox_menu_item *item, void *context);
-    /* TODO: is_active? */
-};
+#include "ui.h"
 
 struct cbox_menu;
-struct cbox_menu_state;
+struct cbox_menu_item;
+
+struct cbox_menu_state
+{
+    struct cbox_ui_page page;
+    struct cbox_menu *menu;
+    int cursor;
+    int label_width, value_width;
+    WINDOW *window;
+    void *context;
+};
 
 extern struct cbox_menu *cbox_menu_new();
-extern struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, const char *label, enum cbox_menu_item_type, void *extras, void *value);
+extern struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, struct cbox_menu_item *item);
 extern void cbox_menu_destroy(struct cbox_menu *menu);
 
 extern struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu *menu, WINDOW *window, void *context);

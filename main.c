@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "io.h"
 #include "layer.h"
 #include "menu.h"
+#include "menuitem.h"
 #include "midi.h"
 #include "module.h"
 #include "procmain.h"
@@ -57,28 +58,28 @@ void print_help(char *progname)
     exit(0);
 }
 
-int cmd_quit(struct cbox_menu_item *item, void *context)
+int cmd_quit(struct cbox_menu_item_command *item, void *context)
 {
     return 1;
 }
 
-int cmd_load_scene(struct cbox_menu_item *item, void *context)
+int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 {
-    struct cbox_scene *scene = cbox_scene_load(item->value);
+    struct cbox_scene *scene = cbox_scene_load(item->item.item_context);
     struct cbox_scene *old = cbox_rt_set_scene(rt, scene);
     if (old)
     {
         cbox_scene_destroy(old);
         g_free(current_scene_name);
-        current_scene_name = g_strdup_printf("scene:%s", (char *)item->value);
+        current_scene_name = g_strdup_printf("scene:%s", (char *)item->item.item_context);
     }
     return 0;
 }
 
-int cmd_load_instrument(struct cbox_menu_item *item, void *context)
+int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 {
     struct cbox_scene *scene = cbox_scene_new();
-    struct cbox_layer *layer = cbox_layer_new((char *)item->value);
+    struct cbox_layer *layer = cbox_layer_new((char *)item->item.item_context);
     
     if (layer)
     {
@@ -89,7 +90,7 @@ int cmd_load_instrument(struct cbox_menu_item *item, void *context)
         {
             cbox_scene_destroy(old);
             g_free(current_scene_name);
-            current_scene_name = g_strdup_printf("instrument:%s", (char *)item->value);
+            current_scene_name = g_strdup_printf("instrument:%s", (char *)item->item.item_context);
         }
     }
     else
@@ -97,16 +98,16 @@ int cmd_load_instrument(struct cbox_menu_item *item, void *context)
     return 0;
 }
 
-gchar *scene_format_value(const struct cbox_menu_item *item, void *context)
+gchar *scene_format_value(const struct cbox_menu_item_static *item, void *context)
 {
     return strdup(current_scene_name);
 }
 
-gchar *transport_format_value(const struct cbox_menu_item *item, void *context)
+gchar *transport_format_value(const struct cbox_menu_item_static *item, void *context)
 {
     struct cbox_bbt bbt;
     cbox_master_to_bbt(rt->master, &bbt);
-    if (!strcmp((const char *)item->value, "pos"))
+    if (!strcmp((const char *)item->item.item_context, "pos"))
         return g_strdup_printf("%d", (int)rt->master->song_pos_samples);
     else
         return g_strdup_printf("%d:%d:%02d", bbt.bar, bbt.beat, bbt.tick);
@@ -115,16 +116,14 @@ gchar *transport_format_value(const struct cbox_menu_item *item, void *context)
 static void config_key_process(struct cbox_config_section_cb *section, const char *key)
 {
     struct cbox_menu *menu = section->user_data;
-    static struct cbox_menu_item_extras_command mx_cmd_load_scene = { cmd_load_scene };
-    static struct cbox_menu_item_extras_command mx_cmd_load_instrument = { cmd_load_instrument };
     
     if (!strncmp(key, "scene:", 6))
-    {    
-        cbox_menu_add_item(menu, key, menu_item_command, &mx_cmd_load_scene, strdup(key + 6));
+    {
+        cbox_menu_add_item(menu, cbox_menu_item_new_command(key, cmd_load_scene, strdup(key + 6)));
     }
     if (!strncmp(key, "instrument:", 11))
     {    
-        cbox_menu_add_item(menu, key, menu_item_command, &mx_cmd_load_instrument, strdup(key + 11));
+        cbox_menu_add_item(menu, cbox_menu_item_new_command(key, cmd_load_instrument, strdup(key + 11)));
     }
 }
 
@@ -132,27 +131,22 @@ void run_ui()
 {
     int var1 = 42;
     double var2 = 1.5;
-    static struct cbox_menu_item_extras_int mx_int_var1 = { 0, 127, "%d" };
-    static struct cbox_menu_item_extras_double mx_double_var2 = { 0, 127, "%f", NULL, 0 };
-    static struct cbox_menu_item_extras_command mx_cmd_quit = { cmd_quit };
-    static struct cbox_menu_item_extras_static mx_format_transport = { transport_format_value };
-    static struct cbox_menu_item_extras_static mx_format_scene = { scene_format_value };
     struct cbox_menu_state *st = NULL;
     struct cbox_ui_page *page = NULL;
     struct cbox_menu *main_menu = cbox_menu_new();
     struct cbox_config_section_cb cb = { .process = config_key_process, .user_data = main_menu };
     cbox_ui_start();
     
-    cbox_menu_add_item(main_menu, "Scenes and layers", menu_item_static, NULL, NULL);
-    cbox_menu_add_item(main_menu, "Current:", menu_item_static, &mx_format_scene, NULL);
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Scenes and layers", NULL, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Current:", scene_format_value, NULL));
     cbox_config_foreach_section(&cb);
-    cbox_menu_add_item(main_menu, "Variables", menu_item_static, NULL, NULL);
-    cbox_menu_add_item(main_menu, "foo:", menu_item_value_int, &mx_int_var1, &var1);
-    cbox_menu_add_item(main_menu, "bar:", menu_item_value_double, &mx_double_var2, &var2);
-    cbox_menu_add_item(main_menu, "pos:", menu_item_static, &mx_format_transport, "pos");
-    cbox_menu_add_item(main_menu, "bbt:", menu_item_static, &mx_format_transport, "bbt");
-    cbox_menu_add_item(main_menu, "Commands", menu_item_static, NULL, NULL);
-    cbox_menu_add_item(main_menu, "Quit", menu_item_command, &mx_cmd_quit, NULL);
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Variables", NULL, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_int("foo:", &var1, 0, 127, NULL));
+    // cbox_menu_add_item(main_menu, "bar:", menu_item_value_double, &mx_double_var2, &var2);
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("pos:", transport_format_value, "pos"));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("bbt:", transport_format_value, "bbt"));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Commands", NULL, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Quit", cmd_quit, NULL));
 
     st = cbox_menu_state_new(main_menu, stdscr, NULL);
     page = cbox_menu_state_get_page(st);

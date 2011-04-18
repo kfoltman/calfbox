@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "menu.h"
+#include "menuitem.h"
 #include "ui.h"
 
 #include <assert.h>
@@ -43,15 +44,8 @@ struct cbox_menu *cbox_menu_new()
     return menu;
 }
 
-struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, const char *label, enum cbox_menu_item_type type, void *extras, void *value)
-{
-    struct cbox_menu_item *item = malloc(sizeof(struct cbox_menu_item));
-    item->label = g_string_chunk_insert(menu->strings, label);
-    item->type = type;
-    item->extras = extras;
-    item->value = value;
-    item->on_change = NULL;
-    
+struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, struct cbox_menu_item *item)
+{    
     g_ptr_array_add(menu->items, item);
 }
 
@@ -64,16 +58,7 @@ void cbox_menu_destroy(struct cbox_menu *menu)
 }
 
 
-struct cbox_menu_state
-{
-    struct cbox_ui_page page;
-    struct cbox_menu *menu;
-    int cursor;
-    int label_width, value_width;
-    WINDOW *window;
-    void *context;
-};
-
+/*
 gchar *cbox_menu_item_value_format(const struct cbox_menu_item *item, void *context)
 {
     switch(item->type)
@@ -105,6 +90,7 @@ gchar *cbox_menu_item_value_format(const struct cbox_menu_item *item, void *cont
     assert(0);
     return NULL;
 }
+*/
 
 void cbox_menu_state_size(struct cbox_menu_state *menu_state)
 {
@@ -116,7 +102,7 @@ void cbox_menu_state_size(struct cbox_menu_state *menu_state)
     for (i = 0; i < menu->items->len; i++)
     {
         const struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
-        gchar *value = cbox_menu_item_value_format(item, menu_state->context);
+        gchar *value = item->item_class->format_value(item, menu_state);
         
         int len = strlen(item->label);
         int len2 = strlen(value);
@@ -134,27 +120,28 @@ void cbox_menu_state_size(struct cbox_menu_state *menu_state)
 void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
 {
     struct cbox_menu *menu = menu_state->menu;
-    int i;
+    int i, x, y;
     
     wclear(menu_state->window);
     box(menu_state->window, 0, 0);
+    x = 1;
+    y = 1;
     for (i = 0; i < menu->items->len; i++)
     {
         const struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
-        gchar *str = cbox_menu_item_value_format(item, menu_state->context);
-        if (menu_state->cursor == i)
-            wattron(menu_state->window, A_REVERSE);
-        if (item->type == menu_item_static && item->extras == NULL)
+        gchar *str = item->item_class->format_value(item, menu_state);
+        if (item->item_class->draw)
         {
-            wattron(menu_state->window, A_BOLD);
-            mvwprintw(menu_state->window, i + 1, 1, "%-*s %*s", menu_state->label_width, item->label, menu_state->value_width, str);
-            wattroff(menu_state->window, A_BOLD);
+            item->item_class->draw(item, menu_state, &y, &x, str, menu_state->cursor == i);
         }
         else
         {
-            mvwprintw(menu_state->window, i + 1, 1, "%-*s %*s", menu_state->label_width, item->label, menu_state->value_width, str);
+            if (menu_state->cursor == i)
+                wattron(menu_state->window, A_REVERSE);
+            mvwprintw(menu_state->window, y, x, "%-*s %*s", menu_state->label_width, item->label, menu_state->value_width, str);
+            wattroff(menu_state->window, A_REVERSE);
+            y++;
         }
-        wattroff(menu_state->window, A_REVERSE);
         g_free(str);
     }
     wrefresh(menu_state->window);
@@ -171,7 +158,7 @@ static int cbox_menu_is_item_enabled(struct cbox_menu *menu, int item)
 {
     assert(item >= 0 && item < menu->items->len);
     
-    return ((struct cbox_menu_item *)g_ptr_array_index(menu->items, item))->type != menu_item_static;
+    return ((struct cbox_menu_item *)g_ptr_array_index(menu->items, item))->item_class->on_key != NULL;
 }
 
 struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu *menu, WINDOW *window, void *context)
@@ -211,67 +198,31 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
     struct cbox_menu *menu = st->menu;
     struct cbox_menu_item *item = NULL;
     int pos = st->cursor;
+    int res = 0;
     if (st->cursor >= 0 && st->cursor < menu->items->len)
         item = g_ptr_array_index(menu->items, st->cursor);
         
-    if (ch == 10)
+    if (ch == 27)
+        return ch;
+
+    if (item->item_class->on_key)
     {
-        if (item)
+        res = item->item_class->on_key(item, st, ch);
+        if (res < 0)
         {
-            int exit_menu = 0;
-            if (item->type == menu_item_command)
-            {
-                struct cbox_menu_item_extras_command *cmd = item->extras;
-                if (cmd && cmd->execute)
-                    exit_menu = cmd->execute(item, st->context);
-            }
-            if (item->on_change)
-                exit_menu = item->on_change(item, st->context) || exit_menu;
-            
-            if (exit_menu)
-                return exit_menu;
+            cbox_menu_state_size(st);
+            cbox_menu_state_draw(st);
+            return 0;
         }
-        return 0;
     }
+
+    if (res > 0)
+        return res;
+    
     switch(ch)
     {
     case 27:
         return ch;
-    case KEY_LEFT:
-        if (!item || !item->extras || !item->value)
-            return 0;
-        if (item->type == menu_item_value_int)
-        {
-            struct cbox_menu_item_extras_int *ix = item->extras;
-            int *pv = item->value;
-            if (*pv > ix->vmin)
-            {
-                (*pv)--;
-                if (item->on_change)
-                    item->on_change(item, st->context);
-                cbox_menu_state_size(st);
-                cbox_menu_state_draw(st);
-            }
-        }
-        return 0;
-    case KEY_RIGHT:
-        if (!item || !item->extras || !item->value)
-            return 0;
-        if (item->type == menu_item_value_int)
-        {
-            struct cbox_menu_item_extras_int *ix = item->extras;
-            int *pv = item->value;
-            if (*pv < ix->vmax)
-            {
-                (*pv)++;
-                if (item->on_change)
-                    item->on_change(item, st->context);
-                cbox_menu_state_size(st);
-                cbox_menu_state_draw(st);
-            }
-        }
-        return 0;
-        
     case KEY_UP:
     case KEY_END:
         pos = ch == KEY_END ? menu->items->len - 1 : st->cursor - 1;
