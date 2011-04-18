@@ -128,7 +128,7 @@ void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
     y = 1;
     for (i = 0; i < menu->items->len; i++)
     {
-        const struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
+        struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
         gchar *str = item->item_class->format_value(item, menu_state);
         if (item->item_class->draw)
         {
