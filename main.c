@@ -90,6 +90,28 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
         {
             cbox_scene_destroy(old);
             g_free(current_scene_name);
+            current_scene_name = g_strdup_printf("layer:%s", (char *)item->item.item_context);
+        }
+    }
+    else
+        cbox_scene_destroy(scene);
+    return 0;
+}
+
+int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
+{
+    struct cbox_scene *scene = cbox_scene_new();
+    struct cbox_layer *layer = cbox_layer_load((char *)item->item.item_context);
+    
+    if (layer)
+    {
+        cbox_scene_add_layer(scene, layer);
+        
+        struct cbox_scene *old = cbox_rt_set_scene(rt, scene);
+        if (old)
+        {
+            cbox_scene_destroy(old);
+            g_free(current_scene_name);
             current_scene_name = g_strdup_printf("instrument:%s", (char *)item->item.item_context);
         }
     }
@@ -113,17 +135,20 @@ gchar *transport_format_value(const struct cbox_menu_item_static *item, void *co
         return g_strdup_printf("%d:%d:%02d", bbt.bar, bbt.beat, bbt.tick);
 }
 
-static void config_key_process(struct cbox_config_section_cb *section, const char *key)
+struct cbox_config_section_cb_data
 {
-    struct cbox_menu *menu = section->user_data;
+    struct cbox_menu *menu;
+    cbox_menu_item_execute_func func;
+    const char *prefix;
+};
+
+static void config_key_process(void *user_data, const char *key)
+{
+    struct cbox_config_section_cb_data *data = user_data;
     
-    if (!strncmp(key, "scene:", 6))
+    if (!strncmp(key, data->prefix, strlen(data->prefix)))
     {
-        cbox_menu_add_item(menu, cbox_menu_item_new_command(key, cmd_load_scene, strdup(key + 6)));
-    }
-    if (!strncmp(key, "instrument:", 11))
-    {    
-        cbox_menu_add_item(menu, cbox_menu_item_new_command(key, cmd_load_instrument, strdup(key + 11)));
+        cbox_menu_add_item(data->menu, cbox_menu_item_new_command(key, data->func, strdup(key + strlen(data->prefix))));
     }
 }
 
@@ -134,12 +159,22 @@ void run_ui()
     struct cbox_menu_state *st = NULL;
     struct cbox_ui_page *page = NULL;
     struct cbox_menu *main_menu = cbox_menu_new();
-    struct cbox_config_section_cb cb = { .process = config_key_process, .user_data = main_menu };
+    struct cbox_config_section_cb_data cb = { .menu = main_menu };
     cbox_ui_start();
     
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Scenes and layers", NULL, NULL));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Current:", scene_format_value, NULL));
-    cbox_config_foreach_section(&cb);
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Current scene:", scene_format_value, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Scenes", NULL, NULL));
+    cb.prefix = "scene:";
+    cb.func = cmd_load_scene;
+    cbox_config_foreach_section(config_key_process, &cb);
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Layers", NULL, NULL));
+    cb.prefix = "layer:";
+    cb.func = cmd_load_layer;
+    cbox_config_foreach_section(config_key_process, &cb);
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Instruments", NULL, NULL));
+    cb.prefix = "instrument:";
+    cb.func = cmd_load_instrument;
+    cbox_config_foreach_section(config_key_process, &cb);
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Variables", NULL, NULL));
     cbox_menu_add_item(main_menu, cbox_menu_item_new_int("foo:", &var1, 0, 127, NULL));
     // cbox_menu_add_item(main_menu, "bar:", menu_item_value_double, &mx_double_var2, &var2);

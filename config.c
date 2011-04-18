@@ -123,13 +123,13 @@ float cbox_config_get_float(const char *section, const char *key, float def_valu
     return result;
 }    
 
-void cbox_config_foreach_section(struct cbox_config_section_cb *cb)
+void cbox_config_foreach_section(void (*process)(void *user_data, const char *key), void *user_data)
 {
     gsize i, length = 0;
     gchar **groups = g_key_file_get_groups (config_keyfile, &length);
     for (i = 0; i < length; i++)
     {
-        cb->process(cb, groups[i]);
+        process(user_data, groups[i]);
     }
     g_strfreev(groups);
 }
