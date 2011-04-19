@@ -22,6 +22,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /*******************************************************************/
 
+static void item_measure(struct cbox_menu_item *item, struct cbox_menu_state *state, struct cbox_menu_measure *m)
+{
+    gchar *value = item->item_class->format_value(item, state);
+    
+    int len = strlen(item->label);
+    int len2 = value ? strlen(value) : 0;
+    if (len > m->label_width)
+        m->label_width = len;
+    if (len2 > m->value_width)
+        m->value_width = len2;
+    m->height++;
+    
+    g_free(value);
+}
+
 static void item_destroy(struct cbox_menu_item *item)
 {
     g_free(item->label);
@@ -46,7 +61,7 @@ static int command_on_key(struct cbox_menu_item *item, struct cbox_menu_state *s
 }
 
 struct cbox_menu_item_class menu_item_class_command = {
-    .measure = NULL,
+    .measure = item_measure,
     .draw = NULL,
     .format_value = command_format,
     .on_idle = NULL,
@@ -78,7 +93,7 @@ static gchar *static_format(const struct cbox_menu_item *item, struct cbox_menu_
 }
 
 struct cbox_menu_item_class menu_item_class_static = {
-    .measure = NULL,
+    .measure = item_measure,
     .draw = static_draw,
     .format_value = static_format,
     .on_idle = NULL,
@@ -127,7 +142,7 @@ static int intvalue_on_key(struct cbox_menu_item *item, struct cbox_menu_state *
 }
 
 struct cbox_menu_item_class menu_item_class_int = {
-    .measure = NULL,
+    .measure = item_measure,
     .draw = NULL,
     .format_value = intvalue_format,
     .on_idle = NULL,

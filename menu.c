@@ -98,26 +98,17 @@ gchar *cbox_menu_item_value_format(const struct cbox_menu_item *item, void *cont
 void cbox_menu_state_size(struct cbox_menu_state *menu_state)
 {
     struct cbox_menu *menu = menu_state->menu;
-    int label_width = 0;
-    int value_width = 0;
     int i;
+    struct cbox_menu_measure size = { .label_width = 0, .value_width = 0, .height = 0 };
     
     for (i = 0; i < menu->items->len; i++)
     {
-        const struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
-        gchar *value = item->item_class->format_value(item, menu_state);
+        struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
         
-        int len = strlen(item->label);
-        int len2 = value ? strlen(value) : 0;
-        if (len > label_width)
-            label_width = len;
-        if (len2 > value_width)
-            value_width = len2;
-        
-        g_free(value);
+        item->item_class->measure(item, menu_state, &size);
     }
-    menu_state->label_width = label_width;
-    menu_state->value_width = value_width;
+    menu_state->label_width = size.label_width;
+    menu_state->value_width = size.value_width;
 }
 
 void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
