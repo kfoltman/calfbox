@@ -204,6 +204,9 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
     
     switch(ch)
     {
+    case 12:
+        wclear(st->window);
+        return 0;
     case 27:
         return ch;
     case KEY_UP:
