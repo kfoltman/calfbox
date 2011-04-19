@@ -107,6 +107,7 @@ void cbox_menu_state_size(struct cbox_menu_state *menu_state)
     {
         struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
         
+        item->x = 1;
         item->y = 1 + menu_state->size.height;
         item->item_class->measure(item, menu_state);
     }
@@ -119,24 +120,11 @@ void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
     
     werase(menu_state->window);
     box(menu_state->window, 0, 0);
-    x = 1;
-    y = 1;
     for (i = 0; i < menu->items->len; i++)
     {
         struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
-        y = item->y;
         gchar *str = item->item_class->format_value(item, menu_state);
-        if (item->item_class->draw)
-        {
-            item->item_class->draw(item, menu_state, &y, &x, str, menu_state->cursor == i);
-        }
-        else
-        {
-            if (menu_state->cursor == i)
-                wattron(menu_state->window, A_REVERSE);
-            mvwprintw(menu_state->window, y, x, "%-*s %*s", menu_state->size.label_width, item->label, menu_state->size.value_width, str);
-            wattroff(menu_state->window, A_REVERSE);
-        }
+        item->item_class->draw(item, menu_state, str, menu_state->cursor == i);
         g_free(str);
     }
     wrefresh(menu_state->window);
@@ -224,10 +212,8 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
         while(pos >= 0 && !cbox_menu_is_item_enabled(menu, pos))
             pos--;
         if (pos >= 0)
-        {
             st->cursor = pos;
-            cbox_menu_state_draw(st);
-        }
+        cbox_menu_state_draw(st);
         return 0;
     case KEY_HOME:
     case KEY_DOWN:
@@ -235,10 +221,7 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
         while(pos < menu->items->len && !cbox_menu_is_item_enabled(menu, pos))
             pos++;
         if (pos < menu->items->len)
-        {
             st->cursor = pos;
-            cbox_menu_state_draw(st);
-        }
         cbox_menu_state_draw(st);
         return 0;
     }

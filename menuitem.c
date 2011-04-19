@@ -45,6 +45,14 @@ static void item_destroy(struct cbox_menu_item *item)
     g_free(item);
 }
 
+static void item_draw(struct cbox_menu_item *item, struct cbox_menu_state *state, gchar *value, int hilited)
+{
+    if (hilited)
+        wattron(state->window, A_REVERSE);
+    mvwprintw(state->window, item->y, item->x, "%-*s %*s", state->size.label_width, item->label, state->size.value_width, value);
+    wattroff(state->window, A_REVERSE);
+}
+
 /*******************************************************************/
 
 static gchar *command_format(const struct cbox_menu_item *item, struct cbox_menu_state *state)
@@ -64,7 +72,7 @@ static int command_on_key(struct cbox_menu_item *item, struct cbox_menu_state *s
 
 struct cbox_menu_item_class menu_item_class_command = {
     .measure = item_measure,
-    .draw = NULL,
+    .draw = item_draw,
     .format_value = command_format,
     .on_idle = NULL,
     .on_key = command_on_key,
@@ -73,17 +81,16 @@ struct cbox_menu_item_class menu_item_class_command = {
 
 /*******************************************************************/
 
-void static_draw(struct cbox_menu_item *item, struct cbox_menu_state *state, int *y, int *x, gchar *value, int hilited)
+void static_draw(struct cbox_menu_item *item, struct cbox_menu_state *state, gchar *value, int hilited)
 {
     if (!value)
     {
         wattron(state->window, A_BOLD);
-        mvwprintw(state->window, *y, *x, "%-*s", state->size.label_width + state->size.value_width, item->label);
+        mvwprintw(state->window, item->y, item->x, "%-*s", state->size.label_width + state->size.value_width, item->label);
         wattroff(state->window, A_BOLD);
     }
     else
-        mvwprintw(state->window, *y, *x, "%-*s %*s", state->size.label_width, item->label, state->size.value_width, value);
-    (*y)++;
+        mvwprintw(state->window, item->y, item->x, "%-*s %*s", state->size.label_width, item->label, state->size.value_width, value);
 }
 
 static gchar *static_format(const struct cbox_menu_item *item, struct cbox_menu_state *state)
@@ -145,7 +152,7 @@ static int intvalue_on_key(struct cbox_menu_item *item, struct cbox_menu_state *
 
 struct cbox_menu_item_class menu_item_class_int = {
     .measure = item_measure,
-    .draw = NULL,
+    .draw = item_draw,
     .format_value = intvalue_format,
     .on_idle = NULL,
     .on_key = intvalue_on_key,

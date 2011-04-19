@@ -39,7 +39,7 @@ struct cbox_menu_measure
 struct cbox_menu_item_class
 {
     void (*measure)(struct cbox_menu_item *item, struct cbox_menu_state *state);
-    void (*draw)(struct cbox_menu_item *item, struct cbox_menu_state *state, int *y, int *x, gchar *value, int hilited);
+    void (*draw)(struct cbox_menu_item *item, struct cbox_menu_state *state, gchar *value, int hilited);
     gchar *(*format_value)(const struct cbox_menu_item *item, struct cbox_menu_state *state);
     int (*on_key)(struct cbox_menu_item *item, struct cbox_menu_state *state, int key);
     int (*on_idle)(struct cbox_menu_item *item, struct cbox_menu_state *state);
@@ -55,9 +55,8 @@ struct cbox_menu_item
     gchar *label;
     struct cbox_menu_item_class *item_class;
     void *item_context;
-    int y;
+    int x, y;
     /* TODO: is_active? */
-    /* TODO: x */
 };
 
 struct cbox_menu_item_command
