@@ -51,7 +51,10 @@ struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, struct cbox_me
 
 void cbox_menu_destroy(struct cbox_menu *menu)
 {
-    // XXXKF free individual items
+    int i;
+    
+    for (i = 0; i < menu->items->len; i++)
+        cbox_menu_item_destroy(g_ptr_array_index(menu->items, i));
     
     g_ptr_array_free(menu->items, TRUE);
     g_string_chunk_free(menu->strings);
