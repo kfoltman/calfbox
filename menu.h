@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <ncurses.h>
 #include <stdint.h>
 
+#include "menuitem.h"
 #include "ui.h"
 
 struct cbox_menu;
@@ -32,7 +33,7 @@ struct cbox_menu_state
     struct cbox_ui_page page;
     struct cbox_menu *menu;
     int cursor;
-    int label_width, value_width;
+    struct cbox_menu_measure size;
     WINDOW *window;
     void *context;
 };

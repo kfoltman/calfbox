@@ -19,11 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "menu.h"
 #include "menuitem.h"
 #include <malloc.h>
+#include <string.h>
 
 /*******************************************************************/
 
-static void item_measure(struct cbox_menu_item *item, struct cbox_menu_state *state, struct cbox_menu_measure *m)
+static void item_measure(struct cbox_menu_item *item, struct cbox_menu_state *state)
 {
+    struct cbox_menu_measure *m = &state->size;
     gchar *value = item->item_class->format_value(item, state);
     
     int len = strlen(item->label);
@@ -76,11 +78,11 @@ void static_draw(struct cbox_menu_item *item, struct cbox_menu_state *state, int
     if (!value)
     {
         wattron(state->window, A_BOLD);
-        mvwprintw(state->window, *y, *x, "%-*s", state->label_width + state->value_width, item->label);
+        mvwprintw(state->window, *y, *x, "%-*s", state->size.label_width + state->size.value_width, item->label);
         wattroff(state->window, A_BOLD);
     }
     else
-        mvwprintw(state->window, *y, *x, "%-*s %*s", state->label_width, item->label, state->value_width, value);
+        mvwprintw(state->window, *y, *x, "%-*s %*s", state->size.label_width, item->label, state->size.value_width, value);
     (*y)++;
 }
 

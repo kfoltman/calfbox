@@ -38,7 +38,7 @@ struct cbox_menu_measure
 
 struct cbox_menu_item_class
 {
-    void (*measure)(struct cbox_menu_item *item, struct cbox_menu_state *state, struct cbox_menu_measure *m);
+    void (*measure)(struct cbox_menu_item *item, struct cbox_menu_state *state);
     void (*draw)(struct cbox_menu_item *item, struct cbox_menu_state *state, int *y, int *x, gchar *value, int hilited);
     gchar *(*format_value)(const struct cbox_menu_item *item, struct cbox_menu_state *state);
     int (*on_key)(struct cbox_menu_item *item, struct cbox_menu_state *state, int key);
