@@ -107,6 +107,7 @@ void cbox_menu_state_size(struct cbox_menu_state *menu_state)
     {
         struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
         
+        item->y = 1 + menu_state->size.height;
         item->item_class->measure(item, menu_state);
     }
 }
@@ -116,13 +117,14 @@ void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
     struct cbox_menu *menu = menu_state->menu;
     int i, x, y;
     
-    wclear(menu_state->window);
+    werase(menu_state->window);
     box(menu_state->window, 0, 0);
     x = 1;
     y = 1;
     for (i = 0; i < menu->items->len; i++)
     {
         struct cbox_menu_item *item = g_ptr_array_index(menu->items, i);
+        y = item->y;
         gchar *str = item->item_class->format_value(item, menu_state);
         if (item->item_class->draw)
         {
@@ -134,7 +136,6 @@ void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
                 wattron(menu_state->window, A_REVERSE);
             mvwprintw(menu_state->window, y, x, "%-*s %*s", menu_state->size.label_width, item->label, menu_state->size.value_width, str);
             wattroff(menu_state->window, A_REVERSE);
-            y++;
         }
         g_free(str);
     }

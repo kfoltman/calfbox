@@ -55,8 +55,9 @@ struct cbox_menu_item
     gchar *label;
     struct cbox_menu_item_class *item_class;
     void *item_context;
+    int y;
     /* TODO: is_active? */
-    /* TODO: x/y */
+    /* TODO: x */
 };
 
 struct cbox_menu_item_command
