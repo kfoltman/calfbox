@@ -27,23 +27,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct cbox_menu;
 struct cbox_menu_item;
+struct cbox_menu_page;
 
 struct cbox_menu_state
 {
-    struct cbox_ui_page page;
+    struct cbox_menu_page *page;
     struct cbox_menu *menu;
     int cursor;
     struct cbox_menu_measure size;
     WINDOW *window;
     void *context;
+    struct cbox_menu_state *caller;
+    int menu_is_temporary;
 };
 
 extern struct cbox_menu *cbox_menu_new();
 extern struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, struct cbox_menu_item *item);
 extern void cbox_menu_destroy(struct cbox_menu *menu);
 
-extern struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu *menu, WINDOW *window, void *context);
-extern struct cbox_ui_page *cbox_menu_state_get_page(struct cbox_menu_state *st);
+extern struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu_page *page, struct cbox_menu *menu, WINDOW *window, void *context);
 extern void cbox_menu_state_destroy(struct cbox_menu_state *st);
+
+struct cbox_menu_page
+{
+    struct cbox_ui_page page;
+    struct cbox_menu_state *state;
+};
+
+extern struct cbox_menu_page *cbox_menu_page_new();
+extern void cbox_menu_page_destroy(struct cbox_menu_page *st);
 
 #endif

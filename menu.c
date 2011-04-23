@@ -132,7 +132,8 @@ void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
 
 static void cbox_menu_page_draw(struct cbox_ui_page *p)
 {
-    struct cbox_menu_state *st = p->user_data;
+    struct cbox_menu_page *mp = p->user_data;
+    struct cbox_menu_state *st = mp->state;
     cbox_menu_state_size(st);
     cbox_menu_state_draw(st);
 }
@@ -144,17 +145,16 @@ static int cbox_menu_is_item_enabled(struct cbox_menu *menu, int item)
     return ((struct cbox_menu_item *)g_ptr_array_index(menu->items, item))->item_class->on_key != NULL;
 }
 
-struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu *menu, WINDOW *window, void *context)
+struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu_page *page, struct cbox_menu *menu, WINDOW *window, void *context)
 {
     struct cbox_menu_state *st = malloc(sizeof(struct cbox_menu_state));
+    st->page = page;
     st->menu = menu;
     st->cursor = 0;
     st->window = window;
     st->context = context;
-    st->page.user_data = st;
-    st->page.draw = cbox_menu_page_draw;
-    st->page.on_key = cbox_menu_page_on_key;
-    st->page.on_idle = cbox_menu_page_on_idle;
+    st->caller = NULL;
+    st->menu_is_temporary = 0;
     
     while(st->cursor < menu->items->len - 1 && !cbox_menu_is_item_enabled(menu, st->cursor))
         st->cursor++;
@@ -162,14 +162,10 @@ struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu *menu, WINDOW *wind
     return st;
 }
 
-struct cbox_ui_page *cbox_menu_state_get_page(struct cbox_menu_state *state)
-{
-    return &state->page;
-}
-
 int cbox_menu_page_on_idle(struct cbox_ui_page *p)
 {
-    struct cbox_menu_state *st = p->user_data;
+    struct cbox_menu_page *mp = p->user_data;
+    struct cbox_menu_state *st = mp->state;
     cbox_menu_state_size(st);
     cbox_menu_state_draw(st);
     return 0;
@@ -177,7 +173,8 @@ int cbox_menu_page_on_idle(struct cbox_ui_page *p)
 
 int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
 {
-    struct cbox_menu_state *st = p->user_data;
+    struct cbox_menu_page *mp = p->user_data;
+    struct cbox_menu_state *st = mp->state;
     struct cbox_menu *menu = st->menu;
     struct cbox_menu_item *item = NULL;
     int pos = st->cursor;
@@ -231,7 +228,22 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
     return 0;
 }
 
-extern void cbox_menu_state_destroy(struct cbox_menu_state *st)
+void cbox_menu_state_destroy(struct cbox_menu_state *st)
 {
     free(st);
+}
+
+struct cbox_menu_page *cbox_menu_page_new()
+{
+    struct cbox_menu_page *page = malloc(sizeof(struct cbox_menu_page));
+    page->state = NULL;
+    page->page.user_data = page;
+    page->page.draw = cbox_menu_page_draw;
+    page->page.on_key = cbox_menu_page_on_key;
+    page->page.on_idle = cbox_menu_page_on_idle;
+}
+
+void cbox_menu_page_destroy(struct cbox_menu_page *p)
+{
+    free(p);
 }

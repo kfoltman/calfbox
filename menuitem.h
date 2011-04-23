@@ -27,6 +27,7 @@ struct cbox_menu;
 struct cbox_menu_item;
 struct cbox_menu_item_command;
 struct cbox_menu_item_static;
+struct cbox_menu_item_menu;
 struct cbox_menu_state;
 
 struct cbox_menu_measure
@@ -91,9 +92,20 @@ struct cbox_menu_item_static
     char *(*format_value)(const struct cbox_menu_item_static *item, void *menu_context);
 };
 
+typedef struct cbox_menu *(*create_menu_func)(struct cbox_menu_item_menu *item, void *menu_context);
+
+struct cbox_menu_item_menu
+{
+    struct cbox_menu_item item;
+    struct cbox_menu *menu;
+    create_menu_func create_menu;
+};
+
 extern struct cbox_menu_item *cbox_menu_item_new_command(const char *label, cbox_menu_item_execute_func exec, void *item_context);
 extern struct cbox_menu_item *cbox_menu_item_new_static(const char *label, cbox_menu_item_format_value fmt, void *item_context);
 extern struct cbox_menu_item *cbox_menu_item_new_int(const char *label, int *value, int vmin, int vmax, void *item_context);
+extern struct cbox_menu_item *cbox_menu_item_new_menu(const char *label, struct cbox_menu *menu, void *item_context);
+extern struct cbox_menu_item *cbox_menu_item_new_dynamic_menu(const char *label, create_menu_func func, void *item_context);
 extern void cbox_menu_item_destroy(struct cbox_menu_item *);
 
 #endif

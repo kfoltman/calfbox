@@ -162,6 +162,56 @@ struct cbox_menu_item_class menu_item_class_int = {
 
 /*******************************************************************/
 
+static gchar *menu_format(const struct cbox_menu_item *item, struct cbox_menu_state *state)
+{
+    struct cbox_menu_item_menu *mitem = (struct cbox_menu_item_menu *)item;
+    
+    return g_strdup((mitem->menu || mitem->create_menu) ? "->" : "<-");
+}
+
+static int menu_on_key(struct cbox_menu_item *item, struct cbox_menu_state *state, int key)
+{
+    if (key == 10)
+    {
+        struct cbox_menu_item_menu *mitem = (struct cbox_menu_item_menu *)item;
+        if (mitem->create_menu)
+        {
+            struct cbox_menu_state *new_state = cbox_menu_state_new(state->page, mitem->create_menu(mitem, state->context), state->window, state->context);
+            new_state->caller = state;
+            state->page->state = new_state;
+        }
+        else
+        if (mitem->menu)
+        {
+            struct cbox_menu_state *new_state = cbox_menu_state_new(state->page, mitem->menu, state->window, state->context);
+            new_state->caller = state;
+            state->page->state = new_state;
+        }
+        else
+        {
+            struct cbox_menu_state *old_state = state;
+            state->page->state = state->caller;
+            if (old_state->menu_is_temporary)
+                cbox_menu_destroy(old_state->menu);
+            cbox_menu_state_destroy(old_state);
+            return -1;
+        }
+        return 0;
+    }
+    return 0;
+}
+
+struct cbox_menu_item_class menu_item_class_menu = {
+    .measure = item_measure,
+    .draw = item_draw,
+    .format_value = menu_format,
+    .on_idle = NULL,
+    .on_key = menu_on_key,
+    .destroy = item_destroy
+};
+
+/*******************************************************************/
+
 struct cbox_menu_item *cbox_menu_item_new_command(const char *label, cbox_menu_item_execute_func exec, void *item_context)
 {
     struct cbox_menu_item_command *item = malloc(sizeof(struct cbox_menu_item_command));
@@ -192,6 +242,28 @@ struct cbox_menu_item *cbox_menu_item_new_int(const char *label, int *value, int
     item->vmin = vmin;
     item->vmax = vmax;
     item->on_change = NULL;
+    return &item->item;
+}
+
+struct cbox_menu_item *cbox_menu_item_new_menu(const char *label, struct cbox_menu *menu, void *item_context)
+{
+    struct cbox_menu_item_menu *item = malloc(sizeof(struct cbox_menu_item_menu));
+    item->item.label = g_strdup(label);
+    item->item.item_class = &menu_item_class_menu;
+    item->item.item_context = item_context;
+    item->menu = menu;
+    item->create_menu = NULL;
+    return &item->item;
+}
+
+struct cbox_menu_item *cbox_menu_item_new_dynamic_menu(const char *label, create_menu_func func, void *item_context)
+{
+    struct cbox_menu_item_menu *item = malloc(sizeof(struct cbox_menu_item_menu));
+    item->item.label = g_strdup(label);
+    item->item.item_class = &menu_item_class_menu;
+    item->item.item_context = item_context;
+    item->menu = NULL;
+    item->create_menu = func;
     return &item->item;
 }
 

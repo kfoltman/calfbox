@@ -153,29 +153,41 @@ static void config_key_process(void *user_data, const char *key)
     }
 }
 
+struct cbox_menu *create_scene_menu(struct cbox_menu_item_menu *item, void *menu_context)
+{
+    struct cbox_menu *scene_menu = cbox_menu_new();
+    struct cbox_config_section_cb_data cb = { .menu = scene_menu };
+
+    cbox_menu_add_item(scene_menu, cbox_menu_item_new_static("Scenes", NULL, NULL));
+    cb.prefix = "scene:";
+    cb.func = cmd_load_scene;
+    cbox_config_foreach_section(config_key_process, &cb);
+    cbox_menu_add_item(scene_menu, cbox_menu_item_new_static("Layers", NULL, NULL));
+    cb.prefix = "layer:";
+    cb.func = cmd_load_layer;
+    cbox_config_foreach_section(config_key_process, &cb);
+    cbox_menu_add_item(scene_menu, cbox_menu_item_new_static("Instruments", NULL, NULL));
+    cb.prefix = "instrument:";
+    cb.func = cmd_load_instrument;
+    cbox_config_foreach_section(config_key_process, &cb);
+    
+    cbox_menu_add_item(scene_menu, cbox_menu_item_new_menu("OK", NULL, NULL));    
+    
+    return scene_menu;
+}
+
 void run_ui()
 {
     int var1 = 42;
     double var2 = 1.5;
     struct cbox_menu_state *st = NULL;
-    struct cbox_ui_page *page = NULL;
+    struct cbox_menu_page *page = cbox_menu_page_new();
     struct cbox_menu *main_menu = cbox_menu_new();
-    struct cbox_config_section_cb_data cb = { .menu = main_menu };
     cbox_ui_start();
     
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Current scene:", scene_format_value, NULL));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Scenes", NULL, NULL));
-    cb.prefix = "scene:";
-    cb.func = cmd_load_scene;
-    cbox_config_foreach_section(config_key_process, &cb);
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Layers", NULL, NULL));
-    cb.prefix = "layer:";
-    cb.func = cmd_load_layer;
-    cbox_config_foreach_section(config_key_process, &cb);
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Instruments", NULL, NULL));
-    cb.prefix = "instrument:";
-    cb.func = cmd_load_instrument;
-    cbox_config_foreach_section(config_key_process, &cb);
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Set scene", create_scene_menu, NULL));
+    
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Variables", NULL, NULL));
     cbox_menu_add_item(main_menu, cbox_menu_item_new_int("foo:", &var1, 0, 127, NULL));
     // cbox_menu_add_item(main_menu, "bar:", menu_item_value_double, &mx_double_var2, &var2);
@@ -184,12 +196,13 @@ void run_ui()
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Commands", NULL, NULL));
     cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Quit", cmd_quit, NULL));
 
-    st = cbox_menu_state_new(main_menu, stdscr, NULL);
-    page = cbox_menu_state_get_page(st);
+    st = cbox_menu_state_new(page, main_menu, stdscr, NULL);
+    page->state = st;
 
-    cbox_ui_run(page);
+    cbox_ui_run(&page->page);
     cbox_ui_stop();
     cbox_menu_state_destroy(st);
+    cbox_menu_page_destroy(page);
 }
 
 int main(int argc, char *argv[])
