@@ -122,7 +122,6 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 
 gchar *scene_format_value(const struct cbox_menu_item_static *item, void *context)
 {
-    cbox_io_poll_ports(&io);
     return strdup(current_scene_name);
 }
 
@@ -176,6 +175,18 @@ struct cbox_menu *create_scene_menu(struct cbox_menu_item_menu *item, void *menu
     return scene_menu;
 }
 
+static int (*old_menu_on_idle)(struct cbox_ui_page *page);
+
+static int on_idle_with_ui_poll(struct cbox_ui_page *page)
+{
+    cbox_io_poll_ports(&io);
+    
+    if (old_menu_on_idle)
+        return old_menu_on_idle(page);
+    else
+        return 0;
+}
+
 void run_ui()
 {
     int var1 = 42;
@@ -184,6 +195,8 @@ void run_ui()
     struct cbox_menu_page *page = cbox_menu_page_new();
     struct cbox_menu *main_menu = cbox_menu_new();
     cbox_ui_start();
+    old_menu_on_idle = page->page.on_idle;
+    page->page.on_idle = on_idle_with_ui_poll;
     
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Current scene:", scene_format_value, NULL));
     cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Set scene", create_scene_menu, NULL));
