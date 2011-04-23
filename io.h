@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <jack/jack.h>
+#include <jack/ringbuffer.h>
 #include "master.h"
 
 struct cbox_io_callbacks;
@@ -30,6 +31,8 @@ struct cbox_io
     jack_client_t *client;
     jack_port_t *output_l, *output_r;
     jack_port_t *midi;
+    
+    jack_ringbuffer_t *rb_autoconnect;
     
     struct cbox_io_callbacks *cb;
 };
@@ -45,4 +48,5 @@ extern int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const param
 extern int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb);
 extern int cbox_io_stop(struct cbox_io *io);
 extern int cbox_io_get_sample_rate(struct cbox_io *io);
+extern void cbox_io_poll_ports(struct cbox_io *io);
 extern void cbox_io_close(struct cbox_io *io);

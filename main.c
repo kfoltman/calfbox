@@ -122,6 +122,7 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 
 gchar *scene_format_value(const struct cbox_menu_item_static *item, void *context)
 {
+    cbox_io_poll_ports(&io);
     return strdup(current_scene_name);
 }
 

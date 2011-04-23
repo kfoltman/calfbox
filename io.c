@@ -25,6 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
+#include <jack/ringbuffer.h>
+#include <jack/types.h>
 
 static const char *io_section = "io";
 
@@ -65,9 +67,17 @@ static int process_cb(jack_nframes_t frames, void *arg)
     return 0;
 }
 
-static void autoconnect_port(jack_client_t *client, const char *port, const char *use_name, int is_cbox_input)
+static void autoconnect_port(jack_client_t *client, const char *port, const char *use_name, int is_cbox_input, const jack_port_t *only_connect_port)
 {
     int res;
+    if (only_connect_port)
+    {
+        jack_port_t *right;
+        right = jack_port_by_name(client, use_name);
+        if (only_connect_port != right)
+            return;
+    }
+    
     if (is_cbox_input)
         res = jack_connect(client, use_name, port);
     else
@@ -75,7 +85,7 @@ static void autoconnect_port(jack_client_t *client, const char *port, const char
     g_message("Connect: %s %s %s (%s)", port, is_cbox_input ? "<-" : "->", use_name, res == 0 ? "success" : (res == EEXIST ? "already connected" : "failed"));
 }
 
-static void autoconnect(jack_client_t *client, const char *port, const char *config_var, int is_cbox_input, int is_midi)
+static void autoconnect(jack_client_t *client, const char *port, const char *config_var, int is_cbox_input, int is_midi, const jack_port_t *only_connect_port)
 {
     char *name, *orig_name, *dpos;
     const char *use_name;
@@ -102,7 +112,7 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
                         ;
                     
                     if (names[i])
-                        autoconnect_port(client, port, names[i], is_cbox_input);
+                        autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port);
                     else
                         g_message("Connect: unmatched port index %d", (int)portidx);
                 }
@@ -117,20 +127,31 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
                     {
                         int i;
                         for (i = 0; names[i]; i++)
-                            autoconnect_port(client, port, names[i], is_cbox_input);
+                            autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port);
                     }
                     else
-                        autoconnect_port(client, port, names[0], is_cbox_input);
+                        autoconnect_port(client, port, names[0], is_cbox_input, only_connect_port);
                 }
                 else
                     g_message("Connect: unmatched port regexp %s", use_name);
             }
             else
-                autoconnect_port(client, port, use_name, is_cbox_input);
+                autoconnect_port(client, port, use_name, is_cbox_input, only_connect_port);
 
             if (dpos)
                 name = dpos + 1;
         } while(dpos);
+    }
+}
+
+static void port_connect_cb(jack_port_id_t port, int registered, void *arg)
+{
+    struct cbox_io *io = arg;
+    if (registered)
+    {
+        jack_port_t *portobj = jack_port_by_id(io->client, port);
+        
+        jack_ringbuffer_write(io->rb_autoconnect, (uint8_t *)&portobj, sizeof(portobj));
     }
 }
 
@@ -139,17 +160,32 @@ int cbox_io_get_sample_rate(struct cbox_io *io)
     return jack_get_sample_rate(io->client);
 }
 
+void cbox_io_poll_ports(struct cbox_io *io)
+{
+    if (jack_ringbuffer_read_space(io->rb_autoconnect) >= sizeof(jack_port_t *))
+    {
+        jack_port_t *portobj;
+        jack_ringbuffer_read(io->rb_autoconnect, (uint8_t *)&portobj, sizeof(portobj));
+        
+        autoconnect(io->client, "cbox:out_l", "out_left", 0, 0, portobj);
+        autoconnect(io->client, "cbox:out_r", "out_right", 0, 0, portobj);
+        autoconnect(io->client, "cbox:midi", "midi", 1, 1, portobj);        
+    }
+}
+
 int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
 {
     io->cb = cb;
+    io->rb_autoconnect = jack_ringbuffer_create(sizeof(jack_port_t *) * 128);
     jack_set_process_callback(io->client, process_cb, io);
+    jack_set_port_registration_callback(io->client, port_connect_cb, io);
     jack_activate(io->client);
 
     if (cbox_config_has_section(io_section))
     {
-        autoconnect(io->client, "cbox:out_l", "out_left", 0, 0);
-        autoconnect(io->client, "cbox:out_r", "out_right", 0, 0);
-        autoconnect(io->client, "cbox:midi", "midi", 1, 1);
+        autoconnect(io->client, "cbox:out_l", "out_left", 0, 0, NULL);
+        autoconnect(io->client, "cbox:out_r", "out_right", 0, 0, NULL);
+        autoconnect(io->client, "cbox:midi", "midi", 1, 1, NULL);
     }
     
     return 1;
@@ -157,6 +193,7 @@ int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
 
 int cbox_io_stop(struct cbox_io *io)
 {
+    jack_ringbuffer_free(io->rb_autoconnect);
     jack_deactivate(io->client);
     return 1;
 }
