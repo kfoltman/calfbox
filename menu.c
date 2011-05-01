@@ -188,6 +188,7 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
     if (item->item_class->on_key)
     {
         res = item->item_class->on_key(item, st, ch);
+        st = mp->state;
         if (res < 0)
         {
             cbox_menu_state_size(st);
@@ -241,6 +242,7 @@ struct cbox_menu_page *cbox_menu_page_new()
     page->page.draw = cbox_menu_page_draw;
     page->page.on_key = cbox_menu_page_on_key;
     page->page.on_idle = cbox_menu_page_on_idle;
+    return page;
 }
 
 void cbox_menu_page_destroy(struct cbox_menu_page *p)
