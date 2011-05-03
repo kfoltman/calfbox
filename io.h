@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_IO_H
+#define CBOX_IO_H
+
 #include <jack/jack.h>
 #include <jack/ringbuffer.h>
 #include "master.h"
@@ -50,3 +53,5 @@ extern int cbox_io_stop(struct cbox_io *io);
 extern int cbox_io_get_sample_rate(struct cbox_io *io);
 extern void cbox_io_poll_ports(struct cbox_io *io);
 extern void cbox_io_close(struct cbox_io *io);
+
+#endif

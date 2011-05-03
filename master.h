@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_MASTER_H
+#define CBOX_MASTER_H
+
 #include <stdint.h>
 
 #define PPQN 24
@@ -50,3 +53,4 @@ extern uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const 
 extern void cbox_master_play(struct cbox_master *master);
 extern void cbox_master_stop(struct cbox_master *master);
 
+#endif
