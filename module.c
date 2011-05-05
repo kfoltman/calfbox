@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 
+extern struct cbox_module_manifest sampler_module;
 extern struct cbox_module_manifest fluidsynth_module;
 extern struct cbox_module_manifest tonewheel_organ_module;
 extern struct cbox_module_manifest stream_player_module;
@@ -42,6 +43,7 @@ struct cbox_module_manifest *cbox_module_list[] = {
     &parametric_eq_module,
     &phaser_module,
     &chorus_module,
+    &sampler_module,
     NULL
 };
 
