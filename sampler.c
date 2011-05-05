@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010 Krzysztof Foltman
+Copyright (C) 2010-2011 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -51,6 +51,12 @@ struct sampler_layer
     float freq;
 };
 
+struct sampler_channel
+{
+    float pitchbend;
+    float pbrange;
+};
+
 struct sampler_voice
 {
     enum sample_player_type mode;
@@ -60,8 +66,10 @@ struct sampler_voice
     int note;
     int vel;
     int released;
+    float freq;
     float gain;
     float pan;
+    struct sampler_channel *channel;
 };
 
 struct sampler_module
@@ -70,6 +78,7 @@ struct sampler_module
 
     int srate;
     struct sampler_voice voices[MAX_SAMPLER_VOICES];
+    struct sampler_channel channels[1];
     struct sampler_layer *layers;
     int layer_count;
 };
@@ -161,21 +170,20 @@ void sampler_start_note(struct sampler_module *m, int note, int vel)
             struct sampler_voice *v = &m->voices[i];
             
             double freq = l->freq * pow(2.0, (note - 69) / 12.0);
-            uint64_t freq64 = freq * 65536.0 * 65536.0 / m->srate;
             
             v->sample_data = l->sample_data;
             v->pos = l->sample_offset;
             v->frac_pos = 0;
             v->loop_start = l->loop_start;
             v->loop_end = l->loop_end;
-            v->delta = freq64 >> 32;
-            v->frac_delta = freq64 & 0xFFFFFFFF;
             v->gain = l->gain * vel / 127.0;
             v->pan = l->pan;
             v->note = note;
             v->vel = vel;
             v->mode = l->mode;
+            v->freq = freq;
             v->released = 0;
+            v->channel = &m->channels[0];
             break;
         }
     }
@@ -203,12 +211,19 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
-        if (m->voices[i].mode != spt_inactive)
+        struct sampler_voice *v = &m->voices[i];
+        
+        if (v->mode != spt_inactive)
         {
-            if (m->voices[i].mode == spt_stereo16)
-                process_voice_stereo(&m->voices[i], outputs);
+            double freq = v->freq * v->channel->pitchbend;
+            uint64_t freq64 = freq * 65536.0 * 65536.0 / m->srate;
+            v->delta = freq64 >> 32;
+            v->frac_delta = freq64 & 0xFFFFFFFF;
+            
+            if (v->mode == spt_stereo16)
+                process_voice_stereo(v, outputs);
             else
-                process_voice_mono(&m->voices[i], outputs);
+                process_voice_mono(v, outputs);
         }
     }    
 }
@@ -248,7 +263,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 break;
 
             case 14:
-                // pb
+                m->channels[0].pitchbend = pow(2.0, (data[1] + 128 * data[2] - 8192) * m->channels[0].pbrange / (1200.0 * 8192.0));
                 break;
 
             }
@@ -271,7 +286,9 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->module.process_block = sampler_process_block;
     m->module.destroy = sampler_destroy;
     m->srate = srate;
-    
+    m->channels[0].pitchbend = 1;
+    m->channels[0].pbrange = 200; // cents
+        
     char *filename = cbox_config_get_string(cfg_section, "file");
     SF_INFO info;
     SNDFILE *sndfile = sf_open(filename, SFM_READ, &info);
