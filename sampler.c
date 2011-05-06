@@ -466,6 +466,55 @@ static void init_channel(struct sampler_channel *c)
     c->modulation = 0;
 }
 
+struct sampler_waveform
+{
+    int16_t *data;
+    SF_INFO info;
+};
+
+static struct sampler_waveform *load_waveform(const char *context_name, const char *filename)
+{
+    int i;
+    int nshorts;
+    
+    struct sampler_waveform *waveform = malloc(sizeof(struct sampler_waveform));
+    SNDFILE *sndfile = sf_open(filename, SFM_READ, &waveform->info);
+    if (!sndfile)
+    {
+        g_error("%s: cannot open file '%s': %s", context_name, filename, sf_strerror(NULL));
+        return NULL;
+    }
+    waveform->data = malloc(waveform->info.channels * 2 * (waveform->info.frames + 1));
+    if (waveform->info.channels != 1 && waveform->info.channels != 2)
+    {
+        g_error("%s: cannot open file '%s': unsupported channel count %d", context_name, filename, (int)waveform->info.channels);
+        return NULL;
+    }
+    nshorts = waveform->info.channels * (waveform->info.frames + 1);
+    for (i = 0; i < nshorts; i++)
+        waveform->data[i] = 0;
+    sf_readf_short(sndfile, waveform->data, waveform->info.frames);
+    sf_close(sndfile);
+    
+    return waveform;
+}
+
+void sampler_load_layer(struct sampler_layer *l, struct sampler_waveform *waveform)
+{
+    l->sample_data = waveform->data;
+    l->sample_offset = 0;
+    l->freq = waveform->info.samplerate ? waveform->info.samplerate : 44100;
+    l->loop_start = -1;
+    l->loop_end = waveform->info.frames;
+    l->gain = 1;
+    l->pan = 0.5;
+    l->mode = waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+    l->min_note = 0;
+    l->max_note = 127;
+    l->min_vel = 0;
+    l->max_vel = 127;
+}
+
 struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate)
 {
     int result = 0;
@@ -485,33 +534,11 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     init_channel(&m->channels[0]);
         
     char *filename = cbox_config_get_string(cfg_section, "file");
-    SF_INFO info;
-    SNDFILE *sndfile = sf_open(filename, SFM_READ, &info);
-    if (!sndfile)
-    {
-        g_error("%s: cannot open file '%s': %s", cfg_section, filename, sf_strerror(NULL));
-        return NULL;
-    }
-    if (info.channels != 1 && info.channels != 2)
-    {
-        g_error("%s: cannot open file '%s': unsupported channel count %d", cfg_section, filename, (int)info.channels);
-        return NULL;
-    }
     
     m->layer_count = 1;
     m->layers = malloc(sizeof(struct sampler_layer) * m->layer_count);
-    m->layers[0].sample_data = malloc(info.channels * 2 * (info.frames + 1));
-    m->layers[0].sample_offset = 0;
-    m->layers[0].freq = info.samplerate ? info.samplerate : 44100;
-    m->layers[0].loop_start = -1;
-    m->layers[0].loop_end = info.frames;
-    m->layers[0].gain = 1;
-    m->layers[0].pan = 0.5;
-    m->layers[0].mode = info.channels == 2 ? spt_stereo16 : spt_mono16;
-    m->layers[0].min_note = 0;
-    m->layers[0].max_note = 127;
-    m->layers[0].min_vel = 0;
-    m->layers[0].max_vel = 127;
+    struct sampler_waveform *waveform = load_waveform(cfg_section, filename);
+    sampler_load_layer(&m->layers[0], waveform);
     
     m->program_count = 1;
     m->programs = malloc(sizeof(struct sampler_program) * m->program_count);
@@ -520,10 +547,6 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->programs[0].layers = malloc(sizeof(struct sampler_layer *) * m->programs[0].layer_count);
     m->programs[0].layers[0] = &m->layers[0];
     
-    for (i = 0; i < info.channels * info.frames; i++)
-        m->layers[0].sample_data[i] = 0;
-    sf_readf_short(sndfile, m->layers[0].sample_data, info.frames);
-    sf_close(sndfile);
     
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
         m->voices[i].mode = spt_inactive;
