@@ -56,6 +56,7 @@ struct sampler_channel
     float pitchbend;
     float pbrange;
     int sustain, sostenuto;
+    int volume, pan, expression, modulation;
 };
 
 struct sampler_voice
@@ -268,10 +269,21 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
     int enabled = val;
     switch(cc)
     {
+        case 1:
+            c->modulation = val << 7;
+            break;
+        case 7:
+            c->volume = val << 7;
+            break;
+        case 10:
+            c->pan = val << 7;
+            break;
+        case 11:
+            c->expression = val << 7;
+            break;
         case 64:
             if (c->sustain && !enabled)
             {
-                printf("stop sustained\n");
                 sampler_stop_sustained(m, c);
             }
             c->sustain = enabled;
@@ -287,6 +299,10 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
         case 121:
             sampler_process_cc(m, c, 64, 0);
             sampler_process_cc(m, c, 66, 0);
+            c->volume = 100 << 7;
+            c->pan = 64 << 7;
+            c->expression = 127 << 7;
+            c->modulation = 0;
             break;
     }
 }
@@ -345,6 +361,10 @@ static void init_channel(struct sampler_channel *c)
     c->pbrange = 200; // cents
     c->sustain = 0;
     c->sostenuto = 0;
+    c->volume = 100 << 7;
+    c->pan = 64 << 7;
+    c->expression = 127 << 7;
+    c->modulation = 0;
 }
 
 struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate)
