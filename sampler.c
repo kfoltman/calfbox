@@ -84,6 +84,7 @@ struct sampler_voice
     float gain;
     float pan;
     float lgain, rgain;
+    float last_lgain, last_rgain;
     struct sampler_channel *channel;
     struct cbox_envelope amp_env;
 };
@@ -101,8 +102,10 @@ struct sampler_module
 
 static void process_voice_mono(struct sampler_voice *v, float **channels)
 {
-    float lgain = v->lgain;
-    float rgain = v->rgain;
+    float lgain = v->last_lgain;
+    float rgain = v->last_rgain;
+    float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
+    float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         if (v->pos >= v->loop_end)
@@ -129,13 +132,17 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
         
         channels[0][i] += sample * lgain;
         channels[1][i] += sample * rgain;
+        lgain += lgain_delta;
+        rgain += rgain_delta;
     }
 }
 
 static void process_voice_stereo(struct sampler_voice *v, float **channels)
 {
-    float lgain = v->lgain;
-    float rgain = v->rgain;
+    float lgain = v->last_lgain;
+    float rgain = v->last_rgain;
+    float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
+    float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         if (v->pos >= v->loop_end)
@@ -163,6 +170,8 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
         
         channels[0][i] += lsample * lgain;
         channels[1][i] += rsample * rgain;
+        lgain += lgain_delta;
+        rgain += rgain_delta;
     }
 }
 
@@ -215,6 +224,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->captured_sostenuto = 0;
             v->channel = c;
             v->amp_env.shape = &l->amp_env_shape;
+            v->last_lgain = 0;
+            v->last_rgain = 0;
             cbox_envelope_reset(&v->amp_env);
             lidx = skip_inactive_layers(prg, lidx + 1, note, vel);
             if (lidx < 0)
@@ -335,6 +346,9 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 process_voice_stereo(v, outputs);
             else
                 process_voice_mono(v, outputs);
+            
+            v->last_lgain = v->lgain;
+            v->last_rgain = v->rgain;
         }
     }    
 }
