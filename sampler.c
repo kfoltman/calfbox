@@ -55,6 +55,7 @@ struct sampler_channel
 {
     float pitchbend;
     float pbrange;
+    int sustain, sostenuto;
 };
 
 struct sampler_voice
@@ -65,7 +66,7 @@ struct sampler_voice
     uint32_t frac_pos, frac_delta;
     int note;
     int vel;
-    int released;
+    int released, released_with_sustain;
     float freq;
     float gain;
     float pan;
@@ -160,7 +161,7 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
     }
 }
 
-void sampler_start_note(struct sampler_module *m, int note, int vel)
+void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
 {
     struct sampler_layer *l = m->layers;
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
@@ -183,20 +184,54 @@ void sampler_start_note(struct sampler_module *m, int note, int vel)
             v->mode = l->mode;
             v->freq = freq;
             v->released = 0;
-            v->channel = &m->channels[0];
+            v->released_with_sustain = 0;
+            v->channel = c;
             break;
         }
     }
 }
 
-void sampler_stop_note(struct sampler_module *m, int note, int vel)
+void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
 {
     struct sampler_layer *l = m->layers;
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
-        if (v->mode != spt_inactive && v->note == note)
+        if (v->mode != spt_inactive && v->channel == c && v->note == note)
+        {
+            if (c->sustain)
+                v->released_with_sustain = 1;
+            else
+                v->released = 1;
+        }
+    }
+}
+
+void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
+{
+    struct sampler_layer *l = m->layers;
+    for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
+    {
+        struct sampler_voice *v = &m->voices[i];
+        if (v->mode != spt_inactive && v->channel == c && v->released_with_sustain)
+        {
             v->released = 1;
+            v->released_with_sustain = 0;
+        }
+    }
+}
+
+void sampler_stop_all(struct sampler_module *m, struct sampler_channel *c)
+{
+    struct sampler_layer *l = m->layers;
+    for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
+    {
+        struct sampler_voice *v = &m->voices[i];
+        if (v->mode != spt_inactive && v->channel == c)
+        {
+            v->released = 0;
+            v->released_with_sustain = 0;
+        }
     }
 }
 
@@ -228,6 +263,34 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     }    
 }
 
+void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int cc, int val)
+{
+    int enabled = val;
+    switch(cc)
+    {
+        case 64:
+            if (c->sustain && !enabled)
+            {
+                printf("stop sustained\n");
+                sampler_stop_sustained(m, c);
+            }
+            c->sustain = enabled;
+            break;
+        case 66:
+            c->sostenuto = enabled;
+            break;
+        
+        case 120:
+        case 123:
+            sampler_stop_all(m, c);
+            break;
+        case 121:
+            sampler_process_cc(m, c, 64, 0);
+            sampler_process_cc(m, c, 66, 0);
+            break;
+    }
+}
+
 void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
     struct sampler_module *m = (struct sampler_module *)module;
@@ -235,15 +298,21 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
     {
         int cmd = data[0] >> 4;
         int chn = data[0] & 15;
+        // XXXKF only channel 1 supported for now
+        if (cmd < 15 && chn)
+            return;
+        struct sampler_channel *c = &m->channels[chn];
         switch(cmd)
         {
             case 8:
-                sampler_stop_note(m, data[1], data[2]);
+                sampler_stop_note(m, c, data[1], data[2]);
                 break;
 
             case 9:
                 if (data[2] > 0)
-                    sampler_start_note(m, data[1], data[2]);
+                    sampler_start_note(m, c, data[1], data[2]);
+                else
+                    sampler_stop_note(m, c, data[1], data[2]);
                 break;
             
             case 10:
@@ -251,7 +320,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 break;
             
             case 11:
-                // cc
+                sampler_process_cc(m, c, data[1], data[2]);
                 break;
 
             case 12:
@@ -263,11 +332,19 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 break;
 
             case 14:
-                m->channels[0].pitchbend = pow(2.0, (data[1] + 128 * data[2] - 8192) * m->channels[0].pbrange / (1200.0 * 8192.0));
+                c->pitchbend = pow(2.0, (data[1] + 128 * data[2] - 8192) * c->pbrange / (1200.0 * 8192.0));
                 break;
 
             }
     }
+}
+
+static void init_channel(struct sampler_channel *c)
+{
+    c->pitchbend = 1;
+    c->pbrange = 200; // cents
+    c->sustain = 0;
+    c->sostenuto = 0;
 }
 
 struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate)
@@ -286,8 +363,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->module.process_block = sampler_process_block;
     m->module.destroy = sampler_destroy;
     m->srate = srate;
-    m->channels[0].pitchbend = 1;
-    m->channels[0].pbrange = 200; // cents
+    init_channel(&m->channels[0]);
         
     char *filename = cbox_config_get_string(cfg_section, "file");
     SF_INFO info;
