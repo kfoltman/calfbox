@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "biquad-float.h"
 #include "config-api.h"
 #include "dspmath.h"
 #include "envelope.h"
@@ -53,7 +54,8 @@ struct sampler_layer
     float freq;
     int min_note, max_note, root_note;
     int min_vel, max_vel;
-    struct cbox_envelope_shape amp_env_shape;
+    float cutoff, resonance, env_mod;
+    struct cbox_envelope_shape amp_env_shape, filter_env_shape;
 };
 
 struct sampler_program
@@ -75,6 +77,7 @@ struct sampler_channel
 struct sampler_voice
 {
     enum sample_player_type mode;
+    struct sampler_layer *layer;
     int16_t *sample_data;
     uint32_t pos, delta, loop_start, loop_end;
     uint32_t frac_pos, frac_delta;
@@ -86,8 +89,11 @@ struct sampler_voice
     float pan;
     float lgain, rgain;
     float last_lgain, last_rgain;
+    float cutoff, resonance, env_mod;
+    struct cbox_biquadf_state filter_left, filter_right;
+    struct cbox_biquadf_coeffs filter_coeffs;
     struct sampler_channel *channel;
-    struct cbox_envelope amp_env;
+    struct cbox_envelope amp_env, filter_env;
 };
 
 struct sampler_module
@@ -107,6 +113,8 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
+    
+    float temp[2][CBOX_BLOCK_SIZE];
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         if (v->pos >= v->loop_end)
@@ -114,6 +122,8 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
             if (v->loop_start == (uint32_t)-1)
             {
                 v->mode = spt_inactive;
+                for (; i < CBOX_BLOCK_SIZE; i++)
+                    temp[0][i] = temp[1][i] = 0.f;
                 break;
             }
             v->pos = v->pos - v->loop_end + v->loop_start;
@@ -131,11 +141,13 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
         v->frac_pos += v->frac_delta;
         v->pos += v->delta;
         
-        channels[0][i] += sample * lgain;
-        channels[1][i] += sample * rgain;
+        temp[0][i] = sample * lgain;
+        temp[1][i] = sample * rgain;
         lgain += lgain_delta;
         rgain += rgain_delta;
     }
+    cbox_biquadf_process_adding(&v->filter_left, &v->filter_coeffs, temp[0], channels[0]);
+    cbox_biquadf_process_adding(&v->filter_right, &v->filter_coeffs, temp[1], channels[1]);
 }
 
 static void process_voice_stereo(struct sampler_voice *v, float **channels)
@@ -144,6 +156,8 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
+
+    float temp[2][CBOX_BLOCK_SIZE];
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         if (v->pos >= v->loop_end)
@@ -151,6 +165,8 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
             if (v->loop_start == (uint32_t)-1)
             {
                 v->mode = spt_inactive;
+                for (; i < CBOX_BLOCK_SIZE; i++)
+                    temp[0][i] = temp[1][i] = 0.f;
                 break;
             }
             v->pos = v->pos - v->loop_end + v->loop_start;
@@ -169,11 +185,13 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
         v->frac_pos += v->frac_delta;
         v->pos += v->delta;
         
-        channels[0][i] += lsample * lgain;
-        channels[1][i] += rsample * rgain;
+        temp[0][i] = lsample * lgain;
+        temp[1][i] = rsample * rgain;
         lgain += lgain_delta;
         rgain += rgain_delta;
     }
+    cbox_biquadf_process_adding(&v->filter_left, &v->filter_coeffs, temp[0], channels[0]);
+    cbox_biquadf_process_adding(&v->filter_right, &v->filter_coeffs, temp[1], channels[1]);
 }
 
 int skip_inactive_layers(struct sampler_program *prg, int first, int note, int vel)
@@ -225,9 +243,16 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->captured_sostenuto = 0;
             v->channel = c;
             v->amp_env.shape = &l->amp_env_shape;
+            v->filter_env.shape = &l->filter_env_shape;
             v->last_lgain = 0;
             v->last_rgain = 0;
+            v->cutoff = l->cutoff;
+            v->resonance = l->resonance;
+            v->env_mod = l->env_mod;
+            cbox_biquadf_reset(&v->filter_left);
+            cbox_biquadf_reset(&v->filter_right);
             cbox_envelope_reset(&v->amp_env);
+            cbox_envelope_reset(&v->filter_env);
             lidx = skip_inactive_layers(prg, lidx + 1, note, vel);
             if (lidx < 0)
                 break;
@@ -323,6 +348,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             struct sampler_channel *c = v->channel;
             
             float amp_env = cbox_envelope_get_next(&v->amp_env, v->released);
+            float filter_env = cbox_envelope_get_next(&v->filter_env, v->released);
             if (v->amp_env.cur_stage < 0)
             {
                 v->mode = spt_inactive;
@@ -342,6 +368,12 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 pan = 1;
             v->lgain = gain * (1 - pan)  / 32768.0;
             v->rgain = gain * pan / 32768.0;
+            float cutoff = v->cutoff*pow(2.0,filter_env*v->env_mod/1200);
+            if (cutoff < 20)
+                cutoff = 20;
+            if (cutoff > m->srate * 0.45)
+                cutoff = m->srate * 0.45;
+            cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, v->resonance, m->srate);
             
             if (v->mode == spt_stereo16)
                 process_voice_stereo(v, outputs);
@@ -542,6 +574,15 @@ void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const
         cbox_config_get_float(cfg_section, "amp_sustain", 1),
         cbox_config_get_float(cfg_section, "amp_release", 0.05),
         m->srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_adsr(&l->filter_env_shape, 
+        cbox_config_get_float(cfg_section, "filter_attack", 0),
+        cbox_config_get_float(cfg_section, "filter_decay", 0),
+        cbox_config_get_float(cfg_section, "filter_sustain", 1),
+        cbox_config_get_float(cfg_section, "filter_release", 0.05),
+        m->srate / CBOX_BLOCK_SIZE);
+    l->cutoff = cbox_config_get_float(cfg_section, "cutoff", 21000);
+    l->resonance = cbox_config_get_float(cfg_section, "resonance", 0.707);
+    l->env_mod = cbox_config_get_float(cfg_section, "env_mod", 0);
 }
 
 static void load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section)
