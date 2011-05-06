@@ -67,10 +67,11 @@ struct sampler_voice
     uint32_t frac_pos, frac_delta;
     int note;
     int vel;
-    int released, released_with_sustain;
+    int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;
     float freq;
     float gain;
     float pan;
+    float lgain, rgain;
     struct sampler_channel *channel;
 };
 
@@ -92,8 +93,8 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
         v->mode = spt_inactive;
         return;
     }
-    float lgain = v->gain * (1 - v->pan) / 32768.0;
-    float rgain = v->gain * v->pan / 32768.0;
+    float lgain = v->lgain;
+    float rgain = v->rgain;
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         if (v->pos >= v->loop_end)
@@ -130,8 +131,8 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
         v->mode = spt_inactive;
         return;
     }
-    float lgain = v->gain * (1 - v->pan) / 32768.0;
-    float rgain = v->gain * v->pan / 32768.0;
+    float lgain = v->lgain;
+    float rgain = v->rgain;
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         if (v->pos >= v->loop_end)
@@ -186,6 +187,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->freq = freq;
             v->released = 0;
             v->released_with_sustain = 0;
+            v->released_with_sostenuto = 0;
+            v->captured_sostenuto = 0;
             v->channel = c;
             break;
         }
@@ -200,7 +203,9 @@ void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int 
         struct sampler_voice *v = &m->voices[i];
         if (v->mode != spt_inactive && v->channel == c && v->note == note)
         {
-            if (c->sustain)
+            if (v->captured_sostenuto)
+                v->released_with_sostenuto = 1;
+            else if (c->sustain)
                 v->released_with_sustain = 1;
             else
                 v->released = 1;
@@ -218,6 +223,35 @@ void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
         {
             v->released = 1;
             v->released_with_sustain = 0;
+        }
+    }
+}
+
+void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
+{
+    struct sampler_layer *l = m->layers;
+    for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
+    {
+        struct sampler_voice *v = &m->voices[i];
+        if (v->mode != spt_inactive && v->channel == c && v->released_with_sostenuto)
+        {
+            v->released = 1;
+            v->released_with_sostenuto = 0;
+            // XXXKF unsure what to do with sustain
+        }
+    }
+}
+
+void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel *c)
+{
+    struct sampler_layer *l = m->layers;
+    for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
+    {
+        struct sampler_voice *v = &m->voices[i];
+        if (v->mode != spt_inactive && v->channel == c && !v->released)
+        {
+            // XXXKF unsure what to do with sustain
+            v->captured_sostenuto = 1;
         }
     }
 }
@@ -251,10 +285,15 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
         
         if (v->mode != spt_inactive)
         {
-            double freq = v->freq * v->channel->pitchbend;
+            struct sampler_channel *c = v->channel;
+            double maxv = 127 << 7;
+            double freq = v->freq * c->pitchbend;
             uint64_t freq64 = freq * 65536.0 * 65536.0 / m->srate;
             v->delta = freq64 >> 32;
             v->frac_delta = freq64 & 0xFFFFFFFF;
+            float gain = v->gain * c->volume * c->expression  / (maxv * maxv);
+            v->lgain = gain * (1 - v->pan)  / 32768.0;
+            v->rgain = gain * v->pan / 32768.0;
             
             if (v->mode == spt_stereo16)
                 process_voice_stereo(v, outputs);
@@ -289,6 +328,10 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
             c->sustain = enabled;
             break;
         case 66:
+            if (c->sostenuto && !enabled)
+                sampler_stop_sostenuto(m, c);
+            if (!c->sostenuto && enabled)
+                sampler_capture_sostenuto(m, c);
             c->sostenuto = enabled;
             break;
         
