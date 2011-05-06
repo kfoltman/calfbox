@@ -49,6 +49,15 @@ struct sampler_layer
     float gain;
     float pan;
     float freq;
+    int min_note, max_note;
+    int min_vel, max_vel;
+};
+
+struct sampler_program
+{
+    int prog_no;
+    struct sampler_layer **layers;
+    int layer_count;
 };
 
 struct sampler_channel
@@ -57,6 +66,7 @@ struct sampler_channel
     float pbrange;
     int sustain, sostenuto;
     int volume, pan, expression, modulation;
+    struct sampler_program *program;
 };
 
 struct sampler_voice
@@ -84,6 +94,8 @@ struct sampler_module
     struct sampler_channel channels[1];
     struct sampler_layer *layers;
     int layer_count;
+    struct sampler_program *programs;
+    int program_count;
 };
 
 static void process_voice_mono(struct sampler_voice *v, float **channels)
@@ -163,14 +175,35 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
     }
 }
 
+int skip_inactive_layers(struct sampler_program *prg, int first, int note, int vel)
+{
+    while(first < prg->layer_count)
+    {
+        struct sampler_layer *l = prg->layers[first];
+        if (note >= l->min_note && note <= l->max_note && vel >= l->min_vel && vel <= l->max_vel)
+        {
+            return first;
+        }
+        first++;
+    }
+    return -1;
+}
+
 void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
 {
-    struct sampler_layer *l = m->layers;
+    struct sampler_program *prg = c->program;
+    if (!prg)
+        return;
+    struct sampler_layer **pl = prg->layers;
+    int lidx = skip_inactive_layers(prg, 0, note, vel);
+    if (lidx < 0)
+        return;
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         if (m->voices[i].mode == spt_inactive)
         {
             struct sampler_voice *v = &m->voices[i];
+            struct sampler_layer *l = pl[lidx];
             
             double freq = l->freq * pow(2.0, (note - 69) / 12.0);
             
@@ -190,7 +223,9 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->released_with_sostenuto = 0;
             v->captured_sostenuto = 0;
             v->channel = c;
-            break;
+            lidx = skip_inactive_layers(prg, lidx + 1, note, vel);
+            if (lidx < 0)
+                break;
         }
     }
 }
@@ -355,6 +390,22 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
     }
 }
 
+void sampler_program_change(struct sampler_module *m, struct sampler_channel *c, int program)
+{
+    // XXXKF replace with something more efficient
+    for (int i = 0; i < m->program_count; i++)
+    {
+        // XXXKF support banks
+        if (m->programs[i].prog_no == program)
+        {
+            c->program = &m->programs[i];
+            return;
+        }
+    }
+    g_warning("Unknown program %d", program);
+    c->program = &m->programs[0];
+}
+
 void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
     struct sampler_module *m = (struct sampler_module *)module;
@@ -388,7 +439,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 break;
 
             case 12:
-                // pc
+                sampler_program_change(m, c, data[1]);
                 break;
 
             case 13:
@@ -447,8 +498,8 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
         return NULL;
     }
     
-    m->layers = malloc(sizeof(struct sampler_layer) * 1);
     m->layer_count = 1;
+    m->layers = malloc(sizeof(struct sampler_layer) * m->layer_count);
     m->layers[0].sample_data = malloc(info.channels * 2 * (info.frames + 1));
     m->layers[0].sample_offset = 0;
     m->layers[0].freq = info.samplerate ? info.samplerate : 44100;
@@ -457,6 +508,14 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->layers[0].gain = 1;
     m->layers[0].pan = 0.5;
     m->layers[0].mode = info.channels == 2 ? spt_stereo16 : spt_mono16;
+    
+    m->program_count = 1;
+    m->programs = malloc(sizeof(struct sampler_program) * m->program_count);
+    m->programs[0].prog_no = 0;
+    m->programs[0].layer_count = 1;
+    m->programs[0].layers = malloc(sizeof(struct sampler_layer *) * m->programs[0].layer_count);
+    m->programs[0].layers[0] = &m->layers[0];
+    
     for (i = 0; i < info.channels * info.frames; i++)
         m->layers[0].sample_data[i] = 0;
     sf_readf_short(sndfile, m->layers[0].sample_data, info.frames);
