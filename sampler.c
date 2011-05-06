@@ -91,7 +91,7 @@ struct sampler_module
 
     int srate;
     struct sampler_voice voices[MAX_SAMPLER_VOICES];
-    struct sampler_channel channels[1];
+    struct sampler_channel channels[16];
     struct sampler_layer *layers;
     int layer_count;
     struct sampler_program *programs;
@@ -413,9 +413,6 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
     {
         int cmd = data[0] >> 4;
         int chn = data[0] & 15;
-        // XXXKF only channel 1 supported for now
-        if (cmd < 15 && chn)
-            return;
         struct sampler_channel *c = &m->channels[chn];
         switch(cmd)
         {
@@ -552,7 +549,8 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
         m->voices[i].mode = spt_inactive;
     
-    init_channel(m, &m->channels[0]);
+    for (i = 0; i < 16; i++)
+        init_channel(m, &m->channels[i]);
 
     return &m->module;
 }
