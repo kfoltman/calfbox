@@ -454,7 +454,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
     }
 }
 
-static void init_channel(struct sampler_channel *c)
+static void init_channel(struct sampler_module *m, struct sampler_channel *c)
 {
     c->pitchbend = 1;
     c->pbrange = 200; // cents
@@ -464,6 +464,7 @@ static void init_channel(struct sampler_channel *c)
     c->pan = 64 << 7;
     c->expression = 127 << 7;
     c->modulation = 0;
+    c->program = &m->programs[0];
 }
 
 struct sampler_waveform
@@ -531,13 +532,14 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->module.process_block = sampler_process_block;
     m->module.destroy = sampler_destroy;
     m->srate = srate;
-    init_channel(&m->channels[0]);
         
     char *filename = cbox_config_get_string(cfg_section, "file");
     
     m->layer_count = 1;
     m->layers = malloc(sizeof(struct sampler_layer) * m->layer_count);
     struct sampler_waveform *waveform = load_waveform(cfg_section, filename);
+    if (!waveform)
+        return NULL;
     sampler_load_layer(&m->layers[0], waveform);
     
     m->program_count = 1;
@@ -547,10 +549,11 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->programs[0].layers = malloc(sizeof(struct sampler_layer *) * m->programs[0].layer_count);
     m->programs[0].layers[0] = &m->layers[0];
     
-    
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
         m->voices[i].mode = spt_inactive;
     
+    init_channel(m, &m->channels[0]);
+
     return &m->module;
 }
 
