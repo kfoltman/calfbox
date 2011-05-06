@@ -92,8 +92,6 @@ struct sampler_module
     int srate;
     struct sampler_voice voices[MAX_SAMPLER_VOICES];
     struct sampler_channel channels[16];
-    struct sampler_layer *layers;
-    int layer_count;
     struct sampler_program *programs;
     int program_count;
 };
@@ -232,7 +230,6 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
 
 void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
 {
-    struct sampler_layer *l = m->layers;
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
@@ -250,7 +247,6 @@ void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int 
 
 void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
 {
-    struct sampler_layer *l = m->layers;
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
@@ -264,7 +260,6 @@ void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
 
 void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
 {
-    struct sampler_layer *l = m->layers;
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
@@ -279,7 +274,6 @@ void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
 
 void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel *c)
 {
-    struct sampler_layer *l = m->layers;
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
@@ -293,7 +287,6 @@ void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel 
 
 void sampler_stop_all(struct sampler_module *m, struct sampler_channel *c)
 {
-    struct sampler_layer *l = m->layers;
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
@@ -475,6 +468,11 @@ static struct sampler_waveform *load_waveform(const char *context_name, const ch
     int i;
     int nshorts;
     
+    if (!filename)
+    {
+        g_error("%s: no filename specified", context_name);
+        return NULL;
+    }
     struct sampler_waveform *waveform = malloc(sizeof(struct sampler_waveform));
     SNDFILE *sndfile = sf_open(filename, SFM_READ, &waveform->info);
     if (!sndfile)
@@ -513,6 +511,21 @@ void sampler_load_layer(struct sampler_layer *l, const char *cfg_section, struct
     l->max_vel = cbox_config_get_int(cfg_section, "max_vel", 127);
 }
 
+static void load_program(struct sampler_program *prg, const char *cfg_section)
+{
+    prg->prog_no = cbox_config_get_int(cfg_section, "program", 0);
+    prg->layer_count = 1;
+    prg->layers = malloc(sizeof(struct sampler_layer *) * prg->layer_count);
+    prg->layers[0] = malloc(sizeof(struct sampler_layer));
+    struct sampler_waveform *waveform = load_waveform(cfg_section, cbox_config_get_string(cfg_section, "file"));
+    if (!waveform)
+    {
+        g_error("waveform not loaded");
+        return;
+    }
+    sampler_load_layer(prg->layers[0], cfg_section, waveform);
+}
+
 struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate)
 {
     int result = 0;
@@ -531,20 +544,28 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->srate = srate;
         
     char *filename = cbox_config_get_string(cfg_section, "file");
-    
-    m->layer_count = 1;
-    m->layers = malloc(sizeof(struct sampler_layer) * m->layer_count);
-    struct sampler_waveform *waveform = load_waveform(cfg_section, filename);
-    if (!waveform)
-        return NULL;
-    sampler_load_layer(&m->layers[0], cfg_section, waveform);
-    
-    m->program_count = 1;
+        
+    for (i = 0; ; i++)
+    {
+        gchar *s = g_strdup_printf("program%d", i);
+        char *p = cbox_config_get_string(cfg_section, s);
+        g_free(s);
+        
+        if (!p)
+        {
+            m->program_count = i;
+            break;
+        }
+    }
     m->programs = malloc(sizeof(struct sampler_program) * m->program_count);
-    m->programs[0].prog_no = 0;
-    m->programs[0].layer_count = 1;
-    m->programs[0].layers = malloc(sizeof(struct sampler_layer *) * m->programs[0].layer_count);
-    m->programs[0].layers[0] = &m->layers[0];
+    for (i = 0; i < m->program_count; i++)
+    {
+        gchar *s = g_strdup_printf("program%d", i);
+        char *p = g_strdup_printf("spgm:%s", cbox_config_get_string(cfg_section, s));
+        g_free(s);
+        
+        load_program(&m->programs[i], p);
+    }
     
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
         m->voices[i].mode = spt_inactive;
