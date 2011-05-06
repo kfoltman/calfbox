@@ -292,8 +292,13 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             v->delta = freq64 >> 32;
             v->frac_delta = freq64 & 0xFFFFFFFF;
             float gain = v->gain * c->volume * c->expression  / (maxv * maxv);
-            v->lgain = gain * (1 - v->pan)  / 32768.0;
-            v->rgain = gain * v->pan / 32768.0;
+            float pan = v->pan + (c->pan * 1.0 / maxv - 0.5) * 2;
+            if (pan < -1)
+                pan = -1;
+            if (pan > 1)
+                pan = 1;
+            v->lgain = gain * (1 - pan)  / 32768.0;
+            v->rgain = gain * pan / 32768.0;
             
             if (v->mode == spt_stereo16)
                 process_voice_stereo(v, outputs);
