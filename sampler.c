@@ -508,6 +508,10 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->layers[0].gain = 1;
     m->layers[0].pan = 0.5;
     m->layers[0].mode = info.channels == 2 ? spt_stereo16 : spt_mono16;
+    m->layers[0].min_note = 0;
+    m->layers[0].max_note = 127;
+    m->layers[0].min_vel = 0;
+    m->layers[0].max_vel = 127;
     
     m->program_count = 1;
     m->programs = malloc(sizeof(struct sampler_program) * m->program_count);
