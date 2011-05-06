@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config-api.h"
 #include "dspmath.h"
 #include "envelope.h"
+#include "midi.h"
 #include "module.h"
 #include <glib.h>
 #include <math.h>
@@ -512,6 +513,14 @@ static struct sampler_waveform *load_waveform(const char *context_name, const ch
     return waveform;
 }
 
+static int cbox_config_get_note(const char *cfg_section, const char *key, int def_value)
+{
+    const char *cv = cbox_config_get_string(cfg_section, key);
+    if (cv)
+        return note_from_string(cv);
+    return def_value;
+}
+
 void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
 {
     l->sample_data = waveform->data;
@@ -523,10 +532,10 @@ void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const
     l->pan = cbox_config_get_float(cfg_section, "pan", 0.5);
     l->mode = waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
     l->root_note = cbox_config_get_int(cfg_section, "root_note", 69);
-    l->min_note = cbox_config_get_int(cfg_section, "min_note", 0);
-    l->max_note = cbox_config_get_int(cfg_section, "max_note", 127);
-    l->min_vel = cbox_config_get_int(cfg_section, "min_vel", 0);
-    l->max_vel = cbox_config_get_int(cfg_section, "max_vel", 127);
+    l->min_note = cbox_config_get_note(cfg_section, "low_note", 0);
+    l->max_note = cbox_config_get_note(cfg_section, "high_note", 127);
+    l->min_vel = cbox_config_get_note(cfg_section, "low_vel", 0);
+    l->max_vel = cbox_config_get_note(cfg_section, "high_vel", 127);
     cbox_envelope_init_adsr(&l->amp_env_shape, 
         cbox_config_get_float(cfg_section, "amp_attack", 0),
         cbox_config_get_float(cfg_section, "amp_decay", 0),
