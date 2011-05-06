@@ -501,7 +501,7 @@ static struct sampler_waveform *load_waveform(const char *context_name, const ch
 void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
 {
     l->sample_data = waveform->data;
-    l->sample_offset = 0;
+    l->sample_offset = cbox_config_get_int(cfg_section, "offset", 0);
     l->freq = waveform->info.samplerate ? waveform->info.samplerate : 44100;
     l->loop_start = cbox_config_get_int(cfg_section, "loop_start", -1);
     l->loop_end = cbox_config_get_int(cfg_section, "loop_end", waveform->info.frames);
