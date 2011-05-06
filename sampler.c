@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config-api.h"
 #include "dspmath.h"
+#include "envelope.h"
 #include "module.h"
 #include <glib.h>
 #include <math.h>
@@ -51,6 +52,7 @@ struct sampler_layer
     float freq;
     int min_note, max_note;
     int min_vel, max_vel;
+    struct cbox_envelope_shape amp_env_shape;
 };
 
 struct sampler_program
@@ -83,6 +85,7 @@ struct sampler_voice
     float pan;
     float lgain, rgain;
     struct sampler_channel *channel;
+    struct cbox_envelope amp_env;
 };
 
 struct sampler_module
@@ -98,11 +101,6 @@ struct sampler_module
 
 static void process_voice_mono(struct sampler_voice *v, float **channels)
 {
-    if (v->released)
-    {
-        v->mode = spt_inactive;
-        return;
-    }
     float lgain = v->lgain;
     float rgain = v->rgain;
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
@@ -136,11 +134,6 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
 
 static void process_voice_stereo(struct sampler_voice *v, float **channels)
 {
-    if (v->released)
-    {
-        v->mode = spt_inactive;
-        return;
-    }
     float lgain = v->lgain;
     float rgain = v->rgain;
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
@@ -221,6 +214,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->released_with_sostenuto = 0;
             v->captured_sostenuto = 0;
             v->channel = c;
+            v->amp_env.shape = &l->amp_env_shape;
+            cbox_envelope_reset(&v->amp_env);
             lidx = skip_inactive_layers(prg, lidx + 1, note, vel);
             if (lidx < 0)
                 break;
@@ -314,12 +309,20 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
         if (v->mode != spt_inactive)
         {
             struct sampler_channel *c = v->channel;
+            
+            float amp_env = cbox_envelope_get_next(&v->amp_env, v->released);
+            if (v->amp_env.cur_stage < 0)
+            {
+                v->mode = spt_inactive;
+                continue;
+            }            
+            
             double maxv = 127 << 7;
             double freq = v->freq * c->pitchbend;
             uint64_t freq64 = freq * 65536.0 * 65536.0 / m->srate;
             v->delta = freq64 >> 32;
             v->frac_delta = freq64 & 0xFFFFFFFF;
-            float gain = v->gain * c->volume * c->expression  / (maxv * maxv);
+            float gain = amp_env * v->gain * c->volume * c->expression  / (maxv * maxv);
             float pan = v->pan + (c->pan * 1.0 / maxv - 0.5) * 2;
             if (pan < -1)
                 pan = -1;
@@ -495,7 +498,7 @@ static struct sampler_waveform *load_waveform(const char *context_name, const ch
     return waveform;
 }
 
-void sampler_load_layer(struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
+void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
 {
     l->sample_data = waveform->data;
     l->sample_offset = 0;
@@ -509,9 +512,15 @@ void sampler_load_layer(struct sampler_layer *l, const char *cfg_section, struct
     l->max_note = cbox_config_get_int(cfg_section, "max_note", 127);
     l->min_vel = cbox_config_get_int(cfg_section, "min_vel", 0);
     l->max_vel = cbox_config_get_int(cfg_section, "max_vel", 127);
+    cbox_envelope_init_adsr(&l->amp_env_shape, 
+        cbox_config_get_float(cfg_section, "amp_attack", 0),
+        cbox_config_get_float(cfg_section, "amp_decay", 0),
+        cbox_config_get_float(cfg_section, "amp_sustain", 1),
+        cbox_config_get_float(cfg_section, "amp_release", 0.05),
+        m->srate / CBOX_BLOCK_SIZE);
 }
 
-static void load_program(struct sampler_program *prg, const char *cfg_section)
+static void load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section)
 {
     prg->prog_no = cbox_config_get_int(cfg_section, "program", 0);
     prg->layer_count = 1;
@@ -523,7 +532,7 @@ static void load_program(struct sampler_program *prg, const char *cfg_section)
         g_error("waveform not loaded");
         return;
     }
-    sampler_load_layer(prg->layers[0], cfg_section, waveform);
+    sampler_load_layer(m, prg->layers[0], cfg_section, waveform);
 }
 
 struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate)
@@ -564,7 +573,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
         char *p = g_strdup_printf("spgm:%s", cbox_config_get_string(cfg_section, s));
         g_free(s);
         
-        load_program(&m->programs[i], p);
+        load_program(m, &m->programs[i], p);
     }
     
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
