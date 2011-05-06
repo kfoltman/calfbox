@@ -50,7 +50,7 @@ struct sampler_layer
     float gain;
     float pan;
     float freq;
-    int min_note, max_note;
+    int min_note, max_note, root_note;
     int min_vel, max_vel;
     struct cbox_envelope_shape amp_env_shape;
 };
@@ -205,7 +205,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             struct sampler_voice *v = &m->voices[i];
             struct sampler_layer *l = pl[lidx];
             
-            double freq = l->freq * pow(2.0, (note - 69) / 12.0);
+            double freq = l->freq * pow(2.0, (note - l->root_note) / 12.0);
             
             v->sample_data = l->sample_data;
             v->pos = l->sample_offset;
@@ -522,6 +522,7 @@ void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const
     l->gain = pow(2.0, cbox_config_get_float(cfg_section, "gain", 0) / 6.0);
     l->pan = cbox_config_get_float(cfg_section, "pan", 0.5);
     l->mode = waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+    l->root_note = cbox_config_get_int(cfg_section, "root_note", 69);
     l->min_note = cbox_config_get_int(cfg_section, "min_note", 0);
     l->max_note = cbox_config_get_int(cfg_section, "max_note", 127);
     l->min_vel = cbox_config_get_int(cfg_section, "min_vel", 0);
