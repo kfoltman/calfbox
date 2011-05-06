@@ -522,17 +522,46 @@ void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const
 
 static void load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section)
 {
+    int i;
+    
     prg->prog_no = cbox_config_get_int(cfg_section, "program", 0);
-    prg->layer_count = 1;
-    prg->layers = malloc(sizeof(struct sampler_layer *) * prg->layer_count);
-    prg->layers[0] = malloc(sizeof(struct sampler_layer));
-    struct sampler_waveform *waveform = load_waveform(cfg_section, cbox_config_get_string(cfg_section, "file"));
-    if (!waveform)
+
+    int layer_count = 0;
+    for (i = 0; ; i++)
     {
-        g_error("waveform not loaded");
-        return;
+        gchar *s = g_strdup_printf("layer%d", i);
+        char *p = cbox_config_get_string(cfg_section, s);
+        g_free(s);
+        
+        if (!p)
+        {
+            layer_count = i;
+            break;
+        }
     }
-    sampler_load_layer(m, prg->layers[0], cfg_section, waveform);
+
+    prg->layer_count = layer_count ? layer_count : 1;
+    prg->layers = malloc(sizeof(struct sampler_layer *) * prg->layer_count);
+    for (i = 0; i < prg->layer_count; i++)
+    {
+        prg->layers[i] = malloc(sizeof(struct sampler_layer));
+        char *where = NULL;
+        if (layer_count)
+        {
+            gchar *s = g_strdup_printf("layer%d", i);
+            where = g_strdup_printf("slayer:%s", cbox_config_get_string(cfg_section, s));
+            g_free(s);
+        }
+        struct sampler_waveform *waveform = load_waveform(where ? where : cfg_section, cbox_config_get_string(where ? where : cfg_section, "file"));
+        if (!waveform)
+        {
+            g_error("waveform not loaded");
+            return;
+        }
+        sampler_load_layer(m, prg->layers[i], where, waveform);
+        if (where)
+            g_free(where);
+    }
 }
 
 struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate)
