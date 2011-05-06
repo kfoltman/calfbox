@@ -500,20 +500,20 @@ static struct sampler_waveform *load_waveform(const char *context_name, const ch
     return waveform;
 }
 
-void sampler_load_layer(struct sampler_layer *l, struct sampler_waveform *waveform)
+void sampler_load_layer(struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
 {
     l->sample_data = waveform->data;
     l->sample_offset = 0;
     l->freq = waveform->info.samplerate ? waveform->info.samplerate : 44100;
-    l->loop_start = -1;
-    l->loop_end = waveform->info.frames;
-    l->gain = 1;
-    l->pan = 0.5;
+    l->loop_start = cbox_config_get_int(cfg_section, "loop_start", -1);
+    l->loop_end = cbox_config_get_int(cfg_section, "loop_end", waveform->info.frames);
+    l->gain = pow(2.0, cbox_config_get_float(cfg_section, "gain", 0) / 6.0);
+    l->pan = cbox_config_get_float(cfg_section, "pan", 0.5);
     l->mode = waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-    l->min_note = 0;
-    l->max_note = 127;
-    l->min_vel = 0;
-    l->max_vel = 127;
+    l->min_note = cbox_config_get_int(cfg_section, "min_note", 0);
+    l->max_note = cbox_config_get_int(cfg_section, "max_note", 127);
+    l->min_vel = cbox_config_get_int(cfg_section, "min_vel", 0);
+    l->max_vel = cbox_config_get_int(cfg_section, "max_vel", 127);
 }
 
 struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate)
@@ -540,7 +540,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     struct sampler_waveform *waveform = load_waveform(cfg_section, filename);
     if (!waveform)
         return NULL;
-    sampler_load_layer(&m->layers[0], waveform);
+    sampler_load_layer(&m->layers[0], cfg_section, waveform);
     
     m->program_count = 1;
     m->programs = malloc(sizeof(struct sampler_program) * m->program_count);
