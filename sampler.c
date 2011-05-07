@@ -52,6 +52,7 @@ struct sampler_layer
     float gain;
     float pan;
     float freq;
+    float note_scaling;
     int min_note, max_note, root_note;
     int min_vel, max_vel;
     float cutoff, resonance, env_mod;
@@ -225,7 +226,10 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             struct sampler_voice *v = &m->voices[i];
             struct sampler_layer *l = pl[lidx];
             
-            double freq = l->freq * pow(2.0, (note - l->root_note) / 12.0);
+            double freq = l->freq;
+            
+            if (l->note_scaling)
+                freq *= pow(2.0, (note - l->root_note) * l->note_scaling / 1200.0);
             
             v->sample_data = l->sample_data;
             v->pos = l->sample_offset;
@@ -586,6 +590,7 @@ void sampler_init_layer(struct sampler_module *m, struct sampler_layer *l, struc
     l->pan = 0.5;
     l->mode = waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
     l->root_note = 69;
+    l->note_scaling = 100.0;
     l->min_note = 0;
     l->max_note = 127;
     l->min_vel = 0;
@@ -614,6 +619,7 @@ void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer
     if (cbox_config_get_string(cfg_section, "gain"))
         l->gain = pow(2.0, cbox_config_get_float(cfg_section, "gain", 0) / 6.0);
     l->pan = cbox_config_get_float(cfg_section, "pan", l->pan);
+    l->note_scaling = cbox_config_get_float(cfg_section, "note_scaling", l->note_scaling);
     l->root_note = cbox_config_get_int(cfg_section, "root_note", l->root_note);
     l->min_note = cbox_config_get_note(cfg_section, "low_note", l->min_note);
     l->max_note = cbox_config_get_note(cfg_section, "high_note", l->max_note);
