@@ -55,6 +55,7 @@ struct sampler_layer
     int min_note, max_note, root_note;
     int min_vel, max_vel;
     float cutoff, resonance, env_mod;
+    struct cbox_adsr amp_adsr, filter_adsr;
     struct cbox_envelope_shape amp_env_shape, filter_env_shape;
 };
 
@@ -553,36 +554,84 @@ static int cbox_config_get_note(const char *cfg_section, const char *key, int de
     return def_value;
 }
 
-void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
+static void cbox_config_get_adsr(const char *cfg_section, const char *prefix, struct cbox_adsr *adsr)
+{
+    gchar *v;
+    
+    v = g_strdup_printf("%s_attack", prefix);
+    adsr->attack = cbox_config_get_float(cfg_section, v, adsr->attack);
+    g_free(v);
+    
+    v = g_strdup_printf("%s_decay", prefix);
+    adsr->decay = cbox_config_get_float(cfg_section, v, adsr->decay);
+    g_free(v);
+    
+    v = g_strdup_printf("%s_sustain", prefix);
+    adsr->sustain = cbox_config_get_float(cfg_section, v, adsr->sustain);
+    g_free(v);
+    
+    v = g_strdup_printf("%s_release", prefix);
+    adsr->release = cbox_config_get_float(cfg_section, v, adsr->release);
+    g_free(v);
+}
+
+void sampler_init_layer(struct sampler_module *m, struct sampler_layer *l, struct sampler_waveform *waveform)
 {
     l->sample_data = waveform->data;
-    l->sample_offset = cbox_config_get_int(cfg_section, "offset", 0);
+    l->sample_offset = 0;
     l->freq = waveform->info.samplerate ? waveform->info.samplerate : 44100;
-    l->loop_start = cbox_config_get_int(cfg_section, "loop_start", -1);
-    l->loop_end = cbox_config_get_int(cfg_section, "loop_end", waveform->info.frames);
-    l->gain = pow(2.0, cbox_config_get_float(cfg_section, "gain", 0) / 6.0);
-    l->pan = cbox_config_get_float(cfg_section, "pan", 0.5);
+    l->loop_start = -1;
+    l->loop_end = waveform->info.frames;
+    l->gain = 1.0;
+    l->pan = 0.5;
     l->mode = waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-    l->root_note = cbox_config_get_int(cfg_section, "root_note", 69);
-    l->min_note = cbox_config_get_note(cfg_section, "low_note", 0);
-    l->max_note = cbox_config_get_note(cfg_section, "high_note", 127);
-    l->min_vel = cbox_config_get_note(cfg_section, "low_vel", 0);
-    l->max_vel = cbox_config_get_note(cfg_section, "high_vel", 127);
-    cbox_envelope_init_adsr(&l->amp_env_shape, 
-        cbox_config_get_float(cfg_section, "amp_attack", 0),
-        cbox_config_get_float(cfg_section, "amp_decay", 0),
-        cbox_config_get_float(cfg_section, "amp_sustain", 1),
-        cbox_config_get_float(cfg_section, "amp_release", 0.05),
-        m->srate / CBOX_BLOCK_SIZE);
-    cbox_envelope_init_adsr(&l->filter_env_shape, 
-        cbox_config_get_float(cfg_section, "filter_attack", 0),
-        cbox_config_get_float(cfg_section, "filter_decay", 0),
-        cbox_config_get_float(cfg_section, "filter_sustain", 1),
-        cbox_config_get_float(cfg_section, "filter_release", 0.05),
-        m->srate / CBOX_BLOCK_SIZE);
-    l->cutoff = cbox_config_get_float(cfg_section, "cutoff", 21000);
-    l->resonance = cbox_config_get_float(cfg_section, "resonance", 0.707);
-    l->env_mod = cbox_config_get_float(cfg_section, "env_mod", 0);
+    l->root_note = 69;
+    l->min_note = 0;
+    l->max_note = 127;
+    l->min_vel = 0;
+    l->max_vel = 127;
+    l->cutoff = 21000;
+    l->resonance = 0.707;
+    l->env_mod = 0;
+    l->amp_adsr.attack = 0;
+    l->amp_adsr.decay = 0;
+    l->amp_adsr.sustain = 1;
+    l->amp_adsr.release = 0.05;
+    l->filter_adsr.attack = 0;
+    l->filter_adsr.decay = 0;
+    l->filter_adsr.sustain = 1;
+    l->filter_adsr.release = 0.05;
+}
+
+void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section)
+{
+    char *imp = cbox_config_get_string(cfg_section, "import");
+    if (imp)
+        sampler_load_layer_overrides(m, l, imp);
+    l->sample_offset = cbox_config_get_int(cfg_section, "offset", l->sample_offset);
+    l->loop_start = cbox_config_get_int(cfg_section, "loop_start", l->loop_start);
+    l->loop_end = cbox_config_get_int(cfg_section, "loop_end", l->loop_end);
+    if (cbox_config_get_string(cfg_section, "gain"))
+        l->gain = pow(2.0, cbox_config_get_float(cfg_section, "gain", 0) / 6.0);
+    l->pan = cbox_config_get_float(cfg_section, "pan", l->pan);
+    l->root_note = cbox_config_get_int(cfg_section, "root_note", l->root_note);
+    l->min_note = cbox_config_get_note(cfg_section, "low_note", l->min_note);
+    l->max_note = cbox_config_get_note(cfg_section, "high_note", l->max_note);
+    l->min_vel = cbox_config_get_note(cfg_section, "low_vel", l->min_vel);
+    l->max_vel = cbox_config_get_note(cfg_section, "high_vel", l->max_vel);
+    cbox_config_get_adsr(cfg_section, "amp", &l->amp_adsr);
+    cbox_config_get_adsr(cfg_section, "filter", &l->filter_adsr);
+    cbox_envelope_init_adsr(&l->amp_env_shape, &l->amp_adsr, m->srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_adsr(&l->filter_env_shape, &l->filter_adsr,  m->srate / CBOX_BLOCK_SIZE);
+    l->cutoff = cbox_config_get_float(cfg_section, "cutoff", l->cutoff);
+    l->resonance = cbox_config_get_float(cfg_section, "resonance", l->resonance);
+    l->env_mod = cbox_config_get_float(cfg_section, "env_mod", l->env_mod);
+}
+
+void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
+{
+    sampler_init_layer(m, l, waveform);
+    sampler_load_layer_overrides(m, l, cfg_section);
 }
 
 static void load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section)

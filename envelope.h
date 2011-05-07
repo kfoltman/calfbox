@@ -68,32 +68,40 @@ static inline float cbox_envelope_get_next(struct cbox_envelope *env, int releas
     return env->cur_value;
 }
 
-static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, float a, float d, float s, float r, int sr)
+struct cbox_adsr
+{
+    float attack;
+    float decay;
+    float sustain;
+    float release;
+};
+
+static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, const struct cbox_adsr *adsr, int sr)
 {
     env->start_value = 0;
     env->stages[0].end_value = 1;
-    env->stages[0].time = a * sr;
+    env->stages[0].time = adsr->attack * sr;
     env->stages[0].next_if_pressed = 1;
     env->stages[0].next_if_released = 1;
     env->stages[0].keep_last_value = 1;
     env->stages[0].break_on_release = 0;
 
-    env->stages[1].end_value = s;
-    env->stages[1].time = d * sr;
+    env->stages[1].end_value = adsr->sustain;
+    env->stages[1].time = adsr->decay * sr;
     env->stages[1].next_if_pressed = 2;
     env->stages[1].next_if_released = 2;
     env->stages[1].keep_last_value = 0;
     env->stages[1].break_on_release = 0;
 
-    env->stages[2].end_value = s;
-    env->stages[2].time = d * sr;
+    env->stages[2].end_value = adsr->sustain;
+    env->stages[2].time = 1 * sr;
     env->stages[2].next_if_pressed = 2;
     env->stages[2].next_if_released = 3;
     env->stages[2].keep_last_value = 0;
     env->stages[2].break_on_release = 1;
 
     env->stages[3].end_value = 0;
-    env->stages[3].time = r * sr;
+    env->stages[3].time = adsr->release * sr;
     env->stages[3].next_if_pressed = -1;
     env->stages[3].next_if_released = -1;
     env->stages[3].keep_last_value = 0;
