@@ -72,7 +72,7 @@ struct stream_state
     struct stream_player_cue_point *pcp_current, *pcp_next;
     
     jack_ringbuffer_t *rb_for_reading, *rb_just_read;
-    float gain, fade_gain;
+    float gain, fade_gain, fade_increment;
     enum stream_state_phase phase;
 };
 
@@ -250,7 +250,7 @@ static void copy_samples(struct stream_state *ss, cbox_sample_t **outputs, float
     float gain = ss->gain * ss->fade_gain;
     if (ss->phase == STARTING)
     {
-        ss->fade_gain += 0.01;
+        ss->fade_gain += ss->fade_increment;
         if (ss->fade_gain >= 1)
         {
             ss->fade_gain = 1;
@@ -260,7 +260,7 @@ static void copy_samples(struct stream_state *ss, cbox_sample_t **outputs, float
     else
     if (ss->phase == STOPPING)
     {
-        ss->fade_gain -= 0.01;
+        ss->fade_gain -= ss->fade_increment;
         if (ss->fade_gain < 0)
         {
             ss->fade_gain = 0;
@@ -523,6 +523,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     m->stream = create_stream(cfg_section, filename);
     m->stream->restart = (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", m->stream->restart);
     m->stream->gain = cbox_config_get_gain(cfg_section, "gain", m->stream->gain);
+    m->stream->fade_increment = 1.0 / (cbox_config_get_float(cfg_section, "fade_time", 0.05) * (srate / CBOX_BLOCK_SIZE));
     
     if (pthread_create(&m->thr_preload, NULL, sample_preload_thread, m))
     {
