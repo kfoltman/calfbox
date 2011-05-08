@@ -16,11 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "assert.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
 #include "module.h"
+#include "procmain.h"
 #include <errno.h>
 #include <glib.h>
 #include <jack/ringbuffer.h>
@@ -194,9 +196,31 @@ void *sample_preload_thread(void *user_data)
         
 }
 
+static int stream_player_seek_execute(void *p)
+{
+    struct stream_player_module *m = p;
+    
+    m->stream->readptr = 0;
+}
+
+static struct cbox_rt_cmd_definition stream_seek_command = {
+    .prepare = NULL,
+    .execute = stream_player_seek_execute,
+    .cleanup = NULL
+};
+
 void stream_player_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
     struct stream_player_module *m = (struct stream_player_module *)module;
+}
+
+void stream_player_process_cmd(struct cbox_module *module, struct cbox_osc_command *cmd)
+{
+    struct stream_player_module *m = (struct stream_player_module *)module;
+    if (!strcmp(cmd->command, "/restart") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_rt_cmd_execute_async(app.rt, &stream_seek_command, module);
+    }
 }
 
 static void request_next(struct stream_state *ss, uint64_t pos)
@@ -414,6 +438,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     cbox_module_init(&m->module, m);
     m->module.process_event = stream_player_process_event;
     m->module.process_block = stream_player_process_block;
+    m->module.process_cmd = stream_player_process_cmd;
     m->module.destroy = stream_player_destroy;
     m->stream = create_stream(cfg_section, filename);
     m->stream->restart = (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", m->stream->restart);
