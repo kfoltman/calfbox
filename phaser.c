@@ -97,7 +97,7 @@ struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int 
     m->module.process_block = phaser_process_block;
     m->tpdsr = 2.0 * M_PI / srate;
     m->phase = 0;
-    m->sphase = cbox_config_get_float(cfg_section, "stereo_phase", 1.f) * 2 * M_PI / 360;
+    m->sphase = cbox_config_get_float(cfg_section, "stereo_phase", 90.f) * 2 * M_PI / 360;
     m->lfo_freq = cbox_config_get_float(cfg_section, "lfo_freq", 1.f);
     m->center = cbox_config_get_float(cfg_section, "center_freq", 1500.f);
     m->mdepth = cbox_config_get_float(cfg_section, "mod_depth", 500.f);
