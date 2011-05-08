@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <assert.h>
 #include <glib.h>
+#include <glob.h>
 #include <getopt.h>
 #include <math.h>
 #include <ncurses.h>
@@ -164,16 +165,45 @@ int cmd_stream_stop(struct cbox_menu_item_command *item, void *context)
     return 0;
 }
 
+int cmd_stream_load(struct cbox_menu_item_command *item, void *context)
+{
+    cbox_module_do(app.rt->scene->instruments[0]->module, "/load", "si", (gchar *)item->item.item_context, 0);
+    return 0;
+}
+
+struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *menu_context)
+{
+    struct cbox_menu *menu = cbox_menu_new();
+    struct cbox_config_section_cb_data cb = { .menu = menu };
+
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Module commands", NULL, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Play stream", cmd_stream_play, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Stop stream", cmd_stream_stop, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Rewind stream", cmd_send_msg, NULL));
+
+    glob_t g;
+    if (glob("*.wav", GLOB_TILDE_CHECK, NULL, &g) == 0)
+    {
+        for (int i = 0; i < g.gl_pathc; i++)
+        {
+            cbox_menu_add_item(menu, cbox_menu_item_new_command(g_strdup_printf("Load: %s", g.gl_pathv[i]), cmd_stream_load, g_strdup(g.gl_pathv[i])));
+        }
+    }
+    
+    globfree(&g);
+        
+    cbox_menu_add_item(menu, cbox_menu_item_new_menu("OK", NULL, NULL));    
+    
+    return menu;
+}
+
 struct cbox_menu *create_main_menu()
 {
     struct cbox_menu *main_menu = cbox_menu_new();
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Current scene:", scene_format_value, NULL));
     cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Set scene", create_scene_menu, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Module control", create_stream_menu, NULL));
     
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Module commands", NULL, NULL));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Play stream", cmd_stream_play, NULL));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Stop stream", cmd_stream_stop, NULL));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Rewind stream", cmd_send_msg, NULL));
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Variables", NULL, NULL));
     // cbox_menu_add_item(main_menu, cbox_menu_item_new_int("foo:", &var1, 0, 127, NULL));
     // cbox_menu_add_item(main_menu, "bar:", menu_item_value_double, &mx_double_var2, &var2);
