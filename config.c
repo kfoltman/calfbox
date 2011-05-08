@@ -142,7 +142,7 @@ float cbox_config_get_gain(const char *section, const char *key, float def_value
 
 float cbox_config_get_gain_db(const char *section, const char *key, float def_value)
 {
-    return cbox_config_get_gain_db(section, key, pow(2.0, def_value / 6.0));
+    return cbox_config_get_gain(section, key, pow(2.0, def_value / 6.0));
 }
 
 void cbox_config_foreach_section(void (*process)(void *user_data, const char *key), void *user_data)
