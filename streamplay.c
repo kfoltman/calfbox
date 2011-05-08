@@ -74,13 +74,13 @@ struct stream_state
     jack_ringbuffer_t *rb_for_reading, *rb_just_read;
     float gain, fade_gain, fade_increment;
     enum stream_state_phase phase;
+
+    pthread_t thr_preload;    
 };
 
 struct stream_player_module
 {
     struct cbox_module module;
-    
-    pthread_t thr_preload;
     
     struct stream_state *stream;
 };
@@ -184,10 +184,9 @@ int get_unused_buffer(struct stream_state *ss)
     return notbad;
 }
 
-void *sample_preload_thread(void *user_data)
+static void *sample_preload_thread(void *user_data)
 {
-    struct stream_player_module *m = user_data;
-    struct stream_state *ss = m->stream;
+    struct stream_state *ss = user_data;
     
     do {
         unsigned char buf_idx;
@@ -386,20 +385,26 @@ void stream_player_process_block(struct cbox_module *module, cbox_sample_t **inp
     }
 }
 
+static void stream_state_destroy(struct stream_state *ss)
+{
+    unsigned char cmd = 255;
+    
+    jack_ringbuffer_write(ss->rb_for_reading, &cmd, 1);
+    pthread_join(ss->thr_preload, NULL);
+    
+    jack_ringbuffer_free(ss->rb_for_reading);
+    jack_ringbuffer_free(ss->rb_just_read);
+    sf_close(ss->sndfile);
+}
+
 void stream_player_destroy(struct cbox_module *module)
 {
     struct stream_player_module *m = (struct stream_player_module *)module;
-    unsigned char cmd = 255;
-    
-    jack_ringbuffer_write(m->stream->rb_for_reading, &cmd, 1);
-    pthread_join(m->thr_preload, NULL);
-    
-    jack_ringbuffer_free(m->stream->rb_for_reading);
-    jack_ringbuffer_free(m->stream->rb_just_read);
-    sf_close(m->stream->sndfile);
+    if (m->stream)
+        stream_state_destroy(m->stream);
 }
 
-struct stream_state *create_stream(const char *context, const char *filename)
+static struct stream_state *stream_state_new(const char *context, const char *filename, uint64_t loop)
 {
     struct stream_state *stream = malloc(sizeof(struct stream_state));
     stream->sndfile = sf_open(filename, SFM_READ, &stream->info);
@@ -416,7 +421,7 @@ struct stream_state *create_stream(const char *context, const char *filename)
     
     stream->phase = STOPPED;
     stream->readptr = 0;
-    stream->restart = -1;
+    stream->restart = loop;
     stream->pcp_current = &stream->cp_start;
     stream->pcp_next = NULL;
     stream->gain = 1.0;
@@ -434,14 +439,23 @@ struct stream_state *create_stream(const char *context, const char *filename)
         init_cue(stream, &stream->cp_readahead[i], CUE_BUFFER_SIZE, NO_SAMPLE_LOOP);
         stream->cp_readahead_ready[i] = 0;
     }
+    if (pthread_create(&stream->thr_preload, NULL, sample_preload_thread, stream))
+    {
+        g_error("Failed to create audio prefetch thread", strerror(errno));
+        return NULL;
+    }
     return stream;
 }
+
+///////////////////////////////////////////////////////////////////////////////////
 
 static int stream_player_seek_execute(void *p)
 {
     struct stream_player_module *m = p;
     
     m->stream->readptr = m->stream->readptr_new;
+    
+    return 1;
 }
 
 static struct cbox_rt_cmd_definition stream_seek_command = {
@@ -449,6 +463,8 @@ static struct cbox_rt_cmd_definition stream_seek_command = {
     .execute = stream_player_seek_execute,
     .cleanup = NULL
 };
+
+///////////////////////////////////////////////////////////////////////////////////
 
 static int stream_player_play_execute(void *p)
 {
@@ -466,6 +482,7 @@ static int stream_player_play_execute(void *p)
         else
             m->stream->phase = STARTING;
     }
+    return 1;
 }
 
 static struct cbox_rt_cmd_definition stream_play_command = {
@@ -474,12 +491,15 @@ static struct cbox_rt_cmd_definition stream_play_command = {
     .cleanup = NULL
 };
 
+///////////////////////////////////////////////////////////////////////////////////
+
 static int stream_player_stop_execute(void *p)
 {
     struct stream_player_module *m = p;
     
     if (m->stream->phase != STOPPED)
         m->stream->phase = STOPPING;
+    return 1;
 }
 
 static struct cbox_rt_cmd_definition stream_stop_command = {
@@ -487,6 +507,58 @@ static struct cbox_rt_cmd_definition stream_stop_command = {
     .execute = stream_player_stop_execute,
     .cleanup = NULL
 };
+
+///////////////////////////////////////////////////////////////////////////////////
+
+struct load_command_data
+{
+    struct stream_player_module *module;
+    gchar *filename;
+    int loop_start;
+    struct stream_state *stream, *old_stream;
+};
+
+static int stream_player_load_prepare(void *p)
+{
+    struct load_command_data *c = p;
+    
+    c->stream = stream_state_new(NULL, c->filename, c->loop_start);
+    c->old_stream = NULL;
+    if (!c->stream)
+    {
+        g_free(c->filename);
+        free(c);
+        return -1;
+    }
+    return 0;
+}
+
+static int stream_player_load_execute(void *p)
+{
+    struct load_command_data *c = p;
+    
+    c->old_stream = c->module->stream;
+    c->module->stream = c->stream;
+    return 1;
+}
+
+static void stream_player_load_cleanup(void *p)
+{
+    struct load_command_data *c = p;
+    
+    g_free(c->filename);
+    if (c->old_stream && c->old_stream != c->stream)
+        stream_state_destroy(c->old_stream);
+    free(c);
+}
+
+static struct cbox_rt_cmd_definition stream_load_command = {
+    .prepare = stream_player_load_prepare,
+    .execute = stream_player_load_execute,
+    .cleanup = stream_player_load_cleanup
+};
+
+///////////////////////////////////////////////////////////////////////////////////
 
 void stream_player_process_cmd(struct cbox_module *module, struct cbox_osc_command *cmd)
 {
@@ -503,6 +575,14 @@ void stream_player_process_cmd(struct cbox_module *module, struct cbox_osc_comma
     else if (!strcmp(cmd->command, "/stop") && !strcmp(cmd->arg_types, ""))
     {
         cbox_rt_cmd_execute_async(app.rt, &stream_stop_command, module);
+    }
+    else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "si"))
+    {
+        struct load_command_data *c = malloc(sizeof(struct load_command_data));
+        c->module = m;
+        c->filename = g_strdup((gchar *)cmd->arg_values[0]);
+        c->loop_start = *(int *)cmd->arg_values[1];
+        cbox_rt_cmd_execute_async(app.rt, &stream_load_command, c);
     }
 }
 
@@ -528,17 +608,9 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     m->module.process_block = stream_player_process_block;
     m->module.process_cmd = stream_player_process_cmd;
     m->module.destroy = stream_player_destroy;
-    m->stream = create_stream(cfg_section, filename);
-    m->stream->restart = (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", m->stream->restart);
+    m->stream = stream_state_new(cfg_section, filename, (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", -1));
     m->stream->gain = cbox_config_get_gain(cfg_section, "gain", m->stream->gain);
     m->stream->fade_increment = 1.0 / (cbox_config_get_float(cfg_section, "fade_time", 0.05) * (srate / CBOX_BLOCK_SIZE));
-    
-    if (pthread_create(&m->thr_preload, NULL, sample_preload_thread, m))
-    {
-        g_error("Failed to create audio prefetch thread", strerror(errno));
-        return NULL;
-    }
-    
     
     return &m->module;
 }
