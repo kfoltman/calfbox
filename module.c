@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "module.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -105,6 +106,33 @@ void cbox_module_init(struct cbox_module *module, void *user_data)
     module->process_event = NULL;
     module->process_block = NULL;
     module->destroy = NULL;
+}
+
+void cbox_module_do(struct cbox_module *module, const char *cmd_name, const char *args, ...)
+{
+    va_list av;
+    int argcount = 0;
+    struct cbox_osc_command cmd;
+    cmd.command = cmd_name;
+    cmd.arg_types = args;
+    for (int i = 0; args[i]; i++)
+        argcount = i;
+    
+    va_start(av, args);
+    for (int i = 0; i < argcount; i++)
+    {
+        switch(args[i])
+        {
+            case 's':
+                cmd.arg_values[i] = va_arg(av, char *);
+                break;
+            case 'i':
+                cmd.arg_values[i] = (void *)va_arg(av, int);
+                break;
+        }
+    }
+    va_end(av);
+    module->process_cmd(module, &cmd);
 }
 
 void cbox_module_destroy(struct cbox_module *module)

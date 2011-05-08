@@ -54,6 +54,13 @@ struct cbox_module_voicingparam_metadata
 {
 };
 
+struct cbox_osc_command
+{
+    const char *command;
+    const char *arg_types;
+    void **arg_values;
+};
+
 struct cbox_module
 {
     void *user_data;
@@ -61,6 +68,7 @@ struct cbox_module
     cbox_sample_t *output_samples;
     struct cbox_midi_buffer midi_input;
     
+    void (*process_cmd)(struct cbox_module *module, struct cbox_osc_command *cmd);
     void (*process_event)(struct cbox_module *module, const uint8_t *data, uint32_t len);
     void (*process_block)(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
     void (*destroy)(struct cbox_module *module);
@@ -105,6 +113,7 @@ extern struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char 
 extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate);
 
 extern void cbox_module_init(struct cbox_module *module, void *user_data);
+extern void cbox_module_do(struct cbox_module *module, const char *cmd, const char *args, ...);
 extern void cbox_module_destroy(struct cbox_module *module);
 
 #endif
