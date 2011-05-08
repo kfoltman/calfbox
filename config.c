@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config-api.h"
 
 #include <glib.h>
+#include <math.h>
 #include <stdlib.h>
 
 static GKeyFile *config_keyfile;
@@ -122,6 +123,27 @@ float cbox_config_get_float(const char *section, const char *key, float def_valu
     }
     return result;
 }    
+
+float cbox_config_get_gain(const char *section, const char *key, float def_value)
+{
+    GError *error = NULL;
+    float result;
+    
+    if (!section || !key)
+        return def_value;
+    result = g_key_file_get_double(config_keyfile, section, key, &error);
+    if (error)
+    {
+        g_error_free(error);
+        return def_value;
+    }
+    return pow(2.0, result / 6.0);
+}    
+
+float cbox_config_get_gain_db(const char *section, const char *key, float def_value)
+{
+    return cbox_config_get_gain_db(section, key, pow(2.0, def_value / 6.0));
+}
 
 void cbox_config_foreach_section(void (*process)(void *user_data, const char *key), void *user_data)
 {

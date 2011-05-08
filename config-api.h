@@ -22,5 +22,7 @@ extern char *cbox_config_get_string(const char *section, const char *key);
 extern char *cbox_config_get_string_with_default(const char *section, const char *key, char *def_value);
 extern int cbox_config_get_int(const char *section, const char *key, int def_value);
 extern float cbox_config_get_float(const char *section, const char *key, float def_value);
+extern float cbox_config_get_gain(const char *section, const char *key, float def_value);
+extern float cbox_config_get_gain_db(const char *section, const char *key, float def_value);
 extern void cbox_config_foreach_section(void (*process)(void *user_data, const char *key), void *user_data);
 extern void cbox_config_close();

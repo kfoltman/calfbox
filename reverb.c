@@ -107,8 +107,8 @@ struct cbox_module *reverb_create(void *user_data, const char *cfg_section, int 
     m->module.process_block = reverb_process_block;
     m->pos = 0;
     m->length = cbox_config_get_float(cfg_section, "reverb_time", 1000) * srate / 1000;
-    m->dryamt = pow(2.0, cbox_config_get_float(cfg_section, "dry_gain", 0.f) / 6.0);
-    m->wetamt = pow(2.0, cbox_config_get_float(cfg_section, "wet_gain", -6.f) / 6.0);
+    m->dryamt = cbox_config_get_gain_db(cfg_section, "dry_gain", 0.f);
+    m->wetamt = cbox_config_get_gain_db(cfg_section, "wet_gain", -6.f);
     for (int u = 0; u < ALLPASS_UNITS; u++)
         for (i = 0; i < MAX_REVERB_LENGTH; i++)
             m->storage[u][i] = 0.f;

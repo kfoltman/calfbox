@@ -417,7 +417,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     m->module.destroy = stream_player_destroy;
     m->stream = create_stream(cfg_section, filename);
     m->stream->restart = (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", m->stream->restart);
-    m->stream->gain = pow(2.0, cbox_config_get_float(cfg_section, "gain", 0.f) / 6.0);
+    m->stream->gain = cbox_config_get_gain(cfg_section, "gain", m->stream->gain);
     
     if (pthread_create(&m->thr_preload, NULL, sample_preload_thread, m))
     {

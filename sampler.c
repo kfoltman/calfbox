@@ -616,8 +616,7 @@ void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer
     l->sample_offset = cbox_config_get_int(cfg_section, "offset", l->sample_offset);
     l->loop_start = cbox_config_get_int(cfg_section, "loop_start", l->loop_start);
     l->loop_end = cbox_config_get_int(cfg_section, "loop_end", l->loop_end);
-    if (cbox_config_get_string(cfg_section, "gain"))
-        l->gain = pow(2.0, cbox_config_get_float(cfg_section, "gain", 0) / 6.0);
+    l->gain = cbox_config_get_gain_db(cfg_section, "gain", 0.0);
     l->pan = cbox_config_get_float(cfg_section, "pan", l->pan);
     l->note_scaling = cbox_config_get_float(cfg_section, "note_scaling", l->note_scaling);
     l->root_note = cbox_config_get_int(cfg_section, "root_note", l->root_note);

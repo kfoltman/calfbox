@@ -119,8 +119,8 @@ struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int 
     m->lfo_freq = cbox_config_get_float(cfg_section, "lfo_freq", 1.f);
     m->min_delay = cbox_config_get_float(cfg_section, "min_delay", 20.f);
     m->mod_depth = cbox_config_get_float(cfg_section, "mod_depth", 15.f);
-    m->dryamt = pow(2.0, cbox_config_get_float(cfg_section, "dry_gain", 0.f) / 6.0);
-    m->wetamt = pow(2.0, cbox_config_get_float(cfg_section, "wet_gain", -6.f) / 6.0);
+    m->dryamt = cbox_config_get_gain_db(cfg_section, "dry_gain", 0.f);
+    m->wetamt = cbox_config_get_gain_db(cfg_section, "wet_gain", -6.f);
     for (i = 0; i < MAX_CHORUS_LENGTH; i++)
         m->storage[i][0] = m->storage[i][1] = 0.f;
     
