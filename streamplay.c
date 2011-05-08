@@ -426,6 +426,7 @@ static struct stream_state *stream_state_new(const char *context, const char *fi
     stream->pcp_next = NULL;
     stream->gain = 1.0;
     stream->fade_gain = 0.0;
+    stream->fade_increment = 1.0;
     
     init_cue(stream, &stream->cp_start, CUE_BUFFER_SIZE, 0);
     load_at_cue(stream, &stream->cp_start);
@@ -538,6 +539,8 @@ static int stream_player_load_execute(void *p)
     struct load_command_data *c = p;
     
     c->old_stream = c->module->stream;
+    if (c->old_stream)
+        c->stream->fade_increment = c->module->stream->fade_increment;
     c->module->stream = c->stream;
     return 1;
 }
