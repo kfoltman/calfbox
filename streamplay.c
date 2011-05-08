@@ -358,9 +358,44 @@ void stream_player_destroy(struct cbox_module *module)
     sf_close(m->stream->sndfile);
 }
 
+struct stream_state *create_stream(const char *context, const char *filename)
+{
+    struct stream_state *stream = malloc(sizeof(struct stream_state));
+    stream->sndfile = sf_open(filename, SFM_READ, &stream->info);
+    
+    if (!stream->sndfile)
+    {
+        g_error("%s: cannot open file '%s': %s", context, filename, sf_strerror(NULL));
+        return NULL;
+    }
+    g_message("Frames %d channels %d", (int)stream->info.frames, (int)stream->info.channels);
+    
+    stream->rb_for_reading = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
+    stream->rb_just_read = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
+    
+    stream->readptr = 0;
+    stream->restart = -1;
+    stream->pcp_current = &stream->cp_start;
+    stream->pcp_next = NULL;
+    stream->gain = 1.0;
+    
+    init_cue(stream, &stream->cp_start, CUE_BUFFER_SIZE, 0);
+    load_at_cue(stream, &stream->cp_start);
+    if (stream->restart > 0 && (stream->restart % CUE_BUFFER_SIZE) > 0)
+        init_cue(stream, &stream->cp_loop, CUE_BUFFER_SIZE + (CUE_BUFFER_SIZE - (stream->restart % CUE_BUFFER_SIZE)), stream->restart);
+    else
+        init_cue(stream, &stream->cp_loop, CUE_BUFFER_SIZE, stream->restart);
+    load_at_cue(stream, &stream->cp_loop);
+    for (int i = 0; i < MAX_READAHEAD_BUFFERS; i++)
+    {
+        init_cue(stream, &stream->cp_readahead[i], CUE_BUFFER_SIZE, NO_SAMPLE_LOOP);
+        stream->cp_readahead_ready[i] = 0;
+    }
+    return stream;
+}
+
 struct cbox_module *stream_player_create(void *user_data, const char *cfg_section, int srate)
 {
-    int i;
     int rest;
     static int inited = 0;
     
@@ -380,39 +415,9 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     m->module.process_event = stream_player_process_event;
     m->module.process_block = stream_player_process_block;
     m->module.destroy = stream_player_destroy;
-    
-    m->stream = malloc(sizeof(struct stream_state));
-    struct stream_state *stream = m->stream;
-    stream->sndfile = sf_open(filename, SFM_READ, &stream->info);
-    
-    if (!stream->sndfile)
-    {
-        g_error("%s: cannot open file '%s': %s", cfg_section, filename, sf_strerror(NULL));
-        return NULL;
-    }
-    g_message("Frames %d channels %d", (int)stream->info.frames, (int)stream->info.channels);
-    
-    stream->rb_for_reading = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
-    stream->rb_just_read = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
-    
-    stream->readptr = 0;
-    stream->restart = (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", -1);
-    stream->pcp_current = &stream->cp_start;
-    stream->pcp_next = NULL;
-    stream->gain = pow(2.0, cbox_config_get_float(cfg_section, "gain", 0.f) / 6.0);
-    
-    init_cue(stream, &stream->cp_start, CUE_BUFFER_SIZE, 0);
-    load_at_cue(stream, &stream->cp_start);
-    if (stream->restart > 0 && (stream->restart % CUE_BUFFER_SIZE) > 0)
-        init_cue(stream, &stream->cp_loop, CUE_BUFFER_SIZE + (CUE_BUFFER_SIZE - (stream->restart % CUE_BUFFER_SIZE)), stream->restart);
-    else
-        init_cue(stream, &stream->cp_loop, CUE_BUFFER_SIZE, stream->restart);
-    load_at_cue(stream, &stream->cp_loop);
-    for (i = 0; i < MAX_READAHEAD_BUFFERS; i++)
-    {
-        init_cue(stream, &stream->cp_readahead[i], CUE_BUFFER_SIZE, NO_SAMPLE_LOOP);
-        stream->cp_readahead_ready[i] = 0;
-    }
+    m->stream = create_stream(cfg_section, filename);
+    m->stream->restart = (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", m->stream->restart);
+    m->stream->gain = pow(2.0, cbox_config_get_float(cfg_section, "gain", 0.f) / 6.0);
     
     if (pthread_create(&m->thr_preload, NULL, sample_preload_thread, m))
     {
