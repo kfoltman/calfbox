@@ -457,7 +457,15 @@ static int stream_player_play_execute(void *p)
     if (m->stream->readptr == NO_SAMPLE_LOOP)
         m->stream->readptr = 0;
     if (m->stream->phase != PLAYING)
-        m->stream->phase = STARTING;
+    {
+        if (m->stream->readptr == 0)
+        {
+            m->stream->fade_gain = 1.0;
+            m->stream->phase = PLAYING;
+        }
+        else
+            m->stream->phase = STARTING;
+    }
 }
 
 static struct cbox_rt_cmd_definition stream_play_command = {
