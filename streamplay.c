@@ -485,7 +485,7 @@ void stream_player_process_cmd(struct cbox_module *module, struct cbox_osc_comma
     struct stream_player_module *m = (struct stream_player_module *)module;
     if (!strcmp(cmd->command, "/seek") && !strcmp(cmd->arg_types, "i"))
     {
-        m->stream->readptr_new = (int)cmd->arg_values[0];
+        m->stream->readptr_new = *(int *)cmd->arg_values[0];
         cbox_rt_cmd_execute_async(app.rt, &stream_seek_command, module);
     }
     else if (!strcmp(cmd->command, "/play") && !strcmp(cmd->arg_types, ""))

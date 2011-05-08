@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "module.h"
 
+#include <assert.h>
+#include <glib.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -113,23 +115,44 @@ void cbox_module_do(struct cbox_module *module, const char *cmd_name, const char
     va_list av;
     int argcount = 0;
     struct cbox_osc_command cmd;
+    uint8_t *extra_data;
+    // XXXKF might be not good enough for weird platforms
+    int unit_size = sizeof(double);
+    // this must be a power of 2 to guarantee proper alignment
+    assert(unit_size >= sizeof(int) && (unit_size == 4 || unit_size == 8));
     cmd.command = cmd_name;
     cmd.arg_types = args;
     for (int i = 0; args[i]; i++)
-        argcount = i;
-    cmd.arg_values = malloc(sizeof(void *) * argcount);
+        argcount = i + 1;
+    // contains pointers to all the values, plus values themselves in case of int/double
+    // (casting them to pointers is ugly, and va_arg does not return a lvalue)
+    cmd.arg_values = malloc(sizeof(void *) * argcount + unit_size * argcount);
+    extra_data = (uint8_t *)&cmd.arg_values[argcount];
     
     va_start(av, args);
     for (int i = 0; i < argcount; i++)
     {
+        int iv;
+        double fv;
+        void *pv = extra_data + unit_size * i;
         switch(args[i])
         {
             case 's':
                 cmd.arg_values[i] = va_arg(av, char *);
                 break;
             case 'i':
-                cmd.arg_values[i] = (void *)va_arg(av, int);
+                iv = va_arg(av, int);
+                memcpy(pv, &iv, sizeof(int));
+                cmd.arg_values[i] = pv;
                 break;
+            case 'f': // double really
+                fv = (double)va_arg(av, double);
+                memcpy(pv, &fv, sizeof(double));
+                cmd.arg_values[i] = pv;
+                break;
+            default:
+                g_error("Invalid format specification '%c'", args[i]);
+                assert(0);
         }
     }
     va_end(av);
