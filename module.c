@@ -117,6 +117,7 @@ void cbox_module_do(struct cbox_module *module, const char *cmd_name, const char
     cmd.arg_types = args;
     for (int i = 0; args[i]; i++)
         argcount = i;
+    cmd.arg_values = malloc(sizeof(void *) * argcount);
     
     va_start(av, args);
     for (int i = 0; i < argcount; i++)
@@ -133,6 +134,7 @@ void cbox_module_do(struct cbox_module *module, const char *cmd_name, const char
     }
     va_end(av);
     module->process_cmd(module, &cmd);
+    free(cmd.arg_values);
 }
 
 void cbox_module_destroy(struct cbox_module *module)
