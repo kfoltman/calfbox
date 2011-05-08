@@ -148,7 +148,19 @@ struct cbox_menu *create_scene_menu(struct cbox_menu_item_menu *item, void *menu
 
 int cmd_send_msg(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_module_do(app.rt->scene->instruments[0]->module, "/restart", "");
+    cbox_module_do(app.rt->scene->instruments[0]->module, "/seek", "i", 0);
+    return 0;
+}
+
+int cmd_stream_play(struct cbox_menu_item_command *item, void *context)
+{
+    cbox_module_do(app.rt->scene->instruments[0]->module, "/play", "");
+    return 0;
+}
+
+int cmd_stream_stop(struct cbox_menu_item_command *item, void *context)
+{
+    cbox_module_do(app.rt->scene->instruments[0]->module, "/stop", "");
     return 0;
 }
 
@@ -158,7 +170,10 @@ struct cbox_menu *create_main_menu()
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Current scene:", scene_format_value, NULL));
     cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Set scene", create_scene_menu, NULL));
     
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Send message", cmd_send_msg, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Module commands", NULL, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Play stream", cmd_stream_play, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Stop stream", cmd_stream_stop, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Rewind stream", cmd_send_msg, NULL));
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Variables", NULL, NULL));
     // cbox_menu_add_item(main_menu, cbox_menu_item_new_int("foo:", &var1, 0, 127, NULL));
     // cbox_menu_add_item(main_menu, "bar:", menu_item_value_double, &mx_double_var2, &var2);

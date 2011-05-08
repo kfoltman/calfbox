@@ -49,12 +49,21 @@ struct stream_player_cue_point
     int queued;
 };
 
+enum stream_state_phase
+{
+    STOPPED,
+    PLAYING,
+    STOPPING,
+    STARTING
+};
+
 struct stream_state
 {
     SNDFILE *sndfile;
     SF_INFO info;
     uint64_t readptr;
     uint64_t restart;
+    uint64_t readptr_new;
     
     volatile int buffer_in_use;
     
@@ -63,7 +72,8 @@ struct stream_state
     struct stream_player_cue_point *pcp_current, *pcp_next;
     
     jack_ringbuffer_t *rb_for_reading, *rb_just_read;
-    float gain;
+    float gain, fade_gain;
+    enum stream_state_phase phase;
 };
 
 struct stream_player_module
@@ -196,31 +206,9 @@ void *sample_preload_thread(void *user_data)
         
 }
 
-static int stream_player_seek_execute(void *p)
-{
-    struct stream_player_module *m = p;
-    
-    m->stream->readptr = 0;
-}
-
-static struct cbox_rt_cmd_definition stream_seek_command = {
-    .prepare = NULL,
-    .execute = stream_player_seek_execute,
-    .cleanup = NULL
-};
-
 void stream_player_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
     struct stream_player_module *m = (struct stream_player_module *)module;
-}
-
-void stream_player_process_cmd(struct cbox_module *module, struct cbox_osc_command *cmd)
-{
-    struct stream_player_module *m = (struct stream_player_module *)module;
-    if (!strcmp(cmd->command, "/restart") && !strcmp(cmd->arg_types, ""))
-    {
-        cbox_rt_cmd_execute_async(app.rt, &stream_seek_command, module);
-    }
 }
 
 static void request_next(struct stream_state *ss, uint64_t pos)
@@ -259,13 +247,35 @@ static void request_next(struct stream_state *ss, uint64_t pos)
 static void copy_samples(struct stream_state *ss, cbox_sample_t **outputs, float *data, int count, int ofs, int pos)
 {
     int i;
-    float gain = ss->gain;
+    float gain = ss->gain * ss->fade_gain;
+    if (ss->phase == STARTING)
+    {
+        ss->fade_gain += 0.01;
+        if (ss->fade_gain >= 1)
+        {
+            ss->fade_gain = 1;
+            ss->phase = PLAYING;
+        }
+    }
+    else
+    if (ss->phase == STOPPING)
+    {
+        ss->fade_gain -= 0.01;
+        if (ss->fade_gain < 0)
+        {
+            ss->fade_gain = 0;
+            ss->phase = STOPPED;
+        }
+    }
+    float new_gain = ss->gain * ss->fade_gain;
+    float gain_delta = (new_gain - gain) * (1.0 / CBOX_BLOCK_SIZE);
     
     if (ss->info.channels == 1)
     {
         for (i = 0; i < count; i++)
         {
             outputs[0][ofs + i] = outputs[1][ofs + i] = gain * data[pos + i];
+            gain += gain_delta;
         }
     }
     else
@@ -275,6 +285,7 @@ static void copy_samples(struct stream_state *ss, cbox_sample_t **outputs, float
         {
             outputs[0][ofs + i] = gain * data[pos << 1];
             outputs[1][ofs + i] = gain * data[(pos << 1) + 1];
+            gain += gain_delta;
             pos++;
         }
     }
@@ -285,6 +296,7 @@ static void copy_samples(struct stream_state *ss, cbox_sample_t **outputs, float
         {
             outputs[0][ofs + i] = gain * data[pos * ch];
             outputs[1][ofs + i] = gain * data[pos * ch + 1];
+            gain += gain_delta;
             pos++;
         }
     }
@@ -319,8 +331,13 @@ void stream_player_process_block(struct cbox_module *module, cbox_sample_t **inp
     
     optr = 0;
     do {
-        if (ss->readptr == NO_SAMPLE_LOOP)
+        if (ss->phase == STOPPED)
             break;
+        if (ss->readptr == NO_SAMPLE_LOOP)
+        {
+            ss->phase = STOPPED;
+            break;
+        }
 
         if (ss->pcp_current && !is_contained(ss->pcp_current, ss->readptr))
             ss->pcp_current = NULL;
@@ -397,11 +414,13 @@ struct stream_state *create_stream(const char *context, const char *filename)
     stream->rb_for_reading = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
     stream->rb_just_read = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
     
+    stream->phase = STOPPED;
     stream->readptr = 0;
     stream->restart = -1;
     stream->pcp_current = &stream->cp_start;
     stream->pcp_next = NULL;
     stream->gain = 1.0;
+    stream->fade_gain = 0.0;
     
     init_cue(stream, &stream->cp_start, CUE_BUFFER_SIZE, 0);
     load_at_cue(stream, &stream->cp_start);
@@ -416,6 +435,67 @@ struct stream_state *create_stream(const char *context, const char *filename)
         stream->cp_readahead_ready[i] = 0;
     }
     return stream;
+}
+
+static int stream_player_seek_execute(void *p)
+{
+    struct stream_player_module *m = p;
+    
+    m->stream->readptr = m->stream->readptr_new;
+}
+
+static struct cbox_rt_cmd_definition stream_seek_command = {
+    .prepare = NULL,
+    .execute = stream_player_seek_execute,
+    .cleanup = NULL
+};
+
+static int stream_player_play_execute(void *p)
+{
+    struct stream_player_module *m = p;
+    
+    if (m->stream->readptr == NO_SAMPLE_LOOP)
+        m->stream->readptr = 0;
+    if (m->stream->phase != PLAYING)
+        m->stream->phase = STARTING;
+}
+
+static struct cbox_rt_cmd_definition stream_play_command = {
+    .prepare = NULL,
+    .execute = stream_player_play_execute,
+    .cleanup = NULL
+};
+
+static int stream_player_stop_execute(void *p)
+{
+    struct stream_player_module *m = p;
+    
+    if (m->stream->phase != STOPPED)
+        m->stream->phase = STOPPING;
+}
+
+static struct cbox_rt_cmd_definition stream_stop_command = {
+    .prepare = NULL,
+    .execute = stream_player_stop_execute,
+    .cleanup = NULL
+};
+
+void stream_player_process_cmd(struct cbox_module *module, struct cbox_osc_command *cmd)
+{
+    struct stream_player_module *m = (struct stream_player_module *)module;
+    if (!strcmp(cmd->command, "/seek") && !strcmp(cmd->arg_types, "i"))
+    {
+        m->stream->readptr_new = (int)cmd->arg_values[0];
+        cbox_rt_cmd_execute_async(app.rt, &stream_seek_command, module);
+    }
+    else if (!strcmp(cmd->command, "/play") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_rt_cmd_execute_async(app.rt, &stream_play_command, module);
+    }
+    else if (!strcmp(cmd->command, "/stop") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_rt_cmd_execute_async(app.rt, &stream_stop_command, module);
+    }
 }
 
 struct cbox_module *stream_player_create(void *user_data, const char *cfg_section, int srate)
