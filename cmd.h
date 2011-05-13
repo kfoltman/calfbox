@@ -37,5 +37,6 @@ struct cbox_command_target
 };
 
 extern void cbox_execute_on(struct cbox_command_target *module, const char *cmd, const char *args, ...);
+extern void cbox_execute_on_v(struct cbox_command_target *module, const char *cmd, const char *args, va_list va);
 
 #endif

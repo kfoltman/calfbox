@@ -25,6 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 void cbox_execute_on(struct cbox_command_target *ct, const char *cmd_name, const char *args, ...)
 {
     va_list av;
+    
+    va_start(av, args);
+    cbox_execute_on_v(ct, cmd_name, args, av);
+    va_end(av);
+}
+
+void cbox_execute_on_v(struct cbox_command_target *ct, const char *cmd_name, const char *args, va_list av)
+{
     int argcount = 0;
     struct cbox_osc_command cmd;
     uint8_t *extra_data;
@@ -41,7 +49,6 @@ void cbox_execute_on(struct cbox_command_target *ct, const char *cmd_name, const
     cmd.arg_values = malloc(sizeof(void *) * argcount + unit_size * argcount);
     extra_data = (uint8_t *)&cmd.arg_values[argcount];
     
-    va_start(av, args);
     for (int i = 0; i < argcount; i++)
     {
         int iv;
@@ -67,7 +74,6 @@ void cbox_execute_on(struct cbox_command_target *ct, const char *cmd_name, const
                 assert(0);
         }
     }
-    va_end(av);
     ct->process_cmd(ct, &cmd);
     free(cmd.arg_values);
 }
