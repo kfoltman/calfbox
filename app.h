@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "cmd.h"
 #include "io.h"
 #include "procmain.h"
 #include <glib.h>
@@ -24,6 +25,7 @@ struct cbox_app
 {
     struct cbox_io io;
     struct cbox_rt *rt;
+    struct cbox_command_target cmd_target;
     gchar *current_scene_name;
 };
 

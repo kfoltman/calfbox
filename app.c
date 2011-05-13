@@ -234,9 +234,87 @@ struct cbox_menu *create_main_menu()
     return main_menu;
 }
 
+static void app_process_cmd(struct cbox_command_target *ct, struct cbox_osc_command *cmd)
+{
+    if (!cmd->command)
+    {
+        g_error("NULL command");
+        return;
+    }
+    if (cmd->command[0] != '/')
+    {
+        g_error("Invalid global command path %s", cmd->command);
+        return;
+    }
+    const char *obj = &cmd->command[1];
+    const char *pos = strchr(obj, '/');
+    if (pos)
+    {
+        int len = pos - obj;
+        if (!strncmp(obj, "instr", len))
+        {
+            obj = &pos[1];
+            pos = strchr(obj, '/');
+            if (!pos)
+            {
+                g_error("Invalid instrument path %s", cmd->command);
+                return;
+            }
+            len = pos - obj;
+            
+            gchar *name = g_strndup(obj, len);
+            struct cbox_instrument *instr = cbox_instruments_get_by_name(name);
+            if (instr)
+            {
+                if (!instr->module->cmd_target.process_cmd)
+                {
+                    g_error("The engine %s has no command target defined\n", instr->engine_name);
+                    return;
+                }
+                struct cbox_osc_command subcmd;
+                subcmd.command = pos;
+                subcmd.arg_types = cmd->arg_types;
+                subcmd.arg_values = cmd->arg_values;
+                instr->module->cmd_target.process_cmd(&instr->module->cmd_target, &subcmd);
+            }
+            else
+            {
+                g_error("Invalid instrument path %s", cmd->command);
+            }
+            g_free(name);
+            return;
+        }
+    }
+    else
+    if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))
+    {
+        g_message("Print: %s", (const char *)cmd->arg_values[0]);
+    }
+    else
+    if (!strcmp(obj, "print_i") && !strcmp(cmd->arg_types, "i"))
+    {
+        g_message("Print: %d", *(const int *)cmd->arg_values[0]);
+    }
+    else
+    if (!strcmp(obj, "print_f") && !strcmp(cmd->arg_types, "f"))
+    {
+        g_message("Print: %f", *(const double *)cmd->arg_values[0]);
+    }
+    else
+    {
+        g_error("Unknown combination of target path and argument: %s, %s", cmd->command, cmd->arg_types);
+        return;
+    }
+}
+
 struct cbox_app app =
 {
     .rt = NULL,
-    .current_scene_name = NULL
+    .current_scene_name = NULL,
+    .cmd_target =
+    {
+        .process_cmd = app_process_cmd,
+        .user_data = &app
+    }
 };
 
