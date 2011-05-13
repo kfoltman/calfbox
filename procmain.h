@@ -52,6 +52,7 @@ struct cbox_rt
 extern struct cbox_rt *cbox_rt_new();
 
 extern void cbox_rt_start(struct cbox_rt *rt, struct cbox_io *io);
+extern void cbox_rt_cmd_handle_queue(struct cbox_rt *rt);
 extern void cbox_rt_stop(struct cbox_rt *rt);
 
 // Those are for calling from the main thread. I will add a RT-thread version later.

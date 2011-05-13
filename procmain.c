@@ -32,6 +32,7 @@ struct cbox_rt_cmd_instance
 {
     struct cbox_rt_cmd_definition *definition;
     void *user_data;
+    int is_async;
 };
 
 struct cbox_rt *cbox_rt_new()
@@ -215,7 +216,8 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     while(cost < RT_MAX_COST_PER_CALL && jack_ringbuffer_read(rt->rb_execute, (char *)&cmd, sizeof(cmd)))
     {
         cost += (cmd.definition->execute)(cmd.user_data);
-        jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
+        if (cmd.definition->cleanup || !cmd.is_async)
+            jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
     }
         
     // Update transport
@@ -274,6 +276,7 @@ void cbox_rt_cmd_execute_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
     
     cmd.definition = def;
     cmd.user_data = user_data;
+    cmd.is_async = 0;
     
     jack_ringbuffer_write(rt->rb_execute, (const char *)&cmd, sizeof(cmd));
     do
@@ -300,7 +303,7 @@ void cbox_rt_cmd_execute_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
 
 void cbox_rt_cmd_execute_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
 {
-    struct cbox_rt_cmd_instance cmd = { def, user_data };
+    struct cbox_rt_cmd_instance cmd = { def, user_data, 1 };
     
     if (def->prepare)
     {
