@@ -147,27 +147,47 @@ struct cbox_menu *create_scene_menu(struct cbox_menu_item_menu *item, void *menu
     return scene_menu;
 }
 
-int cmd_send_msg(struct cbox_menu_item_command *item, void *context)
+static struct cbox_command_target *find_module_target(const char *type)
 {
-    cbox_module_do(app.rt->scene->instruments[0]->module, "/seek", "i", 0);
+    struct cbox_scene *scene = app.rt->scene;
+    for (int i = 0; i < scene->instrument_count; i++)
+    {
+        if (!strcmp(scene->instruments[i]->engine_name, type))
+            return &scene->instruments[0]->module->cmd_target;
+    }
+    return NULL;
+    
+}
+
+int cmd_stream_rewind(struct cbox_menu_item_command *item, void *context)
+{
+    struct cbox_command_target *target = find_module_target("stream_player");
+    if (target)
+        cbox_execute_on(target, "/seek", "i", 0);
     return 0;
 }
 
 int cmd_stream_play(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_module_do(app.rt->scene->instruments[0]->module, "/play", "");
+    struct cbox_command_target *target = find_module_target("stream_player");
+    if (target)
+        cbox_execute_on(target, "/play", "");
     return 0;
 }
 
 int cmd_stream_stop(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_module_do(app.rt->scene->instruments[0]->module, "/stop", "");
+    struct cbox_command_target *target = find_module_target("stream_player");
+    if (target)
+        cbox_execute_on(target, "/stop", "");
     return 0;
 }
 
 int cmd_stream_load(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_module_do(app.rt->scene->instruments[0]->module, "/load", "si", (gchar *)item->item.item_context, 0);
+    struct cbox_command_target *target = find_module_target("stream_player");
+    if (target)
+        cbox_execute_on(target, "/load", "si", (gchar *)item->item.item_context, 0);
     return 0;
 }
 
@@ -179,7 +199,7 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
     cbox_menu_add_item(menu, cbox_menu_item_new_static("Module commands", NULL, NULL));
     cbox_menu_add_item(menu, cbox_menu_item_new_command("Play stream", cmd_stream_play, NULL));
     cbox_menu_add_item(menu, cbox_menu_item_new_command("Stop stream", cmd_stream_stop, NULL));
-    cbox_menu_add_item(menu, cbox_menu_item_new_command("Rewind stream", cmd_send_msg, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Rewind stream", cmd_stream_rewind, NULL));
 
     glob_t g;
     if (glob("*.wav", GLOB_TILDE_CHECK, NULL, &g) == 0)

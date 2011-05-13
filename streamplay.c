@@ -563,21 +563,21 @@ static struct cbox_rt_cmd_definition stream_load_command = {
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-void stream_player_process_cmd(struct cbox_module *module, struct cbox_osc_command *cmd)
+void stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_osc_command *cmd)
 {
-    struct stream_player_module *m = (struct stream_player_module *)module;
+    struct stream_player_module *m = (struct stream_player_module *)ct->user_data;
     if (!strcmp(cmd->command, "/seek") && !strcmp(cmd->arg_types, "i"))
     {
         m->stream->readptr_new = *(int *)cmd->arg_values[0];
-        cbox_rt_cmd_execute_async(app.rt, &stream_seek_command, module);
+        cbox_rt_cmd_execute_async(app.rt, &stream_seek_command, m);
     }
     else if (!strcmp(cmd->command, "/play") && !strcmp(cmd->arg_types, ""))
     {
-        cbox_rt_cmd_execute_async(app.rt, &stream_play_command, module);
+        cbox_rt_cmd_execute_async(app.rt, &stream_play_command, m);
     }
     else if (!strcmp(cmd->command, "/stop") && !strcmp(cmd->arg_types, ""))
     {
-        cbox_rt_cmd_execute_async(app.rt, &stream_stop_command, module);
+        cbox_rt_cmd_execute_async(app.rt, &stream_stop_command, m);
     }
     else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "si"))
     {
@@ -609,7 +609,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     cbox_module_init(&m->module, m);
     m->module.process_event = stream_player_process_event;
     m->module.process_block = stream_player_process_block;
-    m->module.process_cmd = stream_player_process_cmd;
+    m->module.cmd_target.process_cmd = stream_player_process_cmd;
     m->module.destroy = stream_player_destroy;
     m->stream = stream_state_new(cfg_section, filename, (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", -1));
     m->stream->gain = cbox_config_get_gain(cfg_section, "gain", m->stream->gain);

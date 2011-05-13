@@ -45,24 +45,24 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
     struct cbox_module *effect = NULL;
     gchar *instr_section = NULL;
     gpointer value = g_hash_table_lookup(instruments.hash, name);
-    const char *cv;
+    const char *cv, *instr_engine;
     
     if (value)
         return value;
     
     instr_section = g_strdup_printf("instrument:%s", name);
     
-    cv = cbox_config_get_string(instr_section, "engine");
-    if (!cv)
+    instr_engine = cbox_config_get_string(instr_section, "engine");
+    if (!instr_engine)
     {
         g_error("Engine not specified in instrument %s", name);
         goto error;
     }
 
-    mptr = cbox_module_manifest_get_by_name(cv);
+    mptr = cbox_module_manifest_get_by_name(instr_engine);
     if (!mptr)
     {
-        g_error("Cannot find engine %s", cv);
+        g_error("Cannot find engine %s", instr_engine);
         goto error;
     }
     
@@ -116,6 +116,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
     instr = malloc(sizeof(struct cbox_instrument));
     instr->module = module;
     instr->insert = effect;
+    instr->engine_name = instr_engine;
     
     g_hash_table_insert(instruments.hash, g_strdup(name), instr);
     
