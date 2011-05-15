@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:e:s:t:b:d:mh";
+static const char *short_options = "i:c:e:s:t:b:d:D:mh";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
@@ -49,13 +49,14 @@ static struct option long_options[] = {
     {"metronome", 0, 0, 'm'},
     {"tempo", 1, 0, 't'},
     {"beats", 1, 0, 'b'},
-    {"drums", 1, 0, 'd'},
+    {"drum-pattern", 1, 0, 'd'},
+    {"drum-track", 1, 0, 'D'},
     {0,0,0,0},
 };
 
 void print_help(char *progname)
 {
-    printf("Usage: %s [--help] [--metronome] [--drums <pattern>] [--tempo <bpm>] [--beats <beatsperbar>] [--instrument <name>] [--scene <name>] [--config <name>]\n", progname);
+    printf("Usage: %s [--help] [--metronome] [--drum-pattern <pattern>] [--drum-track <track>] [--tempo <bpm>] [--beats <beatsperbar>] [--instrument <name>] [--scene <name>] [--config <name>]\n", progname);
     exit(0);
 }
 
@@ -104,6 +105,7 @@ int main(int argc, char *argv[])
     const char *scene_name = NULL;
     const char *effect_module_name = NULL;
     const char *drum_pattern_name = NULL;
+    const char *drum_track_name = NULL;
     char *instr_section = NULL;
     struct cbox_scene *scene = NULL;
     int metronome = 0;
@@ -132,6 +134,9 @@ int main(int argc, char *argv[])
                 break;
             case 'd':
                 drum_pattern_name = optarg;
+                break;
+            case 'D':
+                drum_track_name = optarg;
                 break;
             case 'm':
                 metronome = 1;
@@ -202,6 +207,8 @@ int main(int argc, char *argv[])
     cbox_master_set_timesig(app.rt->master, bpb, 4);
     if (drum_pattern_name)
         cbox_rt_set_pattern(app.rt, cbox_midi_pattern_load_drum(drum_pattern_name), 0);
+    else if (drum_track_name)
+        cbox_rt_set_pattern(app.rt, cbox_midi_pattern_load_drum_track(drum_track_name), 0);
     else if (metronome)
         cbox_rt_set_pattern(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->timesig_nom), 0);
 

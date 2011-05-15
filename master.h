@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <stdint.h>
 
-#define PPQN 24
+#define PPQN 48
 
 
 enum cbox_master_transport_state
