@@ -29,6 +29,7 @@ struct cbox_layer
     uint8_t high_note;
     int8_t transpose;
     int8_t fixed_note;
+    int disable_aftertouch;
 };
 
 extern struct cbox_layer *cbox_layer_new(const char *name);

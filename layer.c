@@ -64,6 +64,7 @@ struct cbox_layer *cbox_layer_load(const char *name)
     l->fixed_note = cbox_config_get_int(section, "fixed_note", -1);
     l->in_channel = cbox_config_get_int(section, "in_channel", 0) - 1;
     l->out_channel = cbox_config_get_int(section, "out_channel", 0) - 1;
+    l->disable_aftertouch = !cbox_config_get_int(section, "aftertouch", 1);
     
     g_free(section);
     
@@ -96,6 +97,7 @@ extern struct cbox_layer *cbox_layer_new(const char *module_name)
     l->fixed_note = -1;
     l->in_channel = -1;
     l->out_channel = -1;
+    l->disable_aftertouch = 0;
     
     return l;
 

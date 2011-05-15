@@ -114,6 +114,8 @@ int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbo
                     data[0] = (data[0] & 0xF0) + (lp->out_channel & 0x0F);
                 if (cmd >= 8 && cmd <= 10)
                 {
+                    if (cmd == 10 && lp->disable_aftertouch)
+                        continue;
                     // note filter
                     if (data[1] < lp->low_note || data[1] > lp->high_note)
                         continue;
@@ -131,6 +133,8 @@ int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbo
                         data[1] = (uint8_t)lp->fixed_note;
                     }
                 }
+                else if (cmd == 13 && lp->disable_aftertouch)
+                    continue;
             }
             if (!cbox_midi_buffer_write_event(&lp->instrument->module->midi_input, event->time, data, event->size))
                 return -i;
