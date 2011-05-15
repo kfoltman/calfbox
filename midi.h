@@ -78,6 +78,8 @@ extern int cbox_midi_buffer_write_event(struct cbox_midi_buffer *buffer, uint32_
 
 extern int cbox_midi_buffer_copy_event(struct cbox_midi_buffer *buffer, const struct cbox_midi_event *event, int ofs);
 
+extern void cbox_midi_buffer_merge(struct cbox_midi_buffer *output, struct cbox_midi_buffer **inputs, int count, int *positions);
+
 extern int note_from_string(const char *note);
 
 #endif
