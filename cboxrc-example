@@ -63,3 +63,205 @@ device=DSP24
 
 [soundcard:Intel]
 device=Intel
+
+[drumpattern:pat1]
+title=Straight - Verse
+beats=4
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+bd_trigger=9... .... 9.6. ....
+sd_trigger=.... 9..5 .2.. 9...
+hh_trigger=9353 7353 7353 73.3
+ho_trigger=.... .... .... ..3.
+
+[drumpattern:pat1fill]
+title=Straight - Fill
+beats=4
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+bd_trigger=9... .... 9.6. ....
+sd_trigger=..64 9..5 .2.7 99.9
+hh_trigger=9353 7353 7353 73.3
+ho_trigger=.... .... .... ..3.
+
+[drumpattern:pat2]
+title=Enigma - Verse
+beats=4
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+bd_trigger=9..7 ..7. ..6. ....
+sd_trigger=.... 9... .... 9...
+hh_trigger=9353 7353 7353 7353
+ho_trigger=.... .... ..3. ....
+
+[drumpattern:pat2fill]
+title=Enigma - Fill
+beats=4
+resolution=4
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+track5=ht
+track6=mt
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+ht_note=d2
+mt_note=b1
+bd_trigger=9..7 ..7. ..6. ....
+sd_trigger=.... 9... .... 9..9
+hh_trigger=9353 7353 7353 7353
+ho_trigger=.... .... ..3. ....
+ht_trigger=.5.. .... ...7 ....
+mt_trigger=.... ...5 .... ..5.
+
+[drumpattern:pat3]
+title=Shuffle - Verse
+beats=4
+swing=6
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+track5=ht
+track6=mt
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+ht_note=d2
+mt_note=b1
+bd_trigger=9.8. ...8 ..6. ....
+sd_trigger=.... 94.4 .54. 9...
+hh_trigger=9353 7353 7353 7353
+ho_trigger=.... .... .... ....
+ht_trigger=.... .... .... ....
+mt_trigger=.... .... .... ....
+
+[drumpattern:pat3fill]
+title=Shuffle - Fill
+beats=4
+swing=6
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+track5=ht
+track6=mt
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+ht_note=d2
+mt_note=b1
+bd_trigger=9.8. ...8 ..6. ....
+sd_trigger=.... 9... F... 9..9
+hh_trigger=9353 7353 7353 7353
+ho_trigger=.... .... .... ....
+ht_trigger=.... .... ..9. .5..
+mt_trigger=.... .... ...7 ..7.
+
+[drumpattern:pat4]
+title=Swing
+beats=4
+resolution=3
+track1=bd
+track2=sd
+track3=hp
+track4=rc
+track5=rb
+bd_note=c1
+sd_note=d1
+hp_note=g#1
+rc_note=d#2
+rb_note=f2
+bd_trigger=... ... ... ..3
+sd_trigger=... ..3 ..2 .3.
+hp_trigger=... 6.. ... 6..
+rc_trigger=2.. ..4 4.. ..3
+rb_trigger=3.. ... 3.. ...
+
+[drumpattern:pat4fill]
+title=Swing
+beats=4
+resolution=3
+track1=bd
+track2=sd
+track3=hp
+track4=rc
+track5=rb
+bd_note=c1
+sd_note=d1
+hp_note=g#1
+rc_note=d#2
+rb_note=f2
+bd_trigger=7.. 5.. ... ..5
+sd_trigger=..5 ..3 .25 43.
+hp_trigger=... 6.. ... 6..
+rc_trigger=2.. ..4 4.. ...
+rb_trigger=4.. ... 2.. ...
+
+[drumpattern:crash]
+title=Crash cymbal
+beats=4
+track1=cc
+cc_note=c#2
+cc_trigger=9...
+
+[drumpattern:crash2]
+title=Kick+crash cymbal
+beats=4
+track1=cc
+track2=bd
+cc_note=a#2
+bd_note=b0
+cc_trigger=5...
+bd_trigger=5...
+
+[drumtrack:trk1]
+title=Straight
+pos1=pat1,crash
+pos2=pat1
+pos3=pat1
+pos4=pat1fill
+
+[drumtrack:trk2]
+title=Enigma
+pos1=pat2,crash
+pos2=pat2
+pos3=pat2
+pos4=pat2fill
+
+[drumtrack:trk3]
+title=Shuffle
+pos1=pat3,crash
+pos2=pat3
+pos3=pat3
+pos4=pat3fill
+
+[drumtrack:trk4]
+title=Swing
+pos1=pat4,crash2
+pos2=pat4
+pos3=pat4
+pos4=pat4fill
