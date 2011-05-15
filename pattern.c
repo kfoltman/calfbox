@@ -75,3 +75,10 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(float bpm, int ts, int
 
     return p;
 }
+
+void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern)
+{
+    if (pattern->event_count)
+        free(pattern->events);
+    free(pattern);
+}

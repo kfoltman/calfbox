@@ -428,6 +428,8 @@ struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scen
 
 void cbox_rt_destroy(struct cbox_rt *rt)
 {
+    if (rt->mpb.pattern)
+        cbox_midi_pattern_destroy(rt->mpb.pattern);
     jack_ringbuffer_free(rt->rb_execute);
     jack_ringbuffer_free(rt->rb_cleanup);
     free(rt);

@@ -221,21 +221,28 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_pattern *pattern)
+{
+    struct cbox_midi_pattern *old = cbox_rt_set_pattern(rt, pattern);
+    if (old)
+        cbox_midi_pattern_destroy(old);
+}
+
 int cmd_pattern_none(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern(app.rt, NULL);
+    cbox_rt_set_pattern_and_destroy(app.rt, NULL);
     return 0;
 }
 
 int cmd_pattern_simple(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->tempo, 1, cbox_io_get_sample_rate(&app.io)));
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->tempo, 1, cbox_io_get_sample_rate(&app.io)));
     return 0;
 }
 
 int cmd_pattern_normal(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->tempo, app.rt->master->timesig_nom, cbox_io_get_sample_rate(&app.io)));
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->tempo, app.rt->master->timesig_nom, cbox_io_get_sample_rate(&app.io)));
     return 0;
 }
 
