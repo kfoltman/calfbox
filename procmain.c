@@ -47,7 +47,6 @@ struct cbox_rt *cbox_rt_new()
     rt->mpb.pattern = NULL;
     rt->mpb.pos = 0;
     rt->mpb.time = 0;
-    rt->play_pattern = 0;
     rt->master = malloc(sizeof(struct cbox_master));
     cbox_master_init(rt->master);
     return rt;
@@ -156,7 +155,7 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     {
         struct cbox_midi_buffer midibuf_jack, midibuf_pattern, midibuf_total, *midibufsrcs[2];
         cbox_midi_buffer_init(&midibuf_total);
-        if (!rt->play_pattern)
+        if (!rt->mpb.pattern)
             convert_midi_from_jack(io->midi, nframes, &midibuf_total);
         else
         {
@@ -367,6 +366,37 @@ void cbox_rt_cmd_execute_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition
     // will be cleaned up by next sync call or by cbox_rt_cmd_handle_queue
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+
+struct set_pattern_command
+{
+    struct cbox_rt *rt;
+    struct cbox_midi_pattern *new_pattern, *old_pattern;
+};
+
+static int set_pattern_command_execute(void *user_data)
+{
+    struct set_pattern_command *cmd = user_data;
+    
+    cmd->old_pattern = cmd->rt->mpb.pattern;
+    cmd->rt->mpb.pattern = cmd->new_pattern;
+    
+    return 1;
+}
+
+struct cbox_midi_pattern *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern)
+{
+    static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = set_pattern_command_execute, .cleanup = NULL };
+    
+    struct set_pattern_command cmd = { rt, pattern, NULL };
+    
+    cbox_rt_cmd_execute_sync(rt, &def, &cmd);
+    
+    return cmd.old_pattern;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 struct set_scene_command
 {
     struct cbox_rt *rt;
@@ -394,6 +424,7 @@ struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scen
     return sc.old_scene;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
 
 void cbox_rt_destroy(struct cbox_rt *rt)
 {
