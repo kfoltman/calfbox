@@ -549,6 +549,7 @@ static void stream_player_load_cleanup(void *p)
 {
     struct load_command_data *c = p;
     
+    cbox_execute_on(&app.cmd_target, "/print_s", "s", "Load completed");
     g_free(c->filename);
     if (c->old_stream && c->old_stream != c->stream)
         stream_state_destroy(c->old_stream);
