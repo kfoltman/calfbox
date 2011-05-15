@@ -120,7 +120,11 @@ static void config_key_process(void *user_data, const char *key)
     
     if (!strncmp(key, data->prefix, strlen(data->prefix)))
     {
-        cbox_menu_add_item(data->menu, cbox_menu_item_new_command(key, data->func, strdup(key + strlen(data->prefix))));
+        char *title = cbox_config_get_string(key, "title");
+        if (title)
+            cbox_menu_add_item(data->menu, cbox_menu_item_new_command(title, data->func, strdup(key + strlen(data->prefix))));
+        else
+            cbox_menu_add_item(data->menu, cbox_menu_item_new_command(key, data->func, strdup(key + strlen(data->prefix))));
     }
 }
 
@@ -246,6 +250,18 @@ int cmd_pattern_normal(struct cbox_menu_item_command *item, void *context)
     return 0;
 }
 
+int cmd_load_drumpattern(struct cbox_menu_item_command *item, void *context)
+{
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_drum(item->item.item_context));
+    return 0;
+}
+
+int cmd_load_drumtrack(struct cbox_menu_item_command *item, void *context)
+{
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_drum_track(item->item.item_context));
+    return 0;
+}
+
 struct cbox_menu *create_pattern_menu(struct cbox_menu_item_menu *item, void *menu_context)
 {
     struct cbox_menu *menu = cbox_menu_new();
@@ -255,6 +271,15 @@ struct cbox_menu *create_pattern_menu(struct cbox_menu_item_menu *item, void *me
     cbox_menu_add_item(menu, cbox_menu_item_new_command("No pattern", cmd_pattern_none, NULL));
     cbox_menu_add_item(menu, cbox_menu_item_new_command("Simple metronome", cmd_pattern_simple, NULL));
     cbox_menu_add_item(menu, cbox_menu_item_new_command("Normal metronome", cmd_pattern_normal, NULL));
+
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Drum tracks", NULL, NULL));
+    cb.prefix = "drumtrack:";
+    cb.func = cmd_load_drumtrack;
+    cbox_config_foreach_section(config_key_process, &cb);
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Drum patterns", NULL, NULL));
+    cb.prefix = "drumpattern:";
+    cb.func = cmd_load_drumpattern;
+    cbox_config_foreach_section(config_key_process, &cb);
 
     cbox_menu_add_item(menu, cbox_menu_item_new_menu("OK", NULL, NULL));    
     
