@@ -150,15 +150,25 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     float *out_l = jack_port_get_buffer(io->output_l, nframes);
     float *out_r = jack_port_get_buffer(io->output_r, nframes);
 
-    struct cbox_midi_buffer midibuf;
-    cbox_midi_buffer_init(&midibuf);
     if (scene)
     {
+        struct cbox_midi_buffer midibuf_jack, midibuf_pattern, midibuf_total, *midibufsrcs[2];
+        cbox_midi_buffer_init(&midibuf_total);
         if (!rt->play_pattern)
-            convert_midi_from_jack(io->midi, nframes, &midibuf);
+            convert_midi_from_jack(io->midi, nframes, &midibuf_total);
         else
-            cbox_read_pattern(&rt->mpb, &midibuf, nframes);
-        write_events_to_instrument_ports(&midibuf, scene);
+        {
+            struct cbox_midi_buffer midibuf_jack, midibuf_pattern, *midibufsrcs[2];
+            int pos[2] = {0, 0};
+            cbox_midi_buffer_init(&midibuf_jack);
+            cbox_midi_buffer_init(&midibuf_pattern);
+            convert_midi_from_jack(io->midi, nframes, &midibuf_jack);
+            cbox_read_pattern(&rt->mpb, &midibuf_pattern, nframes);
+            midibufsrcs[0] = &midibuf_jack;
+            midibufsrcs[1] = &midibuf_pattern;
+            cbox_midi_buffer_merge(&midibuf_total, midibufsrcs, 2, pos);
+        }
+        write_events_to_instrument_ports(&midibuf_total, scene);
     }
     
     for (i = 0; i < nframes; i ++)
