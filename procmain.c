@@ -44,6 +44,10 @@ struct cbox_rt *cbox_rt_new()
     rt->rb_execute = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS);
     rt->rb_cleanup = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS * 2);
     rt->io = NULL;
+    rt->mpb.pattern = cbox_midi_pattern_new();
+    rt->mpb.pos = 0;
+    rt->mpb.time = 0;
+    rt->play_pattern = 0;
     return rt;
 }
 
@@ -127,7 +131,12 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     float *out_r = jack_port_get_buffer(io->output_r, nframes);
 
     if (scene)
-        convert_midi_from_jack(io->midi, nframes, scene);
+    {
+        if (!rt->play_pattern)
+            convert_midi_from_jack(io->midi, nframes, scene);
+        else
+            cbox_read_pattern(&rt->mpb, &scene->layers[0]->instrument->module->midi_input, nframes);
+    }
     
     for (i = 0; i < nframes; i ++)
     {

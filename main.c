@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:e:s:h";
+static const char *short_options = "i:c:e:s:ph";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
@@ -46,12 +46,13 @@ static struct option long_options[] = {
     {"scene", 1, 0, 's'},
     {"effect", 1, 0, 'e'},
     {"config", 1, 0, 'c'},
+    {"pattern", 0, 0, 'p'},
     {0,0,0,0},
 };
 
 void print_help(char *progname)
 {
-    printf("Usage: %s [--help] [--instrument <name>] [--scene <name>] [--config <name>]\n", progname);
+    printf("Usage: %s [--help] [--pattern] [--instrument <name>] [--scene <name>] [--config <name>]\n", progname);
     exit(0);
 }
 
@@ -101,6 +102,7 @@ int main(int argc, char *argv[])
     const char *effect_module_name = NULL;
     char *instr_section = NULL;
     struct cbox_scene *scene = NULL;
+    int play_pattern = 0;
     
     while(1)
     {
@@ -121,6 +123,9 @@ int main(int argc, char *argv[])
                 break;
             case 'e':
                 effect_module_name = optarg;
+                break;
+            case 'p':
+                play_pattern = 1;
                 break;
             case 'h':
             case '?':
@@ -174,6 +179,7 @@ int main(int argc, char *argv[])
             goto fail;
         }
     }
+    app.rt->play_pattern = play_pattern;
 
     cbox_rt_start(app.rt, &app.io);
     cbox_master_play(app.rt->master);
