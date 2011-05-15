@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:e:s:ph";
+static const char *short_options = "i:c:e:s:t:mh";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
@@ -46,13 +46,14 @@ static struct option long_options[] = {
     {"scene", 1, 0, 's'},
     {"effect", 1, 0, 'e'},
     {"config", 1, 0, 'c'},
-    {"pattern", 0, 0, 'p'},
+    {"metronome", 0, 0, 'm'},
+    {"tempo", 1, 0, 't'},
     {0,0,0,0},
 };
 
 void print_help(char *progname)
 {
-    printf("Usage: %s [--help] [--pattern] [--instrument <name>] [--scene <name>] [--config <name>]\n", progname);
+    printf("Usage: %s [--help] [--metronome] [--tempo <bpm>] [--instrument <name>] [--scene <name>] [--config <name>]\n", progname);
     exit(0);
 }
 
@@ -103,6 +104,7 @@ int main(int argc, char *argv[])
     char *instr_section = NULL;
     struct cbox_scene *scene = NULL;
     int play_pattern = 0;
+    float tempo = 120.0;
     
     while(1)
     {
@@ -124,8 +126,11 @@ int main(int argc, char *argv[])
             case 'e':
                 effect_module_name = optarg;
                 break;
-            case 'p':
+            case 'm':
                 play_pattern = 1;
+                break;
+            case 't':
+                tempo = atof(optarg);
                 break;
             case 'h':
             case '?':
@@ -179,6 +184,7 @@ int main(int argc, char *argv[])
             goto fail;
         }
     }
+    cbox_master_set_tempo(app.rt->master, tempo);
     if (play_pattern)
         app.rt->mpb.pattern = cbox_midi_pattern_new_metronome(app.rt->master->tempo, cbox_io_get_sample_rate(&app.io));
     app.rt->play_pattern = play_pattern;

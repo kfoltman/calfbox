@@ -49,6 +49,7 @@ struct cbox_bbt
 
 extern void cbox_master_init(struct cbox_master *master);
 extern void cbox_master_set_sample_rate(struct cbox_master *master, int srate);
+extern void cbox_master_set_tempo(struct cbox_master *master, float tempo);
 extern void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt);
 extern uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct cbox_bbt *bbt);
 extern void cbox_master_play(struct cbox_master *master);

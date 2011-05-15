@@ -28,9 +28,14 @@ void cbox_master_init(struct cbox_master *master)
     master->state = CMTS_STOP;
 }
 
-extern void cbox_master_set_sample_rate(struct cbox_master *master, int srate)
+void cbox_master_set_sample_rate(struct cbox_master *master, int srate)
 {
     master->srate = srate;
+}
+
+void cbox_master_set_tempo(struct cbox_master *master, float tempo)
+{
+    master->tempo = tempo;
 }
 
 void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt)
