@@ -38,13 +38,13 @@ void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_b
             pb->time -= loop_end; // may be negative, but that's OK
         }
         const struct cbox_midi_event *src = &pb->pattern->events[pb->pos];
-        int32_t tshift = -pb->time;
         if (src->time >= pb->time + nsamples)
             break;
-        if (src->time < pb->time) // convert negative relative time to 0 time
-            tshift = -src->time;
+        int32_t time = 0;
+        if (src->time >= pb->time) // convert negative relative time to 0 time
+            time = src->time - pb->time;
         
-        cbox_midi_buffer_copy_event(buf, src, tshift);
+        cbox_midi_buffer_copy_event(buf, src, time);
         pb->pos++;
     }
     pb->time += nsamples;

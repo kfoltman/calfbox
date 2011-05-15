@@ -84,7 +84,7 @@ static inline int midi_cmd_size(uint8_t cmd)
 
 extern int cbox_midi_buffer_write_event(struct cbox_midi_buffer *buffer, uint32_t time, uint8_t *data, uint32_t size);
 
-extern int cbox_midi_buffer_copy_event(struct cbox_midi_buffer *buffer, const struct cbox_midi_event *event, int ofs);
+extern int cbox_midi_buffer_copy_event(struct cbox_midi_buffer *buffer, const struct cbox_midi_event *event, int new_time);
 
 extern void cbox_midi_buffer_merge(struct cbox_midi_buffer *output, struct cbox_midi_buffer **inputs, int count, int *positions);
 

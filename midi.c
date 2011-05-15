@@ -43,7 +43,7 @@ int cbox_midi_buffer_write_event(struct cbox_midi_buffer *buffer, uint32_t time,
     return 1;
 }
 
-int cbox_midi_buffer_copy_event(struct cbox_midi_buffer *buffer, const struct cbox_midi_event *event, int ofs)
+int cbox_midi_buffer_copy_event(struct cbox_midi_buffer *buffer, const struct cbox_midi_event *event, int new_time)
 {
     struct cbox_midi_event *evt;
     
@@ -52,7 +52,7 @@ int cbox_midi_buffer_copy_event(struct cbox_midi_buffer *buffer, const struct cb
     if (event->size > 4 && event->size > CBOX_MIDI_MAX_LONG_DATA - buffer->long_data_size)
         return 0;
     evt = &buffer->events[buffer->count++];
-    evt->time = event->time + ofs;
+    evt->time = new_time;
     evt->size = event->size;
     if (event->size <= 4)
     {
@@ -110,7 +110,7 @@ void cbox_midi_buffer_merge(struct cbox_midi_buffer *output, struct cbox_midi_bu
         }
         if (first_event)
         {
-            cbox_midi_buffer_copy_event(output, first_event, 0);
+            cbox_midi_buffer_copy_event(output, first_event, first_event->time);
             positions[first_event_input]++;
         }
         else
