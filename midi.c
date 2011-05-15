@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config-api.h"
 #include "midi.h"
 
 int cbox_midi_buffer_write_event(struct cbox_midi_buffer *buffer, uint32_t time, uint8_t *data, uint32_t size)
@@ -116,3 +117,12 @@ void cbox_midi_buffer_merge(struct cbox_midi_buffer *output, struct cbox_midi_bu
             break;
     }
 }
+
+int cbox_config_get_note(const char *cfg_section, const char *key, int def_value)
+{
+    const char *cv = cbox_config_get_string(cfg_section, key);
+    if (cv)
+        return note_from_string(cv);
+    return def_value;
+}
+

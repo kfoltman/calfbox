@@ -550,14 +550,6 @@ static struct sampler_waveform *load_waveform(const char *context_name, const ch
     return waveform;
 }
 
-static int cbox_config_get_note(const char *cfg_section, const char *key, int def_value)
-{
-    const char *cv = cbox_config_get_string(cfg_section, key);
-    if (cv)
-        return note_from_string(cv);
-    return def_value;
-}
-
 static void cbox_config_get_adsr(const char *cfg_section, const char *prefix, struct cbox_adsr *adsr)
 {
     gchar *v;

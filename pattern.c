@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config-api.h"
 #include "pattern.h"
 
 #include <glib.h>
@@ -54,20 +55,24 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(float bpm, int ts, int
     int length = (int)(srate * 60 / bpm);
     p->event_count = 2 * ts;
     p->events = malloc(sizeof(struct cbox_midi_event[1]) * p->event_count);
+    int channel = cbox_config_get_int("metronome", "channel", 10);
+    int accnote = cbox_config_get_note("metronome", "note_accent", 37);
+    int note = cbox_config_get_note("metronome", "note", 37);
     
     for (int i = 0; i < ts; i++)
     {
         int e = 2 * i;
+        int accent = !i && ts != 1;
         p->events[e].time = length * i;
         p->events[e].size = 3;
-        p->events[e].data_inline[0] = 0x99;
-        p->events[e].data_inline[1] = 37;
-        p->events[e].data_inline[2] = i ? 100 : 127;
+        p->events[e].data_inline[0] = 0x90 + channel - 1;
+        p->events[e].data_inline[1] = accent ? accnote : note;
+        p->events[e].data_inline[2] = accent ? 100 : 127;
 
         p->events[e + 1].time = length * i + 1;
         p->events[e + 1].size = 3;
-        p->events[e + 1].data_inline[0] = 0x89;
-        p->events[e + 1].data_inline[1] = 37;
+        p->events[e + 1].data_inline[0] = 0x80 + channel - 1;
+        p->events[e + 1].data_inline[1] = accent ? accnote : note;
         p->events[e + 1].data_inline[2] = 0;
     }
     

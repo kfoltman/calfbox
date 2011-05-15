@@ -82,4 +82,6 @@ extern void cbox_midi_buffer_merge(struct cbox_midi_buffer *output, struct cbox_
 
 extern int note_from_string(const char *note);
 
+extern int cbox_config_get_note(const char *cfg_section, const char *key, int def_value);
+
 #endif
