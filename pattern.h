@@ -35,7 +35,7 @@ struct cbox_midi_pattern_playback
     int time;
 };
 
-extern struct cbox_midi_pattern *cbox_pattern_new();
+extern struct cbox_midi_pattern *cbox_midi_pattern_new();
 
 extern void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int nsamples);
 
