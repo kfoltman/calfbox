@@ -153,7 +153,7 @@ static struct cbox_command_target *find_module_target(const char *type)
     for (int i = 0; i < scene->instrument_count; i++)
     {
         if (!strcmp(scene->instruments[i]->engine_name, type))
-            return &scene->instruments[0]->module->cmd_target;
+            return &scene->instruments[i]->module->cmd_target;
     }
     return NULL;
     
