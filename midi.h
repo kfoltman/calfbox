@@ -98,6 +98,30 @@ static inline int cbox_midi_buffer_write_event(struct cbox_midi_buffer *buffer, 
     return 1;
 }
 
+static inline int cbox_midi_buffer_copy_event(struct cbox_midi_buffer *buffer, const struct cbox_midi_event *event, int ofs)
+{
+    struct cbox_midi_event *evt;
+    
+    if (buffer->count >= CBOX_MIDI_MAX_EVENTS)
+        return 0;
+    if (event->size > 4 && event->size > CBOX_MIDI_MAX_LONG_DATA - buffer->long_data_size)
+        return 0;
+    evt = &buffer->events[buffer->count++];
+    evt->time = event->time + ofs;
+    evt->size = event->size;
+    if (event->size <= 4)
+    {
+        memcpy(evt->data_inline, event->data_inline, event->size);
+    }
+    else
+    {
+        evt->data_ext = buffer->long_data + buffer->long_data_size;
+        memcpy(evt->data_ext, event->data_ext, event->size);
+        buffer->long_data_size += event->size;
+    }
+    return 1;
+}
+
 static inline int note_from_string(const char *note)
 {
     static const int semis[] = {9, 11, 0, 2, 4, 5, 7};
