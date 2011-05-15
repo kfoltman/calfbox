@@ -113,6 +113,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_drum(const char *name)
     
     int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
     int channel = cbox_config_get_int(cfg_section, "channel", 10);
+    int gswing = cbox_config_get_int(cfg_section, "swing", 0);
     
     for (int t = 1; ; t++)
     {
@@ -126,6 +127,9 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_drum(const char *name)
             g_free(tname);
             tname = g_strdup_printf("%s_res", trkname);
             int res = cbox_config_get_note(cfg_section, tname, 4);
+            g_free(tname);
+            tname = g_strdup_printf("%s_swing", trkname);
+            int swing = cbox_config_get_int(cfg_section, tname, gswing);
             g_free(tname);
             tname = g_strdup_printf("%s_trigger", trkname);
             const char *trigger = cbox_config_get_string(cfg_section, tname);
@@ -141,6 +145,8 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_drum(const char *name)
                 {
                     int amt = (trigger[i] - '0') * 127 / 9;
                     int pos = t * PPQN / res;
+                    if (t & 1)
+                        pos += PPQN * swing / (res * 24);
                     cbox_midi_pattern_maker_add(m, pos, 0x90 + channel - 1, note, amt);
                     cbox_midi_pattern_maker_add(m, pos + 1, 0x80 + channel - 1, note, 0);
                     t++;
