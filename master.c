@@ -38,6 +38,12 @@ void cbox_master_set_tempo(struct cbox_master *master, float tempo)
     master->tempo = tempo;
 }
 
+void cbox_master_set_timesig(struct cbox_master *master, int beats, int unit)
+{
+    master->timesig_nom = beats;
+    master->timesig_denom = unit;
+}
+
 void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt)
 {
     double second = ((double)master->song_pos_samples) / master->srate;

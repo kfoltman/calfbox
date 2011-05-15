@@ -48,25 +48,30 @@ void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_b
     pb->time += nsamples;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(float bpm, int srate)
+struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(float bpm, int ts, int srate)
 {
     struct cbox_midi_pattern *p = malloc(sizeof(struct cbox_midi_pattern));
     int length = (int)(srate * 60 / bpm);
-    p->event_count = 2;
+    p->event_count = 2 * ts;
     p->events = malloc(sizeof(struct cbox_midi_event[1]) * p->event_count);
-    p->events[0].time = 0;
-    p->events[0].size = 3;
-    p->events[0].data_inline[0] = 0x99;
-    p->events[0].data_inline[1] = 37;
-    p->events[0].data_inline[2] = 127;
-
-    p->events[1].time = 1;
-    p->events[1].size = 3;
-    p->events[1].data_inline[0] = 0x89;
-    p->events[1].data_inline[1] = 37;
-    p->events[1].data_inline[2] = 0;
     
-    p->loop_end = length;
+    for (int i = 0; i < ts; i++)
+    {
+        int e = 2 * i;
+        p->events[e].time = length * i;
+        p->events[e].size = 3;
+        p->events[e].data_inline[0] = 0x99;
+        p->events[e].data_inline[1] = 37;
+        p->events[e].data_inline[2] = i ? 100 : 127;
+
+        p->events[e + 1].time = length * i + 1;
+        p->events[e + 1].size = 3;
+        p->events[e + 1].data_inline[0] = 0x89;
+        p->events[e + 1].data_inline[1] = 37;
+        p->events[e + 1].data_inline[2] = 0;
+    }
+    
+    p->loop_end = length * ts;
 
     return p;
 }

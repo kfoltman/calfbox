@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:e:s:t:mh";
+static const char *short_options = "i:c:e:s:t:b:mh";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
@@ -48,12 +48,13 @@ static struct option long_options[] = {
     {"config", 1, 0, 'c'},
     {"metronome", 0, 0, 'm'},
     {"tempo", 1, 0, 't'},
+    {"beats", 1, 0, 'b'},
     {0,0,0,0},
 };
 
 void print_help(char *progname)
 {
-    printf("Usage: %s [--help] [--metronome] [--tempo <bpm>] [--instrument <name>] [--scene <name>] [--config <name>]\n", progname);
+    printf("Usage: %s [--help] [--metronome] [--tempo <bpm>] [--beats <beatsperbar>] [--instrument <name>] [--scene <name>] [--config <name>]\n", progname);
     exit(0);
 }
 
@@ -104,6 +105,7 @@ int main(int argc, char *argv[])
     char *instr_section = NULL;
     struct cbox_scene *scene = NULL;
     int play_pattern = 0;
+    int bpb = 4;
     float tempo = 120.0;
     
     while(1)
@@ -128,6 +130,9 @@ int main(int argc, char *argv[])
                 break;
             case 'm':
                 play_pattern = 1;
+                break;
+            case 'b':
+                bpb = atoi(optarg);
                 break;
             case 't':
                 tempo = atof(optarg);
@@ -185,8 +190,9 @@ int main(int argc, char *argv[])
         }
     }
     cbox_master_set_tempo(app.rt->master, tempo);
+    cbox_master_set_timesig(app.rt->master, bpb, 4);
     if (play_pattern)
-        app.rt->mpb.pattern = cbox_midi_pattern_new_metronome(app.rt->master->tempo, cbox_io_get_sample_rate(&app.io));
+        app.rt->mpb.pattern = cbox_midi_pattern_new_metronome(app.rt->master->tempo, app.rt->master->timesig_nom, cbox_io_get_sample_rate(&app.io));
     app.rt->play_pattern = play_pattern;
 
     cbox_rt_start(app.rt, &app.io);
