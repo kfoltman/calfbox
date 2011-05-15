@@ -147,6 +147,8 @@ struct cbox_menu *create_scene_menu(struct cbox_menu_item_menu *item, void *menu
     return scene_menu;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 static struct cbox_command_target *find_module_target(const char *type)
 {
     struct cbox_scene *scene = app.rt->scene;
@@ -217,12 +219,48 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
     return menu;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+int cmd_pattern_none(struct cbox_menu_item_command *item, void *context)
+{
+    cbox_rt_set_pattern(app.rt, NULL);
+    return 0;
+}
+
+int cmd_pattern_simple(struct cbox_menu_item_command *item, void *context)
+{
+    cbox_rt_set_pattern(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->tempo, 1, cbox_io_get_sample_rate(&app.io)));
+    return 0;
+}
+
+int cmd_pattern_normal(struct cbox_menu_item_command *item, void *context)
+{
+    cbox_rt_set_pattern(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->tempo, app.rt->master->timesig_nom, cbox_io_get_sample_rate(&app.io)));
+    return 0;
+}
+
+struct cbox_menu *create_pattern_menu(struct cbox_menu_item_menu *item, void *menu_context)
+{
+    struct cbox_menu *menu = cbox_menu_new();
+    struct cbox_config_section_cb_data cb = { .menu = menu };
+
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Pattern commands", NULL, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("No pattern", cmd_pattern_none, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Simple metronome", cmd_pattern_simple, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Normal metronome", cmd_pattern_normal, NULL));
+
+    cbox_menu_add_item(menu, cbox_menu_item_new_menu("OK", NULL, NULL));    
+    
+    return menu;
+}
+
 struct cbox_menu *create_main_menu()
 {
     struct cbox_menu *main_menu = cbox_menu_new();
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Current scene:", scene_format_value, NULL));
     cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Set scene", create_scene_menu, NULL));
     cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Module control", create_stream_menu, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Pattern control", create_pattern_menu, NULL));
     
     cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Variables", NULL, NULL));
     // cbox_menu_add_item(main_menu, cbox_menu_item_new_int("foo:", &var1, 0, 127, NULL));
