@@ -70,6 +70,7 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
         g_error("Failed to load the default bank %s", bankname);
         return NULL;
     }
+    g_message("Soundfont %s loaded", bankname);
     m->sfid = result;
     fluid_synth_set_reverb_on(m->synth, cbox_config_get_int(cfg_section, "reverb", 1));
     fluid_synth_set_chorus_on(m->synth, cbox_config_get_int(cfg_section, "chorus", 1));
