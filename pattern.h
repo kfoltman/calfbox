@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_PATTERN_H
 #define CBOX_PATTERN_H
 
+#include "master.h"
 #include "midi.h"
 
 struct cbox_midi_pattern
@@ -31,11 +32,12 @@ struct cbox_midi_pattern
 struct cbox_midi_pattern_playback
 {
     struct cbox_midi_pattern *pattern;
+    struct cbox_master *master;
     int pos;
     int time;
 };
 
-extern struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(float bpm, int ts, int srate);
+extern struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts, int srate);
 
 extern void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int nsamples);
 

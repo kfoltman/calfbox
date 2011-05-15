@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
     cbox_master_set_tempo(app.rt->master, tempo);
     cbox_master_set_timesig(app.rt->master, bpb, 4);
     if (play_pattern)
-        cbox_rt_set_pattern(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->tempo, app.rt->master->timesig_nom, cbox_io_get_sample_rate(&app.io)));
+        cbox_rt_set_pattern(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->timesig_nom, cbox_io_get_sample_rate(&app.io)));
 
     cbox_rt_start(app.rt, &app.io);
     cbox_master_play(app.rt->master);

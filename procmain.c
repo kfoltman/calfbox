@@ -44,11 +44,12 @@ struct cbox_rt *cbox_rt_new()
     rt->rb_execute = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS);
     rt->rb_cleanup = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS * 2);
     rt->io = NULL;
-    rt->mpb.pattern = NULL;
-    rt->mpb.pos = 0;
-    rt->mpb.time = 0;
     rt->master = malloc(sizeof(struct cbox_master));
     cbox_master_init(rt->master);
+    rt->mpb.pattern = NULL;
+    rt->mpb.master = rt->master;
+    rt->mpb.pos = 0;
+    rt->mpb.time = 0;
     return rt;
 }
 

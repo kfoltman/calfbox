@@ -22,10 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <glib.h>
 
+int ppqn_to_samples(struct cbox_master *master, int time)
+{
+    return (int)(master->srate * 60.0 * time / (master->tempo * PPQN));
+}
+
 void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int nsamples)
 {
     cbox_midi_buffer_clear(buf);
-    int loop_end = pb->pattern->loop_end;
+    int loop_end = ppqn_to_samples(pb->master, pb->pattern->loop_end);
     while(1)
     {
         if (pb->pos >= pb->pattern->event_count)
@@ -38,11 +43,12 @@ void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_b
             pb->time -= loop_end; // may be negative, but that's OK
         }
         const struct cbox_midi_event *src = &pb->pattern->events[pb->pos];
-        if (src->time >= pb->time + nsamples)
+        int srctime = ppqn_to_samples(pb->master, src->time);
+        if (srctime >= pb->time + nsamples)
             break;
         int32_t time = 0;
-        if (src->time >= pb->time) // convert negative relative time to 0 time
-            time = src->time - pb->time;
+        if (srctime >= pb->time) // convert negative relative time to 0 time
+            time = srctime - pb->time;
         
         cbox_midi_buffer_copy_event(buf, src, time);
         pb->pos++;
@@ -50,11 +56,11 @@ void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_b
     pb->time += nsamples;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(float bpm, int ts, int srate)
+struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts, int srate)
 {
     struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
     
-    int length = (int)(srate * 60 / bpm);
+    int length = PPQN;
     int channel = cbox_config_get_int("metronome", "channel", 10);
     int accnote = cbox_config_get_note("metronome", "note_accent", 37);
     int note = cbox_config_get_note("metronome", "note", 37);
