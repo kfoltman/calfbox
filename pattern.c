@@ -82,6 +82,15 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts, int srate)
     return p;
 }
 
+void cbox_midi_pattern_playback_seek(struct cbox_midi_pattern_playback *pb, int time_ppqn)
+{
+    int pos = 0;
+    while (pos < pb->pattern->event_count && time_ppqn > pb->pattern->events[pos].time)
+        pos++;
+    pb->time = ppqn_to_samples(pb->master, time_ppqn);
+    pb->pos = pos;
+}
+
 void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern)
 {
     if (pattern->event_count)

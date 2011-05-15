@@ -373,6 +373,7 @@ struct set_pattern_command
 {
     struct cbox_rt *rt;
     struct cbox_midi_pattern *new_pattern, *old_pattern;
+    int new_time_ppqn;
 };
 
 static int set_pattern_command_execute(void *user_data)
@@ -381,15 +382,17 @@ static int set_pattern_command_execute(void *user_data)
     
     cmd->old_pattern = cmd->rt->mpb.pattern;
     cmd->rt->mpb.pattern = cmd->new_pattern;
+    if (cmd->new_pattern)
+        cbox_midi_pattern_playback_seek(&cmd->rt->mpb, cmd->new_time_ppqn);
     
     return 1;
 }
 
-struct cbox_midi_pattern *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern)
+struct cbox_midi_pattern *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos)
 {
     static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = set_pattern_command_execute, .cleanup = NULL };
     
-    struct set_pattern_command cmd = { rt, pattern, NULL };
+    struct set_pattern_command cmd = { rt, pattern, NULL, new_pos };
     
     cbox_rt_cmd_execute_sync(rt, &def, &cmd);
     

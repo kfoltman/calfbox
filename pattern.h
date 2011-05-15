@@ -43,4 +43,7 @@ extern void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox
 
 extern void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern);
 
+extern void cbox_midi_pattern_playback_seek(struct cbox_midi_pattern_playback *pb, int time_ppqn);
+
+
 #endif

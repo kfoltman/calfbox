@@ -65,7 +65,7 @@ extern void cbox_rt_cmd_execute_async(struct cbox_rt *rt, struct cbox_rt_cmd_def
 
 // These use an RT command internally
 extern struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scene);
-extern struct cbox_midi_pattern *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern);
+extern struct cbox_midi_pattern *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos);
 
 extern void cbox_rt_destroy(struct cbox_rt *rt);
 
