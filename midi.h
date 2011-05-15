@@ -74,6 +74,14 @@ static inline uint8_t *cbox_midi_event_get_data(struct cbox_midi_event *evt)
     return evt->size > 4 ? evt->data_ext : evt->data_inline;
 }
 
+static inline int midi_cmd_size(uint8_t cmd)
+{
+    static const int sizes[] = { 3, 3, 3, 3, 2, 2, 3, 1 };
+    if (cmd < 128)
+        return 0;
+    return sizes[(cmd >> 4) - 8];
+}
+
 extern int cbox_midi_buffer_write_event(struct cbox_midi_buffer *buffer, uint32_t time, uint8_t *data, uint32_t size);
 
 extern int cbox_midi_buffer_copy_event(struct cbox_midi_buffer *buffer, const struct cbox_midi_event *event, int ofs);

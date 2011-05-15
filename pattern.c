@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config-api.h"
 #include "pattern.h"
+#include "pattern-maker.h"
 
 #include <glib.h>
 
@@ -51,10 +52,9 @@ void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_b
 
 struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(float bpm, int ts, int srate)
 {
-    struct cbox_midi_pattern *p = malloc(sizeof(struct cbox_midi_pattern));
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
+    
     int length = (int)(srate * 60 / bpm);
-    p->event_count = 2 * ts;
-    p->events = malloc(sizeof(struct cbox_midi_event[1]) * p->event_count);
     int channel = cbox_config_get_int("metronome", "channel", 10);
     int accnote = cbox_config_get_note("metronome", "note_accent", 37);
     int note = cbox_config_get_note("metronome", "note", 37);
@@ -63,20 +63,15 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(float bpm, int ts, int
     {
         int e = 2 * i;
         int accent = !i && ts != 1;
-        p->events[e].time = length * i;
-        p->events[e].size = 3;
-        p->events[e].data_inline[0] = 0x90 + channel - 1;
-        p->events[e].data_inline[1] = accent ? accnote : note;
-        p->events[e].data_inline[2] = accent ? 100 : 127;
-
-        p->events[e + 1].time = length * i + 1;
-        p->events[e + 1].size = 3;
-        p->events[e + 1].data_inline[0] = 0x80 + channel - 1;
-        p->events[e + 1].data_inline[1] = accent ? accnote : note;
-        p->events[e + 1].data_inline[2] = 0;
+        cbox_midi_pattern_maker_add(m, length * i, 0x90 + channel - 1, accent ? accnote : note, accent ? 100 : 127);
+        cbox_midi_pattern_maker_add(m, length * i + 1, 0x80 + channel - 1, accent ? accnote : note, 0);
     }
     
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m);
+    
     p->loop_end = length * ts;
+    
+    cbox_midi_pattern_maker_destroy(m);
 
     return p;
 }
