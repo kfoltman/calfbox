@@ -37,7 +37,9 @@ struct cbox_midi_pattern_playback
     int time;
 };
 
-extern struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts, int srate);
+extern struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts);
+
+extern struct cbox_midi_pattern *cbox_midi_pattern_load_drum(const char *name);
 
 extern void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int nsamples);
 

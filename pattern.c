@@ -56,7 +56,7 @@ void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_b
     pb->time += nsamples;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts, int srate)
+struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts)
 {
     struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
     
@@ -96,4 +96,69 @@ void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern)
     if (pattern->event_count)
         free(pattern->events);
     free(pattern);
+}
+
+struct cbox_midi_pattern *cbox_midi_pattern_load_drum(const char *name)
+{
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
+    
+    gchar *cfg_section = g_strdup_printf("drumpattern:%s", name);
+    
+    if (!cbox_config_has_section(cfg_section))
+    {
+        g_error("Drum pattern '%s' not found", name);
+        g_free(cfg_section);
+        return NULL;
+    }
+    
+    int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
+    int channel = cbox_config_get_int(cfg_section, "channel", 10);
+    
+    for (int t = 1; ; t++)
+    {
+        gchar *tname = g_strdup_printf("track%d", t);
+        char *trkname = cbox_config_get_string(cfg_section, tname);
+        g_free(tname);
+        if (trkname)
+        {
+            tname = g_strdup_printf("%s_note", trkname);
+            int note = cbox_config_get_note(cfg_section, tname, -1);
+            g_free(tname);
+            tname = g_strdup_printf("%s_res", trkname);
+            int res = cbox_config_get_note(cfg_section, tname, 4);
+            g_free(tname);
+            tname = g_strdup_printf("%s_trigger", trkname);
+            const char *trigger = cbox_config_get_string(cfg_section, tname);
+            g_free(tname);
+            if (!trigger || note == -1)
+            {
+                g_error("Invalid track %s", trkname);
+            }
+            int t = 0;
+            for (int i = 0; trigger[i]; i++)
+            {
+                if (trigger[i] >= '1' && trigger[i] <= '9')
+                {
+                    int amt = (trigger[i] - '0') * 127 / 9;
+                    int pos = t * PPQN / res;
+                    cbox_midi_pattern_maker_add(m, pos, 0x90 + channel - 1, note, amt);
+                    cbox_midi_pattern_maker_add(m, pos + 1, 0x80 + channel - 1, note, 0);
+                    t++;
+                }
+                if (trigger[i] == '.')
+                    t++;
+            }
+        }
+        else
+            break;
+    }
+    
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m);    
+    p->loop_end = length;
+    
+    cbox_midi_pattern_maker_destroy(m);
+    
+    g_free(cfg_section);
+
+    return p;
 }
