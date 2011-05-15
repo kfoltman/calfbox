@@ -18,14 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "master.h"
 
-void cbox_master_init(struct cbox_master *master, int srate)
+void cbox_master_init(struct cbox_master *master)
 {
     master->song_pos_samples = 0;
-    master->srate = srate;
+    master->srate = 0;
     master->tempo = 120.0;
     master->timesig_nom = 4;
     master->timesig_denom = 4;
     master->state = CMTS_STOP;
+}
+
+extern void cbox_master_set_sample_rate(struct cbox_master *master, int srate)
+{
+    master->srate = srate;
 }
 
 void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt)

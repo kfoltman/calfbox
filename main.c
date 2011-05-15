@@ -179,6 +179,8 @@ int main(int argc, char *argv[])
             goto fail;
         }
     }
+    if (play_pattern)
+        app.rt->mpb.pattern = cbox_midi_pattern_new_metronome(app.rt->master->tempo, cbox_io_get_sample_rate(&app.io));
     app.rt->play_pattern = play_pattern;
 
     cbox_rt_start(app.rt, &app.io);

@@ -44,10 +44,12 @@ struct cbox_rt *cbox_rt_new()
     rt->rb_execute = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS);
     rt->rb_cleanup = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS * 2);
     rt->io = NULL;
-    rt->mpb.pattern = cbox_midi_pattern_new();
+    rt->mpb.pattern = NULL;
     rt->mpb.pos = 0;
     rt->mpb.time = 0;
     rt->play_pattern = 0;
+    rt->master = malloc(sizeof(struct cbox_master));
+    cbox_master_init(rt->master);
     return rt;
 }
 
@@ -273,8 +275,7 @@ void cbox_rt_start(struct cbox_rt *rt, struct cbox_io *io)
     rt->cbs = malloc(sizeof(struct cbox_io_callbacks));
     rt->cbs->user_data = rt;
     rt->cbs->process = cbox_rt_process;
-    rt->master = malloc(sizeof(struct cbox_master));
-    cbox_master_init(rt->master, jack_get_sample_rate(io->client));
+    cbox_master_set_sample_rate(rt->master, jack_get_sample_rate(io->client));
 
     cbox_io_start(io, rt->cbs);        
 }
