@@ -152,12 +152,26 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
                 }
                 if (trigger[i] == 'F') // flam
                 {
-                    int amt = 110;
-                    int dflam = 4;
-                    cbox_midi_pattern_maker_add(m, pos - dflam, 0x90 + channel - 1, note, 60);
+                    int dflam = PPQN / 4;
+                    int rnd = rand() & 7;
+                    dflam += rnd / 2;
+                    cbox_midi_pattern_maker_add(m, pos - dflam, 0x90 + channel - 1, note, 90+rnd);
                     cbox_midi_pattern_maker_add(m, pos - dflam + 1, 0x80 + channel - 1, note, 0);
-                    cbox_midi_pattern_maker_add(m, pos , 0x90 + channel - 1, note, 127);
+                    cbox_midi_pattern_maker_add(m, pos , 0x90 + channel - 1, note, 120 + rnd);
                     cbox_midi_pattern_maker_add(m, pos + 1, 0x80 + channel - 1, note, 0);
+                    t++;
+                }
+                if (trigger[i] == 'D') // drag
+                {
+                    pos = (t + 1) * PPQN / res + start_pos;
+                    //if (!(t & 1))
+                    //    pos += PPQN * swing / (res * 24);
+                    float dflam = PPQN/8.0;
+                    int rnd = rand() & 7;
+                    cbox_midi_pattern_maker_add(m, pos - dflam*2, 0x90 + channel - 1, note, 70+rnd);
+                    cbox_midi_pattern_maker_add(m, pos - dflam*2 + 1, 0x80 + channel - 1, note, 0);
+                    cbox_midi_pattern_maker_add(m, pos - dflam, 0x90 + channel - 1, note, 60+rnd);
+                    cbox_midi_pattern_maker_add(m, pos - dflam + 1, 0x80 + channel - 1, note, 0);
                     t++;
                 }
                 else if (trigger[i] == '.')
