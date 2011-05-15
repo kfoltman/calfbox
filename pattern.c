@@ -63,7 +63,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(float bpm, int ts, int
     {
         int e = 2 * i;
         int accent = !i && ts != 1;
-        cbox_midi_pattern_maker_add(m, length * i, 0x90 + channel - 1, accent ? accnote : note, accent ? 100 : 127);
+        cbox_midi_pattern_maker_add(m, length * i, 0x90 + channel - 1, accent ? accnote : note, accent ? 127 : 100);
         cbox_midi_pattern_maker_add(m, length * i + 1, 0x80 + channel - 1, accent ? accnote : note, 0);
     }
     
