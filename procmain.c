@@ -51,19 +51,13 @@ struct cbox_rt *cbox_rt_new()
     return rt;
 }
 
-int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_scene *scene)
+int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_midi_buffer *destination)
 {
     void *midi = jack_port_get_buffer(port, nframes);
-    uint32_t i;
-    int l;
     uint32_t event_count = jack_midi_get_event_count(midi);
-    int ok = 1;
 
-    for (i = 0; i < scene->instrument_count; i++)
-    {
-        cbox_midi_buffer_clear(&scene->instruments[i]->module->midi_input);
-    }
-    for (i = 0; i < event_count; i++)
+    cbox_midi_buffer_clear(destination);
+    for (uint32_t i = 0; i < event_count; i++)
     {
         jack_midi_event_t event;
         
@@ -73,46 +67,72 @@ int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_scen
             if (event.size >= 4)
                 continue;
             
-            for (l = 0; l < scene->layer_count; l++)
-            {
-                struct cbox_layer *lp = scene->layers[l];
-                uint8_t data[4];
-                memcpy(data, event.buffer, event.size);
-                if (data[0] < 0xF0) // per-channel messages
-                {
-                    int cmd = data[0] >> 4;
-                    // filter on MIDI channel
-                    if (lp->in_channel >= 0 && lp->in_channel != (data[0] & 0x0F))
-                        continue;
-                    // force output channel
-                    if (lp->out_channel >= 0)
-                        data[0] = (data[0] & 0xF0) + (lp->out_channel & 0x0F);
-                    if (cmd >= 8 && cmd <= 10)
-                    {
-                        // note filter
-                        if (data[1] < lp->low_note || data[1] > lp->high_note)
-                            continue;
-                        // transpose
-                        if (lp->transpose)
-                        {
-                            int note = data[1] + lp->transpose;
-                            if (note < 0 || note > 127)
-                                continue;
-                            data[1] = (uint8_t)note;
-                        }
-                        // fixed note
-                        if (lp->fixed_note != -1)
-                        {
-                            data[1] = (uint8_t)lp->fixed_note;
-                        }
-                    }
-                }
-                if (!cbox_midi_buffer_write_event(&lp->instrument->module->midi_input, event.time, data, event.size))
-                    return -i;
-            }
+            uint8_t data[4];
+            memcpy(data, event.buffer, event.size);
+            if (!cbox_midi_buffer_write_event(destination, event.time, data, event.size))
+                return -i;
         }
         else
             return -i;
+    }
+    
+    return event_count;
+}
+
+int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbox_scene *scene)
+{
+    uint32_t i;
+    uint32_t event_count = cbox_midi_buffer_get_count(source);
+
+    for (i = 0; i < scene->instrument_count; i++)
+    {
+        cbox_midi_buffer_clear(&scene->instruments[i]->module->midi_input);
+    }
+    for (i = 0; i < event_count; i++)
+    {
+        struct cbox_midi_event *event = cbox_midi_buffer_get_event(source, i);
+        
+        // XXXKF ignore sysex for now
+        if (event->size >= 4)
+            continue;
+        
+        for (int l = 0; l < scene->layer_count; l++)
+        {
+            struct cbox_layer *lp = scene->layers[l];
+            uint8_t data[4] = {0, 0, 0, 0};
+            memcpy(data, event->data_inline, event->size);
+            if (data[0] < 0xF0) // per-channel messages
+            {
+                int cmd = data[0] >> 4;
+                // filter on MIDI channel
+                if (lp->in_channel >= 0 && lp->in_channel != (data[0] & 0x0F))
+                    continue;
+                // force output channel
+                if (lp->out_channel >= 0)
+                    data[0] = (data[0] & 0xF0) + (lp->out_channel & 0x0F);
+                if (cmd >= 8 && cmd <= 10)
+                {
+                    // note filter
+                    if (data[1] < lp->low_note || data[1] > lp->high_note)
+                        continue;
+                    // transpose
+                    if (lp->transpose)
+                    {
+                        int note = data[1] + lp->transpose;
+                        if (note < 0 || note > 127)
+                            continue;
+                        data[1] = (uint8_t)note;
+                    }
+                    // fixed note
+                    if (lp->fixed_note != -1)
+                    {
+                        data[1] = (uint8_t)lp->fixed_note;
+                    }
+                }
+            }
+            if (!cbox_midi_buffer_write_event(&lp->instrument->module->midi_input, event->time, data, event->size))
+                return -i;
+        }
     }
     
     return event_count;
@@ -130,12 +150,15 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     float *out_l = jack_port_get_buffer(io->output_l, nframes);
     float *out_r = jack_port_get_buffer(io->output_r, nframes);
 
+    struct cbox_midi_buffer midibuf;
+    cbox_midi_buffer_init(&midibuf);
     if (scene)
     {
         if (!rt->play_pattern)
-            convert_midi_from_jack(io->midi, nframes, scene);
+            convert_midi_from_jack(io->midi, nframes, &midibuf);
         else
-            cbox_read_pattern(&rt->mpb, &scene->layers[0]->instrument->module->midi_input, nframes);
+            cbox_read_pattern(&rt->mpb, &midibuf, nframes);
+        write_events_to_instrument_ports(&midibuf, scene);
     }
     
     for (i = 0; i < nframes; i ++)
