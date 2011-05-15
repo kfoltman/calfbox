@@ -105,8 +105,8 @@ int main(int argc, char *argv[])
     char *instr_section = NULL;
     struct cbox_scene *scene = NULL;
     int play_pattern = 0;
-    int bpb = 4;
-    float tempo = 120.0;
+    int bpb = 0;
+    float tempo = 0;
     
     while(1)
     {
@@ -146,6 +146,10 @@ int main(int argc, char *argv[])
 
     app.rt = cbox_rt_new();
     cbox_config_init(config_name);
+    if (tempo < 1)
+        tempo = cbox_config_get_float("master", "tempo", 120);
+    if (bpb < 1)
+        bpb = cbox_config_get_int("master", "beats_per_bar", 4);
 
     if (!cbox_io_init(&app.io, &params))
     {
