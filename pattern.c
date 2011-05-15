@@ -207,13 +207,32 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_drum_track(const char *name)
         g_free(pname);
         if (patname)
         {
+            int tplen = 0;
+            char *comma = strchr(patname, ',');
+            while(comma)
+            {
+                char *v = g_strndup(patname, comma - patname);
+                patname = comma + 1;
+                comma = strchr(patname, ',');
+                int plen = cbox_midi_pattern_load_drum_into(m, v, length); 
+                g_free(v);
+                if (plen < 0)
+                {
+                    cbox_midi_pattern_maker_destroy(m);
+                    return NULL;
+                }
+                if (plen > tplen)
+                    tplen = plen;
+            }
             int plen = cbox_midi_pattern_load_drum_into(m, patname, length); 
             if (plen < 0)
             {
                 cbox_midi_pattern_maker_destroy(m);
                 return NULL;
             }
-            length += plen;
+            if (plen > tplen)
+                tplen = plen;
+            length += tplen;
         }
         else
             break;
