@@ -206,9 +206,9 @@ int main(int argc, char *argv[])
     cbox_master_set_tempo(app.rt->master, tempo);
     cbox_master_set_timesig(app.rt->master, bpb, 4);
     if (drum_pattern_name)
-        cbox_rt_set_pattern(app.rt, cbox_midi_pattern_load_drum(drum_pattern_name), 0);
+        cbox_rt_set_pattern(app.rt, cbox_midi_pattern_load(drum_pattern_name, 1), 0);
     else if (drum_track_name)
-        cbox_rt_set_pattern(app.rt, cbox_midi_pattern_load_drum_track(drum_track_name), 0);
+        cbox_rt_set_pattern(app.rt, cbox_midi_pattern_load_track(drum_track_name, 1), 0);
     else if (metronome)
         cbox_rt_set_pattern(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->timesig_nom), 0);
 
