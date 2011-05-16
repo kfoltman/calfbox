@@ -33,7 +33,7 @@ struct cbox_menu_state
 {
     struct cbox_menu_page *page;
     struct cbox_menu *menu;
-    int cursor;
+    int cursor, yoffset, yspace;
     struct cbox_menu_measure size;
     WINDOW *window;
     void *context;

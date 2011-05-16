@@ -47,9 +47,12 @@ static void item_destroy(struct cbox_menu_item *item)
 
 static void item_draw(struct cbox_menu_item *item, struct cbox_menu_state *state, gchar *value, int hilited)
 {
+    int y = item->y - state->yoffset;
+    if (y < 1 || y > state->yspace)
+        return;
     if (hilited)
         wattron(state->window, A_REVERSE);
-    mvwprintw(state->window, item->y, item->x, "%-*s %*s", state->size.label_width, item->label, state->size.value_width, value);
+    mvwprintw(state->window, item->y - state->yoffset, item->x, "%-*s %*s", state->size.label_width, item->label, state->size.value_width, value);
     wattroff(state->window, A_REVERSE);
 }
 
@@ -83,14 +86,17 @@ struct cbox_menu_item_class menu_item_class_command = {
 
 void static_draw(struct cbox_menu_item *item, struct cbox_menu_state *state, gchar *value, int hilited)
 {
+    int y = item->y - state->yoffset;
+    if (y < 1 || y > state->yspace)
+        return;
     if (!value)
     {
         wattron(state->window, A_BOLD);
-        mvwprintw(state->window, item->y, item->x, "%-*s", state->size.label_width + state->size.value_width, item->label);
+        mvwprintw(state->window, y, item->x, "%-*s", state->size.label_width + state->size.value_width, item->label);
         wattroff(state->window, A_BOLD);
     }
     else
-        mvwprintw(state->window, item->y, item->x, "%-*s %*s", state->size.label_width, item->label, state->size.value_width, value);
+        mvwprintw(state->window, y, item->x, "%-*s %*s", state->size.label_width, item->label, state->size.value_width, value);
 }
 
 static gchar *static_format(const struct cbox_menu_item *item, struct cbox_menu_state *state)

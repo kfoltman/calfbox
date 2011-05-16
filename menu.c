@@ -102,6 +102,7 @@ void cbox_menu_state_size(struct cbox_menu_state *menu_state)
     menu_state->size.label_width = 0;
     menu_state->size.value_width = 0;
     menu_state->size.height = 0;
+    menu_state->yspace = getmaxy(menu_state->window) - 2;
     
     for (i = 0; i < menu->items->len; i++)
     {
@@ -151,6 +152,7 @@ struct cbox_menu_state *cbox_menu_state_new(struct cbox_menu_page *page, struct 
     st->page = page;
     st->menu = menu;
     st->cursor = 0;
+    st->yoffset = 0;
     st->window = window;
     st->context = context;
     st->caller = NULL;
@@ -214,6 +216,27 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
             pos--;
         if (pos >= 0)
             st->cursor = pos;
+        if (ch == KEY_END)
+        {
+            st->yoffset = st->size.height - st->yspace;
+            if (st->yoffset < 0)
+                st->yoffset = 0;
+        }
+        else
+        if (pos >= 0 && pos < menu->items->len)
+        {
+            int npos = st->cursor;
+            int count = 0;
+            // show up to 2 disabled items above
+            while(npos >= 1 && !cbox_menu_is_item_enabled(menu, npos - 1) && count < 2)
+            {
+                npos--;
+                count++;
+            }
+            item = g_ptr_array_index(menu->items, npos);
+            if (item->y < 1 + st->yoffset)
+                st->yoffset = item->y - 1;
+        }
         cbox_menu_state_draw(st);
         return 0;
     case KEY_HOME:
@@ -223,6 +246,14 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
             pos++;
         if (pos < menu->items->len)
             st->cursor = pos;
+        if (ch == KEY_HOME)
+            st->yoffset = 0;
+        else if (pos >= 0 && pos < menu->items->len)
+        {
+            item = g_ptr_array_index(menu->items, st->cursor);
+            if (item->y - 1 - st->yoffset >= st->yspace)
+                st->yoffset = item->y - st->yspace;
+        }
         cbox_menu_state_draw(st);
         return 0;
     }
