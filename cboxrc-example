@@ -64,6 +64,20 @@ device=DSP24
 [soundcard:Intel]
 device=Intel
 
+[pattern:walkingminor]
+title=Walking-minor
+beats=4
+resolution=1
+track1=bass
+bass_channel=2
+bass_vel=80
+bass_notes=c1,d1,eb1,g1
+
+[track:two]
+title=Cm/Ebm
+pos1=walkingminor
+pos2=walkingminor+3
+
 [drumpattern:pat1]
 title=Straight - Verse
 beats=4
