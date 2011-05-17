@@ -221,6 +221,154 @@ hp_trigger=... 6.. ... 6..
 rc_trigger=2.. ..4 4.. ...
 rb_trigger=4.. ... 2.. ...
 
+[drumpattern:pat5]
+title=6/8 Blues - Verse
+beats=4
+resolution=3
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+bd_trigger=7.. ... 7.. .44
+sd_trigger=... 8.. ... 8..
+hh_trigger=7.5 6.4 7.5 6..
+ho_trigger=... ... ... ..3
+
+[drumpattern:pat5fill]
+title=6/8 Blues - Fill
+beats=4
+resolution=3
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+track5=ht
+track6=mt
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+ht_note=d2
+mt_note=b1
+bd_trigger=7.. ... ... ..4
+sd_trigger=... 8.D 75. 85.
+hh_trigger=7.5 6.. 7.. ...
+ho_trigger=.3. ... ... ...
+ht_trigger=... ... ..7 ...
+mt_trigger=... ... ... ..5
+
+[drumpattern:pat6]
+title=Pompopom - Verse
+beats=4
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+bd_trigger=9.97 ...9 .996 ....
+sd_trigger=.... 9... .... 9...
+hh_trigger=9.7. 7.7. 9.7. 7.7.
+ho_trigger=.... .3.. .... ....
+
+[drumpattern:pat6fill]
+title=Pompopom - Fill
+beats=4
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+bd_trigger=9..7 ...9 .9.6 ....
+sd_trigger=.6.. 9.7. ..7D 97.9
+hh_trigger=9.7. 7.7. 9.7. 7.7.
+ho_trigger=.... .3.. .... ....
+
+[drumpattern:pat7]
+title=Rockish
+beats=4
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+bd_trigger=98.6 ...7 .95. ....
+sd_trigger=.... 9... .... 9..D
+hh_trigger=7.5. 7.5. 7.5. 7.5.
+ho_trigger=...3 .... .... ....
+
+[drumpattern:pat7fill]
+title=Rockish - Fill
+beats=4
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+track5=mt
+track6=ht
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+mt_note=b1
+ht_note=d2
+bd_trigger=98.6 ...7 .95. ....
+sd_trigger=.... 9..7 ..9. 9..9
+hh_trigger=7.5. 7.5. 7.5. 7.5.
+ho_trigger=.5.3 .... .... ....
+mt_trigger=.... .... .... ..8.
+ht_trigger=.... .... ...9 ....
+
+[drumpattern:pat8]
+title=80s - Verse
+beats=4
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+bd_trigger=96.. ..96 ..6. ....
+sd_trigger=.... 9... .... 9...
+hh_trigger=7.7. 7.7. 7.7. 7.7.
+ho_trigger=.... .... .... ....
+
+[drumpattern:pat8fill]
+title=80s - Fill
+beats=4
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+track5=mt
+track6=ht
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+mt_note=b1
+ht_note=d2
+bd_trigger=96.. ..96 ..6. ....
+sd_trigger=..7. 9... 7.7. 9...
+hh_trigger=7.7. 7.7. 7.7. 7...
+ho_trigger=.... .... .... ....
+ht_trigger=.... .... .9.. .97.
+mt_trigger=.... .... ...7 ...5
+
 [drumpattern:crash]
 title=Crash cymbal
 beats=4
@@ -265,3 +413,31 @@ pos1=pat4,crash2
 pos2=pat4
 pos3=pat4
 pos4=pat4fill
+
+[drumtrack:trk5]
+title=6/8 Blues
+pos1=pat5,crash
+pos2=pat5
+pos3=pat5
+pos4=pat5fill
+
+[drumtrack:trk6]
+title=Pompopom
+pos1=pat6,crash
+pos2=pat6
+pos3=pat6
+pos4=pat6fill
+
+[drumtrack:trk7]
+title=Rockish
+pos1=pat7,crash
+pos2=pat7
+pos3=pat7
+pos4=pat7fill
+
+[drumtrack:trk8]
+title=80s
+pos1=pat8,crash
+pos2=pat8
+pos3=pat8
+pos4=pat8fill
