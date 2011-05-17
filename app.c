@@ -252,13 +252,25 @@ int cmd_pattern_normal(struct cbox_menu_item_command *item, void *context)
 
 int cmd_load_drumpattern(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_drum(item->item.item_context));
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(item->item.item_context, 1));
     return 0;
 }
 
 int cmd_load_drumtrack(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_drum_track(item->item.item_context));
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(item->item.item_context, 1));
+    return 0;
+}
+
+int cmd_load_pattern(struct cbox_menu_item_command *item, void *context)
+{
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(item->item.item_context, 0));
+    return 0;
+}
+
+int cmd_load_track(struct cbox_menu_item_command *item, void *context)
+{
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(item->item.item_context, 0));
     return 0;
 }
 
@@ -276,9 +288,20 @@ struct cbox_menu *create_pattern_menu(struct cbox_menu_item_menu *item, void *me
     cb.prefix = "drumtrack:";
     cb.func = cmd_load_drumtrack;
     cbox_config_foreach_section(config_key_process, &cb);
+    
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Melodic tracks", NULL, NULL));
+    cb.prefix = "track:";
+    cb.func = cmd_load_track;
+    cbox_config_foreach_section(config_key_process, &cb);
+    
     cbox_menu_add_item(menu, cbox_menu_item_new_static("Drum patterns", NULL, NULL));
     cb.prefix = "drumpattern:";
     cb.func = cmd_load_drumpattern;
+    cbox_config_foreach_section(config_key_process, &cb);
+
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Melodic patterns", NULL, NULL));
+    cb.prefix = "pattern:";
+    cb.func = cmd_load_pattern;
     cbox_config_foreach_section(config_key_process, &cb);
 
     cbox_menu_add_item(menu, cbox_menu_item_new_menu("OK", NULL, NULL));    

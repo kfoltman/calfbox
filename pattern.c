@@ -98,6 +98,97 @@ void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern)
     free(pattern);
 }
 
+static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m, const char *name, int start_pos, int transpose)
+{
+    gchar *cfg_section = g_strdup_printf("pattern:%s", name);
+    
+    if (!cbox_config_has_section(cfg_section))
+    {
+        g_error("Melodic pattern '%s' not found", name);
+        g_free(cfg_section);
+        return -1;
+    }
+    
+    int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
+    int gchannel = cbox_config_get_int(cfg_section, "channel", 1);
+    int gswing = cbox_config_get_int(cfg_section, "swing", 0);
+    int gres = cbox_config_get_int(cfg_section, "resolution", 4);
+    
+    for (int t = 1; ; t++)
+    {
+        gchar *tname = g_strdup_printf("track%d", t);
+        char *trkname = cbox_config_get_string(cfg_section, tname);
+        g_free(tname);
+        if (trkname)
+        {
+            tname = g_strdup_printf("%s_vel", trkname);
+            int vel = cbox_config_get_note(cfg_section, tname, 100);
+            g_free(tname);
+            tname = g_strdup_printf("%s_res", trkname);
+            int res = cbox_config_get_note(cfg_section, tname, gres);
+            g_free(tname);
+            tname = g_strdup_printf("%s_channel", trkname);
+            int channel = cbox_config_get_note(cfg_section, tname, gchannel);
+            g_free(tname);
+            tname = g_strdup_printf("%s_swing", trkname);
+            int swing = cbox_config_get_int(cfg_section, tname, gswing);
+            g_free(tname);
+            tname = g_strdup_printf("%s_notes", trkname);
+            const char *notes = cbox_config_get_string(cfg_section, tname);
+            g_free(tname);
+            if (!notes)
+            {
+                g_error("Invalid track %s", trkname);
+            }
+            const char *s = notes;
+            int i = 0, t = 0;
+            while(1)
+            {
+                if (!*s)
+                    break;
+                
+                gchar *note;
+                const char *comma = strchr(s, ',');
+                if (comma)
+                {
+                    note = g_strndup(s, comma - s);
+                    s = comma + 1;
+                }
+                else
+                {
+                    note = g_strdup(s);
+                    s += strlen(s);
+                }
+                
+                if (*note)
+                {
+                    int pitch = note_from_string(note);
+                    
+                    int pos = t * PPQN / res + start_pos;
+                    if (t & 1)
+                        pos += PPQN * swing / (res * 24);
+                    
+                    int pos2 = (t + 1) * PPQN / res + start_pos;
+                    if (t & 1)
+                        pos2 += PPQN * swing / (res * 24);
+                    
+                    pitch += transpose;
+
+                    cbox_midi_pattern_maker_add(m, pos, 0x90 + channel - 1, pitch, vel);
+                    cbox_midi_pattern_maker_add(m, pos2 - 1, 0x80 + channel - 1, pitch, 0);                
+                }
+                t++;
+            }
+        }
+        else
+            break;
+    }
+    
+    g_free(cfg_section);
+    
+    return length;
+}
+
 static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, const char *name, int start_pos)
 {
     gchar *cfg_section = g_strdup_printf("drumpattern:%s", name);
@@ -187,11 +278,15 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
     return length;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_load_drum(const char *name)
+struct cbox_midi_pattern *cbox_midi_pattern_load(const char *name, int is_drum)
 {
     struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
     
-    int length = cbox_midi_pattern_load_drum_into(m, name, 0);
+    int length = 0;
+    if (is_drum)
+        length = cbox_midi_pattern_load_drum_into(m, name, 0);
+    else
+        length = cbox_midi_pattern_load_melodic_into(m, name, 0, 0);
     struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m);    
     p->loop_end = length;
     
@@ -200,12 +295,12 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_drum(const char *name)
     return p;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_load_drum_track(const char *name)
+struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_drum)
 {
     int length = 0;
     struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
     
-    gchar *cfg_section = g_strdup_printf("drumtrack:%s", name);
+    gchar *cfg_section = g_strdup_printf(is_drum ? "drumtrack:%s" : "track:%s", name);
     
     if (!cbox_config_has_section(cfg_section))
     {
@@ -223,12 +318,26 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_drum_track(const char *name)
         {
             int tplen = 0;
             char *comma = strchr(patname, ',');
-            while(comma)
+            while(*patname)
             {
-                char *v = g_strndup(patname, comma - patname);
-                patname = comma + 1;
-                comma = strchr(patname, ',');
-                int plen = cbox_midi_pattern_load_drum_into(m, v, length); 
+                char *v = comma ? g_strndup(patname, comma - patname) : g_strdup(patname);
+                patname = comma ? comma + 1 : patname + strlen(patname);
+                
+                int xpval = 0;
+                if (!is_drum)
+                {
+                    char *xp = strchr(v, '+');
+                    if (xp)
+                    {
+                        *xp = '\0';
+                        xpval = atoi(xp + 1);
+                    }
+                }
+                int plen = 0;
+                if (is_drum)
+                    plen = cbox_midi_pattern_load_drum_into(m, v, length); 
+                else
+                    plen = cbox_midi_pattern_load_melodic_into(m, v, length, xpval); 
                 g_free(v);
                 if (plen < 0)
                 {
@@ -237,15 +346,9 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_drum_track(const char *name)
                 }
                 if (plen > tplen)
                     tplen = plen;
+                if (*patname)
+                    comma = strchr(patname, ',');
             }
-            int plen = cbox_midi_pattern_load_drum_into(m, patname, length); 
-            if (plen < 0)
-            {
-                cbox_midi_pattern_maker_destroy(m);
-                return NULL;
-            }
-            if (plen > tplen)
-                tplen = plen;
             length += tplen;
         }
         else
