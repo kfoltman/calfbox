@@ -136,7 +136,7 @@ void tonewheel_organ_process_event(struct cbox_module *module, const uint8_t *da
     }
 }
 
-inline int check_keymask(uint64_t keymasks, int note)
+static inline int check_keymask(uint64_t keymasks, int note)
 {
     if (note < 0 || note > 127)
         return 0;
@@ -147,7 +147,7 @@ inline int check_keymask(uint64_t keymasks, int note)
     return 0;
 }
 
-inline int tonegenidx_pedals(int note, int shift)
+static inline int tonegenidx_pedals(int note, int shift)
 {
     if (note < 24 || note > 24 + 11)
         return 91;
@@ -156,7 +156,7 @@ inline int tonegenidx_pedals(int note, int shift)
     return note + shift;
 }
 
-inline int tonegenidx(int note, int shift)
+static inline int tonegenidx(int note, int shift)
 {
     // ignore everything below the lowest key
     if (note < 36)

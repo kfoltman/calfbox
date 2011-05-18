@@ -26,12 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 typedef float cbox_sample_t;
 
-inline float hz2w(float hz, float sr)
+static inline float hz2w(float hz, float sr)
 {
     return M_PI * hz / (2 * sr);
 }
 
-inline float cerp_naive(float v0, float v1, float v2, float v3, float f)
+static inline float cerp_naive(float v0, float v1, float v2, float v3, float f)
 {
     float x0 = -1;
     float x1 = 0;
@@ -46,7 +46,7 @@ inline float cerp_naive(float v0, float v1, float v2, float v3, float f)
     return v0 * l0 + v1 * l1 + v2 * l2 + v3 * l3;
 }
 
-inline float cerp(float v0, float v1, float v2, float v3, float f)
+static inline float cerp(float v0, float v1, float v2, float v3, float f)
 {
     f += 1;
     
@@ -68,21 +68,21 @@ inline float cerp(float v0, float v1, float v2, float v3, float f)
     return y;
 }
 
-inline float sanef(float v)
+static inline float sanef(float v)
 {
     if (fabs(v) < (1.0 / (65536.0 * 65536.0)))
         return 0;
     return v;
 }
 
-inline void sanebf(float *buf)
+static inline void sanebf(float *buf)
 {
     int i;
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
         buf[i] = sanef(buf[i]);
 }
 
-inline void copybf(float *to, float *from)
+static inline void copybf(float *to, float *from)
 {
     memcpy(to, from, sizeof(float) * CBOX_BLOCK_SIZE);
 }
