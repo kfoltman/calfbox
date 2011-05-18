@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "envelope.h"
 #include "midi.h"
 #include "module.h"
+#include "sfzparser.h"
 #include <glib.h>
 #include <math.h>
 #include <memory.h>
@@ -571,16 +572,16 @@ static void cbox_config_get_adsr(const char *cfg_section, const char *prefix, st
     g_free(v);
 }
 
-void sampler_init_layer(struct sampler_module *m, struct sampler_layer *l, struct sampler_waveform *waveform)
+void sampler_layer_init(struct sampler_layer *l)
 {
-    l->sample_data = waveform->data;
+    l->sample_data = NULL;
     l->sample_offset = 0;
-    l->freq = waveform->info.samplerate ? waveform->info.samplerate : 44100;
+    l->freq = 44100;
     l->loop_start = -1;
-    l->loop_end = waveform->info.frames;
+    l->loop_end = 0;
     l->gain = 1.0;
     l->pan = 0.5;
-    l->mode = waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+    l->mode = spt_mono16;
     l->root_note = 69;
     l->note_scaling = 100.0;
     l->min_note = 0;
@@ -598,6 +599,14 @@ void sampler_init_layer(struct sampler_module *m, struct sampler_layer *l, struc
     l->filter_adsr.decay = 0;
     l->filter_adsr.sustain = 1;
     l->filter_adsr.release = 0.05;
+}
+
+void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
+{
+    l->sample_data = waveform ? waveform->data : NULL;
+    l->freq = (waveform && waveform->info.samplerate) ? waveform->info.samplerate : 44100;
+    l->loop_end = waveform ? waveform->info.frames : 0;
+    l->mode = waveform && waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
 }
 
 void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section)
@@ -627,8 +636,111 @@ void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer
 
 void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
 {
-    sampler_init_layer(m, l, waveform);
+    sampler_layer_init(l);
+    sampler_layer_set_waveform(l, waveform);
     sampler_load_layer_overrides(m, l, cfg_section);
+}
+
+struct sfz_load_state
+{
+    struct sampler_module *m;
+    const char *filename;
+    int in_group;
+    struct sampler_layer group;
+    struct sampler_layer *region;
+    GList *layers;
+    GError **error;
+};
+
+static void load_sfz_end_region(struct sfz_parser_client *client)
+{
+    struct sfz_load_state *ls = client->user_data;
+    // printf("-- copy current region to the list of layers\n");
+    struct sampler_layer *l = ls->region;
+    cbox_envelope_init_adsr(&l->amp_env_shape, &l->amp_adsr, ls->m->srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_adsr(&l->filter_env_shape, &l->filter_adsr,  ls->m->srate / CBOX_BLOCK_SIZE);
+    ls->layers = g_list_append(ls->layers, ls->region);
+    ls->region = NULL;
+}
+
+static void load_sfz_group(struct sfz_parser_client *client)
+{
+    struct sfz_load_state *ls = client->user_data;
+    if (ls->region)
+        load_sfz_end_region(client);
+    // printf("-- start group\n");
+    sampler_layer_init(&ls->group);
+    ls->in_group = 1;
+}
+
+static void load_sfz_region(struct sfz_parser_client *client)
+{
+    struct sfz_load_state *ls = client->user_data;
+    
+    if (ls->region)
+    {
+        load_sfz_end_region(client);
+    }
+    ls->region = malloc(sizeof(struct sampler_layer));
+    if (ls->in_group)
+    {
+        memcpy(ls->region, &ls->group, sizeof(struct sampler_layer));
+    }
+    else
+        sampler_layer_init(ls->region);
+    // g_warning("-- start region");
+}
+
+static void load_sfz_key_value(struct sfz_parser_client *client, const char *key, const char *value)
+{
+    struct sfz_load_state *ls = client->user_data;
+    struct sampler_layer *l = ls->region ? ls->region : &ls->group;
+    if (!ls->region && !ls->in_group)
+    {
+        g_warning("Cannot use parameter '%s' outside of region or group", key);
+        return;
+    }
+    
+    if (!strcmp(key, "sample"))
+    {
+        if (!ls->region)
+        {
+            g_warning("Cannot specify samples for entire groups - ignored");
+            return;
+        }
+        sampler_layer_set_waveform(ls->region, load_waveform(ls->filename, value));
+    }
+    else if (!strcmp(key, "lokey"))
+        l->min_note = note_from_string(value);
+    else if (!strcmp(key, "hikey"))
+        l->max_note = note_from_string(value);
+    else
+        g_warning("Unhandled sfz key: %s", key);
+}
+
+static void load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz)
+{
+    GError *error = NULL;
+    struct sfz_load_state ls = { .in_group = 0, .m = m, .filename = sfz, .layers = NULL, .region = NULL, .error = &error };
+    struct sfz_parser_client c = { .user_data = &ls, .region = load_sfz_region, .group = load_sfz_group, .key_value = load_sfz_key_value };
+    load_sfz(sfz, &c, &error);
+    if (!error && ls.region)
+        load_sfz_end_region(&c);
+    if (error)
+    {
+        g_error("%s", error->message);
+        g_error_free(error);
+        return;
+    }
+    
+    prg->layer_count = g_list_length(ls.layers);
+    prg->layers = malloc(prg->layer_count * sizeof(struct sampler_layer *));
+    GList *p = ls.layers;
+    for(int i = 0; p; i++)
+    {
+        prg->layers[i] = p->data;
+        p = g_list_next(p);
+    }
 }
 
 static void load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section)
@@ -637,6 +749,14 @@ static void load_program(struct sampler_module *m, struct sampler_program *prg, 
     
     prg->prog_no = cbox_config_get_int(cfg_section, "program", 0);
 
+    char *sfz = cbox_config_get_string(cfg_section, "sfz");
+    if (sfz)
+    {
+        load_program_sfz(m, prg, sfz);
+        
+        return;
+    }
+    
     int layer_count = 0;
     for (i = 0; ; i++)
     {
@@ -691,9 +811,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->module.process_block = sampler_process_block;
     m->module.destroy = sampler_destroy;
     m->srate = srate;
-        
-    char *filename = cbox_config_get_string(cfg_section, "file");
-        
+            
     for (i = 0; ; i++)
     {
         gchar *s = g_strdup_printf("program%d", i);
