@@ -609,7 +609,12 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program *p
             where = g_strdup_printf("slayer:%s", cbox_config_get_string(cfg_section, s));
             g_free(s);
         }
-        struct sampler_waveform *waveform = sampler_waveform_new_from_file(where ? where : cfg_section, cbox_config_get_string(where ? where : cfg_section, "file"), error);
+        const char *sample_file = cbox_config_get_string(where ? where : cfg_section, "file");
+        
+        gchar *sample_pathname = g_build_filename(spath ? spath : "", sample_file, NULL);
+        struct sampler_waveform *waveform = sampler_waveform_new_from_file(where ? where : cfg_section, sample_pathname, error);
+        g_free(sample_pathname);
+        
         if (!waveform)
             return FALSE;
         sampler_load_layer(m, prg->layers[i], where, waveform);
