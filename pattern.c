@@ -334,10 +334,17 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_
                     }
                 }
                 int plen = 0;
-                if (is_drum)
-                    plen = cbox_midi_pattern_load_drum_into(m, v, length); 
+                int is_drum_pat = is_drum;
+                int nofs = 0;
+                if (*v == '@')
+                {
+                    nofs = 1;
+                    is_drum_pat = !is_drum_pat;
+                }
+                if (is_drum_pat)
+                    plen = cbox_midi_pattern_load_drum_into(m, v + nofs, length); 
                 else
-                    plen = cbox_midi_pattern_load_melodic_into(m, v, length, xpval); 
+                    plen = cbox_midi_pattern_load_melodic_into(m, v + nofs, length, xpval); 
                 g_free(v);
                 if (plen < 0)
                 {
