@@ -103,6 +103,9 @@ static void scan_for_value(struct sfz_parser_state *state)
         if (ch == 0 || ch == '\r' || ch == '\n')
         {
             state->value_end = state->pos;
+            // remove spaces before next key
+            while(state->value_end > state->value_start && isspace(state->buf[state->value_end - 1]))
+                state->value_end--;
             return;
         }
         if (ch == '=')
