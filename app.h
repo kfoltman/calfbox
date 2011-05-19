@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_APP_H
+#define CBOX_APP_H
+
 #include "cmd.h"
 #include "io.h"
 #include "procmain.h"
@@ -36,3 +39,4 @@ extern struct cbox_app app;
 
 struct cbox_menu *create_main_menu();
 
+#endif

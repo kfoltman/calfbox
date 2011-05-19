@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_LAYER_H
+#define CBOX_LAYER_H
+
 #include <stdint.h>
 
 struct cbox_module;
@@ -35,3 +38,4 @@ struct cbox_layer
 extern struct cbox_layer *cbox_layer_new(const char *name);
 extern struct cbox_layer *cbox_layer_load(const char *module_name);
 
+#endif

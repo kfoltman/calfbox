@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_ONEPOLE_INT_H
+#define CBOX_ONEPOLE_INT_H
+
 #include "dspmath.h"
 
 struct cbox_onepole_state
@@ -114,3 +117,5 @@ static inline void cbox_onepole_process_to(struct cbox_onepole_state *state, str
         state->y1 = out;
     }
 }
+
+#endif

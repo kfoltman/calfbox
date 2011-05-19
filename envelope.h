@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_ENVELOPE_H
+#define CBOX_ENVELOPE_H
+
 struct cbox_envstage
 {
     double end_value;
@@ -108,4 +111,4 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
     env->stages[3].break_on_release = 0;
 }
 
-
+#endif

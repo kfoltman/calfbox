@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_SFZPARSER_H
+#define CBOX_SFZPARSER_H
+
 #include <glib.h>
 
 enum sfz_error_code
@@ -34,3 +37,5 @@ struct sfz_parser_client
 };
 
 gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error);
+
+#endif

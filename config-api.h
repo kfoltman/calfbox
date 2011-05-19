@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_CONFIG_API_H
+#define CBOX_CONFIG_API_H
+
 extern void cbox_config_init(const char *override_file);
 extern int cbox_config_has_section(const char *section);
 extern char *cbox_config_get_string(const char *section, const char *key);
@@ -26,3 +29,5 @@ extern float cbox_config_get_gain(const char *section, const char *key, float de
 extern float cbox_config_get_gain_db(const char *section, const char *key, float def_value);
 extern void cbox_config_foreach_section(void (*process)(void *user_data, const char *key), void *user_data);
 extern void cbox_config_close();
+
+#endif

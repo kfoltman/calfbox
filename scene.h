@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_SCENE_H
+#define CBOX_SCENE_H
+
 #define MAX_LAYERS_PER_SCENE 16
 #define MAX_MODULES_PER_SCENE 16
 
@@ -34,3 +37,5 @@ extern void cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *la
 extern struct cbox_scene *cbox_scene_load(const char *section);
 extern struct cbox_scene *cbox_scene_new_for_instrument(const char *name);
 extern void cbox_scene_destroy(struct cbox_scene *scene);
+
+#endif

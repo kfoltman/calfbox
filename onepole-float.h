@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_ONEPOLE_FLOAT_H
+#define CBOX_ONEPOLE_FLOAT_H
+
 #include "dspmath.h"
 
 struct cbox_onepolef_state
@@ -118,3 +121,5 @@ static inline void cbox_onepolef_process_to(struct cbox_onepolef_state *state, s
     }
     state->y1 = sanef(state->y1);
 }
+
+#endif

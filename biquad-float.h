@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef CBOX_BIQUAD_FLOAT_H
+#define CBOX_BIQUAD_FLOAT_H
+
 #include "dspmath.h"
 
 struct cbox_biquadf_state
@@ -146,3 +149,5 @@ static inline void cbox_biquadf_process_adding(struct cbox_biquadf_state *state,
     state->y2 = sanef(y2);
     state->y1 = sanef(y1);
 }
+
+#endif
