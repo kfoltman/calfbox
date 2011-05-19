@@ -51,7 +51,7 @@ static gboolean handle_2ndslash(struct sfz_parser_state *state, int ch)
 
 static void unexpected_char(struct sfz_parser_state *state, int ch)
 {
-    g_set_error(state->error, g_quark_from_string("sfzparser"), SFZ_ERR_INVALID_CHAR, "Unexpected character '%c'", ch);
+    g_set_error(state->error, CBOX_SFZPARSER_ERROR, CBOX_SFZ_PARSER_ERROR_INVALID_CHAR, "Unexpected character '%c'", ch);
 }
 
 static gboolean handle_postslash(struct sfz_parser_state *state, int ch)
@@ -83,7 +83,7 @@ static gboolean handle_header(struct sfz_parser_state *state, int ch)
         else
         {
             gchar *tmp = g_strndup(state->buf + state->token_start, state->pos - 1 - state->token_start);
-            g_set_error(state->error, g_quark_from_string("sfzparser"), SFZ_ERR_INVALID_HEADER, "Unexpected header <%s>", tmp);
+            g_set_error(state->error, CBOX_SFZPARSER_ERROR, CBOX_SFZ_PARSER_ERROR_INVALID_HEADER, "Unexpected header <%s>", tmp);
             g_free(tmp);
             return FALSE;
         }
@@ -169,7 +169,7 @@ static gboolean handle_char(struct sfz_parser_state *state, int ch)
         state->handler = handle_header;
         return TRUE;
     default:
-        g_set_error(state->error, g_quark_from_string("sfzparser"), SFZ_ERR_INVALID_CHAR, "Unexpected character '%c'", ch);
+        unexpected_char(state, ch);
         return FALSE;
     }
 }
@@ -221,3 +221,7 @@ gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
     return TRUE;
 }
 
+GQuark cbox_sfz_parser_error_quark()
+{
+    return g_quark_from_string("cbox-sfz-parser-error-quark");
+}

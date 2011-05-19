@@ -21,11 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <glib.h>
 
-enum sfz_error_code
+#define CBOX_SFZPARSER_ERROR cbox_sfz_parser_error_quark()
+
+enum CboxSfzParserError
 {
-    SFZ_ERR_NONE = 0,
-    SFZ_ERR_INVALID_CHAR = 1,
-    SFZ_ERR_INVALID_HEADER = 2,
+    CBOX_SFZ_PARSER_ERROR_FAILED,
+    CBOX_SFZ_PARSER_ERROR_INVALID_CHAR,
+    CBOX_SFZ_PARSER_ERROR_INVALID_HEADER,
 };
 
 struct sfz_parser_client
@@ -36,6 +38,8 @@ struct sfz_parser_client
     gboolean (*key_value)(struct sfz_parser_client *client, const char *key, const char *value);
 };
 
-gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error);
+extern gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error);
+
+extern GQuark cbox_sfz_parser_error_quark();
 
 #endif

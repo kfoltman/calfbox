@@ -30,6 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 
+GQuark cbox_sampler_error_quark()
+{
+    return g_quark_from_string("cbox-sampler-error-quark");
+}
+
 static void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void sampler_destroy(struct cbox_module *module);
@@ -444,7 +449,7 @@ struct sampler_waveform *sampler_waveform_new_from_file(const char *context_name
     
     if (!filename)
     {
-        g_set_error(error, g_quark_from_string("sampler"), SAMP_ERR_INVALID_LAYER, "%s: no filename specified", context_name);
+        g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_INVALID_LAYER, "%s: no filename specified", context_name);
         return NULL;
     }
     struct sampler_waveform *waveform = malloc(sizeof(struct sampler_waveform));
@@ -457,7 +462,7 @@ struct sampler_waveform *sampler_waveform_new_from_file(const char *context_name
     waveform->data = malloc(waveform->info.channels * 2 * (waveform->info.frames + 1));
     if (waveform->info.channels != 1 && waveform->info.channels != 2)
     {
-        g_set_error(error, g_quark_from_string("sampler"), SAMP_ERR_INVALID_WAVEFORM, 
+        g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_INVALID_WAVEFORM, 
             "%s: cannot open file '%s': unsupported channel count %d", context_name, filename, (int)waveform->info.channels);
         return NULL;
     }

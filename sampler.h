@@ -28,11 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define MAX_SAMPLER_VOICES 128
 
-enum sampler_error_code
+#define CBOX_SAMPLER_ERROR cbox_sampler_error_quark()
+
+enum CboxSamplerError
 {
-    SAMP_ERR_NONE = 0,
-    SAMP_ERR_INVALID_LAYER = 2,
-    SAMP_ERR_INVALID_WAVEFORM = 3
+    CBOX_SAMPLER_ERROR_FAILED,
+    CBOX_SAMPLER_ERROR_INVALID_LAYER,
+    CBOX_SAMPLER_ERROR_INVALID_WAVEFORM
 };
 
 enum sample_player_type
@@ -119,5 +121,6 @@ extern void sampler_layer_init(struct sampler_layer *l);
 extern void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform);
 extern void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section);
 extern struct sampler_waveform *sampler_waveform_new_from_file(const char *context_name, const char *filename, GError **error);
+extern GQuark cbox_sampler_error_quark();
 
 #endif
