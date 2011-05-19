@@ -87,4 +87,9 @@ static inline void copybf(float *to, float *from)
     memcpy(to, from, sizeof(float) * CBOX_BLOCK_SIZE);
 }
 
+static inline float dB2gain(float dB)
+{
+    return pow(2.0, dB / 6.0);
+}
+
 #endif

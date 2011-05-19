@@ -23,6 +23,7 @@ struct sfz_load_state
 {
     struct sampler_module *m;
     const char *filename;
+    const char *sample_path;
     int in_group;
     struct sampler_layer group;
     struct sampler_layer *region;
@@ -69,10 +70,27 @@ static void load_sfz_region(struct sfz_parser_client *client)
     // g_warning("-- start region");
 }
 
+static gboolean parse_envelope_param(struct cbox_adsr *adsr, const char *key, const char *value)
+{
+    float fvalue = atof(value);
+    if (!strcmp(key, "attack"))
+        adsr->attack = fvalue;
+    else if (!strcmp(key, "decay"))
+        adsr->decay = fvalue;
+    else if (!strcmp(key, "sustain"))
+        adsr->sustain = fvalue;
+    else if (!strcmp(key, "release"))
+        adsr->release = fvalue;
+    else
+        return FALSE;
+    return TRUE;
+}
+
 static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char *key, const char *value)
 {
     struct sfz_load_state *ls = client->user_data;
     struct sampler_layer *l = ls->region ? ls->region : &ls->group;
+    int unhandled = 0;
     if (!ls->region && !ls->in_group)
     {
         g_warning("Cannot use parameter '%s' outside of region or group", key);
@@ -81,28 +99,64 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     
     if (!strcmp(key, "sample"))
     {
-        if (!ls->region)
-        {
-            g_warning("Cannot specify samples for entire groups - ignored");
-            return TRUE;
-        }
-        struct sampler_waveform *wf = sampler_waveform_new_from_file(ls->filename, value, ls->error);
+        gchar *filename = g_build_filename(ls->sample_path ? ls->sample_path : ".", value, NULL);
+        struct sampler_waveform *wf = sampler_waveform_new_from_file(ls->filename, filename, ls->error);
+        g_free(filename);
         if (!wf)
             return FALSE;
-        sampler_layer_set_waveform(ls->region, wf);
+        sampler_layer_set_waveform(l, wf);
     }
     else if (!strcmp(key, "lokey"))
         l->min_note = note_from_string(value);
     else if (!strcmp(key, "hikey"))
         l->max_note = note_from_string(value);
+    else if (!strcmp(key, "pitch_keycenter"))
+        l->root_note = note_from_string(value);
+    else if (!strcmp(key, "pitch_keytrack"))
+        l->note_scaling = atof(value);
+    else if (!strcmp(key, "key"))
+        l->min_note = l->max_note = l->root_note = note_from_string(value);
+    else if (!strcmp(key, "lovel"))
+        l->min_note = atoi(value);
+    else if (!strcmp(key, "hivel"))
+        l->max_note = atoi(value);
+    else if (!strcmp(key, "loop_start") || !strcmp(key, "loopstart"))
+        l->loop_start = atoi(value);
+    else if (!strcmp(key, "loop_end") || !strcmp(key, "loopend"))
+        l->loop_end = atoi(value);
+    else if (!strcmp(key, "volume"))
+        l->gain = dB2gain(atof(value));
+    else if (!strcmp(key, "pan"))
+        l->pan = atof(value) / 100.0;
+    else if (!strcmp(key, "cutoff"))
+        l->cutoff = atof(value);
+    else if (!strcmp(key, "resonance"))
+        l->resonance = dB2gain(atof(value));
+    else if (!strcmp(key, "tune"))
+        l->tune = atof(value);
+    else if (!strcmp(key, "transpose"))
+        l->transpose = atoi(value);
+    else if (!strncmp(key, "ampeg_", 6))
+    {
+        if (!parse_envelope_param(&l->amp_adsr, key + 6, value))
+            unhandled = 1;
+    }
+    else if (!strncmp(key, "fileg_", 6))
+    {
+        if (!parse_envelope_param(&l->filter_adsr, key + 6, value))
+            unhandled = 1;
+    }
     else
+        unhandled = 1;
+    
+    if (unhandled)
         g_warning("Unhandled sfz key: %s", key);
     return TRUE;
 }
 
-gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, GError **error)
+gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, const char *sample_path, GError **error)
 {
-    struct sfz_load_state ls = { .in_group = 0, .m = m, .filename = sfz, .layers = NULL, .region = NULL, .error = error };
+    struct sfz_load_state ls = { .in_group = 0, .m = m, .filename = sfz, .layers = NULL, .region = NULL, .error = error, .sample_path = sample_path };
     struct sfz_parser_client c = { .user_data = &ls, .region = load_sfz_region, .group = load_sfz_group, .key_value = load_sfz_key_value };
     g_clear_error(error);
 
