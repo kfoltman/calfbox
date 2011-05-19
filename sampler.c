@@ -158,8 +158,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             
             double freq = l->freq;
             
-            if (l->note_scaling)
-                freq *= pow(2.0, (note - l->root_note) * l->note_scaling / 1200.0);
+            if (l->note_scaling != 0 || (l->tune + 100 * l->transpose) != 0)
+                freq *= pow(2.0, ((note - l->root_note) * l->note_scaling + l->tune + l->transpose * 100) / 1200.0);
             
             v->sample_data = l->sample_data;
             v->pos = l->sample_offset;
@@ -523,6 +523,8 @@ void sampler_layer_init(struct sampler_layer *l)
     l->filter_adsr.decay = 0;
     l->filter_adsr.sustain = 1;
     l->filter_adsr.release = 0.05;
+    l->tune = 0;
+    l->transpose = 0;
 }
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
@@ -549,6 +551,8 @@ void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer
     l->max_note = cbox_config_get_note(cfg_section, "high_note", l->max_note);
     l->min_vel = cbox_config_get_int(cfg_section, "low_vel", l->min_vel);
     l->max_vel = cbox_config_get_int(cfg_section, "high_vel", l->max_vel);
+    l->transpose = cbox_config_get_int(cfg_section, "transpose", l->transpose);
+    l->tune = cbox_config_get_float(cfg_section, "tune", l->tune);
     cbox_config_get_adsr(cfg_section, "amp", &l->amp_adsr);
     cbox_config_get_adsr(cfg_section, "filter", &l->filter_adsr);
     cbox_envelope_init_adsr(&l->amp_env_shape, &l->amp_adsr, m->srate / CBOX_BLOCK_SIZE);

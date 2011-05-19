@@ -54,9 +54,11 @@ struct sampler_layer
     float gain;
     float pan;
     float freq;
+    float tune;
     float note_scaling;
     int min_note, max_note, root_note;
     int min_vel, max_vel;
+    int transpose;
     float cutoff, resonance, env_mod;
     struct cbox_adsr amp_adsr, filter_adsr;
     struct cbox_envelope_shape amp_env_shape, filter_env_shape;
