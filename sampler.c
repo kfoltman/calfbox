@@ -16,13 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "biquad-float.h"
 #include "config-api.h"
 #include "dspmath.h"
-#include "envelope.h"
 #include "midi.h"
 #include "module.h"
-#include "sfzparser.h"
+#include "sampler.h"
+#include "sfzloader.h"
 #include <errno.h>
 #include <glib.h>
 #include <math.h>
@@ -34,89 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 static void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void sampler_destroy(struct cbox_module *module);
-
-#define MAX_SAMPLER_VOICES 128
-
-enum sampler_error_code
-{
-    SAMP_ERR_NONE = 0,
-    SAMP_ERR_INVALID_LAYER = 2,
-    SAMP_ERR_INVALID_WAVEFORM = 3
-};
-
-enum sample_player_type
-{
-    spt_inactive,
-    spt_mono16,
-    spt_stereo16
-};
-
-struct sampler_layer
-{
-    enum sample_player_type mode;
-    int16_t *sample_data;
-    uint32_t sample_offset;
-    uint32_t loop_start;
-    uint32_t loop_end;
-    float gain;
-    float pan;
-    float freq;
-    float note_scaling;
-    int min_note, max_note, root_note;
-    int min_vel, max_vel;
-    float cutoff, resonance, env_mod;
-    struct cbox_adsr amp_adsr, filter_adsr;
-    struct cbox_envelope_shape amp_env_shape, filter_env_shape;
-};
-
-struct sampler_program
-{
-    int prog_no;
-    struct sampler_layer **layers;
-    int layer_count;
-};
-
-struct sampler_channel
-{
-    float pitchbend;
-    float pbrange;
-    int sustain, sostenuto;
-    int volume, pan, expression, modulation;
-    struct sampler_program *program;
-};
-
-struct sampler_voice
-{
-    enum sample_player_type mode;
-    struct sampler_layer *layer;
-    int16_t *sample_data;
-    uint32_t pos, delta, loop_start, loop_end;
-    uint32_t frac_pos, frac_delta;
-    int note;
-    int vel;
-    int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;
-    float freq;
-    float gain;
-    float pan;
-    float lgain, rgain;
-    float last_lgain, last_rgain;
-    float cutoff, resonance, env_mod;
-    struct cbox_biquadf_state filter_left, filter_right;
-    struct cbox_biquadf_coeffs filter_coeffs;
-    struct sampler_channel *channel;
-    struct cbox_envelope amp_env, filter_env;
-};
-
-struct sampler_module
-{
-    struct cbox_module module;
-
-    int srate;
-    struct sampler_voice voices[MAX_SAMPLER_VOICES];
-    struct sampler_channel channels[16];
-    struct sampler_program *programs;
-    int program_count;
-};
 
 static void process_voice_mono(struct sampler_voice *v, float **channels)
 {
@@ -521,13 +437,7 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->program = &m->programs[0];
 }
 
-struct sampler_waveform
-{
-    int16_t *data;
-    SF_INFO info;
-};
-
-static struct sampler_waveform *load_waveform(const char *context_name, const char *filename, GError **error)
+struct sampler_waveform *sampler_waveform_new_from_file(const char *context_name, const char *filename, GError **error)
 {
     int i;
     int nshorts;
@@ -650,111 +560,6 @@ void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const
     sampler_load_layer_overrides(m, l, cfg_section);
 }
 
-struct sfz_load_state
-{
-    struct sampler_module *m;
-    const char *filename;
-    int in_group;
-    struct sampler_layer group;
-    struct sampler_layer *region;
-    GList *layers;
-    GError **error;
-};
-
-static void load_sfz_end_region(struct sfz_parser_client *client)
-{
-    struct sfz_load_state *ls = client->user_data;
-    // printf("-- copy current region to the list of layers\n");
-    struct sampler_layer *l = ls->region;
-    cbox_envelope_init_adsr(&l->amp_env_shape, &l->amp_adsr, ls->m->srate / CBOX_BLOCK_SIZE);
-    cbox_envelope_init_adsr(&l->filter_env_shape, &l->filter_adsr,  ls->m->srate / CBOX_BLOCK_SIZE);
-    ls->layers = g_list_append(ls->layers, ls->region);
-    ls->region = NULL;
-}
-
-static void load_sfz_group(struct sfz_parser_client *client)
-{
-    struct sfz_load_state *ls = client->user_data;
-    if (ls->region)
-        load_sfz_end_region(client);
-    // printf("-- start group\n");
-    sampler_layer_init(&ls->group);
-    ls->in_group = 1;
-}
-
-static void load_sfz_region(struct sfz_parser_client *client)
-{
-    struct sfz_load_state *ls = client->user_data;
-    
-    if (ls->region)
-    {
-        load_sfz_end_region(client);
-    }
-    ls->region = malloc(sizeof(struct sampler_layer));
-    if (ls->in_group)
-    {
-        memcpy(ls->region, &ls->group, sizeof(struct sampler_layer));
-    }
-    else
-        sampler_layer_init(ls->region);
-    // g_warning("-- start region");
-}
-
-static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char *key, const char *value)
-{
-    struct sfz_load_state *ls = client->user_data;
-    struct sampler_layer *l = ls->region ? ls->region : &ls->group;
-    if (!ls->region && !ls->in_group)
-    {
-        g_warning("Cannot use parameter '%s' outside of region or group", key);
-        return TRUE;
-    }
-    
-    if (!strcmp(key, "sample"))
-    {
-        if (!ls->region)
-        {
-            g_warning("Cannot specify samples for entire groups - ignored");
-            return TRUE;
-        }
-        struct sampler_waveform *wf = load_waveform(ls->filename, value, ls->error);
-        if (!wf)
-            return FALSE;
-        sampler_layer_set_waveform(ls->region, wf);
-    }
-    else if (!strcmp(key, "lokey"))
-        l->min_note = note_from_string(value);
-    else if (!strcmp(key, "hikey"))
-        l->max_note = note_from_string(value);
-    else
-        g_warning("Unhandled sfz key: %s", key);
-    return TRUE;
-}
-
-static gboolean load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, GError **error)
-{
-    struct sfz_load_state ls = { .in_group = 0, .m = m, .filename = sfz, .layers = NULL, .region = NULL, .error = error };
-    struct sfz_parser_client c = { .user_data = &ls, .region = load_sfz_region, .group = load_sfz_group, .key_value = load_sfz_key_value };
-    g_clear_error(error);
-
-    if (!load_sfz(sfz, &c, error))
-    {
-        return FALSE;
-    }
-    if (ls.region)
-        load_sfz_end_region(&c);
-    
-    prg->layer_count = g_list_length(ls.layers);
-    prg->layers = malloc(prg->layer_count * sizeof(struct sampler_layer *));
-    GList *p = ls.layers;
-    for(int i = 0; p; i++)
-    {
-        prg->layers[i] = p->data;
-        p = g_list_next(p);
-    }
-    return TRUE;
-}
-
 static gboolean load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section, GError **error)
 {
     int i;
@@ -764,7 +569,7 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program *p
 
     char *sfz = cbox_config_get_string(cfg_section, "sfz");
     if (sfz)
-        return load_program_sfz(m, prg, sfz, error);
+        return sampler_module_load_program_sfz(m, prg, sfz, error);
     
     int layer_count = 0;
     for (i = 0; ; i++)
@@ -792,7 +597,7 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program *p
             where = g_strdup_printf("slayer:%s", cbox_config_get_string(cfg_section, s));
             g_free(s);
         }
-        struct sampler_waveform *waveform = load_waveform(where ? where : cfg_section, cbox_config_get_string(where ? where : cfg_section, "file"), error);
+        struct sampler_waveform *waveform = sampler_waveform_new_from_file(where ? where : cfg_section, cbox_config_get_string(where ? where : cfg_section, "file"), error);
         if (!waveform)
             return FALSE;
         sampler_load_layer(m, prg->layers[i], where, waveform);
