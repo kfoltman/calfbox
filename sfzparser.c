@@ -221,33 +221,3 @@ gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
     return TRUE;
 }
 
-#ifdef SFZPARSERTEST
-
-void do_region(struct sfz_parser_client *client)
-{
-    printf("-- region\n");
-}
-
-void do_group(struct sfz_parser_client *client)
-{
-    printf("-- group\n");
-}
-
-void do_key_value(struct sfz_parser_client *client, const char *key, const char *value)
-{
-    printf("%s=%s\n", key, value);
-}
-
-int main(int argc, char *argv[])
-{
-    struct sfz_parser_client cli;
-    cli.user_data = NULL;
-    cli.region = do_region;
-    cli.group = do_group;
-    cli.key_value = do_key_value;
-    
-    //load_sfz("horn.sfz", &cli);
-    load_sfz(argv[1], &cli);
-}
-
-#endif
