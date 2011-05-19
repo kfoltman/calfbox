@@ -36,8 +36,8 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
     struct sfz_load_state *ls = client->user_data;
     // printf("-- copy current region to the list of layers\n");
     struct sampler_layer *l = ls->region;
-    cbox_envelope_init_adsr(&l->amp_env_shape, &l->amp_adsr, ls->m->srate / CBOX_BLOCK_SIZE);
-    cbox_envelope_init_adsr(&l->filter_env_shape, &l->filter_adsr,  ls->m->srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_dahdsr(&l->amp_env_shape, &l->amp_env, ls->m->srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_dahdsr(&l->filter_env_shape, &l->filter_env,  ls->m->srate / CBOX_BLOCK_SIZE);
     ls->layers = g_list_append(ls->layers, ls->region);
     ls->region = NULL;
 }
@@ -70,17 +70,21 @@ static void load_sfz_region(struct sfz_parser_client *client)
     // g_warning("-- start region");
 }
 
-static gboolean parse_envelope_param(struct cbox_adsr *adsr, const char *key, const char *value)
+static gboolean parse_envelope_param(struct cbox_dahdsr *env, const char *key, const char *value)
 {
     float fvalue = atof(value);
-    if (!strcmp(key, "attack"))
-        adsr->attack = fvalue;
+    if (!strcmp(key, "delay"))
+        env->delay = fvalue;
+    else if (!strcmp(key, "attack"))
+        env->attack = fvalue;
+    else if (!strcmp(key, "hold"))
+        env->hold = fvalue;
     else if (!strcmp(key, "decay"))
-        adsr->decay = fvalue;
+        env->decay = fvalue;
     else if (!strcmp(key, "sustain"))
-        adsr->sustain = fvalue;
+        env->sustain = fvalue;
     else if (!strcmp(key, "release"))
-        adsr->release = fvalue;
+        env->release = fvalue;
     else
         return FALSE;
     return TRUE;
@@ -138,12 +142,12 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->transpose = atoi(value);
     else if (!strncmp(key, "ampeg_", 6))
     {
-        if (!parse_envelope_param(&l->amp_adsr, key + 6, value))
+        if (!parse_envelope_param(&l->amp_env, key + 6, value))
             unhandled = 1;
     }
     else if (!strncmp(key, "fileg_", 6))
     {
-        if (!parse_envelope_param(&l->filter_adsr, key + 6, value))
+        if (!parse_envelope_param(&l->filter_env, key + 6, value))
             unhandled = 1;
     }
     else

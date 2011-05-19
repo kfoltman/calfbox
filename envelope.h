@@ -111,4 +111,60 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
     env->stages[3].break_on_release = 0;
 }
 
+struct cbox_dahdsr
+{
+    float delay;
+    float attack;
+    float hold;
+    float decay;
+    float sustain;
+    float release;
+};
+
+static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, const struct cbox_dahdsr *dahdsr, int sr)
+{
+    env->start_value = 0;
+    env->stages[0].end_value = 0;
+    env->stages[0].time = dahdsr->delay * sr;
+    env->stages[0].next_if_pressed = 1;
+    env->stages[0].next_if_released = 1;
+    env->stages[0].keep_last_value = 1;
+    env->stages[0].break_on_release = 0;
+
+    env->stages[1].end_value = 1;
+    env->stages[1].time = dahdsr->attack * sr;
+    env->stages[1].next_if_pressed = 2;
+    env->stages[1].next_if_released = 2;
+    env->stages[1].keep_last_value = 1;
+    env->stages[1].break_on_release = 0;
+
+    env->stages[2].end_value = 1;
+    env->stages[2].time = dahdsr->hold * sr;
+    env->stages[2].next_if_pressed = 3;
+    env->stages[2].next_if_released = 3;
+    env->stages[2].keep_last_value = 1;
+    env->stages[2].break_on_release = 0;
+
+    env->stages[3].end_value = dahdsr->sustain;
+    env->stages[3].time = dahdsr->decay * sr;
+    env->stages[3].next_if_pressed = 4;
+    env->stages[3].next_if_released = 4;
+    env->stages[3].keep_last_value = 0;
+    env->stages[3].break_on_release = 0;
+
+    env->stages[4].end_value = dahdsr->sustain;
+    env->stages[4].time = 1 * sr;
+    env->stages[4].next_if_pressed = 4;
+    env->stages[4].next_if_released = 5;
+    env->stages[4].keep_last_value = 0;
+    env->stages[4].break_on_release = 1;
+
+    env->stages[5].end_value = 0;
+    env->stages[5].time = dahdsr->release * sr;
+    env->stages[5].next_if_pressed = -1;
+    env->stages[5].next_if_released = -1;
+    env->stages[5].keep_last_value = 0;
+    env->stages[5].break_on_release = 0;
+}
+
 #endif

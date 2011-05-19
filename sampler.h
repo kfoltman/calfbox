@@ -60,7 +60,7 @@ struct sampler_layer
     int min_vel, max_vel;
     int transpose;
     float cutoff, resonance, env_mod;
-    struct cbox_adsr amp_adsr, filter_adsr;
+    struct cbox_dahdsr amp_env, filter_env;
     struct cbox_envelope_shape amp_env_shape, filter_env_shape;
 };
 
