@@ -98,7 +98,7 @@ void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern)
     free(pattern);
 }
 
-static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m, const char *name, int start_pos, int transpose)
+static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m, const char *name, int start_pos, int transpose, int transpose_to_note)
 {
     gchar *cfg_section = g_strdup_printf("pattern:%s", name);
     
@@ -113,6 +113,9 @@ static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m
     int gchannel = cbox_config_get_int(cfg_section, "channel", 1);
     int gswing = cbox_config_get_int(cfg_section, "swing", 0);
     int gres = cbox_config_get_int(cfg_section, "resolution", 4);
+    int orignote = cbox_config_get_note(cfg_section, "base_note", 24);
+    if (transpose_to_note != -1)
+        transpose += transpose_to_note - orignote;
     
     for (int t = 1; ; t++)
     {
@@ -286,7 +289,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_load(const char *name, int is_drum)
     if (is_drum)
         length = cbox_midi_pattern_load_drum_into(m, name, 0);
     else
-        length = cbox_midi_pattern_load_melodic_into(m, name, 0, 0);
+        length = cbox_midi_pattern_load_melodic_into(m, name, 0, 0, -1);
     struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m);    
     p->loop_end = length;
     
@@ -323,7 +326,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_
                 char *v = comma ? g_strndup(patname, comma - patname) : g_strdup(patname);
                 patname = comma ? comma + 1 : patname + strlen(patname);
                 
-                int xpval = 0;
+                int xpval = 0, xpnote = -1;
                 if (!is_drum)
                 {
                     char *xp = strchr(v, '+');
@@ -331,6 +334,15 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_
                     {
                         *xp = '\0';
                         xpval = atoi(xp + 1);
+                    }
+                    else
+                    {
+                        xp = strchr(v, '=');
+                        if (xp)
+                        {
+                            *xp = '\0';
+                            xpnote = note_from_string(xp + 1);
+                        }
                     }
                 }
                 int plen = 0;
@@ -344,7 +356,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_
                 if (is_drum_pat)
                     plen = cbox_midi_pattern_load_drum_into(m, v + nofs, length); 
                 else
-                    plen = cbox_midi_pattern_load_melodic_into(m, v + nofs, length, xpval); 
+                    plen = cbox_midi_pattern_load_melodic_into(m, v + nofs, length, xpval, xpnote); 
                 g_free(v);
                 if (plen < 0)
                 {
