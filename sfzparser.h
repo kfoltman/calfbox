@@ -30,7 +30,7 @@ struct sfz_parser_client
     void *user_data;
     void (*region)(struct sfz_parser_client *client);
     void (*group)(struct sfz_parser_client *client);
-    void (*key_value)(struct sfz_parser_client *client, const char *key, const char *value);
+    gboolean (*key_value)(struct sfz_parser_client *client, const char *key, const char *value);
 };
 
-void load_sfz(const char *name, struct sfz_parser_client *c, GError **error);
+gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error);

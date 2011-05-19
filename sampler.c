@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "midi.h"
 #include "module.h"
 #include "sfzparser.h"
+#include <errno.h>
 #include <glib.h>
 #include <math.h>
 #include <memory.h>
@@ -35,6 +36,13 @@ static void sampler_process_event(struct cbox_module *module, const uint8_t *dat
 static void sampler_destroy(struct cbox_module *module);
 
 #define MAX_SAMPLER_VOICES 128
+
+enum sampler_error_code
+{
+    SAMP_ERR_NONE = 0,
+    SAMP_ERR_INVALID_LAYER = 2,
+    SAMP_ERR_INVALID_WAVEFORM = 3
+};
 
 enum sample_player_type
 {
@@ -519,27 +527,28 @@ struct sampler_waveform
     SF_INFO info;
 };
 
-static struct sampler_waveform *load_waveform(const char *context_name, const char *filename)
+static struct sampler_waveform *load_waveform(const char *context_name, const char *filename, GError **error)
 {
     int i;
     int nshorts;
     
     if (!filename)
     {
-        g_error("%s: no filename specified", context_name);
+        g_set_error(error, g_quark_from_string("sampler"), SAMP_ERR_INVALID_LAYER, "%s: no filename specified", context_name);
         return NULL;
     }
     struct sampler_waveform *waveform = malloc(sizeof(struct sampler_waveform));
     SNDFILE *sndfile = sf_open(filename, SFM_READ, &waveform->info);
     if (!sndfile)
     {
-        g_error("%s: cannot open file '%s': %s", context_name, filename, sf_strerror(NULL));
+        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "%s: cannot open '%s'", context_name, filename);
         return NULL;
     }
     waveform->data = malloc(waveform->info.channels * 2 * (waveform->info.frames + 1));
     if (waveform->info.channels != 1 && waveform->info.channels != 2)
     {
-        g_error("%s: cannot open file '%s': unsupported channel count %d", context_name, filename, (int)waveform->info.channels);
+        g_set_error(error, g_quark_from_string("sampler"), SAMP_ERR_INVALID_WAVEFORM, 
+            "%s: cannot open file '%s': unsupported channel count %d", context_name, filename, (int)waveform->info.channels);
         return NULL;
     }
     nshorts = waveform->info.channels * (waveform->info.frames + 1);
@@ -691,14 +700,14 @@ static void load_sfz_region(struct sfz_parser_client *client)
     // g_warning("-- start region");
 }
 
-static void load_sfz_key_value(struct sfz_parser_client *client, const char *key, const char *value)
+static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char *key, const char *value)
 {
     struct sfz_load_state *ls = client->user_data;
     struct sampler_layer *l = ls->region ? ls->region : &ls->group;
     if (!ls->region && !ls->in_group)
     {
         g_warning("Cannot use parameter '%s' outside of region or group", key);
-        return;
+        return TRUE;
     }
     
     if (!strcmp(key, "sample"))
@@ -706,9 +715,12 @@ static void load_sfz_key_value(struct sfz_parser_client *client, const char *key
         if (!ls->region)
         {
             g_warning("Cannot specify samples for entire groups - ignored");
-            return;
+            return TRUE;
         }
-        sampler_layer_set_waveform(ls->region, load_waveform(ls->filename, value));
+        struct sampler_waveform *wf = load_waveform(ls->filename, value, ls->error);
+        if (!wf)
+            return FALSE;
+        sampler_layer_set_waveform(ls->region, wf);
     }
     else if (!strcmp(key, "lokey"))
         l->min_note = note_from_string(value);
@@ -716,22 +728,21 @@ static void load_sfz_key_value(struct sfz_parser_client *client, const char *key
         l->max_note = note_from_string(value);
     else
         g_warning("Unhandled sfz key: %s", key);
+    return TRUE;
 }
 
-static void load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz)
+static gboolean load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, GError **error)
 {
-    GError *error = NULL;
-    struct sfz_load_state ls = { .in_group = 0, .m = m, .filename = sfz, .layers = NULL, .region = NULL, .error = &error };
+    struct sfz_load_state ls = { .in_group = 0, .m = m, .filename = sfz, .layers = NULL, .region = NULL, .error = error };
     struct sfz_parser_client c = { .user_data = &ls, .region = load_sfz_region, .group = load_sfz_group, .key_value = load_sfz_key_value };
-    load_sfz(sfz, &c, &error);
-    if (!error && ls.region)
-        load_sfz_end_region(&c);
-    if (error)
+    g_clear_error(error);
+
+    if (!load_sfz(sfz, &c, error))
     {
-        g_error("%s", error->message);
-        g_error_free(error);
-        return;
+        return FALSE;
     }
+    if (ls.region)
+        load_sfz_end_region(&c);
     
     prg->layer_count = g_list_length(ls.layers);
     prg->layers = malloc(prg->layer_count * sizeof(struct sampler_layer *));
@@ -741,21 +752,19 @@ static void load_program_sfz(struct sampler_module *m, struct sampler_program *p
         prg->layers[i] = p->data;
         p = g_list_next(p);
     }
+    return TRUE;
 }
 
-static void load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section)
+static gboolean load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section, GError **error)
 {
     int i;
-    
+
+    g_clear_error(error);
     prg->prog_no = cbox_config_get_int(cfg_section, "program", 0);
 
     char *sfz = cbox_config_get_string(cfg_section, "sfz");
     if (sfz)
-    {
-        load_program_sfz(m, prg, sfz);
-        
-        return;
-    }
+        return load_program_sfz(m, prg, sfz, error);
     
     int layer_count = 0;
     for (i = 0; ; i++)
@@ -783,16 +792,14 @@ static void load_program(struct sampler_module *m, struct sampler_program *prg, 
             where = g_strdup_printf("slayer:%s", cbox_config_get_string(cfg_section, s));
             g_free(s);
         }
-        struct sampler_waveform *waveform = load_waveform(where ? where : cfg_section, cbox_config_get_string(where ? where : cfg_section, "file"));
+        struct sampler_waveform *waveform = load_waveform(where ? where : cfg_section, cbox_config_get_string(where ? where : cfg_section, "file"), error);
         if (!waveform)
-        {
-            g_error("waveform not loaded");
-            return;
-        }
+            return FALSE;
         sampler_load_layer(m, prg->layers[i], where, waveform);
         if (where)
             g_free(where);
     }
+    return TRUE;
 }
 
 struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate)
@@ -831,7 +838,12 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
         char *p = g_strdup_printf("spgm:%s", cbox_config_get_string(cfg_section, s));
         g_free(s);
         
-        load_program(m, &m->programs[i], p);
+        GError *error = NULL;
+        if (!load_program(m, &m->programs[i], p, &error))
+        {
+            g_error("%s", error->message);
+            g_error_free(error);
+        }        
     }
     
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)

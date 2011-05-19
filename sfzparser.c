@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct sfz_parser_state
 {
     struct sfz_parser_client *client;
-    void (*handler)(struct sfz_parser_state *state, int ch);
+    gboolean (*handler)(struct sfz_parser_state *state, int ch);
     const char *filename;
     const char *buf;
     int pos;
@@ -36,9 +36,9 @@ struct sfz_parser_state
     GError **error;
 };
 
-static void handle_char(struct sfz_parser_state *state, int ch);
+static gboolean handle_char(struct sfz_parser_state *state, int ch);
 
-static void handle_2ndslash(struct sfz_parser_state *state, int ch)
+static gboolean handle_2ndslash(struct sfz_parser_state *state, int ch)
 {
     if (ch == '\r' || ch == '\n')
     {
@@ -46,6 +46,7 @@ static void handle_2ndslash(struct sfz_parser_state *state, int ch)
         state->token_start = state->pos;
     }
     // otherwise, consume
+    return TRUE;
 }
 
 static void unexpected_char(struct sfz_parser_state *state, int ch)
@@ -53,18 +54,21 @@ static void unexpected_char(struct sfz_parser_state *state, int ch)
     g_set_error(state->error, g_quark_from_string("sfzparser"), SFZ_ERR_INVALID_CHAR, "Unexpected character '%c'", ch);
 }
 
-static void handle_postslash(struct sfz_parser_state *state, int ch)
+static gboolean handle_postslash(struct sfz_parser_state *state, int ch)
 {
     if (ch == '/')
+    {
         state->handler = handle_2ndslash;
-    else
-        unexpected_char(state, ch);
+        return TRUE;
+    }
+    unexpected_char(state, ch);
+    return FALSE;
 }
 
-static void handle_header(struct sfz_parser_state *state, int ch)
+static gboolean handle_header(struct sfz_parser_state *state, int ch)
 {
     if (ch >= 'a' && ch <= 'z')
-        return;
+        return TRUE;
     if (ch == '>')
     {
         if (!strncmp(state->buf + state->token_start, "region", state->pos - 1 - state->token_start))
@@ -81,12 +85,13 @@ static void handle_header(struct sfz_parser_state *state, int ch)
             gchar *tmp = g_strndup(state->buf + state->token_start, state->pos - 1 - state->token_start);
             g_set_error(state->error, g_quark_from_string("sfzparser"), SFZ_ERR_INVALID_HEADER, "Unexpected header <%s>", tmp);
             g_free(tmp);
-            return;
+            return FALSE;
         }
         state->handler = handle_char;
-        return;
+        return TRUE;
     }
     unexpected_char(state, ch);
+    return FALSE;
 }
 
 static void scan_for_value(struct sfz_parser_state *state)
@@ -116,10 +121,10 @@ static void scan_for_value(struct sfz_parser_state *state)
     }
 }
 
-static void handle_key(struct sfz_parser_state *state, int ch)
+static gboolean handle_key(struct sfz_parser_state *state, int ch)
 {
     if (isalpha(ch) || isdigit(ch) || ch == '_')
-        return;
+        return TRUE;
     if(ch == '=')
     {
         state->key_end = state->pos - 1;
@@ -127,55 +132,56 @@ static void handle_key(struct sfz_parser_state *state, int ch)
         
         gchar *key = g_strndup(state->buf + state->key_start, state->key_end - state->key_start);
         gchar *value = g_strndup(state->buf + state->value_start, state->value_end - state->value_start);
-        state->client->key_value(state->client, key, value);
+        gboolean result = state->client->key_value(state->client, key, value);
         g_free(key);
         g_free(value);
         state->handler = handle_char;
-        return;
+        return result;
     }
     unexpected_char(state, ch);
+    return FALSE;
 }
 
-static void handle_char(struct sfz_parser_state *state, int ch)
+static gboolean handle_char(struct sfz_parser_state *state, int ch)
 {
     if (isalpha(ch) || isdigit(ch))
     {
         state->key_start = state->pos - 1;
         state->handler = handle_key;
-        return;
+        return TRUE;
     }
     switch(ch)
     {
     case '_':
-        return;
+        return TRUE;
         
     case '\r':
     case '\n':
     case ' ':
     case '\t':
     case -1:
-        break;
+        return TRUE;
     case '/':
         state->handler = handle_postslash;
-        return;
+        return TRUE;
     case '<':
         state->token_start = state->pos;
         state->handler = handle_header;
-        return;
+        return TRUE;
     default:
         g_set_error(state->error, g_quark_from_string("sfzparser"), SFZ_ERR_INVALID_CHAR, "Unexpected character '%c'", ch);
-        return;
+        return FALSE;
     }
 }
 
-void load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
+gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
 {
     g_clear_error(error);
     FILE *f = fopen(name, "rb");
     if (!f)
     {
         g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot open '%s'", name);
-        return;
+        return FALSE;
     }
     
     fseek(f, 0, 2);
@@ -188,7 +194,7 @@ void load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
     {
         g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot read '%s'", name);
         fclose(f);
-        return;
+        return FALSE;
     }
     fclose(f);
     
@@ -202,14 +208,17 @@ void load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
     s.error = error;
     while(s.pos < len && s.handler != NULL)
     {
-        (*s.handler)(&s, buf[s.pos++]);
-        if (error && *error)
-            return;
+        if (!(*s.handler)(&s, buf[s.pos++]))
+            return FALSE;
     }
     if (s.handler)
-        (*s.handler)(&s, -1);
+    {
+        if (!(*s.handler)(&s, -1))
+            return FALSE;
+    }
     
     free(buf);
+    return TRUE;
 }
 
 #ifdef SFZPARSERTEST
