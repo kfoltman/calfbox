@@ -632,8 +632,8 @@ void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer
     l->root_note = cbox_config_get_int(cfg_section, "root_note", l->root_note);
     l->min_note = cbox_config_get_note(cfg_section, "low_note", l->min_note);
     l->max_note = cbox_config_get_note(cfg_section, "high_note", l->max_note);
-    l->min_vel = cbox_config_get_note(cfg_section, "low_vel", l->min_vel);
-    l->max_vel = cbox_config_get_note(cfg_section, "high_vel", l->max_vel);
+    l->min_vel = cbox_config_get_int(cfg_section, "low_vel", l->min_vel);
+    l->max_vel = cbox_config_get_int(cfg_section, "high_vel", l->max_vel);
     cbox_config_get_adsr(cfg_section, "amp", &l->amp_adsr);
     cbox_config_get_adsr(cfg_section, "filter", &l->filter_adsr);
     cbox_envelope_init_adsr(&l->amp_env_shape, &l->amp_adsr, m->srate / CBOX_BLOCK_SIZE);
