@@ -439,7 +439,7 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->pan = 64 << 7;
     c->expression = 127 << 7;
     c->modulation = 0;
-    c->program = &m->programs[0];
+    c->program = m->program_count ? &m->programs[0] : NULL;
 }
 
 struct sampler_waveform *sampler_waveform_new_from_file(const char *context_name, const char *filename, GError **error)
