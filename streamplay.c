@@ -590,7 +590,7 @@ void stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_osc_c
     }
 }
 
-struct cbox_module *stream_player_create(void *user_data, const char *cfg_section, int srate)
+struct cbox_module *stream_player_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     int rest;
     static int inited = 0;
