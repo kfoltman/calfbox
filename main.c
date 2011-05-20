@@ -189,6 +189,7 @@ int main(int argc, char *argv[])
 
     if (effect_module_name && *effect_module_name)
     {
+        GError *error = NULL;
         mptr = cbox_module_manifest_get_by_name(effect_module_name);
         if (!mptr)
         {
@@ -196,10 +197,12 @@ int main(int argc, char *argv[])
             goto fail;
         }
         cbox_module_manifest_dump(mptr);
-        app.rt->effect = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(&app.io));
+        app.rt->effect = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(&app.io), &error);
         if (!app.rt->effect)
         {
-            fprintf(stderr, "Cannot create effect %s\n", effect_module_name);
+            fprintf(stderr, "Cannot create effect %s: %s\n", effect_module_name, error ? error->message : "unknown error");
+            if (error)
+                g_error_free(error);
             goto fail;
         }
     }

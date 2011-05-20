@@ -636,7 +636,7 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program *p
     return TRUE;
 }
 
-struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate)
+struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     int result = 0;
     int i;
@@ -666,18 +666,24 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
         }
     }
     m->programs = malloc(sizeof(struct sampler_program) * m->program_count);
+    int success = 1;
     for (i = 0; i < m->program_count; i++)
     {
         gchar *s = g_strdup_printf("program%d", i);
         char *p = g_strdup_printf("spgm:%s", cbox_config_get_string(cfg_section, s));
         g_free(s);
         
-        GError *error = NULL;
-        if (!load_program(m, &m->programs[i], p, &error))
+        if (!load_program(m, &m->programs[i], p, error))
         {
-            g_error("%s", error->message);
-            g_error_free(error);
-        }        
+            success = 0;
+            break;
+        }
+    }
+    if (!success)
+    {
+        // XXXKF free programs/layers, first ensuring that they're fully initialised
+        free(m);
+        return NULL;
     }
     
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)

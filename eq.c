@@ -68,7 +68,7 @@ static float get_band_param(const char *cfg_section, int band, const char *param
     return value;
 }
 
-struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_section, int srate)
+struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     int b, c;
     static const float freqs[] = { 150, 400, 1600, 6400 };

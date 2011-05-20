@@ -73,7 +73,7 @@ void delay_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbo
     m->pos = pos;
 }
 
-struct cbox_module *delay_create(void *user_data, const char *cfg_section, int srate)
+struct cbox_module *delay_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     static int inited = 0;
     int i;

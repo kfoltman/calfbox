@@ -81,7 +81,7 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     }
 }
 
-struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int srate)
+struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     int b, c;
     

@@ -86,9 +86,10 @@ struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char *name)
     return NULL;
 }
 
-struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate)
+struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate, GError **error)
 {
-    struct cbox_module *module = manifest->create(manifest->user_data, cfg_section, srate);
+    g_clear_error(error);
+    struct cbox_module *module = manifest->create(manifest->user_data, cfg_section, srate, error);
     if (!module)
         return NULL;
     

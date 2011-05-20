@@ -98,7 +98,7 @@ void chorus_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     m->pos += CBOX_BLOCK_SIZE;
 }
 
-struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int srate)
+struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     static int inited = 0;
     int i;

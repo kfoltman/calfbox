@@ -39,7 +39,7 @@ struct fluidsynth_module
     int sfid;
 };
 
-struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, int srate)
+struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     int result = 0;
     int i;
@@ -52,7 +52,7 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
     if (!bankname)
     {
         g_error("No bank specified (section=%s, key=sf2)", cfg_section);
-        return NULL;        
+        return NULL;
     }
     
     struct fluidsynth_module *m = malloc(sizeof(struct fluidsynth_module));

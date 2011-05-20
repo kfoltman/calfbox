@@ -19,11 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_MODULE_H
 #define CBOX_MODULE_H
 
-#include <stdint.h>
-
+#include "cmd.h"
 #include "cmd.h"
 #include "dspmath.h"
 #include "midi.h"
+
+#include <glib.h>
+#include <stdint.h>
 
 struct cbox_module_keyrange_metadata
 {
@@ -85,7 +87,7 @@ struct cbox_module_manifest
     struct cbox_module_voicingparam_metadata *voicing_params;
     int num_voicing_params;
     
-    struct cbox_module *(*create)(void *user_data, const char *cfg_section, int srate);
+    struct cbox_module *(*create)(void *user_data, const char *cfg_section, int srate, GError **error);
 };
 
 #define DEFINE_MODULE(modname, ninputs, noutputs) \
@@ -105,7 +107,7 @@ extern struct cbox_module_manifest *cbox_module_list[];
 
 extern void cbox_module_manifest_dump(struct cbox_module_manifest *manifest);
 extern struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char *name);
-extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate);
+extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate, GError **error);
 
 extern void cbox_module_init(struct cbox_module *module, void *user_data);
 extern void cbox_module_destroy(struct cbox_module *module);

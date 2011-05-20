@@ -53,7 +53,7 @@ void tone_control_process_block(struct cbox_module *module, cbox_sample_t **inpu
     cbox_onepolef_process(&m->highpass_state[1], &m->highpass_coeffs, outputs[1]);
 }
 
-struct cbox_module *tone_control_create(void *user_data, const char *cfg_section, int srate)
+struct cbox_module *tone_control_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     static int inited = 0;
     if (!inited)

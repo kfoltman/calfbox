@@ -399,7 +399,7 @@ static void read_drawbars(int *drawbars, int count, const char *registration)
     }
 }
 
-struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_section, int srate)
+struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     static int inited = 0;
     int i;

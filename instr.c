@@ -46,6 +46,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
     gchar *instr_section = NULL;
     gpointer value = g_hash_table_lookup(instruments.hash, name);
     const char *cv, *instr_engine;
+    GError *errobj = NULL;
     
     if (value)
         return value;
@@ -68,10 +69,12 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
     
     // cbox_module_manifest_dump(mptr);
     
-    module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(instruments.io));
+    module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(instruments.io), &errobj);
     if (!module)
     {
-        g_error("Cannot create engine %s for instrument %s", cv, name);
+        g_error("Cannot create engine %s for instrument %s: %s", cv, name, errobj ? errobj->message : "unknown error");
+        if (errobj)
+            g_error_free(errobj);
         goto error;
     }
     
@@ -100,10 +103,12 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
             g_error("FX preset '%s' refers to non-existing engine '%s'", cv, engine);
             goto fxpreset_error;
         }
-        effect = cbox_module_manifest_create_module(mptr, section2, cbox_io_get_sample_rate(cbox_instruments_get_io()));
+        effect = cbox_module_manifest_create_module(mptr, section2, cbox_io_get_sample_rate(cbox_instruments_get_io()), &errobj);
         if (!effect)
         {
-            g_error("Could not instantiate FX preset '%s'", cv);
+            g_error("Could not instantiate FX preset '%s': %s", cv, errobj ? errobj->message : "unknown error");
+            if (errobj)
+                g_error_free(errobj);
             goto fxpreset_error;
         }
         
