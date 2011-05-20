@@ -72,7 +72,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
     module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(instruments.io), &errobj);
     if (!module)
     {
-        g_error("Cannot create engine %s for instrument %s: %s", cv, name, errobj ? errobj->message : "unknown error");
+        g_error("Cannot create engine %s for instrument %s: %s", instr_engine, name, errobj ? errobj->message : "unknown error");
         if (errobj)
             g_error_free(errobj);
         goto error;

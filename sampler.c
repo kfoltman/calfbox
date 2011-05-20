@@ -652,6 +652,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->module.process_block = sampler_process_block;
     m->module.destroy = sampler_destroy;
     m->srate = srate;
+    m->programs = NULL;
             
     for (i = 0; ; i++)
     {
@@ -664,6 +665,12 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
             m->program_count = i;
             break;
         }
+    }
+    if (!m->program_count)
+    {
+        g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_NO_PROGRAMS, "%s: no programs defined", cfg_section);
+        cbox_module_destroy(&m->module);
+        return FALSE;
     }
     m->programs = malloc(sizeof(struct sampler_program) * m->program_count);
     int success = 1;
