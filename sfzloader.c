@@ -82,7 +82,7 @@ static gboolean parse_envelope_param(struct cbox_dahdsr *env, const char *key, c
     else if (!strcmp(key, "decay"))
         env->decay = fvalue;
     else if (!strcmp(key, "sustain"))
-        env->sustain = fvalue;
+        env->sustain = fvalue / 100.0;
     else if (!strcmp(key, "release"))
         env->release = fvalue;
     else
@@ -136,6 +136,8 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->cutoff = atof(value);
     else if (!strcmp(key, "resonance"))
         l->resonance = dB2gain(atof(value));
+    else if (!strcmp(key, "fileg_depth"))
+        l->env_mod = atof(value);
     else if (!strcmp(key, "tune"))
         l->tune = atof(value);
     else if (!strcmp(key, "transpose"))
