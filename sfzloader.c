@@ -36,8 +36,7 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
     struct sfz_load_state *ls = client->user_data;
     // printf("-- copy current region to the list of layers\n");
     struct sampler_layer *l = ls->region;
-    cbox_envelope_init_dahdsr(&l->amp_env_shape, &l->amp_env, ls->m->srate / CBOX_BLOCK_SIZE);
-    cbox_envelope_init_dahdsr(&l->filter_env_shape, &l->filter_env,  ls->m->srate / CBOX_BLOCK_SIZE);
+    sampler_layer_finalize(l, ls->m);
     ls->layers = g_list_append(ls->layers, ls->region);
     ls->region = NULL;
 }
@@ -109,6 +108,8 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         if (!wf)
             return FALSE;
         sampler_layer_set_waveform(l, wf);
+        if (l->loop_end == 0)
+            l->loop_end = l->sample_end;
     }
     else if (!strcmp(key, "lokey"))
         l->min_note = note_from_string(value);
@@ -128,6 +129,21 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->loop_start = atoi(value);
     else if (!strcmp(key, "loop_end") || !strcmp(key, "loopend"))
         l->loop_end = atoi(value);
+    else if (!strcmp(key, "loop_mode") || !strcmp(key, "loopmode"))
+    {
+        if (!strcmp(value, "one_shot"))
+            l->loop_mode = slm_one_shot;
+        else if (!strcmp(value, "no_loop"))
+            l->loop_mode = slm_no_loop;
+        else if (!strcmp(value, "loop_continuous"))
+            l->loop_mode = slm_loop_continuous;
+        else if (!strcmp(value, "loop_sustain"))
+            l->loop_mode = slm_loop_sustain;
+        else
+        {
+            g_warning("Unhandled loop mode: %s", value);
+        }
+    }
     else if (!strcmp(key, "volume"))
         l->gain = dB2gain(atof(value));
     else if (!strcmp(key, "pan"))

@@ -45,6 +45,15 @@ enum sample_player_type
     spt_stereo16
 };
 
+enum sample_loop_mode
+{
+    slm_unknown,
+    slm_no_loop,
+    slm_one_shot,
+    slm_loop_continuous,
+    slm_loop_sustain, // unsupported
+};
+
 struct sampler_layer
 {
     enum sample_player_type mode;
@@ -52,6 +61,7 @@ struct sampler_layer
     uint32_t sample_offset;
     uint32_t loop_start;
     uint32_t loop_end;
+    uint32_t sample_end;
     float gain;
     float pan;
     float freq;
@@ -63,6 +73,7 @@ struct sampler_layer
     float cutoff, resonance, env_mod;
     struct cbox_dahdsr amp_env, filter_env;
     struct cbox_envelope_shape amp_env_shape, filter_env_shape;
+    enum sample_loop_mode loop_mode;
 };
 
 struct sampler_program
@@ -86,7 +97,7 @@ struct sampler_voice
     enum sample_player_type mode;
     struct sampler_layer *layer;
     int16_t *sample_data;
-    uint32_t pos, delta, loop_start, loop_end;
+    uint32_t pos, delta, loop_start, loop_end, sample_end;
     uint32_t frac_pos, frac_delta;
     int note;
     int vel;
@@ -101,6 +112,7 @@ struct sampler_voice
     struct cbox_biquadf_coeffs filter_coeffs;
     struct sampler_channel *channel;
     struct cbox_envelope amp_env, filter_env;
+    enum sample_loop_mode loop_mode;
 };
 
 struct sampler_waveform
@@ -122,7 +134,8 @@ struct sampler_module
 
 extern void sampler_layer_init(struct sampler_layer *l);
 extern void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform);
-extern void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section);
+extern void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section);
+extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
 extern struct sampler_waveform *sampler_waveform_new_from_file(const char *context_name, const char *filename, GError **error);
 extern GQuark cbox_sampler_error_quark();
 

@@ -166,6 +166,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->frac_pos = 0;
             v->loop_start = l->loop_start;
             v->loop_end = l->loop_end;
+            v->sample_end = l->sample_end;
             v->gain = l->gain * vel / 127.0;
             v->pan = l->pan;
             v->note = note;
@@ -184,6 +185,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->cutoff = l->cutoff;
             v->resonance = l->resonance;
             v->env_mod = l->env_mod;
+            v->loop_mode = l->loop_mode;
             cbox_biquadf_reset(&v->filter_left);
             cbox_biquadf_reset(&v->filter_right);
             cbox_envelope_reset(&v->amp_env);
@@ -192,6 +194,20 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             if (lidx < 0)
                 break;
         }
+    }
+}
+
+void sampler_voice_release(struct sampler_voice *v)
+{
+    if (v->loop_mode != slm_one_shot)
+        v->released = 1;
+    else
+        v->loop_start = -1; // should be guaranteed by layer settings anyway
+    
+    if (v->loop_mode == slm_loop_sustain)
+    {
+        v->loop_end = v->sample_end;
+        v->loop_start = -1;
     }
 }
 
@@ -207,7 +223,7 @@ void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int 
             else if (c->sustain)
                 v->released_with_sustain = 1;
             else
-                v->released = 1;
+                sampler_voice_release(v);
         }
     }
 }
@@ -219,7 +235,7 @@ void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
         struct sampler_voice *v = &m->voices[i];
         if (v->mode != spt_inactive && v->channel == c && v->released_with_sustain)
         {
-            v->released = 1;
+            sampler_voice_release(v);
             v->released_with_sustain = 0;
         }
     }
@@ -232,7 +248,7 @@ void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
         struct sampler_voice *v = &m->voices[i];
         if (v->mode != spt_inactive && v->channel == c && v->released_with_sostenuto)
         {
-            v->released = 1;
+            sampler_voice_release(v);
             v->released_with_sostenuto = 0;
             // XXXKF unsure what to do with sustain
         }
@@ -244,7 +260,7 @@ void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel 
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
-        if (v->mode != spt_inactive && v->channel == c && !v->released)
+        if (v->mode != spt_inactive && v->channel == c && !v->released && v->loop_mode != slm_one_shot)
         {
             // XXXKF unsure what to do with sustain
             v->captured_sostenuto = 1;
@@ -259,8 +275,10 @@ void sampler_stop_all(struct sampler_module *m, struct sampler_channel *c)
         struct sampler_voice *v = &m->voices[i];
         if (v->mode != spt_inactive && v->channel == c)
         {
-            v->released = 0;
+            sampler_voice_release(v);
             v->released_with_sustain = 0;
+            v->released_with_sostenuto = 0;
+            v->captured_sostenuto = 0;
         }
     }
 }
@@ -508,6 +526,7 @@ void sampler_layer_init(struct sampler_layer *l)
 {
     l->sample_data = NULL;
     l->sample_offset = 0;
+    l->sample_end = 0;
     l->freq = 44100;
     l->loop_start = -1;
     l->loop_end = 0;
@@ -537,6 +556,7 @@ void sampler_layer_init(struct sampler_layer *l)
     l->filter_env.release = 0.05;
     l->tune = 0;
     l->transpose = 0;
+    l->loop_mode = slm_unknown;
 }
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
@@ -544,14 +564,32 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform
     l->sample_data = waveform ? waveform->data : NULL;
     l->freq = (waveform && waveform->info.samplerate) ? waveform->info.samplerate : 44100;
     l->loop_end = waveform ? waveform->info.frames : 0;
+    l->sample_end = waveform ? waveform->info.frames : 0;
     l->mode = waveform && waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
 }
 
-void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section)
+void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
+{
+    cbox_envelope_init_dahdsr(&l->amp_env_shape, &l->amp_env, m->srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_dahdsr(&l->filter_env_shape, &l->filter_env,  m->srate / CBOX_BLOCK_SIZE);
+
+    if (l->loop_mode == slm_unknown)
+        l->loop_mode = l->loop_start == -1 ? slm_no_loop : slm_loop_continuous;
+    
+    if (l->loop_mode == slm_one_shot || l->loop_mode == slm_no_loop)
+        l->loop_start = -1;
+
+    if ((l->loop_mode == slm_loop_continuous || l->loop_mode == slm_loop_sustain) && l->loop_start == -1)
+    {
+        l->loop_start = 0;
+    }
+}
+
+void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section)
 {
     char *imp = cbox_config_get_string(cfg_section, "import");
     if (imp)
-        sampler_load_layer_overrides(m, l, imp);
+        sampler_load_layer_overrides(l, m, imp);
     l->sample_offset = cbox_config_get_int(cfg_section, "offset", l->sample_offset);
     l->loop_start = cbox_config_get_int(cfg_section, "loop_start", l->loop_start);
     l->loop_end = cbox_config_get_int(cfg_section, "loop_end", l->loop_end);
@@ -567,18 +605,21 @@ void sampler_load_layer_overrides(struct sampler_module *m, struct sampler_layer
     l->tune = cbox_config_get_float(cfg_section, "tune", l->tune);
     cbox_config_get_dahdsr(cfg_section, "amp", &l->amp_env);
     cbox_config_get_dahdsr(cfg_section, "filter", &l->filter_env);
-    cbox_envelope_init_dahdsr(&l->amp_env_shape, &l->amp_env, m->srate / CBOX_BLOCK_SIZE);
-    cbox_envelope_init_dahdsr(&l->filter_env_shape, &l->filter_env,  m->srate / CBOX_BLOCK_SIZE);
     l->cutoff = cbox_config_get_float(cfg_section, "cutoff", l->cutoff);
     l->resonance = cbox_config_get_float(cfg_section, "resonance", l->resonance);
     l->env_mod = cbox_config_get_float(cfg_section, "env_mod", l->env_mod);
+    if (cbox_config_get_int(cfg_section, "one_shot", 0))
+        l->loop_mode = slm_one_shot;
+    if (cbox_config_get_int(cfg_section, "loop_sustain", 0))
+        l->loop_mode = slm_loop_sustain;
 }
 
 void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
 {
     sampler_layer_init(l);
     sampler_layer_set_waveform(l, waveform);
-    sampler_load_layer_overrides(m, l, cfg_section);
+    sampler_load_layer_overrides(l, m, cfg_section);
+    sampler_layer_finalize(l, m);
 }
 
 static gboolean load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section, GError **error)
