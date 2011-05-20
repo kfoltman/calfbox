@@ -35,6 +35,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <unistd.h>
 
+#define CBOX_STREAM_PLAYER_ERROR cbox_stream_player_error_quark()
+
+enum CboxStreamPlayerError
+{
+    CBOX_STREAM_PLAYER_ERROR_FAILED,
+};
+
+GQuark cbox_stream_player_error_quark()
+{
+    return g_quark_from_string("cbox-stream-player-error-quark");
+}
+
 #define CUE_BUFFER_SIZE 16000
 #define PREFETCH_THRESHOLD (CUE_BUFFER_SIZE / 4)
 #define MAX_READAHEAD_BUFFERS 3
@@ -75,7 +87,8 @@ struct stream_state
     float gain, fade_gain, fade_increment;
     enum stream_state_phase phase;
 
-    pthread_t thr_preload;    
+    pthread_t thr_preload;
+    int thread_started;
 };
 
 struct stream_player_module
@@ -389,12 +402,19 @@ static void stream_state_destroy(struct stream_state *ss)
 {
     unsigned char cmd = 255;
     
-    jack_ringbuffer_write(ss->rb_for_reading, &cmd, 1);
-    pthread_join(ss->thr_preload, NULL);
+    if (ss->rb_for_reading && ss->thread_started)
+    {
+        jack_ringbuffer_write(ss->rb_for_reading, &cmd, 1);
+        pthread_join(ss->thr_preload, NULL);
+    }
     
-    jack_ringbuffer_free(ss->rb_for_reading);
-    jack_ringbuffer_free(ss->rb_just_read);
-    sf_close(ss->sndfile);
+    if (ss->rb_for_reading)
+        jack_ringbuffer_free(ss->rb_for_reading);
+    if (ss->rb_just_read)
+        jack_ringbuffer_free(ss->rb_just_read);
+    if (ss->sndfile)
+        sf_close(ss->sndfile);
+    free(ss);
 }
 
 void stream_player_destroy(struct cbox_module *module)
@@ -404,14 +424,15 @@ void stream_player_destroy(struct cbox_module *module)
         stream_state_destroy(m->stream);
 }
 
-static struct stream_state *stream_state_new(const char *context, const char *filename, uint64_t loop)
+static struct stream_state *stream_state_new(const char *context, const char *filename, uint64_t loop, GError **error)
 {
     struct stream_state *stream = malloc(sizeof(struct stream_state));
     stream->sndfile = sf_open(filename, SFM_READ, &stream->info);
     
     if (!stream->sndfile)
     {
-        g_error("%s: cannot open file '%s': %s", context, filename, sf_strerror(NULL));
+        g_set_error(error, CBOX_STREAM_PLAYER_ERROR, CBOX_STREAM_PLAYER_ERROR_FAILED, "cannot open file '%s': %s", context, filename, sf_strerror(NULL));
+        free(stream);
         return NULL;
     }
     g_message("Frames %d channels %d", (int)stream->info.frames, (int)stream->info.channels);
@@ -427,6 +448,7 @@ static struct stream_state *stream_state_new(const char *context, const char *fi
     stream->gain = 1.0;
     stream->fade_gain = 0.0;
     stream->fade_increment = 1.0;
+    stream->thread_started = 0;
     
     init_cue(stream, &stream->cp_start, CUE_BUFFER_SIZE, 0);
     load_at_cue(stream, &stream->cp_start);
@@ -442,9 +464,12 @@ static struct stream_state *stream_state_new(const char *context, const char *fi
     }
     if (pthread_create(&stream->thr_preload, NULL, sample_preload_thread, stream))
     {
-        g_error("Failed to create audio prefetch thread", strerror(errno));
+        stream_state_destroy(stream);
+        g_set_error(error, CBOX_STREAM_PLAYER_ERROR, CBOX_STREAM_PLAYER_ERROR_FAILED, "cannot open file '%s': %s", filename, sf_strerror(NULL));
         return NULL;
     }
+    stream->thread_started = 1;
+    
     return stream;
 }
 
@@ -517,13 +542,14 @@ struct load_command_data
     gchar *filename;
     int loop_start;
     struct stream_state *stream, *old_stream;
+    GError **error;
 };
 
 static int stream_player_load_prepare(void *p)
 {
     struct load_command_data *c = p;
     
-    c->stream = stream_state_new(NULL, c->filename, c->loop_start);
+    c->stream = stream_state_new(NULL, c->filename, c->loop_start, c->error);
     c->old_stream = NULL;
     if (!c->stream)
     {
@@ -586,6 +612,7 @@ void stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_osc_c
         c->module = m;
         c->filename = g_strdup((gchar *)cmd->arg_values[0]);
         c->loop_start = *(int *)cmd->arg_values[1];
+        c->error = NULL; // XXXKF add error reporting after creating a return channel
         cbox_rt_cmd_execute_async(app.rt, &stream_load_command, c);
     }
 }
@@ -604,7 +631,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     char *filename = cbox_config_get_string(cfg_section, "file");
     if (!filename)
     {
-        g_error("%s: filename not specified", cfg_section);
+        g_set_error(error, CBOX_STREAM_PLAYER_ERROR, CBOX_STREAM_PLAYER_ERROR_FAILED, "filename not specified");
         return NULL;
     }
     cbox_module_init(&m->module, m);
@@ -612,7 +639,12 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     m->module.process_block = stream_player_process_block;
     m->module.cmd_target.process_cmd = stream_player_process_cmd;
     m->module.destroy = stream_player_destroy;
-    m->stream = stream_state_new(cfg_section, filename, (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", -1));
+    m->stream = stream_state_new(cfg_section, filename, (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", -1), error);
+    if (!m->stream)
+    {
+        cbox_module_destroy(&m->module);
+        return NULL;
+    }
     m->stream->gain = cbox_config_get_gain(cfg_section, "gain", m->stream->gain);
     m->stream->fade_increment = 1.0 / (cbox_config_get_float(cfg_section, "fade_time", 0.05) * (srate / CBOX_BLOCK_SIZE));
     
