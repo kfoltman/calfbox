@@ -153,8 +153,8 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     int cost;
     uint32_t i, j, n;
     
-    float *out_l = jack_port_get_buffer(io->output_l, nframes);
-    float *out_r = jack_port_get_buffer(io->output_r, nframes);
+    float *out_l = jack_port_get_buffer(io->outputs[0], nframes);
+    float *out_r = jack_port_get_buffer(io->outputs[1], nframes);
 
     if (scene)
     {

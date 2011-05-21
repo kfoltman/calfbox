@@ -48,11 +48,23 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
     if (io->client == NULL)
         return 0;
 
-    io->output_l = jack_port_register(io->client, "out_l", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-    io->output_r = jack_port_register(io->client, "out_r", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    io->output_count = cbox_config_get_int("io", "outputs", 2);
+    io->outputs = malloc(sizeof(jack_port_t *) * io->output_count);
+    for (int i = 0; i < io->output_count; i++)
+    {
+        gchar *name = g_strdup_printf("out_%d", 1 + i);
+        io->outputs[i] = jack_port_register(io->client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+        if (!io->outputs[i])
+        {
+            // XXXKF switch to glib style error reporting, though this condition will probably rarely happen in real life
+            g_error("Cannot create output port %d", i);
+            return 0;
+        }
+        g_free(name);
+    }
     io->midi = jack_port_register(io->client, "midi", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
     
-    if (!io->output_l || !io->output_r || !io->midi)
+    if (!io->midi)
         return 0;
     
     return 1;
@@ -103,7 +115,7 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
             if (use_name[0] == '#')
             {
                 char *endptr = NULL;
-                long portidx = strtol(use_name + 1, &endptr, 10);
+                long portidx = strtol(use_name + 1, &endptr, 10) - 1;
                 if (endptr == use_name + strlen(use_name))
                 {
                     const char **names = jack_get_ports(client, ".*", is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
@@ -160,16 +172,27 @@ int cbox_io_get_sample_rate(struct cbox_io *io)
     return jack_get_sample_rate(io->client);
 }
 
+static void do_autoconnect(struct cbox_io *io, jack_port_t *portobj)
+{
+    for (int i = 0; i < io->output_count; i++)
+    {
+        gchar *cbox_port = g_strdup_printf("cbox:out_%d", 1 + i);
+        gchar *config_key = g_strdup_printf("out_%d", 1 + i);
+        autoconnect(io->client, cbox_port, config_key, 0, 0, portobj);
+        g_free(cbox_port);
+        g_free(config_key);
+    }
+    autoconnect(io->client, "cbox:midi", "midi", 1, 1, portobj);        
+}
+
 void cbox_io_poll_ports(struct cbox_io *io)
 {
     if (jack_ringbuffer_read_space(io->rb_autoconnect) >= sizeof(jack_port_t *))
     {
         jack_port_t *portobj;
         jack_ringbuffer_read(io->rb_autoconnect, (uint8_t *)&portobj, sizeof(portobj));
+        do_autoconnect(io, portobj);
         
-        autoconnect(io->client, "cbox:out_l", "out_left", 0, 0, portobj);
-        autoconnect(io->client, "cbox:out_r", "out_right", 0, 0, portobj);
-        autoconnect(io->client, "cbox:midi", "midi", 1, 1, portobj);        
     }
 }
 
@@ -182,11 +205,7 @@ int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
     jack_activate(io->client);
 
     if (cbox_config_has_section(io_section))
-    {
-        autoconnect(io->client, "cbox:out_l", "out_left", 0, 0, NULL);
-        autoconnect(io->client, "cbox:out_r", "out_right", 0, 0, NULL);
-        autoconnect(io->client, "cbox:midi", "midi", 1, 1, NULL);
-    }
+        do_autoconnect(io, NULL);
     
     return 1;
 }
@@ -202,10 +221,8 @@ void cbox_io_close(struct cbox_io *io)
 {
     if (io->client)
     {
-        if (io->output_l)
-            jack_port_unregister(io->client, io->output_l);
-        if (io->output_r)
-            jack_port_unregister(io->client, io->output_r);
+        for (int i = 0; i < io->output_count; i++)
+            jack_port_unregister(io->client, io->outputs[i]);
         if (io->midi)
             jack_port_unregister(io->client, io->midi);
         

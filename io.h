@@ -32,8 +32,10 @@ struct cbox_open_params
 struct cbox_io
 {
     jack_client_t *client;
-    jack_port_t *output_l, *output_r;
+    jack_port_t **outputs;
+    int output_count;
     jack_port_t *midi;
+    
     
     jack_ringbuffer_t *rb_autoconnect;
     
