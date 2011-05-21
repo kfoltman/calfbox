@@ -190,12 +190,13 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         int event_count = instr->module->midi_input.count;
         int cur_event = 0;
         uint32_t highwatermark = 0;
+        cbox_sample_t channels[CBOX_MAX_AUDIO_PORTS][CBOX_BLOCK_SIZE];
+        cbox_sample_t *outputs[CBOX_MAX_AUDIO_PORTS];
+        for (i = 0; i < module->outputs; i++)
+            outputs[i] = channels[i];
         
         for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
-        {
-            cbox_sample_t left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
-            cbox_sample_t *outputs[2] = {left, right};
-            
+        {            
             if (i >= highwatermark)
             {
                 while(cur_event < event_count)
@@ -224,8 +225,8 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
             }
             for (j = 0; j < CBOX_BLOCK_SIZE; j++)
             {
-                out_l[i + j] += left[j];
-                out_r[i + j] += right[j];
+                out_l[i + j] += channels[0][j];
+                out_r[i + j] += channels[1][j];
             }
         }
         while(cur_event < event_count)

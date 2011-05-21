@@ -26,6 +26,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <fluidsynth.h>
 
+#define CBOX_FLUIDSYNTH_ERROR cbox_fluidsynth_error_quark()
+
+enum CboxFluidsynthError
+{
+    CBOX_FLUIDSYNTH_ERROR_FAILED,
+};
+
+GQuark cbox_fluidsynth_error_quark()
+{
+    return g_quark_from_string("cbox-fluidsynth-error-quark");
+}
+
 static void fluidsynth_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 static void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void fluidsynth_destroy(struct cbox_module *module);
@@ -37,6 +49,8 @@ struct fluidsynth_module
     fluid_settings_t *settings;
     fluid_synth_t *synth;
     int sfid;
+    int output_pairs;
+    float **left_outputs, **right_outputs;
 };
 
 struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, int srate, GError **error)
@@ -51,23 +65,44 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
     }
     if (!bankname)
     {
-        g_error("No bank specified (section=%s, key=sf2)", cfg_section);
+        g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "No bank specified (section=%s, key=sf2)", cfg_section);
         return NULL;
     }
     
     struct fluidsynth_module *m = malloc(sizeof(struct fluidsynth_module));
-    cbox_module_init(&m->module, m, 0, 2);
+    m->output_pairs = cbox_config_get_int(cfg_section, "output_pairs", 1);
+    if (m->output_pairs < 1 || m->output_pairs > 16)
+    {
+        free(m);
+        g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Invalid number of output pairs (found %d, supported range 1-16)", m->output_pairs);
+        return NULL;
+    }
+    if (m->output_pairs == 1)
+    {
+        cbox_module_init(&m->module, m, 0, 2 * m->output_pairs);
+        m->left_outputs = NULL;
+        m->right_outputs = NULL;
+    }
+    else
+    {
+        g_message("Multichannel mode enabled, %d output pairs, 2 effects", m->output_pairs);
+        cbox_module_init(&m->module, m, 0, 2 * m->output_pairs + 4); // direct + fx outputs
+        m->left_outputs = malloc(sizeof(float *) * (m->output_pairs + 2));
+        m->right_outputs = malloc(sizeof(float *) * (m->output_pairs + 2));
+    }
     m->module.process_event = fluidsynth_process_event;
     m->module.process_block = fluidsynth_process_block;
     m->module.destroy = fluidsynth_destroy;
     m->settings = new_fluid_settings();
     fluid_settings_setnum(m->settings, "synth.sample-rate", srate);
+    fluid_settings_setint(m->settings, "synth.audio-channels", m->output_pairs);
+    fluid_settings_setint(m->settings, "synth.audio-groups", m->output_pairs);
     m->synth = new_fluid_synth(m->settings);
     g_message("Loading soundfont %s", bankname);
     result = fluid_synth_sfload(m->synth, bankname, 1);
     if (result == FLUID_FAILED)
     {
-        g_error("Failed to load the default bank %s", bankname);
+        g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Failed to load the default bank %s", bankname);
         return NULL;
     }
     g_message("Soundfont %s loaded", bankname);
@@ -116,7 +151,19 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
 void fluidsynth_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct fluidsynth_module *m = (struct fluidsynth_module *)module;
-    fluid_synth_write_float(m->synth, CBOX_BLOCK_SIZE, outputs[0], 0, 1, outputs[1], 0, 1);
+    if (m->output_pairs == 1)
+        fluid_synth_write_float(m->synth, CBOX_BLOCK_SIZE, outputs[0], 0, 1, outputs[1], 0, 1);
+    else
+    {
+        int i;
+        for (i = 0; i < 2 + m->output_pairs; i++)
+        {
+            m->left_outputs[i] = outputs[2 * i];
+            m->right_outputs[i] = outputs[2 * i + 1];
+        }
+        
+        fluid_synth_nwrite_float(m->synth, CBOX_BLOCK_SIZE, m->left_outputs, m->right_outputs, m->left_outputs + m->output_pairs, m->right_outputs + m->output_pairs);
+    }
 }
 
 void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
@@ -163,6 +210,12 @@ void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, u
 void fluidsynth_destroy(struct cbox_module *module)
 {
     struct fluidsynth_module *m = (struct fluidsynth_module *)module;
+    
+    if (m->output_pairs)
+    {
+        free(m->left_outputs);
+        free(m->right_outputs);
+    }
     
     delete_fluid_settings(m->settings);
     delete_fluid_synth(m->synth);

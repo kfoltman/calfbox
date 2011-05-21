@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib.h>
 #include <stdint.h>
 
+#define CBOX_MAX_AUDIO_PORTS 32
+
 struct cbox_module_keyrange_metadata
 {
     uint8_t channel; // 0 = omni
