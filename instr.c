@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010 Krzysztof Foltman
+Copyright (C) 2010-2011 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -82,38 +82,13 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
     cv = cbox_config_get_string(instr_section, "insert");
     if (cv)
     {
-        gchar *section2 = g_strdup_printf("fxpreset:%s", cv);
-        const char *engine;
-        struct cbox_module_manifest *mptr;
-        
-        if (!cbox_config_has_section(section2))
-        {
-            g_error("No FX preset called '%s'", cv);
-            goto fxpreset_error;
-        }
-        engine = cbox_config_get_string(section2, "engine");
-        if (!engine)
-        {
-            g_error("FX engine not specified for preset '%s'", cv);
-            goto fxpreset_error;
-        }
-        mptr = cbox_module_manifest_get_by_name(engine);
-        if (!mptr)
-        {
-            g_error("FX preset '%s' refers to non-existing engine '%s'", cv, engine);
-            goto fxpreset_error;
-        }
-        effect = cbox_module_manifest_create_module(mptr, section2, cbox_io_get_sample_rate(cbox_instruments_get_io()), &errobj);
+        effect = cbox_module_new_from_fx_preset(cv, &errobj);
         if (!effect)
         {
-            g_error("Could not instantiate FX preset '%s': %s", cv, errobj ? errobj->message : "unknown error");
+            g_error("%s", errobj ? errobj->message : "unknown error");
             if (errobj)
                 g_error_free(errobj);
-            goto fxpreset_error;
         }
-        
-    fxpreset_error:
-        g_free(section2);
     }
 
     free(instr_section);

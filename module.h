@@ -29,6 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define CBOX_MAX_AUDIO_PORTS 32
 
+#define CBOX_MODULE_ERROR cbox_module_error_quark()
+
+enum CboxModuleError
+{
+    CBOX_MODULE_ERROR_FAILED,
+};
+
 struct cbox_module_keyrange_metadata
 {
     uint8_t channel; // 0 = omni
@@ -112,7 +119,11 @@ extern void cbox_module_manifest_dump(struct cbox_module_manifest *manifest);
 extern struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char *name);
 extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate, GError **error);
 
+extern struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **error);
+
 extern void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs);
 extern void cbox_module_destroy(struct cbox_module *module);
+
+extern GQuark cbox_module_error_quark();
 
 #endif

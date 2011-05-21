@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
+#include "config-api.h"
 #include "module.h"
 
 #include <assert.h>
@@ -35,6 +37,7 @@ extern struct cbox_module_manifest reverb_module;
 extern struct cbox_module_manifest parametric_eq_module;
 extern struct cbox_module_manifest phaser_module;
 extern struct cbox_module_manifest chorus_module;
+extern struct cbox_module_manifest fxchain_module;
 
 struct cbox_module_manifest *cbox_module_list[] = {
     &tonewheel_organ_module,
@@ -47,8 +50,14 @@ struct cbox_module_manifest *cbox_module_list[] = {
     &phaser_module,
     &chorus_module,
     &sampler_module,
+    &fxchain_module,
     NULL
 };
+
+GQuark cbox_module_error_quark()
+{
+    return g_quark_from_string("cbox-module-error-quark");
+}
 
 void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
 {
@@ -113,6 +122,45 @@ void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, i
     module->process_event = NULL;
     module->process_block = NULL;
     module->destroy = NULL;
+}
+
+struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **error)
+{
+    gchar *section = g_strdup_printf("fxpreset:%s", name);
+    const char *engine;
+    struct cbox_module_manifest *mptr;
+    struct cbox_module *effect;
+    GError *errobj = NULL;
+    
+    if (!cbox_config_has_section(section))
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No FX preset called '%s'", name);
+        goto fxpreset_error;
+    }
+    engine = cbox_config_get_string(section, "engine");
+    if (!engine)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "FX engine not specified for preset '%s'", name);
+        goto fxpreset_error;
+    }
+    mptr = cbox_module_manifest_get_by_name(engine);
+    if (!mptr)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "FX preset '%s' refers to non-existing engine '%s'", name, engine);
+        goto fxpreset_error;
+    }
+    effect = cbox_module_manifest_create_module(mptr, section, cbox_io_get_sample_rate(&app.io), &errobj);
+    if (!effect)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Could not instantiate FX preset '%s': %s", name, errobj ? errobj->message : "unknown error");
+        g_error_free(errobj);
+        goto fxpreset_error;
+    }
+    return effect;
+    
+fxpreset_error:
+    g_free(section);
+    return NULL;
 }
 
 void cbox_module_destroy(struct cbox_module *module)
