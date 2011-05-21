@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
     const char *config_name = NULL;
     const char *instrument_name = "default";
     const char *scene_name = NULL;
-    const char *effect_module_name = NULL;
+    const char *effect_preset_name = NULL;
     const char *drum_pattern_name = NULL;
     const char *drum_track_name = NULL;
     char *instr_section = NULL;
@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
                 scene_name = optarg;
                 break;
             case 'e':
-                effect_module_name = optarg;
+                effect_preset_name = optarg;
                 break;
             case 'd':
                 drum_pattern_name = optarg;
@@ -187,20 +187,13 @@ int main(int argc, char *argv[])
         cbox_scene_add_layer(scene, layer);
     }
 
-    if (effect_module_name && *effect_module_name)
+    if (effect_preset_name && *effect_preset_name)
     {
         GError *error = NULL;
-        mptr = cbox_module_manifest_get_by_name(effect_module_name);
-        if (!mptr)
-        {
-            fprintf(stderr, "Cannot find effect %s\n", effect_module_name);
-            goto fail;
-        }
-        cbox_module_manifest_dump(mptr);
-        app.rt->effect = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(&app.io), &error);
+        app.rt->effect = cbox_module_new_from_fx_preset(effect_preset_name, &error);
         if (!app.rt->effect)
         {
-            fprintf(stderr, "Cannot create effect %s: %s\n", effect_module_name, error ? error->message : "unknown error");
+            fprintf(stderr, "%s\n", error ? error->message : "unknown error");
             if (error)
                 g_error_free(error);
             goto fail;
