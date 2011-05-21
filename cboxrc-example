@@ -5,6 +5,18 @@ out_right=#1
 ;midi=alsa_pcm:E-MU-XMidi2X2/midi_capture_2;alsa_pcm:E-MU-XMidi2X2/midi_capture_1
 midi=~alsa_pcm:in-.*-E-MU-XMidi2X2-MIDI-1;~alsa_pcm:in-.*-E-MU-XMidi2X2-MIDI-2;~alsa_pcm:in-.*-padKONTROL-MIDI-2
 
+[master]
+tempo=100
+beats_per_bar=4
+;effect=cbox_reverb
+
+[fxpreset:cbox_reverb]
+engine=reverb
+reverb_time=800
+wet_gain=-12
+dry_gain=0
+stereo=-12
+
 [scene:example]
 layer1=organ
 layer2=piano

@@ -56,7 +56,21 @@ static struct option long_options[] = {
 
 void print_help(char *progname)
 {
-    printf("Usage: %s [--help] [--metronome] [--drum-pattern <pattern>] [--drum-track <track>] [--tempo <bpm>] [--beats <beatsperbar>] [--instrument <name>] [--scene <name>] [--config <name>]\n", progname);
+    printf("Usage: %s [options]\n"
+        "\n"
+        "Options:\n"
+        " -h | --help               Show this help text\n"
+        " -m | --metronome          Create a simple metronome pattern\n"
+        " -d | --drum-pattern <p>   Load drum pattern with a given name\n"
+        " -D | --drum-track <t>     Load drum track with a given name\n"
+        " -t | --tempo <bpm>        Use given tempo (specified in beats/min)\n"
+        " -b | --beats <bpb>        Use given beats/bar\n"
+        " -e | --effect <e>         Override master effect with preset <e>\n"
+        " -i | --instrument <i>     Load instrument <i> as a single-instrument scene\n"
+        " -s | --scene <s>          Load a scene <s>\n"
+        " -c | --config <c>         Use specified config file instead of default\n"
+        "\n",
+        progname);
     exit(0);
 }
 
@@ -187,6 +201,9 @@ int main(int argc, char *argv[])
         cbox_scene_add_layer(scene, layer);
     }
 
+    if (!effect_preset_name)
+        effect_preset_name = cbox_config_get_string("master", "effect");
+    
     if (effect_preset_name && *effect_preset_name)
     {
         GError *error = NULL;
