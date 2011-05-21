@@ -634,7 +634,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
         g_set_error(error, CBOX_STREAM_PLAYER_ERROR, CBOX_STREAM_PLAYER_ERROR_FAILED, "filename not specified");
         return NULL;
     }
-    cbox_module_init(&m->module, m);
+    cbox_module_init(&m->module, m, 0, 2);
     m->module.process_event = stream_player_process_event;
     m->module.process_block = stream_player_process_block;
     m->module.cmd_target.process_cmd = stream_player_process_cmd;

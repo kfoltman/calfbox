@@ -83,7 +83,7 @@ struct cbox_module *delay_create(void *user_data, const char *cfg_section, int s
     }
     
     struct delay_module *m = malloc(sizeof(struct delay_module));
-    cbox_module_init(&m->module, m);
+    cbox_module_init(&m->module, m, 2, 2);
     m->module.process_event = delay_process_event;
     m->module.process_block = delay_process_block;
     m->pos = 0;

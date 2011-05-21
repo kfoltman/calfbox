@@ -688,7 +688,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     }
     
     struct sampler_module *m = malloc(sizeof(struct sampler_module));
-    cbox_module_init(&m->module, m);
+    cbox_module_init(&m->module, m, 0, 2);
     m->module.process_event = sampler_process_event;
     m->module.process_block = sampler_process_block;
     m->module.destroy = sampler_destroy;

@@ -55,7 +55,7 @@ void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
     static const char *ctl_classes[] = { "Switch CC#", "Continuous CC#", "Cont. Param", "Discrete Param", "Enum" };
     int i = 0;
     printf("Module: %s\n", manifest->name);
-    printf("Audio I/O: %d inputs, %d outputs\n", manifest->inputs, manifest->outputs);
+    printf("Audio I/O: min %d inputs, min %d outputs\n", manifest->min_inputs, manifest->min_outputs);
     
     printf("Live controllers:\n");
     printf("Ch#             Type Number Name                          \n");
@@ -93,18 +93,20 @@ struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manife
     if (!module)
         return NULL;
     
-    module->input_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * manifest->inputs);
-    module->output_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * manifest->outputs);
+    module->input_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * module->inputs);
+    module->output_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * module->outputs);
     cbox_midi_buffer_init(&module->midi_input);
     
     return module;
 }
 
-void cbox_module_init(struct cbox_module *module, void *user_data)
+void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs)
 {
     module->user_data = user_data;
     module->input_samples = NULL;
     module->output_samples = NULL;
+    module->inputs = inputs;
+    module->outputs = outputs;
     
     module->cmd_target.process_cmd = NULL;
     module->cmd_target.user_data = module;

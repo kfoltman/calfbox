@@ -110,7 +110,7 @@ struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int 
     }
     
     struct chorus_module *m = malloc(sizeof(struct chorus_module));
-    cbox_module_init(&m->module, m);
+    cbox_module_init(&m->module, m, 2, 2);
     m->module.process_event = chorus_process_event;
     m->module.process_block = chorus_process_block;
     m->pos = 0;
