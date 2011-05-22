@@ -26,7 +26,8 @@ struct cbox_instrument
 {
     const char *engine_name;
     struct cbox_module *module;
-    struct cbox_module *insert;
+    struct cbox_module **inserts;
+    int *output_buses;
 };
 
 extern void cbox_instruments_init(struct cbox_io *io);

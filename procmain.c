@@ -187,7 +187,6 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     {
         struct cbox_instrument *instr = scene->instruments[n];
         struct cbox_module *module = instr->module;
-        struct cbox_module *effect = instr->insert;
         int event_count = instr->module->midi_input.count;
         int cur_event = 0;
         uint32_t highwatermark = 0;
@@ -220,14 +219,18 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
                 }
             }
             (*module->process_block)(module, NULL, outputs);
-            if (effect)
+            for (int o = 0; o < module->outputs / 2; o++)
             {
-                (*effect->process_block)(effect, outputs, outputs);
-            }
-            for (j = 0; j < CBOX_BLOCK_SIZE; j++)
-            {
-                io->output_buffers[0][i + j] += channels[0][j];
-                io->output_buffers[1][i + j] += channels[1][j];
+                int leftch = instr->output_buses[o] * 2;
+                int rightch = leftch + 1;
+                struct cbox_module *insert = instr->inserts[o];
+                if (insert)
+                    (*insert->process_block)(insert, outputs + 2 * o, outputs + 2 * o);
+                for (j = 0; j < CBOX_BLOCK_SIZE; j++)
+                {
+                    io->output_buffers[leftch][i + j] += channels[2 * o][j];
+                    io->output_buffers[rightch][i + j] += channels[2 * o + 1][j];
+                }
             }
         }
         while(cur_event < event_count)

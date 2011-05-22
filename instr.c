@@ -42,7 +42,6 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
     struct cbox_module_manifest *mptr = NULL;
     struct cbox_instrument *instr = NULL;
     struct cbox_module *module = NULL;
-    struct cbox_module *effect = NULL;
     gchar *instr_section = NULL;
     gpointer value = g_hash_table_lookup(instruments.hash, name);
     const char *cv, *instr_engine;
@@ -78,16 +77,30 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
         goto error;
     }
     
-    effect = NULL;
-    cv = cbox_config_get_string(instr_section, "insert");
-    if (cv)
+    struct cbox_module **effects = malloc(sizeof(struct cbox_module *) * module->outputs / 2);
+    int *output_buses = malloc(sizeof(int) * module->outputs);
+    for (int i = 0; i < module->outputs / 2; i ++)
     {
-        effect = cbox_module_new_from_fx_preset(cv, &errobj);
-        if (!effect)
+        gchar *key = i == 0 ? g_strdup("output_bus") : g_strdup_printf("output%d_bus", 1 + i);
+        output_buses[i] = cbox_config_get_int(instr_section, key, 1) - 1;
+        g_free(key);
+        
+        effects[i] = NULL;
+
+        key = i == 0 ? g_strdup("insert") : g_strdup_printf("insert%d", 1 + i);
+        cv = cbox_config_get_string(instr_section, key);
+        g_free(key);
+        
+        if (cv)
         {
-            g_error("%s", errobj ? errobj->message : "unknown error");
-            if (errobj)
-                g_error_free(errobj);
+            errobj = NULL;
+            effects[i] = cbox_module_new_from_fx_preset(cv, &errobj);
+            if (!effects[i])
+            {
+                g_error("%s", errobj ? errobj->message : "unknown error");
+                if (errobj)
+                    g_error_free(errobj);
+            }
         }
     }
 
@@ -95,8 +108,9 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
     
     instr = malloc(sizeof(struct cbox_instrument));
     instr->module = module;
-    instr->insert = effect;
+    instr->inserts = effects;
     instr->engine_name = instr_engine;
+    instr->output_buses = output_buses;
     
     g_hash_table_insert(instruments.hash, g_strdup(name), instr);
     
