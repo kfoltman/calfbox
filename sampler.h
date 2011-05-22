@@ -88,7 +88,7 @@ struct sampler_channel
     float pitchbend;
     float pbrange;
     int sustain, sostenuto;
-    int volume, pan, expression, modulation;
+    int volume, pan, expression, modulation, cutoff_ctl, resonance_ctl;
     struct sampler_program *program;
 };
 

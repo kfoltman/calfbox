@@ -167,7 +167,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->loop_start = l->loop_start;
             v->loop_end = l->loop_end;
             v->sample_end = l->sample_end;
-            v->gain = l->gain * vel / 127.0;
+            v->gain = l->gain * vel / 127.0 * vel / 127.0;
             v->pan = l->pan;
             v->note = note;
             v->vel = vel;
@@ -321,12 +321,17 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 pan = 1;
             v->lgain = gain * (1 - pan)  / 32768.0;
             v->rgain = gain * pan / 32768.0;
-            float cutoff = v->cutoff*pow(2.0,filter_env*v->env_mod/1200);
+            float cutoff = v->cutoff*pow(2.0,(filter_env*v->env_mod + c->cutoff_ctl*9600/maxv)/1200);
             if (cutoff < 20)
                 cutoff = 20;
             if (cutoff > m->srate * 0.45)
                 cutoff = m->srate * 0.45;
-            cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, v->resonance, m->srate);
+            float resonance = v->resonance*pow(32.0,c->resonance_ctl/maxv);
+            if (resonance < 0.7)
+                resonance = 0.7;
+            if (resonance > 32)
+                resonance = 32;
+            cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
             
             if (v->mode == spt_stereo16)
                 process_voice_stereo(v, outputs);
@@ -355,6 +360,12 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
             break;
         case 11:
             c->expression = val << 7;
+            break;
+        case 71:
+            c->resonance_ctl = (val << 7) - (64 << 7);
+            break;
+        case 74:
+            c->cutoff_ctl = (val << 7) - (64 << 7);
             break;
         case 64:
             if (c->sustain && !enabled)
@@ -457,6 +468,8 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->pan = 64 << 7;
     c->expression = 127 << 7;
     c->modulation = 0;
+    c->cutoff_ctl = 0;
+    c->resonance_ctl = 0;
     c->program = m->program_count ? &m->programs[0] : NULL;
 }
 
