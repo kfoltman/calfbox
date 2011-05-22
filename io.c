@@ -48,8 +48,24 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
     if (io->client == NULL)
         return 0;
 
+    io->input_count = cbox_config_get_int("io", "inputs", 0);
+    io->inputs = malloc(sizeof(jack_port_t *) * io->input_count);
+    io->input_buffers = malloc(sizeof(float *) * io->input_count);
+    for (int i = 0; i < io->input_count; i++)
+    {
+        gchar *name = g_strdup_printf("in_%d", 1 + i);
+        io->inputs[i] = jack_port_register(io->client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+        if (!io->inputs[i])
+        {
+            // XXXKF switch to glib style error reporting, though this condition will probably rarely happen in real life
+            g_error("Cannot create input port %d", i);
+            return 0;
+        }
+        g_free(name);
+    }
     io->output_count = cbox_config_get_int("io", "outputs", 2);
     io->outputs = malloc(sizeof(jack_port_t *) * io->output_count);
+    io->output_buffers = malloc(sizeof(float *) * io->output_count);
     for (int i = 0; i < io->output_count; i++)
     {
         gchar *name = g_strdup_printf("out_%d", 1 + i);
@@ -179,6 +195,14 @@ static void do_autoconnect(struct cbox_io *io, jack_port_t *portobj)
         gchar *cbox_port = g_strdup_printf("cbox:out_%d", 1 + i);
         gchar *config_key = g_strdup_printf("out_%d", 1 + i);
         autoconnect(io->client, cbox_port, config_key, 0, 0, portobj);
+        g_free(cbox_port);
+        g_free(config_key);
+    }
+    for (int i = 0; i < io->input_count; i++)
+    {
+        gchar *cbox_port = g_strdup_printf("cbox:in_%d", 1 + i);
+        gchar *config_key = g_strdup_printf("in_%d", 1 + i);
+        autoconnect(io->client, cbox_port, config_key, 1, 0, portobj);
         g_free(cbox_port);
         g_free(config_key);
     }

@@ -153,8 +153,8 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     int cost;
     uint32_t i, j, n;
     
-    float *out_l = jack_port_get_buffer(io->outputs[0], nframes);
-    float *out_r = jack_port_get_buffer(io->outputs[1], nframes);
+    for (i = 0; i < io->output_count; i++)
+        io->output_buffers[i] = jack_port_get_buffer(io->outputs[i], nframes);
 
     if (scene)
     {
@@ -177,10 +177,9 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         write_events_to_instrument_ports(&midibuf_total, scene);
     }
     
-    for (i = 0; i < nframes; i ++)
-    {
-        out_l[i] = out_r[i] = 0.f;
-    }
+    for (n = 0; n < io->output_count; n++)
+        for (i = 0; i < nframes; i ++)
+            io->output_buffers[n][i] = 0.f;
     
     for (n = 0; scene && n < scene->instrument_count; n++)
     {
@@ -225,8 +224,8 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
             }
             for (j = 0; j < CBOX_BLOCK_SIZE; j++)
             {
-                out_l[i + j] += channels[0][j];
-                out_r[i + j] += channels[1][j];
+                io->output_buffers[0][i + j] += channels[0][j];
+                io->output_buffers[1][i + j] += channels[1][j];
             }
         }
         while(cur_event < event_count)
@@ -249,13 +248,13 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
         {
             cbox_sample_t left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
-            cbox_sample_t *in_bufs[2] = {out_l + i, out_r + i};
+            cbox_sample_t *in_bufs[2] = {io->output_buffers[0] + i, io->output_buffers[1] + i};
             cbox_sample_t *out_bufs[2] = {left, right};
             (*effect->process_block)(effect, in_bufs, out_bufs);
             for (j = 0; j < CBOX_BLOCK_SIZE; j++)
             {
-                out_l[i + j] = left[j];
-                out_r[i + j] = right[j];
+                io->output_buffers[0][i + j] = left[j];
+                io->output_buffers[1][i + j] = right[j];
             }
         }
     }

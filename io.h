@@ -32,10 +32,13 @@ struct cbox_open_params
 struct cbox_io
 {
     jack_client_t *client;
+    jack_port_t **inputs;
+    int input_count;
+    float **input_buffers; // only valid inside jack_rt_process
     jack_port_t **outputs;
     int output_count;
+    float **output_buffers; // only valid inside jack_rt_process
     jack_port_t *midi;
-    
     
     jack_ringbuffer_t *rb_autoconnect;
     
