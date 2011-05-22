@@ -39,6 +39,7 @@ struct cbox_io
     int output_count;
     float **output_buffers; // only valid inside jack_rt_process
     jack_port_t *midi;
+    int buffer_size;
     
     jack_ringbuffer_t *rb_autoconnect;
     

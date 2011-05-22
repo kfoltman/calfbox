@@ -153,6 +153,8 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     int cost;
     uint32_t i, j, n;
     
+    for (i = 0; i < io->input_count; i++)
+        io->input_buffers[i] = jack_port_get_buffer(io->inputs[i], nframes);
     for (i = 0; i < io->output_count; i++)
         io->output_buffers[i] = jack_port_get_buffer(io->outputs[i], nframes);
 

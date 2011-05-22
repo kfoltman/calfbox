@@ -91,6 +91,9 @@ static int process_cb(jack_nframes_t frames, void *arg)
     struct cbox_io *io = arg;
     struct cbox_io_callbacks *cb = io->cb;
     
+    for (int i = 0; i < io->input_count; i++)
+        io->input_buffers[i] = NULL;
+    io->buffer_size = frames;
     cb->process(cb->user_data, io, frames);
     return 0;
 }
