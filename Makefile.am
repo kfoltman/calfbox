@@ -2,7 +2,7 @@ INCLUDES = -I$(srcdir)
 
 bin_PROGRAMS = calfbox
 
-calfbox_SOURCES = app.c chorus.c cmd.c config.c delay.c eq.c fluid.c fxchain.c hwcfg.c instr.c io.c layer.c main.c master.c menu.c menuitem.c midi.c module.c pattern.c pattern-maker.c phaser.c procmain.c reverb.c sampler.c sfzloader.c sfzparser.c tonectl.c tonewheel.c scene.c streamplay.c ui.c
+calfbox_SOURCES = app.c chorus.c cmd.c config.c delay.c eq.c fluid.c fxchain.c hwcfg.c instr.c io.c jackinput.c layer.c main.c master.c menu.c menuitem.c midi.c module.c pattern.c pattern-maker.c phaser.c procmain.c reverb.c sampler.c sfzloader.c sfzparser.c tonectl.c tonewheel.c scene.c streamplay.c ui.c
 calfbox_LDADD = $(JACK_DEPS_LIBS) $(GLIB_DEPS_LIBS) $(FLUIDSYNTH_DEPS_LIBS)
 
 AM_CFLAGS = $(JACK_DEPS_CFLAGS) $(GLIB_DEPS_CFLAGS) $(FLUIDSYNTH_DEPS_CFLAGS)
