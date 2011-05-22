@@ -421,6 +421,43 @@ ho_trigger=.... .... .... ....
 ht_trigger=.... .... .9.. .97.
 mt_trigger=.... .... ...7 ...5
 
+[drumpattern:pat9]
+title=Disco - Verse
+beats=4
+swing=2
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+track5=rs
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+rs_note=c#1
+bd_trigger=9... 9... 9... 9...
+rs_trigger=..4. .4.. 4..4 ..4.
+sd_trigger=.... 8..6 .... 8...
+hh_trigger=74.7 74.7 74.7 74.7 
+ho_trigger=..5. ..5. ..5. ..5.
+
+[drumpattern:pat9fill]
+title=Disco - Fill
+beats=4
+swing=2
+track1=bd
+track2=sd
+track3=hh
+track4=ho
+bd_note=c1
+sd_note=d1
+hh_note=f#1
+ho_note=a#1
+bd_trigger=9... 9... 9... 9...
+sd_trigger=.6.. 8.58 .6.5 8688
+hh_trigger=74.7 74.7 74.7 74.7 
+ho_trigger=..5. ..5. ..5. ..5.
+
 [drumpattern:crash]
 title=Crash cymbal
 beats=4
@@ -493,3 +530,10 @@ pos1=pat8,crash
 pos2=pat8
 pos3=pat8
 pos4=pat8fill
+
+[drumtrack:trk9]
+title=Disco
+pos1=pat9,crash
+pos2=pat9
+pos3=pat9
+pos4=pat9fill
