@@ -29,7 +29,6 @@ struct cbox_layer *cbox_layer_load(const char *name, GError **error)
     const char *cv = NULL;
     struct cbox_instrument *instr = NULL;
     gchar *section = g_strdup_printf("layer:%s", name);
-    GError *errobj = NULL;
     
     if (!cbox_config_has_section(section))
     {
@@ -43,12 +42,11 @@ struct cbox_layer *cbox_layer_load(const char *name, GError **error)
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Instrument not specified for layer %s", name);
         goto error;
     }
-    instr = cbox_instruments_get_by_name(cv, &errobj);
+    instr = cbox_instruments_get_by_name(cv, error);
     if (!instr)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot get instrument %s for layer %s: %s", cv, name, errobj ? errobj->message : "unknown error");
-        if (errobj)
-            g_error_free(errobj);
+        cbox_force_error(error);
+        g_prefix_error(error, "Cannot get instrument %s for layer %s: ", cv, name);
         goto error;
     }
     l->instrument = instr;
@@ -85,14 +83,12 @@ extern struct cbox_layer *cbox_layer_new(const char *module_name, GError **error
     struct cbox_layer *l = malloc(sizeof(struct cbox_layer));
     const char *cv = NULL;
     struct cbox_instrument *instr = NULL;
-    GError *errobj = NULL;
     
-    instr = cbox_instruments_get_by_name(module_name, &errobj);
+    instr = cbox_instruments_get_by_name(module_name, error);
     if (!instr)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot get instrument %s for new layer: %s", module_name, errobj ? errobj->message : "unknown error");
-        if (errobj)
-            g_error_free(errobj);
+        cbox_force_error(error);
+        g_prefix_error(error, "Cannot get instrument %s for new layer: ", module_name);
         goto error;
     }
 

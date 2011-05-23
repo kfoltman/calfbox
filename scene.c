@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "instr.h"
 #include "layer.h"
 #include "midi.h"
+#include "module.h"
 #include "scene.h"
 #include <glib.h>
 
@@ -32,7 +33,7 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
     
     if (!cbox_config_has_section(section))
     {
-        g_error("Missing section for scene %s", name);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No config section for scene '%s'", name);
         goto error;
     }
     
@@ -54,8 +55,7 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
         l = cbox_layer_load(cv, error);
         if (!l)
         {
-            // XXXKF free all the previous layers
-            free(s);
+            cbox_scene_destroy(s);
             return NULL;
         }
         

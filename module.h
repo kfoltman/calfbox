@@ -124,5 +124,6 @@ extern void cbox_module_init(struct cbox_module *module, void *user_data, int in
 extern void cbox_module_destroy(struct cbox_module *module);
 
 extern GQuark cbox_module_error_quark();
+extern void cbox_force_error(GError **error);
 
 #endif

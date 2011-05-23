@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
     goto ok;
 
 fail:
-    fprintf(stderr, "%s\n", error ? error->message : "unknown error");
+    fprintf(stderr, "Cannot start: %s\n", error ? error->message : "unknown error");
 ok:
     if (error)
         g_error_free(error);

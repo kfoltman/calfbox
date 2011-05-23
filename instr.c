@@ -45,35 +45,39 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, GE
     gchar *instr_section = NULL;
     gpointer value = g_hash_table_lookup(instruments.hash, name);
     const char *cv, *instr_engine;
-    GError *errobj = NULL;
     
     if (value)
         return value;
     
     instr_section = g_strdup_printf("instrument:%s", name);
     
+    if (!cbox_config_has_section(instr_section))
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No config section for instrument '%s'", name);
+        goto error;
+    }
+    
     instr_engine = cbox_config_get_string(instr_section, "engine");
     if (!instr_engine)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Engine not specified in instrument %s", name);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Engine not specified in instrument '%s'", name);
         goto error;
     }
 
     mptr = cbox_module_manifest_get_by_name(instr_engine);
     if (!mptr)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot find engine %s", instr_engine);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine called '%s'", instr_engine);
         goto error;
     }
     
     // cbox_module_manifest_dump(mptr);
     
-    module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(instruments.io), &errobj);
+    module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(instruments.io), error);
     if (!module)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create engine %s for instrument %s: %s", instr_engine, name, errobj ? errobj->message : "unknown error");
-        if (errobj)
-            g_error_free(errobj);
+        cbox_force_error(error);
+        g_prefix_error(error, "Cannot create engine '%s' for instrument '%s': ", instr_engine, name);
         goto error;
     }
     
@@ -93,13 +97,11 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, GE
         
         if (cv)
         {
-            errobj = NULL;
-            effects[i] = cbox_module_new_from_fx_preset(cv, &errobj);
+            effects[i] = cbox_module_new_from_fx_preset(cv, error);
             if (!effects[i])
             {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot instantiate effect preset '%s': %s", cv, errobj ? errobj->message : "unknown error");
-                if (errobj)
-                    g_error_free(errobj);
+                cbox_force_error(error);
+                g_prefix_error(error, "Cannot instantiate effect preset '%s' for instrument '%s': ", cv, name);
             }
         }
     }

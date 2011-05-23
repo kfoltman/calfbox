@@ -61,6 +61,12 @@ GQuark cbox_module_error_quark()
     return g_quark_from_string("cbox-module-error-quark");
 }
 
+void cbox_force_error(GError **error)
+{
+    if (error && !*error)
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "unknown error");
+}
+
 void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
 {
     static const char *ctl_classes[] = { "Switch CC#", "Continuous CC#", "Cont. Param", "Discrete Param", "Enum" };
@@ -132,7 +138,6 @@ struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **er
     const char *engine;
     struct cbox_module_manifest *mptr;
     struct cbox_module *effect;
-    GError *errobj = NULL;
     
     if (!cbox_config_has_section(section))
     {
@@ -151,11 +156,11 @@ struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **er
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "FX preset '%s' refers to non-existing engine '%s'", name, engine);
         goto fxpreset_error;
     }
-    effect = cbox_module_manifest_create_module(mptr, section, cbox_io_get_sample_rate(&app.io), &errobj);
+    effect = cbox_module_manifest_create_module(mptr, section, cbox_io_get_sample_rate(&app.io), error);
     if (!effect)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Could not instantiate FX preset '%s': %s", name, errobj ? errobj->message : "unknown error");
-        g_error_free(errobj);
+        cbox_force_error(error);
+        g_prefix_error(error, "Could not instantiate FX preset '%s': ", name);
         goto fxpreset_error;
     }
     return effect;
