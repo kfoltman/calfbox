@@ -44,6 +44,17 @@ int cmd_quit(struct cbox_menu_item_command *item, void *context)
     return 1;
 }
 
+void print_gerror(GError *error)
+{
+    if (!error)
+    {
+        g_error("Unspecified error");
+        return;
+    }
+    g_error("%s", error->message);
+    g_error_free(error);
+}
+
 void switch_scene(struct cbox_menu_item_command *item, struct cbox_scene *new_scene, const char *prefix)
 {
     struct cbox_scene *old = cbox_rt_set_scene(app.rt, new_scene);
@@ -57,15 +68,20 @@ void switch_scene(struct cbox_menu_item_command *item, struct cbox_scene *new_sc
 
 int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 {
-    struct cbox_scene *scene = cbox_scene_load(item->item.item_context);
-    switch_scene(item, scene, "scene");
+    GError *error = NULL;
+    struct cbox_scene *scene = cbox_scene_load(item->item.item_context, &error);
+    if (scene)
+        switch_scene(item, scene, "scene");
+    else
+        print_gerror(error);
     return 0;
 }
 
 int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 {
+    GError *error = NULL;
     struct cbox_scene *scene = cbox_scene_new();
-    struct cbox_layer *layer = cbox_layer_new((char *)item->item.item_context);
+    struct cbox_layer *layer = cbox_layer_new((char *)item->item.item_context, &error);
     
     if (layer)
     {
@@ -73,14 +89,18 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
         switch_scene(item, scene, "instrument");
     }
     else
+    {
+        print_gerror(error);
         cbox_scene_destroy(scene);
+    }
     return 0;
 }
 
 int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 {
+    GError *error = NULL;
     struct cbox_scene *scene = cbox_scene_new();
-    struct cbox_layer *layer = cbox_layer_load((char *)item->item.item_context);
+    struct cbox_layer *layer = cbox_layer_load((char *)item->item.item_context, &error);
     
     if (layer)
     {
@@ -88,7 +108,10 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
         switch_scene(item, scene, "layer");
     }
     else
+    {
+        print_gerror(error);
         cbox_scene_destroy(scene);
+    }
     return 0;
 }
 
@@ -355,8 +378,9 @@ static void app_process_cmd(struct cbox_command_target *ct, struct cbox_osc_comm
             }
             len = pos - obj;
             
+            GError *error = NULL;
             gchar *name = g_strndup(obj, len);
-            struct cbox_instrument *instr = cbox_instruments_get_by_name(name);
+            struct cbox_instrument *instr = cbox_instruments_get_by_name(name, &error);
             if (instr)
             {
                 if (!instr->module->cmd_target.process_cmd)
@@ -372,7 +396,9 @@ static void app_process_cmd(struct cbox_command_target *ct, struct cbox_osc_comm
             }
             else
             {
-                g_error("Invalid instrument path %s", cmd->command);
+                g_error("Cannot access instrument %s: %s", cmd->command, error ? error->message : "unknown error");
+                if (error)
+                    g_error_free(error);
             }
             g_free(name);
             return;

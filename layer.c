@@ -20,31 +20,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "instr.h"
 #include "layer.h"
 #include "midi.h"
+#include "module.h"
 #include <glib.h>
 
-struct cbox_layer *cbox_layer_load(const char *name)
+struct cbox_layer *cbox_layer_load(const char *name, GError **error)
 {
     struct cbox_layer *l = malloc(sizeof(struct cbox_layer));
     const char *cv = NULL;
     struct cbox_instrument *instr = NULL;
     gchar *section = g_strdup_printf("layer:%s", name);
+    GError *errobj = NULL;
     
     if (!cbox_config_has_section(section))
     {
-        g_error("Missing section for layer %s", name);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Missing section for layer %s", name);
         goto error;
     }
     
     cv = cbox_config_get_string(section, "instrument");
     if (!cv)
     {
-        g_error("Instrument not specified for layer %s", name);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Instrument not specified for layer %s", name);
         goto error;
     }
-    instr = cbox_instruments_get_by_name(cv);
+    instr = cbox_instruments_get_by_name(cv, &errobj);
     if (!instr)
     {
-        g_error("Missing instrument %s for layer %s", cv, name);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot get instrument %s for layer %s: %s", cv, name, errobj ? errobj->message : "unknown error");
+        if (errobj)
+            g_error_free(errobj);
         goto error;
     }
     l->instrument = instr;
@@ -76,16 +80,19 @@ error:
     return NULL;
 }
 
-extern struct cbox_layer *cbox_layer_new(const char *module_name)
+extern struct cbox_layer *cbox_layer_new(const char *module_name, GError **error)
 {
     struct cbox_layer *l = malloc(sizeof(struct cbox_layer));
     const char *cv = NULL;
     struct cbox_instrument *instr = NULL;
+    GError *errobj = NULL;
     
-    instr = cbox_instruments_get_by_name(module_name);
+    instr = cbox_instruments_get_by_name(module_name, &errobj);
     if (!instr)
     {
-        g_error("Missing instrument %s for new layer", module_name);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot get instrument %s for new layer: %s", module_name, errobj ? errobj->message : "unknown error");
+        if (errobj)
+            g_error_free(errobj);
         goto error;
     }
 

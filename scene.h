@@ -34,7 +34,7 @@ struct cbox_scene
 
 extern struct cbox_scene *cbox_scene_new();
 extern void cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer);
-extern struct cbox_scene *cbox_scene_load(const char *section);
+extern struct cbox_scene *cbox_scene_load(const char *section, GError **error);
 extern struct cbox_scene *cbox_scene_new_for_instrument(const char *name);
 extern void cbox_scene_destroy(struct cbox_scene *scene);
 

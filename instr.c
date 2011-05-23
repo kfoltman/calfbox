@@ -37,7 +37,7 @@ void cbox_instruments_init(struct cbox_io *io)
     instruments.io = io;
 }
 
-extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
+extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, GError **error)
 {
     struct cbox_module_manifest *mptr = NULL;
     struct cbox_instrument *instr = NULL;
@@ -55,14 +55,14 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
     instr_engine = cbox_config_get_string(instr_section, "engine");
     if (!instr_engine)
     {
-        g_error("Engine not specified in instrument %s", name);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Engine not specified in instrument %s", name);
         goto error;
     }
 
     mptr = cbox_module_manifest_get_by_name(instr_engine);
     if (!mptr)
     {
-        g_error("Cannot find engine %s", instr_engine);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot find engine %s", instr_engine);
         goto error;
     }
     
@@ -71,7 +71,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
     module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(instruments.io), &errobj);
     if (!module)
     {
-        g_error("Cannot create engine %s for instrument %s: %s", instr_engine, name, errobj ? errobj->message : "unknown error");
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create engine %s for instrument %s: %s", instr_engine, name, errobj ? errobj->message : "unknown error");
         if (errobj)
             g_error_free(errobj);
         goto error;
@@ -97,7 +97,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name)
             effects[i] = cbox_module_new_from_fx_preset(cv, &errobj);
             if (!effects[i])
             {
-                g_error("%s", errobj ? errobj->message : "unknown error");
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot instantiate effect preset '%s': %s", cv, errobj ? errobj->message : "unknown error");
                 if (errobj)
                     g_error_free(errobj);
             }

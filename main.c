@@ -125,6 +125,7 @@ int main(int argc, char *argv[])
     int metronome = 0;
     int bpb = 0;
     float tempo = 0;
+    GError *error = NULL;
     
     while(1)
     {
@@ -186,7 +187,7 @@ int main(int argc, char *argv[])
     if (scene_name)
     {
         app.current_scene_name = g_strdup_printf("scene:%s", scene_name);
-        scene = cbox_scene_load(scene_name);        
+        scene = cbox_scene_load(scene_name, &error);
         if (!scene)
             goto fail;
     }
@@ -194,7 +195,7 @@ int main(int argc, char *argv[])
     {
         app.current_scene_name = g_strdup_printf("instrument:%s", instrument_name);
         scene = cbox_scene_new();
-        layer = cbox_layer_new(instrument_name);
+        layer = cbox_layer_new(instrument_name, &error);
         if (!layer)
             goto fail;
 
@@ -206,15 +207,9 @@ int main(int argc, char *argv[])
     
     if (effect_preset_name && *effect_preset_name)
     {
-        GError *error = NULL;
         app.rt->effect = cbox_module_new_from_fx_preset(effect_preset_name, &error);
         if (!app.rt->effect)
-        {
-            fprintf(stderr, "%s\n", error ? error->message : "unknown error");
-            if (error)
-                g_error_free(error);
             goto fail;
-        }
     }
     cbox_master_set_tempo(app.rt->master, tempo);
     cbox_master_set_timesig(app.rt->master, bpb, 4);
@@ -232,8 +227,13 @@ int main(int argc, char *argv[])
     scene = cbox_rt_set_scene(app.rt, NULL);
     cbox_rt_stop(app.rt);
     cbox_io_close(&app.io);
+    goto ok;
 
 fail:
+    fprintf(stderr, "%s\n", error ? error->message : "unknown error");
+ok:
+    if (error)
+        g_error_free(error);
     if (app.rt->effect)
         cbox_module_destroy(app.rt->effect);
     if (app.rt->scene)

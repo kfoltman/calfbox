@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_LAYER_H
 #define CBOX_LAYER_H
 
+#include <glib.h>
 #include <stdint.h>
 
 struct cbox_module;
@@ -35,7 +36,7 @@ struct cbox_layer
     int disable_aftertouch;
 };
 
-extern struct cbox_layer *cbox_layer_new(const char *name);
-extern struct cbox_layer *cbox_layer_load(const char *module_name);
+extern struct cbox_layer *cbox_layer_new(const char *name, GError **error);
+extern struct cbox_layer *cbox_layer_load(const char *module_name, GError **error);
 
 #endif
