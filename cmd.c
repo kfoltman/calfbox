@@ -22,16 +22,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <malloc.h>
 #include <string.h>
 
-void cbox_execute_on(struct cbox_command_target *ct, const char *cmd_name, const char *args, ...)
+gboolean cbox_execute_on(struct cbox_command_target *ct, const char *cmd_name, const char *args, GError **error, ...)
 {
     va_list av;
     
-    va_start(av, args);
-    cbox_execute_on_v(ct, cmd_name, args, av);
+    va_start(av, error);
+    gboolean res = cbox_execute_on_v(ct, cmd_name, args, av, error);
     va_end(av);
+    return res;
 }
 
-void cbox_execute_on_v(struct cbox_command_target *ct, const char *cmd_name, const char *args, va_list av)
+gboolean cbox_execute_on_v(struct cbox_command_target *ct, const char *cmd_name, const char *args, va_list av, GError **error)
 {
     int argcount = 0;
     struct cbox_osc_command cmd;
@@ -70,11 +71,12 @@ void cbox_execute_on_v(struct cbox_command_target *ct, const char *cmd_name, con
                 cmd.arg_values[i] = pv;
                 break;
             default:
-                g_error("Invalid format specification '%c'", args[i]);
+                g_error("Invalid format character '%c' for command '%s'", args[i], cmd_name);
                 assert(0);
         }
     }
-    ct->process_cmd(ct, &cmd);
+    gboolean result = ct->process_cmd(ct, &cmd, error);
     free(cmd.arg_values);
+    return result;
 }
 

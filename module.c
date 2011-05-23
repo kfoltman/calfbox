@@ -67,6 +67,25 @@ void cbox_force_error(GError **error)
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "unknown error");
 }
 
+void cbox_print_error(GError *error)
+{
+    if (!error)
+    {
+        g_error("Unspecified error");
+        return;
+    }
+    g_error("%s", error->message);
+    g_error_free(error);
+}
+
+void cbox_print_error_if(GError *error)
+{
+    if (!error)
+        return;
+    g_error("%s", error->message);
+    g_error_free(error);
+}
+
 void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
 {
     static const char *ctl_classes[] = { "Switch CC#", "Continuous CC#", "Cont. Param", "Discrete Param", "Enum" };
@@ -103,13 +122,14 @@ struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char *name)
     return NULL;
 }
 
-struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate, GError **error)
+struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate, const char *instance_name, GError **error)
 {
     g_clear_error(error);
     struct cbox_module *module = manifest->create(manifest->user_data, cfg_section, srate, error);
     if (!module)
         return NULL;
-    
+
+    module->instance_name = g_strdup(instance_name);
     module->input_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * module->inputs);
     module->output_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * module->outputs);
     cbox_midi_buffer_init(&module->midi_input);
@@ -120,6 +140,7 @@ struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manife
 void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs)
 {
     module->user_data = user_data;
+    module->instance_name = NULL;
     module->input_samples = NULL;
     module->output_samples = NULL;
     module->inputs = inputs;
@@ -156,13 +177,14 @@ struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **er
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "FX preset '%s' refers to non-existing engine '%s'", name, engine);
         goto fxpreset_error;
     }
-    effect = cbox_module_manifest_create_module(mptr, section, cbox_io_get_sample_rate(&app.io), error);
+    effect = cbox_module_manifest_create_module(mptr, section, cbox_io_get_sample_rate(&app.io), section, error);
     if (!effect)
     {
         cbox_force_error(error);
         g_prefix_error(error, "Could not instantiate FX preset '%s': ", name);
         goto fxpreset_error;
     }
+    g_free(section);
     return effect;
     
 fxpreset_error:
@@ -172,6 +194,7 @@ fxpreset_error:
 
 void cbox_module_destroy(struct cbox_module *module)
 {
+    g_free(module->instance_name);
     free(module->input_samples);
     free(module->output_samples);
     if (module->destroy)

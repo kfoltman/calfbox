@@ -431,7 +431,7 @@ static struct stream_state *stream_state_new(const char *context, const char *fi
     
     if (!stream->sndfile)
     {
-        g_set_error(error, CBOX_STREAM_PLAYER_ERROR, CBOX_STREAM_PLAYER_ERROR_FAILED, "cannot open file '%s': %s", context, filename, sf_strerror(NULL));
+        g_set_error(error, CBOX_STREAM_PLAYER_ERROR, CBOX_STREAM_PLAYER_ERROR_FAILED, "instrument '%s': cannot open file '%s': %s", context, filename, sf_strerror(NULL));
         free(stream);
         return NULL;
     }
@@ -539,6 +539,7 @@ static struct cbox_rt_cmd_definition stream_stop_command = {
 struct load_command_data
 {
     struct stream_player_module *module;
+    gchar *context;
     gchar *filename;
     int loop_start;
     struct stream_state *stream, *old_stream;
@@ -549,12 +550,11 @@ static int stream_player_load_prepare(void *p)
 {
     struct load_command_data *c = p;
     
-    c->stream = stream_state_new(NULL, c->filename, c->loop_start, c->error);
+    c->stream = stream_state_new(c->context, c->filename, c->loop_start, c->error);
     c->old_stream = NULL;
     if (!c->stream)
     {
         g_free(c->filename);
-        free(c);
         return -1;
     }
     return 0;
@@ -575,11 +575,9 @@ static void stream_player_load_cleanup(void *p)
 {
     struct load_command_data *c = p;
     
-    cbox_execute_on(&app.cmd_target, "/print_s", "s", "Load completed");
     g_free(c->filename);
     if (c->old_stream && c->old_stream != c->stream)
         stream_state_destroy(c->old_stream);
-    free(c);
 }
 
 static struct cbox_rt_cmd_definition stream_load_command = {
@@ -590,7 +588,7 @@ static struct cbox_rt_cmd_definition stream_load_command = {
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-void stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_osc_command *cmd)
+gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_osc_command *cmd, GError **error)
 {
     struct stream_player_module *m = (struct stream_player_module *)ct->user_data;
     if (!strcmp(cmd->command, "/seek") && !strcmp(cmd->arg_types, "i"))
@@ -609,12 +607,24 @@ void stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_osc_c
     else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "si"))
     {
         struct load_command_data *c = malloc(sizeof(struct load_command_data));
+        c->context = m->module.instance_name;
         c->module = m;
+        c->stream = NULL;
+        c->old_stream = NULL;
         c->filename = g_strdup((gchar *)cmd->arg_values[0]);
         c->loop_start = *(int *)cmd->arg_values[1];
-        c->error = NULL; // XXXKF add error reporting after creating a return channel
-        cbox_rt_cmd_execute_async(app.rt, &stream_load_command, c);
+        c->error = error;
+        cbox_rt_cmd_execute_sync(app.rt, &stream_load_command, c);
+        gboolean success = c->stream != NULL;
+        free(c);
+        return success;
     }
+    else
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown command '%s'", cmd->command);
+        return FALSE;
+    }
+    return TRUE;
 }
 
 struct cbox_module *stream_player_create(void *user_data, const char *cfg_section, int srate, GError **error)

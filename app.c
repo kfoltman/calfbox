@@ -44,17 +44,6 @@ int cmd_quit(struct cbox_menu_item_command *item, void *context)
     return 1;
 }
 
-void print_gerror(GError *error)
-{
-    if (!error)
-    {
-        g_error("Unspecified error");
-        return;
-    }
-    g_error("%s", error->message);
-    g_error_free(error);
-}
-
 void switch_scene(struct cbox_menu_item_command *item, struct cbox_scene *new_scene, const char *prefix)
 {
     struct cbox_scene *old = cbox_rt_set_scene(app.rt, new_scene);
@@ -73,7 +62,7 @@ int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
     if (scene)
         switch_scene(item, scene, "scene");
     else
-        print_gerror(error);
+        cbox_print_error(error);
     return 0;
 }
 
@@ -90,7 +79,7 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
     }
     else
     {
-        print_gerror(error);
+        cbox_print_error(error);
         cbox_scene_destroy(scene);
     }
     return 0;
@@ -109,7 +98,7 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
     }
     else
     {
-        print_gerror(error);
+        cbox_print_error(error);
         cbox_scene_destroy(scene);
     }
     return 0;
@@ -176,7 +165,7 @@ struct cbox_menu *create_scene_menu(struct cbox_menu_item_menu *item, void *menu
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static struct cbox_command_target *find_module_target(const char *type)
+static struct cbox_command_target *find_module_target(const char *type, GError **error)
 {
     struct cbox_scene *scene = app.rt->scene;
     for (int i = 0; i < scene->instrument_count; i++)
@@ -184,39 +173,48 @@ static struct cbox_command_target *find_module_target(const char *type)
         if (!strcmp(scene->instruments[i]->engine_name, type))
             return &scene->instruments[i]->module->cmd_target;
     }
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot find a module of type '%s'", type);
     return NULL;
     
 }
 
 int cmd_stream_rewind(struct cbox_menu_item_command *item, void *context)
 {
-    struct cbox_command_target *target = find_module_target("stream_player");
+    GError *error = NULL;
+    struct cbox_command_target *target = find_module_target("stream_player", &error);
     if (target)
-        cbox_execute_on(target, "/seek", "i", 0);
+        cbox_execute_on(target, "/seek", "i", &error, 0);
+    cbox_print_error_if(error);
     return 0;
 }
 
 int cmd_stream_play(struct cbox_menu_item_command *item, void *context)
 {
-    struct cbox_command_target *target = find_module_target("stream_player");
+    GError *error = NULL;
+    struct cbox_command_target *target = find_module_target("stream_player", &error);
     if (target)
-        cbox_execute_on(target, "/play", "");
+        cbox_execute_on(target, "/play", "", &error);
+    cbox_print_error_if(error);
     return 0;
 }
 
 int cmd_stream_stop(struct cbox_menu_item_command *item, void *context)
 {
-    struct cbox_command_target *target = find_module_target("stream_player");
+    GError *error = NULL;
+    struct cbox_command_target *target = find_module_target("stream_player", &error);
     if (target)
-        cbox_execute_on(target, "/stop", "");
+        cbox_execute_on(target, "/stop", "", &error);
+    cbox_print_error_if(error);
     return 0;
 }
 
 int cmd_stream_load(struct cbox_menu_item_command *item, void *context)
 {
-    struct cbox_command_target *target = find_module_target("stream_player");
+    GError *error = NULL;
+    struct cbox_command_target *target = find_module_target("stream_player", &error);
     if (target)
-        cbox_execute_on(target, "/load", "si", (gchar *)item->item.item_context, 0);
+        cbox_execute_on(target, "/load", "si", &error, (gchar *)item->item.item_context, 0);
+    cbox_print_error_if(error);
     return 0;
 }
 
@@ -350,17 +348,17 @@ struct cbox_menu *create_main_menu()
     return main_menu;
 }
 
-static void app_process_cmd(struct cbox_command_target *ct, struct cbox_osc_command *cmd)
+static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_osc_command *cmd, GError **error)
 {
     if (!cmd->command)
     {
-        g_error("NULL command");
-        return;
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "NULL command");
+        return FALSE;
     }
     if (cmd->command[0] != '/')
     {
-        g_error("Invalid global command path %s", cmd->command);
-        return;
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid global command path '%s'", cmd->command);
+        return FALSE;
     }
     const char *obj = &cmd->command[1];
     const char *pos = strchr(obj, '/');
@@ -373,56 +371,59 @@ static void app_process_cmd(struct cbox_command_target *ct, struct cbox_osc_comm
             pos = strchr(obj, '/');
             if (!pos)
             {
-                g_error("Invalid instrument path %s", cmd->command);
-                return;
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid instrument path '%s'", cmd->command);
+                return FALSE;
             }
             len = pos - obj;
             
-            GError *error = NULL;
             gchar *name = g_strndup(obj, len);
-            struct cbox_instrument *instr = cbox_instruments_get_by_name(name, &error);
+            struct cbox_instrument *instr = cbox_instruments_get_by_name(name, error);
             if (instr)
             {
+                g_free(name);
                 if (!instr->module->cmd_target.process_cmd)
                 {
-                    g_error("The engine %s has no command target defined\n", instr->engine_name);
-                    return;
+                    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", instr->engine_name);
+                    return FALSE;
                 }
                 struct cbox_osc_command subcmd;
                 subcmd.command = pos;
                 subcmd.arg_types = cmd->arg_types;
                 subcmd.arg_values = cmd->arg_values;
-                instr->module->cmd_target.process_cmd(&instr->module->cmd_target, &subcmd);
+                instr->module->cmd_target.process_cmd(&instr->module->cmd_target, &subcmd, error);
             }
             else
             {
-                g_error("Cannot access instrument %s: %s", cmd->command, error ? error->message : "unknown error");
-                if (error)
-                    g_error_free(error);
+                cbox_force_error(error);
+                g_prefix_error(error, "Cannot access instrument '%s': ", name);
+                g_free(name);
+                return FALSE;
             }
-            g_free(name);
-            return;
+            return TRUE;
         }
     }
     else
     if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))
     {
         g_message("Print: %s", (const char *)cmd->arg_values[0]);
+        return TRUE;
     }
     else
     if (!strcmp(obj, "print_i") && !strcmp(cmd->arg_types, "i"))
     {
         g_message("Print: %d", *(const int *)cmd->arg_values[0]);
+        return TRUE;
     }
     else
     if (!strcmp(obj, "print_f") && !strcmp(cmd->arg_types, "f"))
     {
         g_message("Print: %f", *(const double *)cmd->arg_values[0]);
+        return TRUE;
     }
     else
     {
-        g_error("Unknown combination of target path and argument: %s, %s", cmd->command, cmd->arg_types);
-        return;
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+        return FALSE;
     }
 }
 

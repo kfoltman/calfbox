@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_CMD_H
 #define CBOX_CMD_H
 
+#include <glib.h>
 #include <stdarg.h>
 #include <stdint.h>
 
@@ -33,10 +34,10 @@ struct cbox_command_target
 {
     void *user_data;
     
-    void (*process_cmd)(struct cbox_command_target *ct, struct cbox_osc_command *cmd);
+    gboolean (*process_cmd)(struct cbox_command_target *ct, struct cbox_osc_command *cmd, GError **error);
 };
 
-extern void cbox_execute_on(struct cbox_command_target *module, const char *cmd, const char *args, ...);
-extern void cbox_execute_on_v(struct cbox_command_target *module, const char *cmd, const char *args, va_list va);
+extern gboolean cbox_execute_on(struct cbox_command_target *module, const char *cmd, const char *args, GError **error, ...);
+extern gboolean cbox_execute_on_v(struct cbox_command_target *module, const char *cmd, const char *args, va_list va, GError **error);
 
 #endif

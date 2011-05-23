@@ -68,6 +68,7 @@ struct cbox_module_voicingparam_metadata
 struct cbox_module
 {
     void *user_data;
+    gchar *instance_name;
     cbox_sample_t *input_samples;
     cbox_sample_t *output_samples;
     struct cbox_midi_buffer midi_input;
@@ -116,7 +117,7 @@ extern struct cbox_module_manifest *cbox_module_list[];
 
 extern void cbox_module_manifest_dump(struct cbox_module_manifest *manifest);
 extern struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char *name);
-extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate, GError **error);
+extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate, const char *instance_name, GError **error);
 
 extern struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **error);
 
@@ -125,5 +126,7 @@ extern void cbox_module_destroy(struct cbox_module *module);
 
 extern GQuark cbox_module_error_quark();
 extern void cbox_force_error(GError **error);
+extern void cbox_print_error(GError *error);
+extern void cbox_print_error_if(GError *error);
 
 #endif

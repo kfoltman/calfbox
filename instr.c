@@ -73,7 +73,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, GE
     
     // cbox_module_manifest_dump(mptr);
     
-    module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(instruments.io), error);
+    module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(instruments.io), name, error);
     if (!module)
     {
         cbox_force_error(error);
