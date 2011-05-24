@@ -70,9 +70,9 @@ struct sampler_layer
     int min_note, max_note, root_note;
     int min_vel, max_vel;
     int transpose;
-    float cutoff, resonance, env_mod;
-    struct cbox_dahdsr amp_env, filter_env;
-    struct cbox_envelope_shape amp_env_shape, filter_env_shape;
+    float cutoff, resonance, fileg_depth, pitcheg_depth;
+    struct cbox_dahdsr amp_env, filter_env, pitch_env;
+    struct cbox_envelope_shape amp_env_shape, filter_env_shape, pitch_env_shape;
     enum sample_loop_mode loop_mode;
 };
 
@@ -107,11 +107,11 @@ struct sampler_voice
     float pan;
     float lgain, rgain;
     float last_lgain, last_rgain;
-    float cutoff, resonance, env_mod;
+    float cutoff, resonance, fileg_depth, pitcheg_depth;
     struct cbox_biquadf_state filter_left, filter_right;
     struct cbox_biquadf_coeffs filter_coeffs;
     struct sampler_channel *channel;
-    struct cbox_envelope amp_env, filter_env;
+    struct cbox_envelope amp_env, filter_env, pitch_env;
     enum sample_loop_mode loop_mode;
 };
 

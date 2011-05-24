@@ -113,6 +113,7 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
 
 struct cbox_dahdsr
 {
+    float start;
     float delay;
     float attack;
     float hold;
@@ -120,6 +121,17 @@ struct cbox_dahdsr
     float sustain;
     float release;
 };
+
+static inline void cbox_dahdsr_init(struct cbox_dahdsr *dahdsr)
+{
+    dahdsr->start = 0.f;
+    dahdsr->delay = 0.f;
+    dahdsr->attack = 0.f;
+    dahdsr->hold = 0.f;
+    dahdsr->decay = 0.f;
+    dahdsr->sustain = 1.f;
+    dahdsr->release = 0.05f;
+}
 
 static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, const struct cbox_dahdsr *dahdsr, int sr)
 {

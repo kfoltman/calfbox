@@ -72,7 +72,9 @@ static void load_sfz_region(struct sfz_parser_client *client)
 static gboolean parse_envelope_param(struct cbox_dahdsr *env, const char *key, const char *value)
 {
     float fvalue = atof(value);
-    if (!strcmp(key, "delay"))
+    if (!strcmp(key, "start"))
+        env->start = fvalue;
+    else if (!strcmp(key, "delay"))
         env->delay = fvalue;
     else if (!strcmp(key, "attack"))
         env->attack = fvalue;
@@ -153,7 +155,9 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else if (!strcmp(key, "resonance"))
         l->resonance = dB2gain(atof(value));
     else if (!strcmp(key, "fileg_depth"))
-        l->env_mod = atof(value);
+        l->fileg_depth = atof(value);
+    else if (!strcmp(key, "pitcheg_depth"))
+        l->pitcheg_depth = atof(value);
     else if (!strcmp(key, "tune"))
         l->tune = atof(value);
     else if (!strcmp(key, "transpose"))
@@ -166,6 +170,11 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else if (!strncmp(key, "fileg_", 6))
     {
         if (!parse_envelope_param(&l->filter_env, key + 6, value))
+            unhandled = 1;
+    }
+    else if (!strncmp(key, "pitcheg_", 6))
+    {
+        if (!parse_envelope_param(&l->pitch_env, key + 8, value))
             unhandled = 1;
     }
     else

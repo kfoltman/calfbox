@@ -180,16 +180,19 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->channel = c;
             v->amp_env.shape = &l->amp_env_shape;
             v->filter_env.shape = &l->filter_env_shape;
+            v->pitch_env.shape = &l->pitch_env_shape;
             v->last_lgain = 0;
             v->last_rgain = 0;
             v->cutoff = l->cutoff;
             v->resonance = l->resonance;
-            v->env_mod = l->env_mod;
+            v->pitcheg_depth = l->pitcheg_depth;
+            v->fileg_depth = l->fileg_depth;
             v->loop_mode = l->loop_mode;
             cbox_biquadf_reset(&v->filter_left);
             cbox_biquadf_reset(&v->filter_right);
             cbox_envelope_reset(&v->amp_env);
             cbox_envelope_reset(&v->filter_env);
+            cbox_envelope_reset(&v->pitch_env);
             lidx = skip_inactive_layers(prg, lidx + 1, note, vel);
             if (lidx < 0)
                 break;
@@ -302,6 +305,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             
             float amp_env = cbox_envelope_get_next(&v->amp_env, v->released);
             float filter_env = cbox_envelope_get_next(&v->filter_env, v->released);
+            float pitch_env = cbox_envelope_get_next(&v->pitch_env, v->released);
             if (v->amp_env.cur_stage < 0)
             {
                 v->mode = spt_inactive;
@@ -310,6 +314,8 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             
             double maxv = 127 << 7;
             double freq = v->freq * c->pitchbend;
+            if (pitch_env != 0)
+                freq *= pow(2.0, v->pitcheg_depth * pitch_env / 1200.0);
             uint64_t freq64 = freq * 65536.0 * 65536.0 / m->srate;
             v->delta = freq64 >> 32;
             v->frac_delta = freq64 & 0xFFFFFFFF;
@@ -321,7 +327,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 pan = 1;
             v->lgain = gain * (1 - pan)  / 32768.0;
             v->rgain = gain * pan / 32768.0;
-            float cutoff = v->cutoff*pow(2.0,(filter_env*v->env_mod + c->cutoff_ctl*9600/maxv)/1200);
+            float cutoff = v->cutoff*pow(2.0,(filter_env*v->fileg_depth + c->cutoff_ctl*9600/maxv)/1200);
             if (cutoff < 20)
                 cutoff = 20;
             if (cutoff > m->srate * 0.45)
@@ -510,6 +516,10 @@ static void cbox_config_get_dahdsr(const char *cfg_section, const char *prefix, 
 {
     gchar *v;
     
+    v = g_strdup_printf("%s_start", prefix);
+    env->start = cbox_config_get_float(cfg_section, v, env->start);
+    g_free(v);
+    
     v = g_strdup_printf("%s_delay", prefix);
     env->delay = cbox_config_get_float(cfg_section, v, env->delay);
     g_free(v);
@@ -554,19 +564,11 @@ void sampler_layer_init(struct sampler_layer *l)
     l->max_vel = 127;
     l->cutoff = 21000;
     l->resonance = 0.707;
-    l->env_mod = 0;
-    l->amp_env.delay = 0;
-    l->amp_env.attack = 0;
-    l->amp_env.hold = 0;
-    l->amp_env.decay = 0;
-    l->amp_env.sustain = 1;
-    l->amp_env.release = 0.05;
-    l->filter_env.delay = 0;
-    l->filter_env.attack = 0;
-    l->filter_env.hold = 0;
-    l->filter_env.decay = 0;
-    l->filter_env.sustain = 1;
-    l->filter_env.release = 0.05;
+    l->fileg_depth = 0;
+    l->pitcheg_depth = 0;
+    cbox_dahdsr_init(&l->filter_env);
+    cbox_dahdsr_init(&l->pitch_env);
+    cbox_dahdsr_init(&l->amp_env);
     l->tune = 0;
     l->transpose = 0;
     l->loop_mode = slm_unknown;
@@ -585,6 +587,7 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
 {
     cbox_envelope_init_dahdsr(&l->amp_env_shape, &l->amp_env, m->srate / CBOX_BLOCK_SIZE);
     cbox_envelope_init_dahdsr(&l->filter_env_shape, &l->filter_env,  m->srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_dahdsr(&l->pitch_env_shape, &l->pitch_env,  m->srate / CBOX_BLOCK_SIZE);
 
     if (l->loop_mode == slm_unknown)
         l->loop_mode = l->loop_start == -1 ? slm_no_loop : slm_loop_continuous;
@@ -618,9 +621,11 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->tune = cbox_config_get_float(cfg_section, "tune", l->tune);
     cbox_config_get_dahdsr(cfg_section, "amp", &l->amp_env);
     cbox_config_get_dahdsr(cfg_section, "filter", &l->filter_env);
+    cbox_config_get_dahdsr(cfg_section, "pitch", &l->pitch_env);
     l->cutoff = cbox_config_get_float(cfg_section, "cutoff", l->cutoff);
     l->resonance = cbox_config_get_float(cfg_section, "resonance", l->resonance);
-    l->env_mod = cbox_config_get_float(cfg_section, "env_mod", l->env_mod);
+    l->fileg_depth = cbox_config_get_float(cfg_section, "fileg_depth", l->fileg_depth);
+    l->pitcheg_depth = cbox_config_get_float(cfg_section, "pitcheg_depth", l->pitcheg_depth);
     if (cbox_config_get_int(cfg_section, "one_shot", 0))
         l->loop_mode = slm_one_shot;
     if (cbox_config_get_int(cfg_section, "loop_sustain", 0))
