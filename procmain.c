@@ -50,6 +50,8 @@ struct cbox_rt *cbox_rt_new()
     rt->mpb.master = rt->master;
     rt->mpb.pos = 0;
     rt->mpb.time = 0;
+    rt->mpb.active_notes = &rt->active_notes;
+    cbox_midi_playback_active_notes_init(&rt->active_notes);
     return rt;
 }
 

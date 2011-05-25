@@ -27,6 +27,27 @@ int ppqn_to_samples(struct cbox_master *master, int time)
     return (int)(master->srate * 60.0 * time / (master->tempo * PPQN));
 }
 
+static inline void accumulate_event(struct cbox_midi_playback_active_notes *notes, const struct cbox_midi_event *event)
+{
+    if (event->size != 3)
+        return;
+    // this ignores poly aftertouch - which, I supposed, is OK for now
+    if (event->data_inline[0] < 0x80 || event->data_inline[0] > 0x9F)
+        return;
+    int ch = event->data_inline[0] & 0x0F;
+    if (event->data_inline[0] >= 0x90 && event->data_inline[2] > 0)
+    {
+        int note = event->data_inline[1] & 0x7F;
+        if (!(notes->channels_active & (1 << ch)))
+        {
+            for (int i = 0; i < 4; i++)
+                notes->notes[ch][i] = 0;
+            notes->channels_active |= 1 << ch;
+        }
+        notes->notes[ch][note >> 5] |= 1 << (note & 0x1F);
+    }
+}
+
 void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int nsamples)
 {
     cbox_midi_buffer_clear(buf);
@@ -51,6 +72,8 @@ void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_b
             time = srctime - pb->time;
         
         cbox_midi_buffer_copy_event(buf, src, time);
+        if (pb->active_notes)
+            accumulate_event(pb->active_notes, src);
         pb->pos++;
     }
     pb->time += nsamples;
@@ -383,3 +406,9 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_
     
     return p;
 }
+
+void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes *notes)
+{
+    notes->channels_active = 0;
+}
+
