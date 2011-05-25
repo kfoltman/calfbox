@@ -38,10 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:e:s:t:b:d:D:mh";
+static const char *short_options = "i:c:e:s:t:b:d:D:nmh";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
+    {"no-ui", 0, 0, 'n'},
     {"instrument", 1, 0, 'i'},
     {"scene", 1, 0, 's'},
     {"effect", 1, 0, 'e'},
@@ -61,6 +62,7 @@ void print_help(char *progname)
         "Options:\n"
         " -h | --help               Show this help text\n"
         " -m | --metronome          Create a simple metronome pattern\n"
+        " -n | --no-ui              Do not start the user interface\n"
         " -d | --drum-pattern <p>   Load drum pattern with a given name\n"
         " -D | --drum-track <t>     Load drum track with a given name\n"
         " -t | --tempo <bpm>        Use given tempo (specified in beats/min)\n"
@@ -126,6 +128,7 @@ int main(int argc, char *argv[])
     int bpb = 0;
     float tempo = 0;
     GError *error = NULL;
+    gboolean no_ui = FALSE;
     
     while(1)
     {
@@ -155,6 +158,9 @@ int main(int argc, char *argv[])
                 break;
             case 'm':
                 metronome = 1;
+                break;
+            case 'n':
+                no_ui = TRUE;
                 break;
             case 'b':
                 bpb = atoi(optarg);
@@ -223,7 +229,16 @@ int main(int argc, char *argv[])
     cbox_rt_start(app.rt, &app.io);
     cbox_master_play(app.rt->master);
     cbox_rt_set_scene(app.rt, scene);
-    run_ui();
+    if (!no_ui)
+        run_ui();
+    else
+    {
+        do {
+            int ch = getchar();
+            if (ch == 10 || ch == -1)
+                break;
+        } while(1);
+    }
     scene = cbox_rt_set_scene(app.rt, NULL);
     cbox_rt_stop(app.rt);
     cbox_io_close(&app.io);
