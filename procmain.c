@@ -236,15 +236,17 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
             (*module->process_block)(module, NULL, outputs);
             for (int o = 0; o < module->outputs / 2; o++)
             {
-                int leftch = instr->output_buses[o] * 2;
+                struct cbox_instrument_output *oobj = &instr->outputs[o];
+                int leftch = oobj->output_bus * 2;
                 int rightch = leftch + 1;
-                struct cbox_module *insert = instr->inserts[o];
+                struct cbox_module *insert = oobj->insert;
+                float gain = oobj->gain;
                 if (insert)
                     (*insert->process_block)(insert, outputs + 2 * o, outputs + 2 * o);
                 for (j = 0; j < CBOX_BLOCK_SIZE; j++)
                 {
-                    io->output_buffers[leftch][i + j] += channels[2 * o][j];
-                    io->output_buffers[rightch][i + j] += channels[2 * o + 1][j];
+                    io->output_buffers[leftch][i + j] += gain * channels[2 * o][j];
+                    io->output_buffers[rightch][i + j] += gain * channels[2 * o + 1][j];
                 }
             }
         }

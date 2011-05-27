@@ -81,15 +81,20 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, GE
         goto error;
     }
     
-    struct cbox_module **effects = malloc(sizeof(struct cbox_module *) * module->outputs / 2);
-    int *output_buses = malloc(sizeof(int) * module->outputs);
+    struct cbox_instrument_output *outputs = malloc(sizeof(struct cbox_instrument_output) * module->outputs / 2);
     for (int i = 0; i < module->outputs / 2; i ++)
     {
+        struct cbox_instrument_output *oobj = outputs + i;
+        cbox_instrument_output_init(oobj);
+        
         gchar *key = i == 0 ? g_strdup("output_bus") : g_strdup_printf("output%d_bus", 1 + i);
-        output_buses[i] = cbox_config_get_int(instr_section, key, 1) - 1;
+        oobj->output_bus = cbox_config_get_int(instr_section, key, 1) - 1;
+        g_free(key);
+        key = i == 0 ? g_strdup("gain") : g_strdup_printf("gain%d", 1 + i);
+        oobj->gain = cbox_config_get_gain_db(instr_section, key, 1);
         g_free(key);
         
-        effects[i] = NULL;
+        oobj->insert = NULL;
 
         key = i == 0 ? g_strdup("insert") : g_strdup_printf("insert%d", 1 + i);
         cv = cbox_config_get_string(instr_section, key);
@@ -97,8 +102,8 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, GE
         
         if (cv)
         {
-            effects[i] = cbox_module_new_from_fx_preset(cv, error);
-            if (!effects[i])
+            oobj->insert = cbox_module_new_from_fx_preset(cv, error);
+            if (!oobj->insert)
             {
                 cbox_force_error(error);
                 g_prefix_error(error, "Cannot instantiate effect preset '%s' for instrument '%s': ", cv, name);
@@ -110,9 +115,8 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, GE
     
     instr = malloc(sizeof(struct cbox_instrument));
     instr->module = module;
-    instr->inserts = effects;
+    instr->outputs = outputs;
     instr->engine_name = instr_engine;
-    instr->output_buses = output_buses;
     
     g_hash_table_insert(instruments.hash, g_strdup(name), instr);
     
@@ -132,3 +136,11 @@ void cbox_instruments_close()
 {
     g_hash_table_destroy(instruments.hash);
 }
+
+void cbox_instrument_output_init(struct cbox_instrument_output *output)
+{
+    output->insert = NULL;
+    output->output_bus = 0;
+    output->gain = 1.0;
+}
+

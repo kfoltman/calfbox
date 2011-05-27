@@ -24,17 +24,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct cbox_module;
 struct cbox_io;
 
+struct cbox_instrument_output
+{
+    struct cbox_module *insert;
+    int output_bus;
+    float gain;
+};
+
 struct cbox_instrument
 {
     const char *engine_name;
     struct cbox_module *module;
-    struct cbox_module **inserts;
-    int *output_buses;
+    struct cbox_instrument_output *outputs;
 };
 
 extern void cbox_instruments_init(struct cbox_io *io);
 extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, GError **error);
 extern struct cbox_io *cbox_instruments_get_io();
 extern void cbox_instruments_close();
+
+extern void cbox_instrument_output_init(struct cbox_instrument_output *output);
 
 #endif
