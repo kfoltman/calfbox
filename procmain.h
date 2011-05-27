@@ -50,6 +50,7 @@ struct cbox_rt
     struct cbox_io_callbacks *cbs;
     struct cbox_master *master;
     struct cbox_midi_playback_active_notes active_notes;
+    struct cbox_midi_buffer midibuf_aux;
     
     jack_ringbuffer_t *rb_execute, *rb_cleanup;
 };

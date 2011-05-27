@@ -62,6 +62,22 @@ static inline uint32_t cbox_midi_buffer_get_count(struct cbox_midi_buffer *buffe
     return buffer->count;
 }
 
+static inline uint32_t cbox_midi_buffer_get_last_event_time(struct cbox_midi_buffer *buffer)
+{
+    if (!buffer->count)
+        return 0;
+    return buffer->events[buffer->count - 1].time;
+}
+
+static inline int cbox_midi_buffer_can_store_msg(struct cbox_midi_buffer *buffer, int size)
+{
+    if (buffer->count >= CBOX_MIDI_MAX_EVENTS)
+        return 0;
+    if (size < 4)
+        return 1;
+    return buffer->long_data_size + size <= CBOX_MIDI_MAX_LONG_DATA;
+}
+
 static inline struct cbox_midi_event *cbox_midi_buffer_get_event(struct cbox_midi_buffer *buffer, uint32_t pos)
 {
     if (pos >= buffer->count)
@@ -83,6 +99,8 @@ static inline int midi_cmd_size(uint8_t cmd)
 }
 
 extern int cbox_midi_buffer_write_event(struct cbox_midi_buffer *buffer, uint32_t time, uint8_t *data, uint32_t size);
+
+extern int cbox_midi_buffer_write_inline(struct cbox_midi_buffer *buffer, uint32_t time, ...);
 
 extern int cbox_midi_buffer_copy_event(struct cbox_midi_buffer *buffer, const struct cbox_midi_event *event, int new_time);
 

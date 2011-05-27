@@ -58,6 +58,6 @@ extern void cbox_midi_pattern_playback_seek(struct cbox_midi_pattern_playback *p
 
 extern void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes *notes);
 
-extern void cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf);
+extern int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf);
 
 #endif

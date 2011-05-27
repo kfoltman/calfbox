@@ -412,3 +412,37 @@ void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes
     notes->channels_active = 0;
 }
 
+int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf)
+{
+    if (!notes->channels_active)
+        return 0;
+    int note_offs = 0;
+    for (int c = 0; c < 16; c++)
+    {
+        if (!notes->channels_active & (1 << c))
+            continue;
+        
+        for (int g = 0; g < 4; g++)
+        {
+            uint32_t group = notes->notes[c][g];
+            if (!group)
+                continue;
+            for (int i = 0; i < 32; i++)
+            {
+                int n = i + g * 32;
+                if (!(group & (1 << i)))
+                    continue;
+                if (!cbox_midi_buffer_can_store_msg(buf, 3))
+                    return -1;
+                cbox_midi_buffer_write_inline(buf, cbox_midi_buffer_get_last_event_time(buf), 0x80 + c, n, 0);
+                group &= ~(1 << i);
+                notes->notes[c][g] = group;
+                note_offs++;
+                g_message("Note off %d channel %d", n, c);
+            }
+        }
+        // all Note Offs emitted without buffer overflow - channel is no longer active
+        notes->channels_active &= ~(1 << c);
+    }
+    return note_offs;
+}

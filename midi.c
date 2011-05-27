@@ -18,6 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config-api.h"
 #include "midi.h"
+#include <stdarg.h>
+
+int cbox_midi_buffer_write_inline(struct cbox_midi_buffer *buffer, uint32_t time, ...)
+{
+    uint8_t buf[4];
+    va_list va;
+    va_start(va, time);
+    buf[0] = va_arg(va, int);
+    int size = midi_cmd_size(buf[0]);
+    for (int i = 1; i < size; i++)
+        buf[i] = va_arg(va, int);
+    return cbox_midi_buffer_write_event(buffer, time, buf, size);
+}
 
 int cbox_midi_buffer_write_event(struct cbox_midi_buffer *buffer, uint32_t time, uint8_t *data, uint32_t size)
 {

@@ -155,6 +155,17 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     int cost;
     uint32_t i, j, n;
     
+    cbox_midi_buffer_init(&rt->midibuf_aux);
+    
+    // Process command queue
+    cost = 0;
+    while(cost < RT_MAX_COST_PER_CALL && jack_ringbuffer_read(rt->rb_execute, (char *)&cmd, sizeof(cmd)))
+    {
+        cost += (cmd.definition->execute)(cmd.user_data);
+        if (cmd.definition->cleanup || !cmd.is_async)
+            jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
+    }
+        
     for (i = 0; i < io->input_count; i++)
         io->input_buffers[i] = jack_port_get_buffer(io->inputs[i], nframes);
     for (i = 0; i < io->output_count; i++)
@@ -164,19 +175,21 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     {
         struct cbox_midi_buffer midibuf_jack, midibuf_pattern, midibuf_total, *midibufsrcs[2];
         cbox_midi_buffer_init(&midibuf_total);
-        if (!rt->mpb.pattern)
+        if (!rt->mpb.pattern && rt->midibuf_aux.count == 0)
             convert_midi_from_jack(io->midi, nframes, &midibuf_total);
         else
         {
-            struct cbox_midi_buffer midibuf_jack, midibuf_pattern, *midibufsrcs[2];
-            int pos[2] = {0, 0};
+            struct cbox_midi_buffer midibuf_jack, midibuf_pattern, *midibufsrcs[3];
+            int pos[3] = {0, 0, 0};
             cbox_midi_buffer_init(&midibuf_jack);
             cbox_midi_buffer_init(&midibuf_pattern);
             convert_midi_from_jack(io->midi, nframes, &midibuf_jack);
-            cbox_read_pattern(&rt->mpb, &midibuf_pattern, nframes);
+            if (rt->mpb.pattern)
+                cbox_read_pattern(&rt->mpb, &midibuf_pattern, nframes);
             midibufsrcs[0] = &midibuf_jack;
             midibufsrcs[1] = &midibuf_pattern;
-            cbox_midi_buffer_merge(&midibuf_total, midibufsrcs, 2, pos);
+            midibufsrcs[2] = &rt->midibuf_aux;
+            cbox_midi_buffer_merge(&midibuf_total, midibufsrcs, 3, pos);
         }
         write_events_to_instrument_ports(&midibuf_total, scene);
     }
@@ -266,15 +279,6 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         }
     }
     
-    // Process command queue
-    cost = 0;
-    while(cost < RT_MAX_COST_PER_CALL && jack_ringbuffer_read(rt->rb_execute, (char *)&cmd, sizeof(cmd)))
-    {
-        cost += (cmd.definition->execute)(cmd.user_data);
-        if (cmd.definition->cleanup || !cmd.is_async)
-            jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
-    }
-        
     // Update transport
     if (rt->master->state == CMTS_ROLLING)
         rt->master->song_pos_samples += nframes;
@@ -391,6 +395,8 @@ static int set_pattern_command_execute(void *user_data)
 {
     struct set_pattern_command *cmd = user_data;
     
+    if (cbox_midi_playback_active_notes_release(cmd->rt->mpb.active_notes, &cmd->rt->midibuf_aux) < 0)
+        return 0;
     cmd->old_pattern = cmd->rt->mpb.pattern;
     cmd->rt->mpb.pattern = cmd->new_pattern;
     if (cmd->new_pattern)
