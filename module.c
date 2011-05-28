@@ -56,36 +56,6 @@ struct cbox_module_manifest *cbox_module_list[] = {
     NULL
 };
 
-GQuark cbox_module_error_quark()
-{
-    return g_quark_from_string("cbox-module-error-quark");
-}
-
-void cbox_force_error(GError **error)
-{
-    if (error && !*error)
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "unknown error");
-}
-
-void cbox_print_error(GError *error)
-{
-    if (!error)
-    {
-        g_error("Unspecified error");
-        return;
-    }
-    g_error("%s", error->message);
-    g_error_free(error);
-}
-
-void cbox_print_error_if(GError *error)
-{
-    if (!error)
-        return;
-    g_error("%s", error->message);
-    g_error_free(error);
-}
-
 void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
 {
     static const char *ctl_classes[] = { "Switch CC#", "Continuous CC#", "Cont. Param", "Discrete Param", "Enum" };
