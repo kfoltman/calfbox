@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "config-api.h"
+#include "errors.h"
 #include "instr.h"
 #include "layer.h"
 #include "midi.h"
-#include "module.h"
 #include "scene.h"
 #include <glib.h>
 
