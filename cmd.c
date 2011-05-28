@@ -17,22 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "cmd.h"
+#include "module.h"
 #include <assert.h>
 #include <glib.h>
 #include <malloc.h>
 #include <string.h>
 
-gboolean cbox_execute_on(struct cbox_command_target *ct, const char *cmd_name, const char *args, GError **error, ...)
+gboolean cbox_execute_on(struct cbox_command_target *ct, struct cbox_command_target *fb, const char *cmd_name, const char *args, GError **error, ...)
 {
     va_list av;
     
     va_start(av, error);
-    gboolean res = cbox_execute_on_v(ct, cmd_name, args, av, error);
+    gboolean res = cbox_execute_on_v(ct, fb, cmd_name, args, av, error);
     va_end(av);
     return res;
 }
 
-gboolean cbox_execute_on_v(struct cbox_command_target *ct, const char *cmd_name, const char *args, va_list av, GError **error)
+gboolean cbox_execute_on_v(struct cbox_command_target *ct, struct cbox_command_target *fb, const char *cmd_name, const char *args, va_list av, GError **error)
 {
     int argcount = 0;
     struct cbox_osc_command cmd;
@@ -75,8 +76,40 @@ gboolean cbox_execute_on_v(struct cbox_command_target *ct, const char *cmd_name,
                 assert(0);
         }
     }
-    gboolean result = ct->process_cmd(ct, &cmd, error);
+    gboolean result = ct->process_cmd(ct, fb, &cmd, error);
     free(cmd.arg_values);
     return result;
+}
+
+gboolean cbox_osc_command_dump(const struct cbox_osc_command *cmd)
+{
+    g_message("Command = %s, args = %s", cmd->command, cmd->arg_types);
+    for (int i = 0; cmd->arg_types[i]; i++)
+    {
+        switch(cmd->arg_types[i])
+        {
+            case 's':
+                g_message("Args[%d] = '%s'", i, (const char *)cmd->arg_values[i]);
+                break;
+            case 'i':
+                g_message("Args[%d] = %d", i, *(int *)cmd->arg_values[i]);
+                break;
+            case 'f':
+                g_message("Args[%d] = %f", i, *(double *)cmd->arg_values[i]);
+                break;
+            default:
+                g_error("Invalid format character '%c' for command '%s'", cmd->arg_types[i], cmd->command);
+                assert(0);
+        }
+    }
+}
+
+gboolean cbox_check_fb_channel(struct cbox_command_target *fb, const char *command, GError **error)
+{
+    if (fb)
+        return TRUE;
+    
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Feedback channel required for command '%s'", command);    
+    return FALSE;
 }
 

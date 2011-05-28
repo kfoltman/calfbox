@@ -183,7 +183,7 @@ int cmd_stream_rewind(struct cbox_menu_item_command *item, void *context)
     GError *error = NULL;
     struct cbox_command_target *target = find_module_target("stream_player", &error);
     if (target)
-        cbox_execute_on(target, "/seek", "i", &error, 0);
+        cbox_execute_on(target, NULL, "/seek", "i", &error, 0);
     cbox_print_error_if(error);
     return 0;
 }
@@ -193,7 +193,7 @@ int cmd_stream_play(struct cbox_menu_item_command *item, void *context)
     GError *error = NULL;
     struct cbox_command_target *target = find_module_target("stream_player", &error);
     if (target)
-        cbox_execute_on(target, "/play", "", &error);
+        cbox_execute_on(target, NULL, "/play", "", &error);
     cbox_print_error_if(error);
     return 0;
 }
@@ -203,7 +203,34 @@ int cmd_stream_stop(struct cbox_menu_item_command *item, void *context)
     GError *error = NULL;
     struct cbox_command_target *target = find_module_target("stream_player", &error);
     if (target)
-        cbox_execute_on(target, "/stop", "", &error);
+        cbox_execute_on(target, NULL, "/stop", "", &error);
+    cbox_print_error_if(error);
+    return 0;
+}
+
+int cmd_stream_unload(struct cbox_menu_item_command *item, void *context)
+{
+    GError *error = NULL;
+    struct cbox_command_target *target = find_module_target("stream_player", &error);
+    if (target)
+        cbox_execute_on(target, NULL, "/unload", "", &error);
+    cbox_print_error_if(error);
+    return 0;
+}
+
+gboolean result_parser_status(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    cbox_osc_command_dump(cmd);
+    return TRUE;
+}
+
+int cmd_stream_status(struct cbox_menu_item_command *item, void *context)
+{
+    struct cbox_command_target response = { NULL, result_parser_status };
+    GError *error = NULL;
+    struct cbox_command_target *target = find_module_target("stream_player", &error);
+    if (target)
+        cbox_execute_on(target, &response, "/status", "", &error);
     cbox_print_error_if(error);
     return 0;
 }
@@ -213,7 +240,7 @@ int cmd_stream_load(struct cbox_menu_item_command *item, void *context)
     GError *error = NULL;
     struct cbox_command_target *target = find_module_target("stream_player", &error);
     if (target)
-        cbox_execute_on(target, "/load", "si", &error, (gchar *)item->item.item_context, 0);
+        cbox_execute_on(target, NULL, "/load", "si", &error, (gchar *)item->item.item_context, 0);
     cbox_print_error_if(error);
     return 0;
 }
@@ -227,6 +254,8 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
     cbox_menu_add_item(menu, cbox_menu_item_new_command("Play stream", cmd_stream_play, NULL));
     cbox_menu_add_item(menu, cbox_menu_item_new_command("Stop stream", cmd_stream_stop, NULL));
     cbox_menu_add_item(menu, cbox_menu_item_new_command("Rewind stream", cmd_stream_rewind, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Describe stream", cmd_stream_status, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Unload stream", cmd_stream_unload, NULL));
 
     glob_t g;
     if (glob("*.wav", GLOB_TILDE_CHECK, NULL, &g) == 0)
@@ -348,7 +377,7 @@ struct cbox_menu *create_main_menu()
     return main_menu;
 }
 
-static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_osc_command *cmd, GError **error)
+static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     if (!cmd->command)
     {
@@ -390,7 +419,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_osc_
                 subcmd.command = pos;
                 subcmd.arg_types = cmd->arg_types;
                 subcmd.arg_values = cmd->arg_values;
-                instr->module->cmd_target.process_cmd(&instr->module->cmd_target, &subcmd, error);
+                instr->module->cmd_target.process_cmd(&instr->module->cmd_target, fb, &subcmd, error);
             }
             else
             {

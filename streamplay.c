@@ -89,6 +89,8 @@ struct stream_state
 
     pthread_t thr_preload;
     int thread_started;
+    
+    gchar *filename;
 };
 
 struct stream_player_module
@@ -326,7 +328,7 @@ void stream_player_process_block(struct cbox_module *module, cbox_sample_t **inp
     int i, optr;
     unsigned char buf_idx;
     
-    if (ss->readptr == NO_SAMPLE_LOOP)
+    if (!ss || ss->readptr == NO_SAMPLE_LOOP)
     {
         for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
         {
@@ -414,6 +416,8 @@ static void stream_state_destroy(struct stream_state *ss)
         jack_ringbuffer_free(ss->rb_just_read);
     if (ss->sndfile)
         sf_close(ss->sndfile);
+    if (ss->filename)
+        g_free(ss->filename);
     free(ss);
 }
 
@@ -424,7 +428,7 @@ void stream_player_destroy(struct cbox_module *module)
         stream_state_destroy(m->stream);
 }
 
-static struct stream_state *stream_state_new(const char *context, const char *filename, uint64_t loop, GError **error)
+static struct stream_state *stream_state_new(const char *context, const gchar *filename, uint64_t loop, GError **error)
 {
     struct stream_state *stream = malloc(sizeof(struct stream_state));
     stream->sndfile = sf_open(filename, SFM_READ, &stream->info);
@@ -449,6 +453,7 @@ static struct stream_state *stream_state_new(const char *context, const char *fi
     stream->fade_gain = 0.0;
     stream->fade_increment = 1.0;
     stream->thread_started = 0;
+    stream->filename = g_strdup(filename);
     
     init_cue(stream, &stream->cp_start, CUE_BUFFER_SIZE, 0);
     load_at_cue(stream, &stream->cp_start);
@@ -550,6 +555,8 @@ static int stream_player_load_prepare(void *p)
 {
     struct load_command_data *c = p;
     
+    if (!c->filename)
+        return 0;
     c->stream = stream_state_new(c->context, c->filename, c->loop_start, c->error);
     c->old_stream = NULL;
     if (!c->stream)
@@ -565,7 +572,7 @@ static int stream_player_load_execute(void *p)
     struct load_command_data *c = p;
     
     c->old_stream = c->module->stream;
-    if (c->old_stream)
+    if (c->old_stream && c->stream)
         c->stream->fade_increment = c->module->stream->fade_increment;
     c->module->stream = c->stream;
     return 1;
@@ -575,7 +582,8 @@ static void stream_player_load_cleanup(void *p)
 {
     struct load_command_data *c = p;
     
-    g_free(c->filename);
+    if (c->filename)
+        g_free(c->filename);
     if (c->old_stream && c->old_stream != c->stream)
         stream_state_destroy(c->old_stream);
 }
@@ -588,21 +596,51 @@ static struct cbox_rt_cmd_definition stream_load_command = {
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_osc_command *cmd, GError **error)
+static gboolean require_stream(struct stream_player_module *m, GError **error)
+{
+    if (!m->stream)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No stream loaded");
+        return FALSE;
+    }
+    return TRUE;
+}
+
+gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct stream_player_module *m = (struct stream_player_module *)ct->user_data;
     if (!strcmp(cmd->command, "/seek") && !strcmp(cmd->arg_types, "i"))
     {
+        if (!require_stream(m, error))
+            return FALSE;
         m->stream->readptr_new = *(int *)cmd->arg_values[0];
         cbox_rt_cmd_execute_async(app.rt, &stream_seek_command, m);
     }
     else if (!strcmp(cmd->command, "/play") && !strcmp(cmd->arg_types, ""))
     {
+        if (!require_stream(m, error))
+            return FALSE;
         cbox_rt_cmd_execute_async(app.rt, &stream_play_command, m);
     }
     else if (!strcmp(cmd->command, "/stop") && !strcmp(cmd->arg_types, ""))
     {
+        if (!require_stream(m, error))
+            return FALSE;
         cbox_rt_cmd_execute_async(app.rt, &stream_stop_command, m);
+    }
+    else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        if (m->stream)
+        {
+            return cbox_execute_on(fb, NULL, "/filename", "s", error, m->stream->filename) &&
+                cbox_execute_on(fb, NULL, "/pos", "i", error, m->stream->readptr) &&
+                cbox_execute_on(fb, NULL, "/playing", "i", error, m->stream->phase != STOPPED);
+        }
+        else
+            return
+                cbox_execute_on(fb, NULL, "/filename", "s", error, "");
     }
     else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "si"))
     {
@@ -618,6 +656,21 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_o
         gboolean success = c->stream != NULL;
         free(c);
         return success;
+    }
+    else if (!strcmp(cmd->command, "/unload") && !strcmp(cmd->arg_types, ""))
+    {
+        struct load_command_data *c = malloc(sizeof(struct load_command_data));
+        c->context = m->module.instance_name;
+        c->module = m;
+        c->stream = NULL;
+        c->old_stream = NULL;
+        c->filename = NULL;
+        c->loop_start = 0;
+        c->error = error;
+        cbox_rt_cmd_execute_sync(app.rt, &stream_load_command, c);
+        gboolean success = c->stream == NULL;
+        free(c);
+        return success;        
     }
     else
     {
@@ -638,7 +691,7 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     }
     
     struct stream_player_module *m = malloc(sizeof(struct stream_player_module));
-    char *filename = cbox_config_get_string(cfg_section, "file");
+    gchar *filename = cbox_config_get_string(cfg_section, "file");
     if (!filename)
     {
         g_set_error(error, CBOX_STREAM_PLAYER_ERROR, CBOX_STREAM_PLAYER_ERROR_FAILED, "filename not specified");

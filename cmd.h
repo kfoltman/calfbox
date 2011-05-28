@@ -34,10 +34,14 @@ struct cbox_command_target
 {
     void *user_data;
     
-    gboolean (*process_cmd)(struct cbox_command_target *ct, struct cbox_osc_command *cmd, GError **error);
+    gboolean (*process_cmd)(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 };
 
-extern gboolean cbox_execute_on(struct cbox_command_target *module, const char *cmd, const char *args, GError **error, ...);
-extern gboolean cbox_execute_on_v(struct cbox_command_target *module, const char *cmd, const char *args, va_list va, GError **error);
+extern gboolean cbox_check_fb_channel(struct cbox_command_target *fb, const char *command, GError **error);
+
+extern gboolean cbox_execute_on(struct cbox_command_target *module, struct cbox_command_target *fb, const char *cmd, const char *args, GError **error, ...);
+extern gboolean cbox_execute_on_v(struct cbox_command_target *module, struct cbox_command_target *fb, const char *cmd, const char *args, va_list va, GError **error);
+
+extern gboolean cbox_osc_command_dump(const struct cbox_osc_command *cmd);
 
 #endif
