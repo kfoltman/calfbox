@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "module.h"
 #include "procmain.h"
 #include "scene.h"
+#include "scripting.h"
 #include "ui.h"
 
 #include <assert.h>
@@ -38,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:e:s:t:b:d:D:nmh";
+static const char *short_options = "i:c:r:e:s:t:b:d:D:nmh";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
@@ -52,6 +53,7 @@ static struct option long_options[] = {
     {"beats", 1, 0, 'b'},
     {"drum-pattern", 1, 0, 'd'},
     {"drum-track", 1, 0, 'D'},
+    {"run-script", 1, 0, 'r'},
     {0,0,0,0},
 };
 
@@ -71,6 +73,7 @@ void print_help(char *progname)
         " -i | --instrument <i>     Load instrument <i> as a single-instrument scene\n"
         " -s | --scene <s>          Load a scene <s>\n"
         " -c | --config <c>         Use specified config file instead of default\n"
+        " -r | --run-script <s>     Run a Python script from a given file\n"
         "\n",
         progname);
     exit(0);
@@ -122,6 +125,7 @@ int main(int argc, char *argv[])
     const char *effect_preset_name = NULL;
     const char *drum_pattern_name = NULL;
     const char *drum_track_name = NULL;
+    const char *script_name = NULL;
     char *instr_section = NULL;
     struct cbox_scene *scene = NULL;
     int metronome = 0;
@@ -155,6 +159,9 @@ int main(int argc, char *argv[])
                 break;
             case 'D':
                 drum_track_name = optarg;
+                break;
+            case 'r':
+                script_name = optarg;
                 break;
             case 'm':
                 metronome = 1;
@@ -229,7 +236,9 @@ int main(int argc, char *argv[])
     cbox_rt_start(app.rt, &app.io);
     cbox_master_play(app.rt->master);
     cbox_rt_set_scene(app.rt, scene);
-    if (!no_ui)
+    if (script_name)
+        cbox_script_run(script_name);
+    else if (!no_ui)
         run_ui();
     else
     {
