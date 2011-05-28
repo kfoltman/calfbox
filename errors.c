@@ -33,10 +33,10 @@ void cbox_print_error(GError *error)
 {
     if (!error)
     {
-        g_error("Unspecified error");
+        g_warning("Unspecified error");
         return;
     }
-    g_error("%s", error->message);
+    g_warning("%s", error->message);
     g_error_free(error);
 }
 
@@ -44,7 +44,7 @@ void cbox_print_error_if(GError *error)
 {
     if (!error)
         return;
-    g_error("%s", error->message);
+    g_warning("%s", error->message);
     g_error_free(error);
 }
 
