@@ -135,6 +135,10 @@ int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbo
                         data[1] = (uint8_t)lp->fixed_note;
                     }
                 }
+                else if (cmd == 11 && data[1] == 64 && lp->invert_sustain)
+                {
+                    data[2] = 127 - data[2];
+                }
                 else if (cmd == 13 && lp->disable_aftertouch)
                     continue;
             }
