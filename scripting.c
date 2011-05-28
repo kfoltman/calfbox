@@ -16,10 +16,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "errors.h"
 #include "scripting.h"
 #include <glib.h>
 #include <Python.h>
+
+static PyObject *cbox_python_do_cmd(PyObject *self, PyObject *args)
+{
+    return NULL;
+}
+
+static PyMethodDef EmbMethods[] = {
+    {"do_cmd", cbox_python_do_cmd, METH_VARARGS, "Execute a CalfBox command using a global path."},
+    {NULL, NULL, 0, NULL}
+};
 
 void cbox_script_run(const char *name)
 {
@@ -30,6 +41,7 @@ void cbox_script_run(const char *name)
         return;
     }
     Py_Initialize();
+    Py_InitModule("cbox", EmbMethods);
     PyRun_SimpleFile(fp, name);
     Py_Finalize();
 }
