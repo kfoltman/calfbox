@@ -23,7 +23,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib.h>
 #include <Python.h>
 
+struct PyCboxCallback 
+{
+    PyObject_HEAD
+    struct cbox_command_target *target;
+};
+
+static PyObject *
+PyCboxCallback_New(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    struct PyCboxCallback *self;
+
+    self = (struct PyCboxCallback *)type->tp_alloc(type, 0);
+    if (self != NULL) {
+        self->target = NULL;
+    }
+
+    return (PyObject *)self;
+}
+
+static int
+PyCboxCallback_Init(struct PyCboxCallback *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *cobj = NULL;
+    if (!PyArg_ParseTuple(args, "O!:init", &PyCObject_Type, &cobj))
+        return -1;
+    
+    self->target = PyCObject_AsVoidPtr(cobj);
+}
+
 static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject *self, PyObject *args);
+
+static PyObject *
+PyCboxCallback_Call(PyObject *_self, PyObject *args, PyObject *kwds)
+{
+    struct PyCboxCallback *self = (struct PyCboxCallback *)_self;
+
+    return cbox_python_do_cmd_on(self->target, _self, args);
+}
+
+PyTypeObject CboxCallbackType = {
+    PyObject_HEAD_INIT(NULL)
+    .tp_name = "cbox.Callback",
+    .tp_basicsize = sizeof(struct PyCboxCallback),
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_doc = "Callback for feedback channel to Cbox C code",
+    .tp_init = (initproc)PyCboxCallback_Init,
+    .tp_new = PyCboxCallback_New,
+    .tp_call = PyCboxCallback_Call
+};
 
 static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
@@ -53,16 +101,49 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
             Py_INCREF(Py_None);
         }
     }
+    struct PyCboxCallback *fbcb = NULL;
+    
     PyObject *args = PyTuple_New(3);
     PyTuple_SetItem(args, 0, PyString_FromString(cmd->command));
-    PyTuple_SetItem(args, 1, Py_None); // XXXKF
+    if (fb)
+    {
+        struct PyCboxCallback *fbcb = PyObject_New(struct PyCboxCallback, &CboxCallbackType);
+        fbcb->target = fb;
+        
+        PyTuple_SetItem(args, 1, (PyObject *)fbcb);
+    }
+    else
+    {
+        PyTuple_SetItem(args, 1, Py_None);
+        Py_INCREF(Py_None);
+    }
     PyTuple_SetItem(args, 2, arg_values);
-    Py_INCREF(Py_None);
 //    PyTuple_SetItem(args, 2, PyList_New(strlen(cmd->arg_types)));
     
-    PyObject_Call(callback, args, NULL);
+    PyObject *result = PyObject_Call(callback, args, NULL);
     
-    return TRUE;
+    if (fbcb)
+        fbcb->target = NULL;
+    
+    if (result)
+    {
+        Py_DECREF(result);
+        return TRUE;
+    }
+    
+    PyObject *ptype = NULL, *pvalue = NULL, *ptraceback = NULL;
+    PyErr_Fetch(&ptype, &pvalue, &ptraceback);
+    PyObject *ptypestr = PyObject_Str(ptype);
+    PyObject *pvaluestr = PyObject_Str(pvalue);
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "%s: %s", PyString_AsString(ptypestr), PyString_AsString(pvaluestr));
+    //g_error("%s:%s", PyString_AsString(ptypestr), PyString_AsString(pvaluestr));
+    Py_DECREF(ptypestr);
+    Py_DECREF(pvaluestr);
+    Py_DECREF(ptype);
+    Py_DECREF(pvalue);
+    Py_DECREF(ptraceback);
+    
+    return FALSE;
 }
 
 static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject *self, PyObject *args)
@@ -121,9 +202,7 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
     free(arg_types);
     
     if (!result)
-    {
         return PyErr_Format(PyExc_Exception, "%s", error ? error->message : "Unknown error");
-    }
     
     Py_RETURN_NONE;
 }
@@ -147,7 +226,14 @@ void cbox_script_run(const char *name)
         return;
     }
     Py_Initialize();
-    Py_InitModule("cbox", EmbMethods);
+    PyObject *m = Py_InitModule("cbox", EmbMethods);
+    if (!m)
+        return;
+    if (PyType_Ready(&CboxCallbackType) < 0)
+        return;
+    Py_INCREF(&CboxCallbackType);
+    PyModule_AddObject(m, "Callback", (PyObject *)&CboxCallbackType);
+    
     PyRun_SimpleFile(fp, name);
     Py_Finalize();
 }
