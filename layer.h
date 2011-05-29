@@ -35,6 +35,7 @@ struct cbox_layer
     int8_t fixed_note;
     int disable_aftertouch;
     int invert_sustain;
+    int consume;
 };
 
 extern struct cbox_layer *cbox_layer_new(const char *name, GError **error);

@@ -144,6 +144,8 @@ int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbo
             }
             if (!cbox_midi_buffer_write_event(&lp->instrument->module->midi_input, event->time, data, event->size))
                 return -i;
+            if (lp->consume)
+                break;
         }
     }
     
