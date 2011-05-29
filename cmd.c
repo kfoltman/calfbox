@@ -113,3 +113,12 @@ gboolean cbox_check_fb_channel(struct cbox_command_target *fb, const char *comma
     return FALSE;
 }
 
+
+gboolean cbox_execute_sub(struct cbox_command_target *ct, struct cbox_command_target *fb, const struct cbox_osc_command *cmd, const char *new_command, GError **error)
+{
+    struct cbox_osc_command subcmd;
+    subcmd.command = new_command;
+    subcmd.arg_types = cmd->arg_types;
+    subcmd.arg_values = cmd->arg_values;
+    return ct->process_cmd(ct, fb, &subcmd, error);
+}

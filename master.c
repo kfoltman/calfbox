@@ -16,7 +16,67 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "errors.h"
 #include "master.h"
+#include <string.h>
+
+static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct cbox_master *m = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !*cmd->arg_types)
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        return cbox_execute_on(fb, NULL, "/sample_rate", "i", error, m->srate) &&
+            cbox_execute_on(fb, NULL, "/tempo", "f", error, m->tempo) &&
+            cbox_execute_on(fb, NULL, "/timesig", "ii", error, m->timesig_nom, m->timesig_denom) &&
+            cbox_execute_on(fb, NULL, "/playing", "i", error, (int)m->state) &&
+            cbox_execute_on(fb, NULL, "/pos", "i", error, m->song_pos_samples);
+    }
+    else
+    if (!strcmp(cmd->command, "/tell") && !*cmd->arg_types)
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        return cbox_execute_on(fb, NULL, "/playing", "i", error, (int)m->state) &&
+            cbox_execute_on(fb, NULL, "/pos", "i", error, m->song_pos_samples);
+    }
+    else
+    if (!strcmp(cmd->command, "/set_tempo") && !strcmp(cmd->arg_types, "f"))
+    {
+        cbox_master_set_tempo(m, *(double *)cmd->arg_values[0]);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/set_timesig") && !strcmp(cmd->arg_types, "ii"))
+    {
+        cbox_master_set_timesig(m, *(int *)cmd->arg_values[0], *(int *)cmd->arg_values[1]);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/play") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_master_play(m);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/stop") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_master_stop(m);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/seek") && !strcmp(cmd->arg_types, "i"))
+    {
+        cbox_master_seek(m, *(int *)cmd->arg_values[0]);
+        return TRUE;
+    }
+    else
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+        return FALSE;
+    }
+}
 
 void cbox_master_init(struct cbox_master *master)
 {
@@ -26,6 +86,8 @@ void cbox_master_init(struct cbox_master *master)
     master->timesig_nom = 4;
     master->timesig_denom = 4;
     master->state = CMTS_STOP;
+    master->cmd_target.user_data = master;
+    master->cmd_target.process_cmd = master_process_cmd;
 }
 
 void cbox_master_set_sample_rate(struct cbox_master *master, int srate)
@@ -69,5 +131,10 @@ void cbox_master_play(struct cbox_master *master)
 void cbox_master_stop(struct cbox_master *master)
 {
     master->state = CMTS_STOP;
+}
+
+void cbox_master_seek(struct cbox_master *master, uint32_t song_pos_samples)
+{
+    master->song_pos_samples = song_pos_samples;
 }
 

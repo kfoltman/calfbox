@@ -394,7 +394,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     if (pos)
     {
         int len = pos - obj;
-        if (!strncmp(obj, "instr", len))
+        if (!strncmp(obj, "instr", 5))
         {
             obj = &pos[1];
             pos = strchr(obj, '/');
@@ -415,11 +415,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
                     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", instr->engine_name);
                     return FALSE;
                 }
-                struct cbox_osc_command subcmd;
-                subcmd.command = pos;
-                subcmd.arg_types = cmd->arg_types;
-                subcmd.arg_values = cmd->arg_values;
-                return instr->module->cmd_target.process_cmd(&instr->module->cmd_target, fb, &subcmd, error);
+                return cbox_execute_sub(&instr->module->cmd_target, fb, cmd, pos, error);
             }
             else
             {
@@ -429,6 +425,11 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
                 return FALSE;
             }
             return TRUE;
+        }
+        else
+        if (!strncmp(obj, "master", 6))
+        {
+            return cbox_execute_sub(&app.rt->master->cmd_target, fb, cmd, pos, error);
         }
     }
     else

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_MASTER_H
 
 #include <stdint.h>
+#include "cmd.h"
 
 #define PPQN 48
 
@@ -38,6 +39,7 @@ struct cbox_master
     int timesig_nom;
     int timesig_denom; // must be 4 for now
     enum cbox_master_transport_state state;
+    struct cbox_command_target cmd_target;
 };
 
 struct cbox_bbt
@@ -55,5 +57,6 @@ extern void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt
 extern uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct cbox_bbt *bbt);
 extern void cbox_master_play(struct cbox_master *master);
 extern void cbox_master_stop(struct cbox_master *master);
+extern void cbox_master_seek(struct cbox_master *master, uint32_t song_pos_samples);
 
 #endif
