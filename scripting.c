@@ -23,12 +23,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib.h>
 #include <Python.h>
 
-static PyObject *cbox_python_do_cmd(PyObject *self, PyObject *args)
+static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject *self, PyObject *args);
+
+static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    PyObject *callback = ct->user_data;
+    
+    int argc = strlen(cmd->arg_types);
+    PyObject *arg_values = PyList_New(argc);
+    for (int i = 0; i < argc; i++)
+    {
+        if (cmd->arg_types[i] == 's')
+        {
+            PyList_SetItem(arg_values, i, PyString_FromString(cmd->arg_values[i]));
+        }
+        else
+        if (cmd->arg_types[i] == 'i')
+        {
+            PyList_SetItem(arg_values, i, PyInt_FromLong(*(int *)cmd->arg_values[i]));
+        }
+        else
+        if (cmd->arg_types[i] == 'f')
+        {
+            PyList_SetItem(arg_values, i, PyFloat_FromDouble(*(double *)cmd->arg_values[i]));
+        }
+        else
+        {
+            PyList_SetItem(arg_values, i, Py_None);
+            Py_INCREF(Py_None);
+        }
+    }
+    PyObject *args = PyTuple_New(3);
+    PyTuple_SetItem(args, 0, PyString_FromString(cmd->command));
+    PyTuple_SetItem(args, 1, Py_None); // XXXKF
+    PyTuple_SetItem(args, 2, arg_values);
+    Py_INCREF(Py_None);
+//    PyTuple_SetItem(args, 2, PyList_New(strlen(cmd->arg_types)));
+    
+    PyObject_Call(callback, args, NULL);
+    
+    return TRUE;
+}
+
+static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject *self, PyObject *args)
 {
     const char *command = NULL;
-    const char *ret_path = NULL;
+    PyObject *callback = NULL;
     PyObject *list = NULL;
-    if (!PyArg_ParseTuple(args, "szO!:do_cmd", &command, &ret_path, &PyList_Type, &list))
+    if (!PyArg_ParseTuple(args, "sOO!:do_cmd", &command, &callback, &PyList_Type, &list))
         return NULL;
     
     int len = PyList_Size(list);
@@ -67,13 +109,28 @@ static PyObject *cbox_python_do_cmd(PyObject *self, PyObject *args)
             assert(0);
     }
     arg_types[len] = '\0';
+    
+    struct cbox_command_target target;
+    target.user_data = callback;
+    target.process_cmd = bridge_to_python_callback;
+    
     // cbox_osc_command_dump(&cmd);
-    app.cmd_target.process_cmd(&app.cmd_target, NULL, &cmd, &error);
+    gboolean result = ct->process_cmd(ct, callback != Py_None ? &target : NULL, &cmd, &error);
     free(arg_space);
     free(arg_values);
     free(arg_types);
     
+    if (!result)
+    {
+        return PyErr_Format(PyExc_Exception, "%s", error ? error->message : "Unknown error");
+    }
+    
     Py_RETURN_NONE;
+}
+
+static PyObject *cbox_python_do_cmd(PyObject *self, PyObject *args)
+{
+    return cbox_python_do_cmd_on(&app.cmd_target, self, args);
 }
 
 static PyMethodDef EmbMethods[] = {
