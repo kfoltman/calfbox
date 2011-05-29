@@ -419,7 +419,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
                 subcmd.command = pos;
                 subcmd.arg_types = cmd->arg_types;
                 subcmd.arg_values = cmd->arg_values;
-                instr->module->cmd_target.process_cmd(&instr->module->cmd_target, fb, &subcmd, error);
+                return instr->module->cmd_target.process_cmd(&instr->module->cmd_target, fb, &subcmd, error);
             }
             else
             {
