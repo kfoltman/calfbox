@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_SCENE_H
 #define CBOX_SCENE_H
 
+#include "cmd.h"
+
 #define MAX_LAYERS_PER_SCENE 16
 #define MAX_MODULES_PER_SCENE 16
 
@@ -26,6 +28,10 @@ struct cbox_instrument;
 
 struct cbox_scene
 {
+    struct cbox_command_target cmd_target;
+    gchar *name;
+    gchar *title;
+    
     struct cbox_layer *layers[MAX_LAYERS_PER_SCENE];
     int layer_count;
     struct cbox_instrument *instruments[MAX_MODULES_PER_SCENE];

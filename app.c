@@ -431,6 +431,11 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         {
             return cbox_execute_sub(&app.rt->master->cmd_target, fb, cmd, pos, error);
         }
+        else
+        if (!strncmp(obj, "scene", 5))
+        {
+            return cbox_execute_sub(&app.rt->scene->cmd_target, fb, cmd, pos, error);
+        }
     }
     else
     if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))

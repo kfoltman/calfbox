@@ -21,8 +21,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "instr.h"
 #include "layer.h"
 #include "midi.h"
+#include "module.h"
 #include "scene.h"
 #include <glib.h>
+
+static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct cbox_scene *s = ct->user_data;
+    
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        if (!cbox_execute_on(fb, NULL, "/name", "s", error, s->name))
+            return FALSE;
+        if (!cbox_execute_on(fb, NULL, "/title", "s", error, s->title))
+            return FALSE;
+        
+        for (int i = 0; i < s->layer_count; i++)
+        {
+            if (!cbox_execute_on(fb, NULL, "/layer", "i", error, i + 1))
+                return FALSE;
+        }
+        for (int i = 0; i < s->instrument_count; i++)
+        {
+            if (!cbox_execute_on(fb, NULL, "/instrument", "ss", error, s->instruments[i]->module->instance_name, s->instruments[i]->engine_name))
+                return FALSE;
+        }
+        return TRUE;
+    }
+    else
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+        return FALSE;
+    }
+}
 
 struct cbox_scene *cbox_scene_load(const char *name, GError **error)
 {
@@ -62,7 +96,11 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
         cbox_scene_add_layer(s, l);        
     }
     
+    s->title = g_strdup(cbox_config_get_string_with_default(section, "title", ""));
     g_free(section);
+    s->cmd_target.process_cmd = cbox_scene_process_cmd;
+    s->cmd_target.user_data = s;
+    s->name = g_strdup(name);
     return s;
 
 error:
@@ -74,8 +112,12 @@ error:
 struct cbox_scene *cbox_scene_new()
 {
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
+    s->name = g_strdup("");
+    s->title = g_strdup("");
     s->layer_count = 0;
     s->instrument_count = 0;
+    s->cmd_target.process_cmd = cbox_scene_process_cmd;
+    s->cmd_target.user_data = s;
     return s;
 }
 
