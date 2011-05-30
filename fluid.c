@@ -93,6 +93,7 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
     m->module.process_event = fluidsynth_process_event;
     m->module.process_block = fluidsynth_process_block;
     m->module.destroy = fluidsynth_destroy;
+    m->module.aux_offset = 2 * m->output_pairs;
     m->settings = new_fluid_settings();
     fluid_settings_setnum(m->settings, "synth.sample-rate", srate);
     fluid_settings_setint(m->settings, "synth.audio-channels", m->output_pairs);

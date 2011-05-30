@@ -11,6 +11,8 @@ class GetThings:
         for i in anames:
             if i.startswith("*"):
                 setattr(self, i[1:], [])
+            elif i.startswith("%"):
+                setattr(self, i[1:], {})
             else:
                 setattr(self, i, None)
         anames = set(anames)
@@ -23,9 +25,14 @@ class GetThings:
                     setattr(self, cmd, args)
             elif "*" + cmd in anames:
                 if len(args) == 1:
-                    setattr(self, cmd, getattr(self, cmd) + [args[0]])
+                    getattr(self, cmd).append(args[0])
                 else:
-                    setattr(self, cmd, getattr(self, cmd) + [args])
+                    getattr(self, cmd).append(args)
+            elif "%" + cmd in anames:
+                if len(args) == 2:
+                    getattr(self, cmd)[args[0]] = args[1]
+                else:
+                    getattr(self, cmd)[args[0]] = args[1:]
         cbox.do_cmd(cmd, update_callback, args)
 
 class StreamWindow(gtk.VBox):
@@ -69,15 +76,22 @@ class MainWindow(gtk.Window):
         self.vbox.add(l)
         
         for i in scene.instrument:
+            idata = GetThings("/instr/%s/status" % i[0], ['%gain', '%output', 'aux_offset'], [])
             #attribs = GetThings("/scene/instr_info", ['engine', 'name'], [i])
             #markup += '<b>Instrument %d:</b> engine %s, name %s\n' % (i, attribs.engine, attribs.name)
+            f = gtk.Frame(label = 'Instrument %s' % i[0])
+            b = gtk.VBox(spacing = 5)
+            b.set_border_width(5)
+            f.add(b)
+            b.add(gtk.Label("Engine: %s" % i[1]))
+            for o in idata.output.keys():
+                if 2 * o < idata.aux_offset:
+                    b.add(gtk.Label("Output[%s]: %s Gain: %0.2f" % (o, idata.output[o], idata.gain[o])))
+                else:
+                    b.add(gtk.Label("Aux output[%s]: %s Gain: %0.2f" % (o - idata.aux_offset / 2, idata.output[o], idata.gain[o])))
             if i[1] == 'stream_player':
-                f = gtk.Frame(label = 'Instrument %s (%s)' % (i[0], i[1]))
-                f.add(StreamWindow(i[0]))
-                self.vbox.add(f)
-            else:
-                self.vbox.add(gtk.HSeparator())
-                self.vbox.add(gtk.Label('Instrument %s (%s)' % (i[0], i[1])))
+                b.add(StreamWindow(i[0]))
+            self.vbox.add(f)
 
 def do_quit(window, event):
     gtk.main_quit()

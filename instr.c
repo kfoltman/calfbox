@@ -54,10 +54,13 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
     {
         if (!cbox_execute_on(fb, NULL, "/engine", "s", error, instr->engine_name))
             return FALSE;
+        if (!cbox_execute_on(fb, NULL, "/aux_offset", "i", error, instr->module->aux_offset))
+            return FALSE;
 
         for (int i = 0; i < instr->module->outputs / 2; i++)
         {
             if (!(cbox_execute_on(fb, NULL, "/gain_linear", "if", error, i, instr->outputs[i].gain) &&
+                cbox_execute_on(fb, NULL, "/gain", "if", error, i, gain2dB_simple(instr->outputs[i].gain)) &&
                 cbox_execute_on(fb, NULL, "/output", "ii", error, i, instr->outputs[i].output_bus + 1)))
                 return FALSE;
         }
@@ -161,7 +164,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
         oobj->output_bus = cbox_config_get_int(instr_section, key, 1) - 1;
         g_free(key);
         key = i == 0 ? g_strdup("gain") : g_strdup_printf("gain%d", 1 + i);
-        oobj->gain = cbox_config_get_gain_db(instr_section, key, 1);
+        oobj->gain = cbox_config_get_gain_db(instr_section, key, 0);
         g_free(key);
         
         oobj->insert = NULL;

@@ -115,6 +115,7 @@ void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, i
     module->output_samples = NULL;
     module->inputs = inputs;
     module->outputs = outputs;
+    module->aux_offset = outputs;
     
     module->cmd_target.process_cmd = NULL;
     module->cmd_target.user_data = module;

@@ -65,7 +65,7 @@ struct cbox_module
     cbox_sample_t *input_samples;
     cbox_sample_t *output_samples;
     struct cbox_midi_buffer midi_input;
-    int inputs, outputs;
+    int inputs, outputs, aux_offset;
     
     struct cbox_command_target cmd_target;
         
