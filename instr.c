@@ -59,9 +59,9 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
 
         for (int i = 0; i < instr->module->outputs / 2; i++)
         {
-            if (!(cbox_execute_on(fb, NULL, "/gain_linear", "if", error, i, instr->outputs[i].gain) &&
-                cbox_execute_on(fb, NULL, "/gain", "if", error, i, gain2dB_simple(instr->outputs[i].gain)) &&
-                cbox_execute_on(fb, NULL, "/output", "ii", error, i, instr->outputs[i].output_bus + 1)))
+            if (!(cbox_execute_on(fb, NULL, "/gain_linear", "if", error, 1 + i, instr->outputs[i].gain) &&
+                cbox_execute_on(fb, NULL, "/gain", "if", error, 1 + i, gain2dB_simple(instr->outputs[i].gain)) &&
+                cbox_execute_on(fb, NULL, "/output", "ii", error, 1 + i, instr->outputs[i].output_bus + 1)))
                 return FALSE;
         }
         return TRUE;
