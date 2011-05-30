@@ -69,10 +69,11 @@ class MainWindow(gtk.Window):
         self.update()
         
     def update(self):
+        rt = GetThings("/rt/status", ['audio_channels'], [])
         scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title'], [])
         
         l = gtk.Label()
-        l.set_markup('<b>Scene:</b> %s\n<b>Title:</b> %s\n' % (scene.name, scene.title))
+        l.set_markup('<b>Scene:</b> %s\n<b>Title:</b> %s\nInputs: %s\nOutputs: %s' % (scene.name, scene.title, rt.audio_channels[0], rt.audio_channels[1]))
         self.vbox.add(l)
         
         for i in scene.instrument:

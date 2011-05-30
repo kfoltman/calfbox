@@ -394,7 +394,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     if (pos)
     {
         int len = pos - obj;
-        if (!strncmp(obj, "instr", 5))
+        if (!strncmp(obj, "instr/", 6))
         {
             obj = &pos[1];
             pos = strchr(obj, '/');
@@ -423,14 +423,18 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             return TRUE;
         }
         else
-        if (!strncmp(obj, "master", 6))
-        {
+        if (!strncmp(obj, "master/", 7))
             return cbox_execute_sub(&app.rt->master->cmd_target, fb, cmd, pos, error);
-        }
         else
-        if (!strncmp(obj, "scene", 5))
-        {
+        if (!strncmp(obj, "scene/", 6))
             return cbox_execute_sub(&app.rt->scene->cmd_target, fb, cmd, pos, error);
+        else
+        if (!strncmp(obj, "rt/", 3))
+            return cbox_execute_sub(&app.rt->cmd_target, fb, cmd, pos, error);
+        else
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+            return FALSE;
         }
     }
     else

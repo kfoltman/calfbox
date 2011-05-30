@@ -35,6 +35,22 @@ struct cbox_rt_cmd_instance
     int is_async;
 };
 
+static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct cbox_rt *rt = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count);
+    }
+    else
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+        return FALSE;
+    }    
+}
+
 struct cbox_rt *cbox_rt_new()
 {
     struct cbox_rt *rt = malloc(sizeof(struct cbox_rt));
@@ -52,6 +68,8 @@ struct cbox_rt *cbox_rt_new()
     rt->mpb.time = 0;
     rt->mpb.active_notes = &rt->active_notes;
     cbox_midi_playback_active_notes_init(&rt->active_notes);
+    rt->cmd_target.user_data = rt;
+    rt->cmd_target.process_cmd = cbox_rt_process_cmd;
     return rt;
 }
 

@@ -53,6 +53,8 @@ struct cbox_rt
     struct cbox_midi_buffer midibuf_aux;
     
     jack_ringbuffer_t *rb_execute, *rb_cleanup;
+    
+    struct cbox_command_target cmd_target;
 };
 
 extern struct cbox_rt *cbox_rt_new();
