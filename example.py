@@ -2,9 +2,22 @@ import cbox
 import pygtk
 import gtk
 import glib
+import gobject
 
 def callback(cmd, cb, args):
     print cmd, cb, args
+
+def bold_label(text):
+    l = gtk.Label()
+    l.set_markup("<b>%s</b>" % text)
+    return l
+
+def gain_value_changed(adjustment, instr, output_pair):
+    cbox.do_cmd("/instr/%s/set_gain" % instr, None, [output_pair, adjustment.get_value()])
+
+def output_combo_value_changed(combo, instr, output_pair):
+    if combo.get_active() != -1:
+        cbox.do_cmd("/instr/%s/set_output" % instr, None, [output_pair, 1 + combo.get_active()])
 
 class GetThings:
     def __init__(self, cmd, anames, args):
@@ -85,12 +98,35 @@ class MainWindow(gtk.Window):
             b.set_border_width(5)
             f.add(b)
             b.add(gtk.Label("Engine: %s" % i[1]))
+            b.add(gtk.HSeparator())
+            t = gtk.Table(1 + len(idata.output), 3)
+            t.attach(bold_label("Instr. output"), 0, 1, 0, 1, gtk.SHRINK)
+            t.attach(bold_label("Send to"), 1, 2, 0, 1, gtk.SHRINK)
+            t.attach(bold_label("Gain [dB]"), 2, 3, 0, 1)
+            b.add(t)
+            y = 1
             for o in idata.output.keys():
-                if 2 * o < idata.aux_offset:
-                    b.add(gtk.Label("Output[%s]: %s Gain: %0.2f" % (o, idata.output[o], idata.gain[o])))
+                if 2 * (o - 1) < idata.aux_offset:
+                    output_name = "Out %s" % o
                 else:
-                    b.add(gtk.Label("Aux output[%s]: %s Gain: %0.2f" % (o - idata.aux_offset / 2, idata.output[o], idata.gain[o])))
+                    output_name = "Aux %s" % (o - idata.aux_offset / 2)
+                t.attach(gtk.Label(output_name), 0, 1, y, y + 1, gtk.SHRINK)
+                ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
+                for out in range(0, rt.audio_channels[1]/2):
+                    ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
+                cb = gtk.ComboBox(ls)
+                cb.set_active(idata.output[o] - 1)
+                cell = gtk.CellRendererText()
+                cb.pack_start(cell, True)
+                cb.add_attribute(cell, 'text', 0)
+                cb.connect('changed', output_combo_value_changed, i[0], o)
+                t.attach(cb, 1, 2, y, y + 1, gtk.SHRINK)
+                adj = gtk.Adjustment(idata.gain[o], -96, 0, 1, 6, 0)
+                adj.connect('value_changed', gain_value_changed, i[0], o)
+                t.attach(gtk.HScale(adj), 2, 3, y, y + 1)
+                y += 1
             if i[1] == 'stream_player':
+                b.add(gtk.HSeparator())
                 b.add(StreamWindow(i[0]))
             self.vbox.add(f)
 
