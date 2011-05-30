@@ -10,10 +10,20 @@ def callback(cmd, cb, args):
 def bold_label(text):
     l = gtk.Label()
     l.set_markup("<b>%s</b>" % text)
+    l.set_alignment(1, 0.5)
+    return l
+
+def left_label(text):
+    l = gtk.Label()
+    l.set_markup(text)
+    l.set_alignment(0, 0.5)
     return l
 
 def gain_value_changed(adjustment, instr, output_pair):
     cbox.do_cmd("/instr/%s/set_gain" % instr, None, [output_pair, adjustment.get_value()])
+
+def tempo_value_changed(adjustment):
+    cbox.do_cmd("/master/set_tempo", None, [adjustment.get_value()])
 
 def output_combo_value_changed(combo, instr, output_pair):
     if combo.get_active() != -1:
@@ -79,15 +89,38 @@ class MainWindow(gtk.Window):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.vbox = gtk.VBox(spacing = 5)
         self.add(self.vbox)
-        self.update()
+        self.create()
+        self.refresh_id = glib.timeout_add(30, lambda: self.update())
         
-    def update(self):
+    def create(self):
         rt = GetThings("/rt/status", ['audio_channels'], [])
         scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title'], [])
         
-        l = gtk.Label()
-        l.set_markup('<b>Scene:</b> %s\n<b>Title:</b> %s\nInputs: %s\nOutputs: %s' % (scene.name, scene.title, rt.audio_channels[0], rt.audio_channels[1]))
-        self.vbox.add(l)
+        self.master_info = left_label("")
+        self.timesig_info = left_label("")
+        
+        t = gtk.Table(2, 5)
+        t.set_col_spacings(5)
+        t.set_row_spacings(5)
+        
+        t.attach(bold_label("Scene"), 0, 1, 0, 1, gtk.SHRINK | gtk.FILL)
+        t.attach(left_label(scene.name), 1, 2, 0, 1)
+        
+        t.attach(bold_label("Title"), 0, 1, 1, 2, gtk.SHRINK | gtk.FILL)
+        t.attach(left_label(scene.title), 1, 2, 1, 2)
+        
+        t.attach(bold_label("Play pos"), 0, 1, 2, 3, gtk.SHRINK | gtk.FILL)
+        t.attach(self.master_info, 1, 2, 2, 3)
+        
+        t.attach(bold_label("Time sig"), 0, 1, 3, 4, gtk.SHRINK)
+        t.attach(self.timesig_info, 1, 2, 3, 4)
+        
+        t.attach(bold_label("Tempo"), 0, 1, 4, 5, gtk.SHRINK | gtk.FILL)
+        self.tempo_adj = gtk.Adjustment(40, 40, 300, 1, 5, 0)
+        self.tempo_adj.connect('value_changed', tempo_value_changed)
+        t.attach(gtk.HScale(self.tempo_adj), 1, 2, 4, 5)
+        
+        self.vbox.add(t)
         
         for i in scene.instrument:
             idata = GetThings("/instr/%s/status" % i[0], ['%gain', '%output', 'aux_offset'], [])
@@ -129,6 +162,14 @@ class MainWindow(gtk.Window):
                 b.add(gtk.HSeparator())
                 b.add(StreamWindow(i[0]))
             self.vbox.add(f)
+        self.update()
+        
+    def update(self):
+        master = GetThings("/master/status", ['pos', 'tempo', 'timesig'], [])
+        self.master_info.set_markup('%s' % master.pos)
+        self.timesig_info.set_markup("%s/%s" % tuple(master.timesig))
+        self.tempo_adj.set_value(master.tempo)
+        return True
 
 def do_quit(window, event):
     gtk.main_quit()
