@@ -406,7 +406,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             len = pos - obj;
             
             gchar *name = g_strndup(obj, len);
-            struct cbox_instrument *instr = cbox_instruments_get_by_name(name, error);
+            struct cbox_instrument *instr = cbox_instruments_get_by_name(name, FALSE, error);
             if (instr)
             {
                 g_free(name);

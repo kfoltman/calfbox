@@ -42,7 +42,7 @@ struct cbox_layer *cbox_layer_load(const char *name, GError **error)
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Instrument not specified for layer %s", name);
         goto error;
     }
-    instr = cbox_instruments_get_by_name(cv, error);
+    instr = cbox_instruments_get_by_name(cv, TRUE, error);
     if (!instr)
     {
         cbox_force_error(error);
@@ -86,7 +86,7 @@ extern struct cbox_layer *cbox_layer_new(const char *module_name, GError **error
     const char *cv = NULL;
     struct cbox_instrument *instr = NULL;
     
-    instr = cbox_instruments_get_by_name(module_name, error);
+    instr = cbox_instruments_get_by_name(module_name, TRUE, error);
     if (!instr)
     {
         cbox_force_error(error);

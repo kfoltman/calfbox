@@ -39,7 +39,7 @@ struct cbox_instrument
 };
 
 extern void cbox_instruments_init(struct cbox_io *io);
-extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, GError **error);
+extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gboolean load, GError **error);
 extern struct cbox_io *cbox_instruments_get_io();
 extern void cbox_instruments_close();
 
