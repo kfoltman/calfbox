@@ -708,7 +708,6 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
         cbox_module_destroy(&m->module);
         return NULL;
     }
-    m->stream->gain = cbox_config_get_gain(cfg_section, "gain", m->stream->gain);
     m->stream->fade_increment = 1.0 / (cbox_config_get_float(cfg_section, "fade_time", 0.05) * (srate / CBOX_BLOCK_SIZE));
     
     return &m->module;
