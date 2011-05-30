@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_INSTR_H
 #define CBOX_INSTR_H
 
-#include <glib.h>
+#include "cmd.h"
 
 struct cbox_module;
 struct cbox_io;
@@ -36,6 +36,7 @@ struct cbox_instrument
     const char *engine_name;
     struct cbox_module *module;
     struct cbox_instrument_output *outputs;
+    struct cbox_command_target cmd_target;
 };
 
 extern void cbox_instruments_init(struct cbox_io *io);

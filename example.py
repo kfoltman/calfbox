@@ -31,7 +31,7 @@ class GetThings:
 class StreamWindow(gtk.VBox):
     def __init__(self, instrument):
         gtk.Widget.__init__(self)
-        self.path = "/instr/%s" % instrument
+        self.path = "/instr/%s/engine" % instrument
         self.status_label = gtk.Label("")
         self.play_button = gtk.Button(label = "_Play")
         self.rewind_button = gtk.Button(label = "_Rewind")

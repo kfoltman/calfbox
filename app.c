@@ -410,12 +410,8 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             if (instr)
             {
                 g_free(name);
-                if (!instr->module->cmd_target.process_cmd)
-                {
-                    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", instr->engine_name);
-                    return FALSE;
-                }
-                return cbox_execute_sub(&instr->module->cmd_target, fb, cmd, pos, error);
+                
+                return cbox_execute_sub(&instr->cmd_target, fb, cmd, pos, error);
             }
             else
             {
