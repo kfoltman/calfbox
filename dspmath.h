@@ -92,4 +92,18 @@ static inline float dB2gain(float dB)
     return pow(2.0, dB / 6.0);
 }
 
+static inline float dB2gain_simple(float dB)
+{
+    if (dB <= -96)
+        return 0;
+    return pow(2.0, dB / 6.0);
+}
+
+static inline float gain2dB_simple(float gain)
+{
+    if (gain < pow(2.0, -96.0 / 6.0))
+        return -96;
+    return 6.0 * log(gain) / log(2.0);
+}
+
 #endif
