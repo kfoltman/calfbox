@@ -676,7 +676,7 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program *p
         char *where = NULL;
         if (layer_count)
         {
-            gchar *s = g_strdup_printf("layer%d", i);
+            gchar *s = g_strdup_printf("layer%d", 1 + i);
             where = g_strdup_printf("slayer:%s", cbox_config_get_string(cfg_section, s));
             g_free(s);
         }
