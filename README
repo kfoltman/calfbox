@@ -1,0 +1,224 @@
+Configuration file sections
+---------------------------
+
+[io]
+;Determines number of JACK audio inputs/outputs and auto-connections.
+
+;4 mono audio inputs (2 stereo pairs)
+inputs=2
+
+;2 mono audio outputs (1 stereo pair)
+outputs=4
+
+;autoconnection of inputs - first two inputs connect to first two physical ports
+in_1=#1
+in_2=#2
+
+;similar for outputs
+out_1=#1
+out_2=#2
+out_3=#3
+out_4=#4
+
+;MIDI autoconnect: connect those ports, exact match
+midi=alsa_pcm:E-MU-XMidi2X2/midi_capture_2;alsa_pcm:E-MU-XMidi2X2/midi_capture_1
+
+;MIDI autoconnect: connect first port matching a regex
+midi=~alsa_pcm:in-.*-(E-MU-XMidi2X2-MIDI-.*|padKONTROL-MIDI-.*|Kurzweil-PC3-.*)
+
+;MIDI autoconnect: connect all ports matching a regex
+midi=*alsa_pcm:in-.*-(E-MU-XMidi2X2-MIDI-.*|padKONTROL-MIDI-.*|Kurzweil-PC3-.*)
+
+========================================================================
+
+[master]
+;Transport properties - tempo and time signature
+;Also contains master effect setting
+
+;tempo (in bpm)
+tempo=100
+
+;time signature/4
+beats_per_bar=4
+
+;master effect, used for output 1
+effect=cbox_reverb
+
+========================================================================
+
+[metronome]
+;Metronome settings
+
+;Channel number
+channel=1
+
+;note number for non-accented beats
+note=C4
+;note number for accented beats
+note_accent=C5
+
+========================================================================
+
+[scene:myscene]
+;Defines a scene (set of instruments and assignments)
+
+;Scene title (user-visible)
+title=My scene
+
+;Layer references
+layer1=piano_all
+layer2=epiano_all
+layer3=drums
+
+========================================================================
+
+[layer:piano_all]
+;Defines a scene layer, which processes input events and sends some of them,
+;with optional modifications, to an instrument
+
+;Layer's output - send to this instrument
+instrument=default
+
+;Input channel filter - only notes for this channel will be matched
+in_channel=1
+;Output channel
+out_channel=1
+
+;This blocks aftertouch events (default 1)
+aftertouch=0
+
+;This can be used to invert the polarity of the sustain pedal, very hacky
+;workaround but might be useful for emergency situations/ancient gear
+;invert_sustain=1
+
+;Do not send the note matched by this layer to any further layer
+;(might be useful for selective layers before default/catch-all layers)
+consume=1
+
+========================================================================
+
+[layer:piano]
+;This layer sends notes C#3 and above on channel 1 to instrument default
+instrument=default
+in_channel=1
+out_channel=1
+
+;Skip notes below this note
+low_note=C#3
+out_channel=1
+
+========================================================================
+
+[layer:brass]
+;This layer sends notes B2 and below on channel 1 to instrument default
+;channel 3
+instrument=default
+in_channel=1
+out_channel=3
+;Skip notes above this note
+high_note=B2
+;Transpose notes by that many semitones
+transpose=24
+
+========================================================================
+
+[instrument:sampler]
+;Defines an instrument
+
+;Selects a DSP engine for the instrument; this selects a built in simple 
+;sampler module
+engine=sampler
+;Program 0 is defined in section [spgm:piano]
+program0=piano
+
+========================================================================
+
+[spgm:piano]
+;Program definition for the sampler
+
+;Directory to use for samples
+sample_path=/media/resources/samples/sp250/
+;Layer references (refer to [slayer:piano-c1 and so forth)
+layer1=piano-c1
+layer2=piano-c2
+layer3=piano-c3
+layer4=piano-c4
+layer5=piano-c5
+
+========================================================================
+
+[slayer:piano-layer]
+;Definition of a layer for the sampler. This one is not referenced directly,
+;but is included in a "proper" sampler layer piano-c1
+
+;Filter cutoff
+cutoff=100
+;Filter resonance
+resonance=4
+;Filter envelope amount 
+fileg_depth=9600
+;Filter DAHDSR settings
+filter_attack=0
+filter_decay=0.3
+filter_sustain=0.1
+
+[slayer:piano-c1]
+
+;Waveform to load
+file=c1-vel127.wav
+;Lowest note assigned to the layer
+low_note=36
+;Highest note assigned to the layer
+high_note=47
+;Playing the sample at the original freq. corresponds to this note
+root_note=36
+;Copy all the other settings from another layer (can be only used one time in each layer)
+import=slayer:piano-layer
+
+========================================================================
+
+engines:
+tonewheel_organ
+stream_player
+jack_input
+sampler (partly done)
+fluidsynth
+
+phaser
+chorus
+delay
+reverb (yuck)
+eq
+tone_control
+fxchain
+
+insert effects
+multi I/O
+
+========================================================================
+
+[fxpreset:...]
+
+========================================================================
+
+[autojack]
+
+========================================================================
+
+[soundcard:...]
+
+========================================================================
+
+[pattern:...]
+
+========================================================================
+
+[drumpattern:...]
+
+========================================================================
+
+[track:...]
+
+========================================================================
+
+[drumtrack:...]
