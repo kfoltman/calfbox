@@ -66,10 +66,10 @@ struct cbox_module *tone_control_create(void *user_data, const char *cfg_section
     m->module.process_event = tone_control_process_event;
     m->module.process_block = tone_control_process_block;
     
-    float tpdsr = 2 * M_PI / srate;
+    float pdsr = M_PI / srate;
     
-    cbox_onepolef_set_lowpass(&m->lowpass_coeffs, cbox_config_get_float(cfg_section, "lowpass", 8000.f) * tpdsr);
-    cbox_onepolef_set_highpass(&m->highpass_coeffs, cbox_config_get_float(cfg_section, "highpass", 75.f) * tpdsr);
+    cbox_onepolef_set_lowpass(&m->lowpass_coeffs, cbox_config_get_float(cfg_section, "lowpass", 8000.f) * pdsr);
+    cbox_onepolef_set_highpass(&m->highpass_coeffs, cbox_config_get_float(cfg_section, "highpass", 75.f) * pdsr);
     cbox_onepolef_reset(&m->lowpass_state[0]);
     cbox_onepolef_reset(&m->lowpass_state[1]);
     cbox_onepolef_reset(&m->highpass_state[0]);
