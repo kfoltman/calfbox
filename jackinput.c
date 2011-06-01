@@ -64,7 +64,7 @@ struct cbox_module *jack_input_create(void *user_data, const char *cfg_section, 
     }
     
     struct jack_input_module *m = malloc(sizeof(struct jack_input_module));
-    m->module.user_data = m;
+    cbox_module_init(&m->module, m, 0, 2);
     m->module.process_event = jack_input_process_event;
     m->module.process_block = jack_input_process_block;
     
