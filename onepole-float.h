@@ -41,7 +41,7 @@ static inline void cbox_onepolef_reset(struct cbox_onepolef_state *state)
 
 static inline void cbox_onepolef_set_lowpass(struct cbox_onepolef_coeffs *coeffs, float w)
 {
-    float x = tan (w);
+    float x = tan (w * 0.5f);
     float q = 1 / (1 + x);
     float a01 = x*q;
     float b1 = a01 - q;
@@ -53,7 +53,7 @@ static inline void cbox_onepolef_set_lowpass(struct cbox_onepolef_coeffs *coeffs
 
 static inline void cbox_onepolef_set_highpass(struct cbox_onepolef_coeffs *coeffs, float w)
 {
-    float x = tan (w);
+    float x = tan (w * 0.5f);
     float q = 1 / (1 + x);
     float a01 = x*q;
     float b1 = a01 - q;
@@ -65,7 +65,7 @@ static inline void cbox_onepolef_set_highpass(struct cbox_onepolef_coeffs *coeff
 
 static inline void cbox_onepolef_set_allpass(struct cbox_onepolef_coeffs *coeffs, float w)
 {
-    float x = tan (w);
+    float x = tan (w * 0.5f);
     float q = 1 / (1 + x);
     float a01 = x*q;
     float b1 = a01 - q;

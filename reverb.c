@@ -179,10 +179,10 @@ struct cbox_module *reverb_create(void *user_data, const char *cfg_section, int 
             b->delay_storage[i] = 0.f;
     }
     
-    float pdsr = M_PI / srate;
+    float tpdsr = 2 * M_PI / srate;
     
-    cbox_onepolef_set_lowpass(&m->filter_coeffs[0], cbox_config_get_float(cfg_section, "lowpass", 8000.f) * pdsr);
-    cbox_onepolef_set_highpass(&m->filter_coeffs[1], cbox_config_get_float(cfg_section, "highpass", 35.f) * pdsr);
+    cbox_onepolef_set_lowpass(&m->filter_coeffs[0], cbox_config_get_float(cfg_section, "lowpass", 8000.f) * tpdsr);
+    cbox_onepolef_set_highpass(&m->filter_coeffs[1], cbox_config_get_float(cfg_section, "highpass", 35.f) * tpdsr);
     
     return &m->module;
 }
