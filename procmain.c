@@ -444,31 +444,39 @@ struct cbox_midi_pattern *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_mi
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct set_scene_command
+struct swap_pointers_command
 {
-    struct cbox_rt *rt;
-    struct cbox_scene *new_scene, *old_scene;
+    void **ptr;
+    void *old_value;
+    void *new_value;
 };
 
-static int set_scene_command_execute(void *user_data)
+static int swap_pointers_command_execute(void *user_data)
 {
-    struct set_scene_command *cmd = user_data;
+    struct swap_pointers_command *cmd = user_data;
     
-    cmd->old_scene = cmd->rt->scene;
-    cmd->rt->scene = cmd->new_scene;
+    cmd->old_value = *cmd->ptr;
+    *cmd->ptr = cmd->new_value;
     
     return 1;
 }
 
-struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scene)
+void *cbox_rt_swap_pointers(struct cbox_rt *rt, void **ptr, void *new_value)
 {
-    static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = set_scene_command_execute, .cleanup = NULL };
+    static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = swap_pointers_command_execute, .cleanup = NULL };
     
-    struct set_scene_command sc = { rt, scene, NULL };
+    struct swap_pointers_command sc = { ptr, NULL, new_value };
     
     cbox_rt_execute_cmd_sync(rt, &scdef, &sc);
     
-    return sc.old_scene;
+    return sc.old_value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scene)
+{
+    return cbox_rt_swap_pointers(rt, (void **)&rt->scene, scene);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
