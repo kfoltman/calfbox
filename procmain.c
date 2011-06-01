@@ -331,7 +331,7 @@ void cbox_rt_stop(struct cbox_rt *rt)
     rt->io = NULL;
 }
 
-void cbox_rt_cmd_handle_queue(struct cbox_rt *rt)
+void cbox_rt_handle_cmd_queue(struct cbox_rt *rt)
 {
     struct cbox_rt_cmd_instance cmd;
     
@@ -341,7 +341,7 @@ void cbox_rt_cmd_handle_queue(struct cbox_rt *rt)
     }
 }
 
-void cbox_rt_cmd_execute_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
+void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
 {
     struct cbox_rt_cmd_instance cmd;
     
@@ -385,7 +385,7 @@ void cbox_rt_cmd_execute_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
     } while(1);
 }
 
-void cbox_rt_cmd_execute_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
+void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
 {
     struct cbox_rt_cmd_instance cmd = { def, user_data, 1 };
     
@@ -437,7 +437,7 @@ struct cbox_midi_pattern *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_mi
     
     struct set_pattern_command cmd = { rt, pattern, NULL, new_pos };
     
-    cbox_rt_cmd_execute_sync(rt, &def, &cmd);
+    cbox_rt_execute_cmd_sync(rt, &def, &cmd);
     
     return cmd.old_pattern;
 }
@@ -466,7 +466,7 @@ struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scen
     
     struct set_scene_command sc = { rt, scene, NULL };
     
-    cbox_rt_cmd_execute_sync(rt, &scdef, &sc);
+    cbox_rt_execute_cmd_sync(rt, &scdef, &sc);
     
     return sc.old_scene;
 }

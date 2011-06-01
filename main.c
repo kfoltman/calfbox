@@ -85,7 +85,7 @@ static int on_idle_with_ui_poll(struct cbox_ui_page *page)
 {
     cbox_io_poll_ports(&app.io);
     if (app.rt)
-        cbox_rt_cmd_handle_queue(app.rt);
+        cbox_rt_handle_cmd_queue(app.rt);
     
     if (old_menu_on_idle)
         return old_menu_on_idle(page);

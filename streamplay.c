@@ -614,19 +614,19 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
         if (!require_stream(m, error))
             return FALSE;
         m->stream->readptr_new = *(int *)cmd->arg_values[0];
-        cbox_rt_cmd_execute_async(app.rt, &stream_seek_command, m);
+        cbox_rt_execute_cmd_async(app.rt, &stream_seek_command, m);
     }
     else if (!strcmp(cmd->command, "/play") && !strcmp(cmd->arg_types, ""))
     {
         if (!require_stream(m, error))
             return FALSE;
-        cbox_rt_cmd_execute_async(app.rt, &stream_play_command, m);
+        cbox_rt_execute_cmd_async(app.rt, &stream_play_command, m);
     }
     else if (!strcmp(cmd->command, "/stop") && !strcmp(cmd->arg_types, ""))
     {
         if (!require_stream(m, error))
             return FALSE;
-        cbox_rt_cmd_execute_async(app.rt, &stream_stop_command, m);
+        cbox_rt_execute_cmd_async(app.rt, &stream_stop_command, m);
     }
     else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
@@ -652,7 +652,7 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
         c->filename = g_strdup((gchar *)cmd->arg_values[0]);
         c->loop_start = *(int *)cmd->arg_values[1];
         c->error = error;
-        cbox_rt_cmd_execute_sync(app.rt, &stream_load_command, c);
+        cbox_rt_execute_cmd_sync(app.rt, &stream_load_command, c);
         gboolean success = c->stream != NULL;
         free(c);
         return success;
@@ -667,7 +667,7 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
         c->filename = NULL;
         c->loop_start = 0;
         c->error = error;
-        cbox_rt_cmd_execute_sync(app.rt, &stream_load_command, c);
+        cbox_rt_execute_cmd_sync(app.rt, &stream_load_command, c);
         gboolean success = c->stream == NULL;
         free(c);
         return success;        
