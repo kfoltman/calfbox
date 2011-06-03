@@ -19,6 +19,12 @@ def left_label(text):
     l.set_alignment(0, 0.5)
     return l
 
+def effect_value_changed_int(adjustment, path):
+    cbox.do_cmd(path, None, [int(adjustment.get_value())])
+
+def effect_value_changed_float(adjustment, path):
+    cbox.do_cmd(path, None, [float(adjustment.get_value())])
+
 def gain_value_changed(adjustment, instr, output_pair):
     cbox.do_cmd("/instr/%s/set_gain" % instr, None, [output_pair, adjustment.get_value()])
 
@@ -84,23 +90,27 @@ class StreamWindow(gtk.VBox):
         self.status_label.set_markup("<b>File:</b> %s\n<b>Pos:</b> %s" % (attribs.filename, attribs.pos))
         return True
 
-def add_slider_row(t, row, label, value, min, max):
-    t.attach(bold_label(labelgt), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL)
-    adj = gtk.Adjustment(value, min, max, 1, 6, 0)
-    t.attach(gtk.HScale(adj), 1, 2, row, row+1)
+def add_slider_row(t, row, label, path, values, item, min, max, setter = effect_value_changed_float):
+    t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL)
+    adj = gtk.Adjustment(getattr(values, item), min, max, 1, 6, 0)
+    adj.connect("value_changed", lambda adj: setter(adj, path + "/" + item))
+    hsc = gtk.HScale(adj)
+    hsc.set_size_request(100, -1)
+    t.attach(hsc, 1, 2, row, row+1)
 
 class PhaserWindow(gtk.Window):
     def __init__(self, instrument, output):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.path = "/instr/%s/insert%s/engine" % (instrument, "" if output == 1 else str(output))
+        self.set_title("Phaser - %s" % instrument)
         values = GetThings(self.path + "/status", ["center_freq", "mod_depth", "fb_amt", "lfo_freq", "stereo_phase", "stages"], [])
         t = gtk.Table(1, 6)
-        add_slider_row(t, 0, "Center", values.center_freq, 100, 20000)
-        add_slider_row(t, 1, "Mod depth", values.mod_depth, 0, 4000)
-        add_slider_row(t, 2, "Feedback", values.fb_amt, -1, 1)
-        add_slider_row(t, 3, "LFO frequency", values.lfo_freq, 0, 20)
-        add_slider_row(t, 4, "Stereo", values.stereo_phase * 180 / 3.1415296, 0, 360)
-        add_slider_row(t, 5, "Stages", values.stages, 1, 12)
+        add_slider_row(t, 0, "Center", self.path, values, "center_freq", 100, 20000)
+        add_slider_row(t, 1, "Mod depth", self.path, values, "mod_depth", 0, 4000)
+        add_slider_row(t, 2, "Feedback", self.path, values, "fb_amt", -1, 1)
+        add_slider_row(t, 3, "LFO frequency", self.path, values, "lfo_freq", 0, 20)
+        add_slider_row(t, 4, "Stereo", self.path, values, "stereo_phase", 0, 360)
+        add_slider_row(t, 5, "Stages", self.path, values, "stages", 1, 12, setter = effect_value_changed_int)
         self.add(t)
 
 class MainWindow(gtk.Window):
