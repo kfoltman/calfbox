@@ -84,6 +84,25 @@ class StreamWindow(gtk.VBox):
         self.status_label.set_markup("<b>File:</b> %s\n<b>Pos:</b> %s" % (attribs.filename, attribs.pos))
         return True
 
+def add_slider_row(t, row, label, value, min, max):
+    t.attach(bold_label(labelgt), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL)
+    adj = gtk.Adjustment(value, min, max, 1, 6, 0)
+    t.attach(gtk.HScale(adj), 1, 2, row, row+1)
+
+class PhaserWindow(gtk.Window):
+    def __init__(self, instrument, output):
+        gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
+        self.path = "/instr/%s/insert%s/engine" % (instrument, "" if output == 1 else str(output))
+        values = GetThings(self.path + "/status", ["center_freq", "mod_depth", "fb_amt", "lfo_freq", "stereo_phase", "stages"], [])
+        t = gtk.Table(1, 6)
+        add_slider_row(t, 0, "Center", values.center_freq, 100, 20000)
+        add_slider_row(t, 1, "Mod depth", values.mod_depth, 0, 4000)
+        add_slider_row(t, 2, "Feedback", values.fb_amt, -1, 1)
+        add_slider_row(t, 3, "LFO frequency", values.lfo_freq, 0, 20)
+        add_slider_row(t, 4, "Stereo", values.stereo_phase * 180 / 3.1415296, 0, 360)
+        add_slider_row(t, 5, "Stages", values.stages, 1, 12)
+        self.add(t)
+
 class MainWindow(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
@@ -123,7 +142,7 @@ class MainWindow(gtk.Window):
         self.vbox.add(t)
         
         for i in scene.instrument:
-            idata = GetThings("/instr/%s/status" % i[0], ['%gain', '%output', 'aux_offset'], [])
+            idata = GetThings("/instr/%s/status" % i[0], ['%gain', '%output', 'aux_offset', '%insert_engine'], [])
             #attribs = GetThings("/scene/instr_info", ['engine', 'name'], [i])
             #markup += '<b>Instrument %d:</b> engine %s, name %s\n' % (i, attribs.engine, attribs.name)
             f = gtk.Frame(label = 'Instrument %s' % i[0])
@@ -132,10 +151,11 @@ class MainWindow(gtk.Window):
             f.add(b)
             b.add(gtk.Label("Engine: %s" % i[1]))
             b.add(gtk.HSeparator())
-            t = gtk.Table(1 + len(idata.output), 3)
+            t = gtk.Table(1 + len(idata.output), 5)
             t.attach(bold_label("Instr. output"), 0, 1, 0, 1, gtk.SHRINK)
             t.attach(bold_label("Send to"), 1, 2, 0, 1, gtk.SHRINK)
             t.attach(bold_label("Gain [dB]"), 2, 3, 0, 1)
+            t.attach(bold_label("Effect"), 3, 5, 0, 1)
             b.add(t)
             y = 1
             for o in idata.output.keys():
@@ -157,6 +177,12 @@ class MainWindow(gtk.Window):
                 adj = gtk.Adjustment(idata.gain[o], -96, 0, 1, 6, 0)
                 adj.connect('value_changed', gain_value_changed, i[0], o)
                 t.attach(gtk.HScale(adj), 2, 3, y, y + 1)
+                fx = gtk.Label(idata.insert_engine[o])
+                t.attach(fx, 3, 4, y, y + 1)
+                if idata.insert_engine[o] == 'phaser':
+                    fx = gtk.Button("_Edit")
+                    t.attach(fx, 4, 5, y, y + 1)
+                    fx.connect("clicked", lambda button, instr, output: PhaserWindow(instr, output).show_all(), i[0], o)
                 y += 1
             if i[1] == 'stream_player':
                 b.add(gtk.HSeparator())
