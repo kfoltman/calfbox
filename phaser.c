@@ -63,16 +63,30 @@ static struct phaser_params *copy_params(struct phaser_module *m)
     return res;
 }
 
+#define EFFECT_PARAM(path, type, field, ctype, expr) \
+    if (!strcmp(cmd->command, path) && !strcmp(cmd->arg_types, type)) \
+    { \
+        struct phaser_params *pp = copy_params(m); \
+        pp->field = expr(*(ctype *)cmd->arg_values[0]); \
+        free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, pp)); \
+    } \
+
+static inline float deg2rad(float deg)
+{
+    return deg * M_PI / 180;
+}
+
 gboolean phaser_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct phaser_module *m = (struct phaser_module *)ct->user_data;
-    if (!strcmp(cmd->command, "/center_freq") && !strcmp(cmd->arg_types, "f"))
-    {
-        struct phaser_params *pp = copy_params(m);
-        pp->center = *(float *)cmd->arg_values[0];
-        free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, pp));
-    }
-    else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    
+    EFFECT_PARAM("/center_freq", "f", center, double, ) else
+    EFFECT_PARAM("/mod_depth", "f", mdepth, double, ) else
+    EFFECT_PARAM("/fb_amt", "f", fb_amt, double, ) else
+    EFFECT_PARAM("/lfo_freq", "f", lfo_freq, double, ) else
+    EFFECT_PARAM("/stereo_phase", "f", sphase, double, deg2rad) else
+    EFFECT_PARAM("/stages", "i", stages, int, ) else
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
@@ -80,7 +94,7 @@ gboolean phaser_process_cmd(struct cbox_command_target *ct, struct cbox_command_
             cbox_execute_on(fb, NULL, "/mod_depth", "f", error, m->params->mdepth) &&
             cbox_execute_on(fb, NULL, "/fb_amt", "f", error, m->params->fb_amt) &&
             cbox_execute_on(fb, NULL, "/lfo_freq", "f", error, m->params->lfo_freq) &&
-            cbox_execute_on(fb, NULL, "/stereo_phase", "f", error, m->params->sphase) &&
+            cbox_execute_on(fb, NULL, "/stereo_phase", "f", error, m->params->sphase * 180 / M_PI) &&
             cbox_execute_on(fb, NULL, "/stages", "i", error, m->params->stages);
     }
     else
