@@ -102,6 +102,7 @@ struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manife
     module->instance_name = g_strdup(instance_name);
     module->input_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * module->inputs);
     module->output_samples = malloc(sizeof(float) * CBOX_BLOCK_SIZE * module->outputs);
+    module->engine_name = manifest->name;
     cbox_midi_buffer_init(&module->midi_input);
     
     return module;

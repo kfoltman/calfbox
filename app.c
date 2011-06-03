@@ -170,7 +170,7 @@ static struct cbox_command_target *find_module_target(const char *type, GError *
     struct cbox_scene *scene = app.rt->scene;
     for (int i = 0; i < scene->instrument_count; i++)
     {
-        if (!strcmp(scene->instruments[i]->engine_name, type))
+        if (!strcmp(scene->instruments[i]->module->engine_name, type))
             return &scene->instruments[i]->module->cmd_target;
     }
     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot find a module of type '%s'", type);

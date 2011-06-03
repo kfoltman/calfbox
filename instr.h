@@ -33,7 +33,6 @@ struct cbox_instrument_output
 
 struct cbox_instrument
 {
-    const char *engine_name;
     struct cbox_module *module;
     struct cbox_instrument_output *outputs;
     struct cbox_command_target cmd_target;

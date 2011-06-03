@@ -52,7 +52,7 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
     struct cbox_instrument *instr = ct->user_data;
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
-        if (!cbox_execute_on(fb, NULL, "/engine", "s", error, instr->engine_name))
+        if (!cbox_execute_on(fb, NULL, "/engine", "s", error, instr->module->engine_name))
             return FALSE;
         if (!cbox_execute_on(fb, NULL, "/aux_offset", "i", error, instr->module->aux_offset))
             return FALSE;
@@ -61,7 +61,8 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
         {
             if (!(cbox_execute_on(fb, NULL, "/gain_linear", "if", error, 1 + i, instr->outputs[i].gain) &&
                 cbox_execute_on(fb, NULL, "/gain", "if", error, 1 + i, gain2dB_simple(instr->outputs[i].gain)) &&
-                cbox_execute_on(fb, NULL, "/output", "ii", error, 1 + i, instr->outputs[i].output_bus + 1)))
+                cbox_execute_on(fb, NULL, "/output", "ii", error, 1 + i, instr->outputs[i].output_bus + 1) &&
+                cbox_execute_on(fb, NULL, "/insert_engine", "is", error, 1 + i, instr->outputs[i].insert ? instr->outputs[i].insert->engine_name : "")))
                 return FALSE;
         }
         return TRUE;
@@ -95,10 +96,25 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
     {
         if (!instr->module->cmd_target.process_cmd)
         {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", instr->engine_name);
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", instr->module->engine_name);
             return FALSE;
         }
         return cbox_execute_sub(&instr->module->cmd_target, fb, cmd, cmd->command + 7, error);
+    }
+    else
+    if (!strncmp(cmd->command, "/insert/engine/",8 + 7))
+    {
+        if (!instr->outputs[0].insert)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The instrument %s has no insert effect", instr->module->instance_name);
+            return FALSE;
+        }
+        if (!instr->outputs[0].insert->cmd_target.process_cmd)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", instr->module->engine_name);
+            return FALSE;
+        }
+        return cbox_execute_sub(&instr->outputs[0].insert->cmd_target, fb, cmd, cmd->command + 7, error);
     }
     else
     {
@@ -189,7 +205,6 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
     instr = malloc(sizeof(struct cbox_instrument));
     instr->module = module;
     instr->outputs = outputs;
-    instr->engine_name = instr_engine;
     instr->cmd_target.user_data = instr;
     instr->cmd_target.process_cmd = cbox_instrument_process_cmd;
     

@@ -61,6 +61,7 @@ struct cbox_module_voicingparam_metadata
 struct cbox_module
 {
     void *user_data;
+    const char *engine_name;
     gchar *instance_name;
     cbox_sample_t *input_samples;
     cbox_sample_t *output_samples;

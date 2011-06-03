@@ -46,7 +46,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         }
         for (int i = 0; i < s->instrument_count; i++)
         {
-            if (!cbox_execute_on(fb, NULL, "/instrument", "ss", error, s->instruments[i]->module->instance_name, s->instruments[i]->engine_name))
+            if (!cbox_execute_on(fb, NULL, "/instrument", "ss", error, s->instruments[i]->module->instance_name, s->instruments[i]->module->engine_name))
                 return FALSE;
         }
         return TRUE;
