@@ -114,7 +114,7 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", instr->module->engine_name);
             return FALSE;
         }
-        return cbox_execute_sub(&instr->outputs[0].insert->cmd_target, fb, cmd, cmd->command + 7, error);
+        return cbox_execute_sub(&instr->outputs[0].insert->cmd_target, fb, cmd, cmd->command + 7 + 7, error);
     }
     else
     {
