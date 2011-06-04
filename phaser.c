@@ -59,13 +59,6 @@ struct phaser_module
     float phase;
 };
 
-static struct phaser_params *copy_params(struct phaser_module *m)
-{
-    struct phaser_params *res = malloc(sizeof(struct phaser_params));
-    memcpy(res, m->params, sizeof(struct phaser_params));
-    return res;
-}
-
 static inline float deg2rad(float deg)
 {
     return deg * M_PI / 180;
