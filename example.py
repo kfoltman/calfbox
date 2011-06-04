@@ -114,8 +114,23 @@ class PhaserWindow(gtk.Window):
         add_slider_row(t, 6, "Stages", self.path, values, "stages", 1, 12, setter = effect_value_changed_int)
         self.add(t)
 
+class ChorusWindow(gtk.Window):
+    def __init__(self, instrument, output):
+        gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
+        self.path = "/instr/%s/insert%s/engine" % (instrument, "" if output == 1 else str(output))
+        self.set_title("Chorus - %s" % instrument)
+        values = GetThings(self.path + "/status", ["min_delay", "mod_depth", "lfo_freq", "stereo_phase", "stages", "wet_dry"], [])
+        t = gtk.Table(1, 5)
+        add_slider_row(t, 0, "Min. delay", self.path, values, "min_delay", 1, 20)
+        add_slider_row(t, 1, "Mod depth", self.path, values, "mod_depth", 1, 20)
+        add_slider_row(t, 2, "LFO frequency", self.path, values, "lfo_freq", 0, 20)
+        add_slider_row(t, 3, "Stereo", self.path, values, "stereo_phase", 0, 360)
+        add_slider_row(t, 4, "Wet/dry", self.path, values, "wet_dry", 0, 1)
+        self.add(t)
+
 engine_window_map = {
     'phaser': PhaserWindow,
+    'chorus': ChorusWindow,
 }
 
 class MainWindow(gtk.Window):
