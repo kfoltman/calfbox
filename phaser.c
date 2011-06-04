@@ -40,6 +40,7 @@ struct phaser_params
     float fb_amt;
     float lfo_freq;
     float sphase;
+    float wet_dry;
     int stages;
 };
 
@@ -85,6 +86,7 @@ gboolean phaser_process_cmd(struct cbox_command_target *ct, struct cbox_command_
     EFFECT_PARAM("/fb_amt", "f", fb_amt, double, ) else
     EFFECT_PARAM("/lfo_freq", "f", lfo_freq, double, ) else
     EFFECT_PARAM("/stereo_phase", "f", sphase, double, deg2rad) else
+    EFFECT_PARAM("/wet_dry", "f", wet_dry, double, ) else
     EFFECT_PARAM("/stages", "i", stages, int, ) else
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
@@ -95,6 +97,7 @@ gboolean phaser_process_cmd(struct cbox_command_target *ct, struct cbox_command_
             cbox_execute_on(fb, NULL, "/fb_amt", "f", error, m->params->fb_amt) &&
             cbox_execute_on(fb, NULL, "/lfo_freq", "f", error, m->params->lfo_freq) &&
             cbox_execute_on(fb, NULL, "/stereo_phase", "f", error, m->params->sphase * 180 / M_PI) &&
+            cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry) &&
             cbox_execute_on(fb, NULL, "/stages", "i", error, m->params->stages);
     }
     else
@@ -134,7 +137,7 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
             for (s = 0; s < stages; s++)
                 wet = cbox_onepolef_process_sample(&m->state[s][c], &m->coeffs[c], wet);
             m->fb[c] = wet;
-            outputs[c][i] = dry + wet;
+            outputs[c][i] = dry + (wet - dry) * p->wet_dry;
         }
     }
 }
@@ -163,6 +166,7 @@ struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int 
     p->center = cbox_config_get_float(cfg_section, "center_freq", 1500.f);
     p->mdepth = cbox_config_get_float(cfg_section, "mod_depth", 500.f);
     p->fb_amt = cbox_config_get_float(cfg_section, "feedback", 0.f);
+    p->wet_dry = cbox_config_get_float(cfg_section, "wet_dry", 0.5f);
     p->stages = cbox_config_get_int(cfg_section, "stages", NO_STAGES);
     
     for (b = 0; b < NO_STAGES; b++)
