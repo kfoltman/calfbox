@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -30,22 +31,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define MAX_CHORUS_LENGTH 4096
 
+#define MODULE_PARAMS chorus_params
+
 static float sine_table[2049];
+
+struct chorus_params
+{
+    float lfo_freq;
+    float min_delay;
+    float mod_depth;
+    float wet_dry;
+    float sphase;
+};
 
 struct chorus_module
 {
     struct cbox_module module;
 
     float storage[MAX_CHORUS_LENGTH][2];
+    struct chorus_params *params;
     int pos;
-    float lfo_freq;
-    float min_delay;
-    float mod_depth;
-    float dryamt;
-    float wetamt;
     float tp32dsr;
-    uint32_t phase, sphase;
+    uint32_t phase;
 };
+
+gboolean chorus_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct chorus_module *m = (struct chorus_module *)ct->user_data;
+    
+    EFFECT_PARAM("/min_delay", "f", min_delay, double, ) else
+    EFFECT_PARAM("/mod_depth", "f", mod_depth, double, ) else
+    EFFECT_PARAM("/lfo_freq", "f", lfo_freq, double, ) else
+    EFFECT_PARAM("/stereo_phase", "f", sphase, double, ) else
+    EFFECT_PARAM("/wet_dry", "f", wet_dry, double, ) else
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        return cbox_execute_on(fb, NULL, "/min_delay", "f", error, m->params->min_delay) &&
+            cbox_execute_on(fb, NULL, "/mod_depth", "f", error, m->params->mod_depth) &&
+            cbox_execute_on(fb, NULL, "/lfo_freq", "f", error, m->params->lfo_freq) &&
+            cbox_execute_on(fb, NULL, "/stereo_phase", "f", error, m->params->sphase) &&
+            cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry);
+    }
+    else
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown command '%s'", cmd->command);
+        return FALSE;
+    }
+    return TRUE;
+}
 
 void chorus_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
@@ -55,21 +90,22 @@ void chorus_process_event(struct cbox_module *module, const uint8_t *data, uint3
 void chorus_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct chorus_module *m = (struct chorus_module *)module;
+    struct chorus_params *p = m->params;
     
-    float min_delay = m->min_delay;
-    float mod_depth = m->mod_depth;
-    float dryamt = m->dryamt;
-    float wetamt = m->wetamt;
+    float min_delay = p->min_delay;
+    float mod_depth = p->mod_depth;
+    float wet_dry = p->wet_dry;
     int i, c;
     int mask = MAX_CHORUS_LENGTH - 1;
-    uint32_t dphase = (uint32_t)(m->lfo_freq * m->tp32dsr);
+    uint32_t sphase = (uint32_t)(p->sphase * 65536.0 * 65536.0 / 360);
+    uint32_t dphase = (uint32_t)(p->lfo_freq * m->tp32dsr);
     const int fracbits = 32 - 11;
     const int fracscale = 1 << fracbits;
     
     for (c = 0; c < 2; c++)
     {
         int pos = m->pos;
-        uint32_t phase = m->phase + c * m->sphase;
+        uint32_t phase = m->phase + c * sphase;
         for (i = 0; i < CBOX_BLOCK_SIZE; i++)
         {
             float dry = inputs[c][i];
@@ -87,7 +123,7 @@ void chorus_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
             
             float smp = smp0 + (smp1 - smp0) * frac;
             
-            outputs[c][i] = sanef(dry * dryamt + smp * wetamt);
+            outputs[c][i] = sanef(dry + (smp - dry) * wet_dry);
 
             pos++;
             phase += dphase;
@@ -106,21 +142,24 @@ struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int 
     {
         inited = 1;
         for (i = 0; i < 2049; i++)
-            sine_table[i] = sin(i * M_PI / 1024);
+            sine_table[i] = 1 + sin(i * M_PI / 1024);
     }
     
     struct chorus_module *m = malloc(sizeof(struct chorus_module));
     cbox_module_init(&m->module, m, 2, 2);
     m->module.process_event = chorus_process_event;
     m->module.process_block = chorus_process_block;
+    m->module.cmd_target.process_cmd = chorus_process_cmd;
     m->pos = 0;
     m->phase = 0;
     m->tp32dsr = 65536.0 * 65536.0 / srate;
-    m->lfo_freq = cbox_config_get_float(cfg_section, "lfo_freq", 1.f);
-    m->min_delay = cbox_config_get_float(cfg_section, "min_delay", 20.f);
-    m->mod_depth = cbox_config_get_float(cfg_section, "mod_depth", 15.f);
-    m->dryamt = cbox_config_get_gain_db(cfg_section, "dry_gain", 0.f);
-    m->wetamt = cbox_config_get_gain_db(cfg_section, "wet_gain", -6.f);
+    struct chorus_params *p = malloc(sizeof(struct chorus_params));
+    m->params = p;
+    p->sphase = cbox_config_get_float(cfg_section, "stereo_phase", 90.f);
+    p->lfo_freq = cbox_config_get_float(cfg_section, "lfo_freq", 1.f);
+    p->min_delay = cbox_config_get_float(cfg_section, "min_delay", 20.f);
+    p->mod_depth = cbox_config_get_float(cfg_section, "mod_depth", 15.f);
+    p->wet_dry = cbox_config_get_float(cfg_section, "wet_dry", 0.5f);
     for (i = 0; i < MAX_CHORUS_LENGTH; i++)
         m->storage[i][0] = m->storage[i][1] = 0.f;
     
