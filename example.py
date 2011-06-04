@@ -103,15 +103,20 @@ class PhaserWindow(gtk.Window):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.path = "/instr/%s/insert%s/engine" % (instrument, "" if output == 1 else str(output))
         self.set_title("Phaser - %s" % instrument)
-        values = GetThings(self.path + "/status", ["center_freq", "mod_depth", "fb_amt", "lfo_freq", "stereo_phase", "stages"], [])
-        t = gtk.Table(1, 6)
+        values = GetThings(self.path + "/status", ["center_freq", "mod_depth", "fb_amt", "lfo_freq", "stereo_phase", "stages", "wet_dry"], [])
+        t = gtk.Table(1, 7)
         add_slider_row(t, 0, "Center", self.path, values, "center_freq", 100, 20000)
         add_slider_row(t, 1, "Mod depth", self.path, values, "mod_depth", 0, 4000)
         add_slider_row(t, 2, "Feedback", self.path, values, "fb_amt", -1, 1)
         add_slider_row(t, 3, "LFO frequency", self.path, values, "lfo_freq", 0, 20)
         add_slider_row(t, 4, "Stereo", self.path, values, "stereo_phase", 0, 360)
-        add_slider_row(t, 5, "Stages", self.path, values, "stages", 1, 12, setter = effect_value_changed_int)
+        add_slider_row(t, 5, "Wet/dry", self.path, values, "wet_dry", 0, 1)
+        add_slider_row(t, 6, "Stages", self.path, values, "stages", 1, 12, setter = effect_value_changed_int)
         self.add(t)
+
+engine_window_map = {
+    'phaser': PhaserWindow,
+}
 
 class MainWindow(gtk.Window):
     def __init__(self):
@@ -189,10 +194,10 @@ class MainWindow(gtk.Window):
                 t.attach(gtk.HScale(adj), 2, 3, y, y + 1)
                 fx = gtk.Label(idata.insert_engine[o])
                 t.attach(fx, 3, 4, y, y + 1)
-                if idata.insert_engine[o] == 'phaser':
+                if idata.insert_engine[o] in engine_window_map:
                     fx = gtk.Button("_Edit")
                     t.attach(fx, 4, 5, y, y + 1)
-                    fx.connect("clicked", lambda button, instr, output: PhaserWindow(instr, output).show_all(), i[0], o)
+                    fx.connect("clicked", lambda button, instr, output, wclass: wclass(instr, output).show_all(), i[0], o, engine_window_map[idata.insert_engine[o]])
                 y += 1
             if i[1] == 'stream_player':
                 b.add(gtk.HSeparator())
