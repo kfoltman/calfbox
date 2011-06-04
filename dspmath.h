@@ -106,4 +106,15 @@ static inline float gain2dB_simple(float gain)
     return 6.0 * log(gain) / log(2.0);
 }
 
+static inline float deg2rad(float deg)
+{
+    return deg * M_PI / 180;
+}
+
+static inline float rad2deg(float rad)
+{
+    return rad * 180 / M_PI;
+}
+
+
 #endif

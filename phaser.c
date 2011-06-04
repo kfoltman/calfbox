@@ -59,11 +59,6 @@ struct phaser_module
     float phase;
 };
 
-static inline float deg2rad(float deg)
-{
-    return deg * M_PI / 180;
-}
-
 gboolean phaser_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct phaser_module *m = (struct phaser_module *)ct->user_data;
@@ -83,7 +78,7 @@ gboolean phaser_process_cmd(struct cbox_command_target *ct, struct cbox_command_
             cbox_execute_on(fb, NULL, "/mod_depth", "f", error, m->params->mdepth) &&
             cbox_execute_on(fb, NULL, "/fb_amt", "f", error, m->params->fb_amt) &&
             cbox_execute_on(fb, NULL, "/lfo_freq", "f", error, m->params->lfo_freq) &&
-            cbox_execute_on(fb, NULL, "/stereo_phase", "f", error, m->params->sphase * 180 / M_PI) &&
+            cbox_execute_on(fb, NULL, "/stereo_phase", "f", error, rad2deg(m->params->sphase)) &&
             cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry) &&
             cbox_execute_on(fb, NULL, "/stages", "i", error, m->params->stages);
     }
