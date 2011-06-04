@@ -20,17 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_ERRORS_H
 
 #include <glib.h>
+#include "cmd.h"
 
 #define CBOX_MODULE_ERROR cbox_module_error_quark()
 
 enum CboxModuleError
 {
     CBOX_MODULE_ERROR_FAILED,
+    CBOX_MODULE_ERROR_INVALID_COMMAND,
+    CBOX_MODULE_ERROR_OUT_OF_RANGE,
 };
+
+struct cbox_osc_command;
 
 extern GQuark cbox_module_error_quark();
 extern void cbox_force_error(GError **error);
 extern void cbox_print_error(GError *error);
 extern void cbox_print_error_if(GError *error);
+extern gboolean cbox_set_command_error(GError **error, const struct cbox_osc_command *cmd);
+extern gboolean cbox_set_range_error(GError **error, const char *param, double minv, double maxv);
 
 #endif

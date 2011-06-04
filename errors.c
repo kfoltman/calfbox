@@ -48,3 +48,16 @@ void cbox_print_error_if(GError *error)
     g_error_free(error);
 }
 
+gboolean cbox_set_command_error(GError **error, const struct cbox_osc_command *cmd)
+{
+    if (error && !*error)
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_OUT_OF_RANGE, "Invalid command '%s' with args '%s'", cmd->command, cmd->arg_types);
+    return FALSE;
+}
+
+gboolean cbox_set_range_error(GError **error, const char *param, double minv, double maxv)
+{
+    if (error && !*error)
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_OUT_OF_RANGE, "Parameter %s not within a valid range of [%f, %f]", param, minv, maxv);
+    return FALSE;
+}

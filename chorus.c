@@ -59,11 +59,11 @@ gboolean chorus_process_cmd(struct cbox_command_target *ct, struct cbox_command_
 {
     struct chorus_module *m = (struct chorus_module *)ct->user_data;
     
-    EFFECT_PARAM("/min_delay", "f", min_delay, double, ) else
-    EFFECT_PARAM("/mod_depth", "f", mod_depth, double, ) else
-    EFFECT_PARAM("/lfo_freq", "f", lfo_freq, double, ) else
-    EFFECT_PARAM("/stereo_phase", "f", sphase, double, ) else
-    EFFECT_PARAM("/wet_dry", "f", wet_dry, double, ) else
+    EFFECT_PARAM("/min_delay", "f", min_delay, double, , 1, 20) else
+    EFFECT_PARAM("/mod_depth", "f", mod_depth, double, , 1, 20) else
+    EFFECT_PARAM("/lfo_freq", "f", lfo_freq, double, , 0, 20) else
+    EFFECT_PARAM("/stereo_phase", "f", sphase, double, , 0, 360) else
+    EFFECT_PARAM("/wet_dry", "f", wet_dry, double, , 0, 1) else
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
@@ -75,10 +75,7 @@ gboolean chorus_process_cmd(struct cbox_command_target *ct, struct cbox_command_
             cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry);
     }
     else
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown command '%s'", cmd->command);
-        return FALSE;
-    }
+        return cbox_set_command_error(error, cmd);
     return TRUE;
 }
 

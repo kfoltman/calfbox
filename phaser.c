@@ -63,13 +63,13 @@ gboolean phaser_process_cmd(struct cbox_command_target *ct, struct cbox_command_
 {
     struct phaser_module *m = (struct phaser_module *)ct->user_data;
     
-    EFFECT_PARAM("/center_freq", "f", center, double, ) else
-    EFFECT_PARAM("/mod_depth", "f", mdepth, double, ) else
-    EFFECT_PARAM("/fb_amt", "f", fb_amt, double, ) else
-    EFFECT_PARAM("/lfo_freq", "f", lfo_freq, double, ) else
-    EFFECT_PARAM("/stereo_phase", "f", sphase, double, deg2rad) else
-    EFFECT_PARAM("/wet_dry", "f", wet_dry, double, ) else
-    EFFECT_PARAM("/stages", "i", stages, int, ) else
+    EFFECT_PARAM("/center_freq", "f", center, double, , 10, 20000) else
+    EFFECT_PARAM("/mod_depth", "f", mdepth, double, , 0, 10000) else
+    EFFECT_PARAM("/fb_amt", "f", fb_amt, double, , -1, 1) else
+    EFFECT_PARAM("/lfo_freq", "f", lfo_freq, double, , 0, 20) else
+    EFFECT_PARAM("/stereo_phase", "f", sphase, double, deg2rad, 0, 360) else
+    EFFECT_PARAM("/wet_dry", "f", wet_dry, double, , 0, 1) else
+    EFFECT_PARAM("/stages", "i", stages, int, , 1, 12) else
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
@@ -83,10 +83,7 @@ gboolean phaser_process_cmd(struct cbox_command_target *ct, struct cbox_command_
             cbox_execute_on(fb, NULL, "/stages", "i", error, m->params->stages);
     }
     else
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown command '%s'", cmd->command);
-        return FALSE;
-    }
+        return cbox_set_command_error(error, cmd);
     return TRUE;
 }
 

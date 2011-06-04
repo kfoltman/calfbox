@@ -122,11 +122,14 @@ extern void cbox_module_destroy(struct cbox_module *module);
     struct MODULE_PARAMS *res = malloc(sizeof(struct MODULE_PARAMS)); \
     memcpy(res, m->params, sizeof(struct MODULE_PARAMS)); \
 
-#define EFFECT_PARAM(path, type, field, ctype, expr) \
+#define EFFECT_PARAM(path, type, field, ctype, expr, minv, maxv) \
     if (!strcmp(cmd->command, path) && !strcmp(cmd->arg_types, type)) \
     { \
+        ctype value = *(ctype *)cmd->arg_values[0]; \
+        if (value < minv || value > maxv) \
+            return cbox_set_range_error(error, path, minv, maxv);\
         EFFECT_PARAM_CLONE(pp); \
-        pp->field = expr(*(ctype *)cmd->arg_values[0]); \
+        pp->field = expr(value); \
         free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, pp)); \
     } \
 
