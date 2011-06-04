@@ -118,4 +118,12 @@ extern struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GErr
 extern void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs);
 extern void cbox_module_destroy(struct cbox_module *module);
 
+#define EFFECT_PARAM(path, type, field, ctype, expr) \
+    if (!strcmp(cmd->command, path) && !strcmp(cmd->arg_types, type)) \
+    { \
+        struct MODULE_PARAMS *pp = copy_params(m); \
+        pp->field = expr(*(ctype *)cmd->arg_values[0]); \
+        free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, pp)); \
+    } \
+
 #endif

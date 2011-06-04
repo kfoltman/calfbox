@@ -33,6 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define NO_STAGES 12
 
+#define MODULE_PARAMS phaser_params
+
 struct phaser_params
 {
     float center;
@@ -63,14 +65,6 @@ static struct phaser_params *copy_params(struct phaser_module *m)
     memcpy(res, m->params, sizeof(struct phaser_params));
     return res;
 }
-
-#define EFFECT_PARAM(path, type, field, ctype, expr) \
-    if (!strcmp(cmd->command, path) && !strcmp(cmd->arg_types, type)) \
-    { \
-        struct phaser_params *pp = copy_params(m); \
-        pp->field = expr(*(ctype *)cmd->arg_values[0]); \
-        free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, pp)); \
-    } \
 
 static inline float deg2rad(float deg)
 {
