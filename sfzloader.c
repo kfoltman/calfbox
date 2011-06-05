@@ -164,6 +164,8 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->transpose = atoi(value);
     else if (!strcmp(key, "velcurve_quadratic"))
         l->velcurve_quadratic = atoi(value);
+    else if (!strcmp(key, "fil_veltrack"))
+        l->fil_veltrack = atof(value);
     else if (!strncmp(key, "ampeg_", 6))
     {
         if (!parse_envelope_param(&l->amp_env, key + 6, value))

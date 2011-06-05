@@ -158,8 +158,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             
             double freq = l->freq;
             
-            if (l->note_scaling != 0 || (l->tune + 100 * l->transpose) != 0)
-                freq *= pow(2.0, ((note - l->root_note) * l->note_scaling + l->tune + l->transpose * 100) / 1200.0);
+            freq *= pow(2.0, ((note - l->root_note) * l->note_scaling + l->tune + l->transpose * 100) / 1200.0);
             
             v->sample_data = l->sample_data;
             v->pos = l->sample_offset;
@@ -183,7 +182,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->pitch_env.shape = &l->pitch_env_shape;
             v->last_lgain = 0;
             v->last_rgain = 0;
-            v->cutoff = l->cutoff;
+            v->cutoff = l->cutoff * pow(2.0, (vel * l->fil_veltrack)/ (1200 * 127.0));
             v->resonance = l->resonance;
             v->pitcheg_depth = l->pitcheg_depth;
             v->fileg_depth = l->fileg_depth;
@@ -577,6 +576,7 @@ void sampler_layer_init(struct sampler_layer *l)
     for (int i = 1; i < 127; i++)
         l->velcurve[i] = -1;
     l->velcurve_quadratic = -1; // not known yet
+    l->fil_veltrack = 0;
 }
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
@@ -655,6 +655,7 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->resonance = cbox_config_get_float(cfg_section, "resonance", l->resonance);
     l->fileg_depth = cbox_config_get_float(cfg_section, "fileg_depth", l->fileg_depth);
     l->pitcheg_depth = cbox_config_get_float(cfg_section, "pitcheg_depth", l->pitcheg_depth);
+    l->fil_veltrack = cbox_config_get_float(cfg_section, "fil_veltrack", l->fil_veltrack);
     if (cbox_config_get_int(cfg_section, "one_shot", 0))
         l->loop_mode = slm_one_shot;
     if (cbox_config_get_int(cfg_section, "loop_sustain", 0))
