@@ -123,9 +123,9 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->note_scaling = atof(value);
     else if (!strcmp(key, "key"))
         l->min_note = l->max_note = l->root_note = note_from_string(value);
-    else if (!strcmp(key, "lovel"))
+    else if (!strcmp(key, "lovel") || !strcmp(key, "lolev"))
         l->min_vel = atoi(value);
-    else if (!strcmp(key, "hivel"))
+    else if (!strcmp(key, "hivel") || !strcmp(key, "hilev"))
         l->max_vel = atoi(value);
     else if (!strcmp(key, "loop_start") || !strcmp(key, "loopstart"))
         l->loop_start = atoi(value);
@@ -162,6 +162,8 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->tune = atof(value);
     else if (!strcmp(key, "transpose"))
         l->transpose = atoi(value);
+    else if (!strcmp(key, "velcurve_quadratic"))
+        l->velcurve_quadratic = atoi(value);
     else if (!strncmp(key, "ampeg_", 6))
     {
         if (!parse_envelope_param(&l->amp_env, key + 6, value))
@@ -172,9 +174,26 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         if (!parse_envelope_param(&l->filter_env, key + 6, value))
             unhandled = 1;
     }
-    else if (!strncmp(key, "pitcheg_", 6))
+    else if (!strncmp(key, "pitcheg_", 7))
     {
         if (!parse_envelope_param(&l->pitch_env, key + 8, value))
+            unhandled = 1;
+    }
+    else if (!strncmp(key, "amp_velcurve_", 13))
+    {
+        // if not known yet, set to 0, it can always be overriden via velcurve_quadratic setting
+        if (l->velcurve_quadratic == -1)
+            l->velcurve_quadratic = 0;
+        int point = atoi(key + 13);
+        if (point >= 0 && point <= 127)
+        {
+            l->velcurve[point] = atof(value);
+            if (l->velcurve[point] < 0)
+                l->velcurve[point] = 0;
+            if (l->velcurve[point] > 1)
+                l->velcurve[point] = 1;
+        }
+        else
             unhandled = 1;
     }
     else

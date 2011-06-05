@@ -167,7 +167,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->loop_start = l->loop_start;
             v->loop_end = l->loop_end;
             v->sample_end = l->sample_end;
-            v->gain = l->gain * vel / 127.0 * vel / 127.0;
+            v->gain = l->gain * l->velcurve[vel];
             v->pan = l->pan;
             v->note = note;
             v->vel = vel;
@@ -572,6 +572,11 @@ void sampler_layer_init(struct sampler_layer *l)
     l->tune = 0;
     l->transpose = 0;
     l->loop_mode = slm_unknown;
+    l->velcurve[0] = 0;
+    l->velcurve[127] = 1;
+    for (int i = 1; i < 127; i++)
+        l->velcurve[i] = -1;
+    l->velcurve_quadratic = -1; // not known yet
 }
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
@@ -598,6 +603,30 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
     if ((l->loop_mode == slm_loop_continuous || l->loop_mode == slm_loop_sustain) && l->loop_start == -1)
     {
         l->loop_start = 0;
+    }
+
+    // if no amp_velcurve_nnn setting, default to quadratic
+    if (l->velcurve_quadratic == -1)
+        l->velcurve_quadratic = 1;
+    // interpolate missing points in velcurve
+    int start = 0;
+    for (int i = 1; i < 128; i++)
+    {
+        if (l->velcurve[i] == -1)
+            continue;
+        float sv = l->velcurve[start];
+        float ev = l->velcurve[i];
+        if (l->velcurve_quadratic)
+        {
+            for (int j = start + 1; j < i; j++)
+                l->velcurve[j] = sv + (ev - sv) * (j - start) * (j - start) / ((i - start) * (i - start));
+        }
+        else
+        {
+            for (int j = start + 1; j < i; j++)
+                l->velcurve[j] = sv + (ev - sv) * (j - start) / (i - start);
+        }
+        start = i;
     }
 }
 

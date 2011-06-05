@@ -74,6 +74,8 @@ struct sampler_layer
     struct cbox_dahdsr amp_env, filter_env, pitch_env;
     struct cbox_envelope_shape amp_env_shape, filter_env_shape, pitch_env_shape;
     enum sample_loop_mode loop_mode;
+    float velcurve[128];
+    int velcurve_quadratic;
 };
 
 struct sampler_program
