@@ -51,7 +51,7 @@ struct feedback_reducer_module
 {
     struct cbox_module module;
     
-    struct feedback_reducer_params *params;
+    struct feedback_reducer_params *params, *old_params;
 
     struct cbox_biquadf_coeffs coeffs[MAX_FBR_BANDS];
     struct cbox_biquadf_state state[2][MAX_FBR_BANDS];
@@ -65,8 +65,13 @@ static void redo_filters(struct feedback_reducer_module *m)
     {
         struct fbr_band *band = &m->params->bands[i];
         if (band->active)
+        {
+            printf("band %d: %d %f %f %f\n", i, (int)band->active, band->center, band->q, band->gain);
+
             cbox_biquadf_set_peakeq_rbj(&m->coeffs[i], band->center, band->q, band->gain, m->srate);
+        }
     }
+    m->old_params = m->params;
 }
 
 gboolean feedback_reducer_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -109,6 +114,9 @@ void feedback_reducer_process_block(struct cbox_module *module, cbox_sample_t **
 {
     struct feedback_reducer_module *m = module->user_data;
     
+    if (m->params != m->old_params)
+        redo_filters(m);
+    
     for (int c = 0; c < 2; c++)
     {
         gboolean first = TRUE;
@@ -131,6 +139,24 @@ void feedback_reducer_process_block(struct cbox_module *module, cbox_sample_t **
     }
 }
 
+static float get_band_param(const char *cfg_section, int band, const char *param, float defvalue)
+{
+    gchar *s = g_strdup_printf("band%d_%s", band + 1, param);
+    float v = cbox_config_get_float(cfg_section, s, defvalue);
+    g_free(s);
+    
+    return v;
+}
+
+static float get_band_param_db(const char *cfg_section, int band, const char *param, float defvalue)
+{
+    gchar *s = g_strdup_printf("band%d_%s", band + 1, param);
+    float v = cbox_config_get_gain_db(cfg_section, s, defvalue);
+    g_free(s);
+    
+    return v;
+}
+
 struct cbox_module *feedback_reducer_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     static int inited = 0;
@@ -147,13 +173,14 @@ struct cbox_module *feedback_reducer_create(void *user_data, const char *cfg_sec
     m->srate = srate;
     struct feedback_reducer_params *p = malloc(sizeof(struct feedback_reducer_params));
     m->params = p;
+    m->old_params = NULL;
     
     for (int i = 0; i < MAX_FBR_BANDS; i++)
     {
-        p->bands[i].active = TRUE;
-        p->bands[i].center = 500 + 700 * i;
-        p->bands[i].q = 16;
-        p->bands[i].gain = 0.25;
+        p->bands[i].active = get_band_param(cfg_section, i, "active", 0) > 0;
+        p->bands[i].center = get_band_param(cfg_section, i, "center", 50 * pow(2.0, i / 2.0));
+        p->bands[i].q = get_band_param(cfg_section, i, "q", 0.707 * 2);
+        p->bands[i].gain = get_band_param_db(cfg_section, i, "gain", 0);
     }
     redo_filters(m);
     
