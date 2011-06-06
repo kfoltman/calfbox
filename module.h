@@ -133,6 +133,18 @@ extern void cbox_module_destroy(struct cbox_module *module);
         free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, pp)); \
     } \
 
+#define EFFECT_PARAM_ARRAY(path, type, array, field, ctype, expr, minv, maxv) \
+    if (!strcmp(cmd->command, path) && !strcmp(cmd->arg_types, "i" type)) \
+    { \
+        int pos = *(int *)cmd->arg_values[0]; \
+        ctype value = *(ctype *)cmd->arg_values[1]; \
+        if (value < minv || value > maxv) \
+            return cbox_set_range_error(error, path, minv, maxv);\
+        EFFECT_PARAM_CLONE(pp); \
+        pp->array[pos].field = expr(value); \
+        free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, pp)); \
+    } \
+
 
 
 

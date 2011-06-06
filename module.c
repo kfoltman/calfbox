@@ -39,6 +39,7 @@ extern struct cbox_module_manifest phaser_module;
 extern struct cbox_module_manifest chorus_module;
 extern struct cbox_module_manifest fxchain_module;
 extern struct cbox_module_manifest jack_input_module;
+extern struct cbox_module_manifest feedback_reducer_module;
 
 struct cbox_module_manifest *cbox_module_list[] = {
     &tonewheel_organ_module,
@@ -53,6 +54,7 @@ struct cbox_module_manifest *cbox_module_list[] = {
     &sampler_module,
     &fxchain_module,
     &jack_input_module,
+    &feedback_reducer_module,
     NULL
 };
 
