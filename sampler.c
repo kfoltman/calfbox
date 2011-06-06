@@ -39,7 +39,7 @@ static void sampler_process_block(struct cbox_module *module, cbox_sample_t **in
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void sampler_destroy(struct cbox_module *module);
 
-static void process_voice_mono(struct sampler_voice *v, float **channels)
+static void process_voice_mono_lerp(struct sampler_voice *v, float **channels)
 {
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
@@ -82,7 +82,73 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
     cbox_biquadf_process_adding(&v->filter_right, &v->filter_coeffs, temp[1], channels[1]);
 }
 
-static void process_voice_stereo(struct sampler_voice *v, float **channels)
+static void process_voice_mono(struct sampler_voice *v, float **channels)
+{
+    float lgain = v->last_lgain;
+    float rgain = v->last_rgain;
+    float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
+    float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
+    
+    float temp[2][CBOX_BLOCK_SIZE];
+    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+    {
+        if (v->pos >= v->loop_end)
+        {
+            if (v->loop_start == (uint32_t)-1)
+            {
+                v->mode = spt_inactive;
+                for (; i < CBOX_BLOCK_SIZE; i++)
+                    temp[0][i] = temp[1][i] = 0.f;
+                break;
+            }
+            v->pos = v->pos - v->loop_end + v->loop_start;
+        }
+        
+        float t = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
+        
+        float idata[4];
+        if (v->pos + 4 < v->loop_end)
+        {
+            int16_t *p = &v->sample_data[v->pos];
+            for (int s = 0; s < 4; s++)
+                idata[s] = p[s];
+        }
+        else
+        {
+            uint32_t nextsample = v->pos;
+            int s;
+            for (s = 0; s < 4; s++)
+            {
+                if (nextsample >= v->loop_end)
+                {
+                    if (v->loop_start == (uint32_t)-1)
+                        break;
+                    nextsample -= v->loop_start;
+                }
+                idata[s] = v->sample_data[nextsample];
+                nextsample++;
+            }
+            while(s < 4)
+                idata[s++] = 0.f;
+        }
+        
+        float sample = (-t*(t-1)*(t-2) * idata[0] + 3*(t+1)*(t-1)*(t-2) * idata[1] - 3*(t+1)*t*(t-2) * idata[2] + (t+1)*t*(t-1) * idata[3]) * (1.0 / 6.0);
+        
+        if (v->frac_pos > ~v->frac_delta)
+            v->pos++;
+        v->frac_pos += v->frac_delta;
+        v->pos += v->delta;
+        
+        temp[0][i] = sample * lgain;
+        temp[1][i] = sample * rgain;
+        lgain += lgain_delta;
+        rgain += rgain_delta;
+    }
+    cbox_biquadf_process_adding(&v->filter_left, &v->filter_coeffs, temp[0], channels[0]);
+    cbox_biquadf_process_adding(&v->filter_right, &v->filter_coeffs, temp[1], channels[1]);
+}
+
+static void process_voice_stereo_lerp(struct sampler_voice *v, float **channels)
 {
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
@@ -119,6 +185,81 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
         
         temp[0][i] = lsample * lgain;
         temp[1][i] = rsample * rgain;
+        lgain += lgain_delta;
+        rgain += rgain_delta;
+    }
+    cbox_biquadf_process_adding(&v->filter_left, &v->filter_coeffs, temp[0], channels[0]);
+    cbox_biquadf_process_adding(&v->filter_right, &v->filter_coeffs, temp[1], channels[1]);
+}
+
+static void process_voice_stereo(struct sampler_voice *v, float **channels)
+{
+    float lgain = v->last_lgain;
+    float rgain = v->last_rgain;
+    float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
+    float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
+
+    float temp[2][CBOX_BLOCK_SIZE];
+    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+    {
+        if (v->pos >= v->loop_end)
+        {
+            if (v->loop_start == (uint32_t)-1)
+            {
+                v->mode = spt_inactive;
+                for (; i < CBOX_BLOCK_SIZE; i++)
+                    temp[0][i] = temp[1][i] = 0.f;
+                break;
+            }
+            v->pos = v->pos - v->loop_end + v->loop_start;
+        }
+        
+        float fr = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
+
+        float idata[2][4];
+        if (v->pos + 4 < v->loop_end)
+        {
+            int16_t *p = &v->sample_data[v->pos << 1];
+            for (int s = 0; s < 4; s++, p += 2)
+            {
+                idata[0][s] = p[0];
+                idata[1][s] = p[1];
+            }
+        }
+        else
+        {
+            uint32_t nextsample = v->pos;
+            int s;
+            for (s = 0; s < 4; s++)
+            {
+                if (nextsample >= v->loop_end)
+                {
+                    if (v->loop_start == (uint32_t)-1)
+                        break;
+                    nextsample -= v->loop_start;
+                }
+                idata[0][s] = v->sample_data[nextsample << 1];
+                idata[1][s] = v->sample_data[1 + (nextsample << 1)];
+                nextsample++;
+            }
+            for(; s < 4; s++)
+                idata[0][s] = idata[1][s] = 0;
+        }
+        
+        float ch[2] = {0, 0};
+        for (int c = 0; c < 2; c++)
+        {
+            float t = fr;
+            ch[c] = (-t*(t-1)*(t-2) * idata[c][0] + 3*(t+1)*(t-1)*(t-2) * idata[c][1] - 3*(t+1)*t*(t-2) * idata[c][2] + (t+1)*t*(t-1) * idata[c][3]) * (1.0 / 6.0);
+        }
+        
+        if (v->frac_pos > ~v->frac_delta)
+            v->pos++;
+        v->frac_pos += v->frac_delta;
+        v->pos += v->delta;
+        
+        temp[0][i] = ch[0] * lgain;
+        temp[1][i] = ch[1] * rgain;
         lgain += lgain_delta;
         rgain += rgain_delta;
     }
