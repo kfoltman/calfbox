@@ -66,8 +66,6 @@ static void redo_filters(struct feedback_reducer_module *m)
         struct fbr_band *band = &m->params->bands[i];
         if (band->active)
         {
-            printf("band %d: %d %f %f %f\n", i, (int)band->active, band->center, band->q, band->gain);
-
             cbox_biquadf_set_peakeq_rbj(&m->coeffs[i], band->center, band->q, band->gain, m->srate);
         }
     }
