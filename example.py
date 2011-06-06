@@ -7,10 +7,10 @@ import gobject
 def callback(cmd, cb, args):
     print cmd, cb, args
 
-def bold_label(text):
+def bold_label(text, halign = 1):
     l = gtk.Label()
     l.set_markup("<b>%s</b>" % text)
-    l.set_alignment(1, 0.5)
+    l.set_alignment(halign, 0.5)
     return l
 
 def left_label(text):
@@ -24,6 +24,12 @@ def effect_value_changed_int(adjustment, path):
 
 def effect_value_changed_float(adjustment, path):
     cbox.do_cmd(path, None, [float(adjustment.get_value())])
+
+def effect_value_changed_array_int(value, path, item):
+    cbox.do_cmd(path, None, [int(item), int(value)])
+
+def effect_value_changed_array_float(value, path, item):
+    cbox.do_cmd(path, None, [int(item), float(value)])
 
 def gain_value_changed(adjustment, instr, output_pair):
     cbox.do_cmd("/instr/%s/set_gain" % instr, None, [output_pair, adjustment.get_value()])
@@ -104,7 +110,7 @@ class PhaserWindow(gtk.Window):
         self.path = "/instr/%s/insert%s/engine" % (instrument, "" if output == 1 else str(output))
         self.set_title("Phaser - %s" % instrument)
         values = GetThings(self.path + "/status", ["center_freq", "mod_depth", "fb_amt", "lfo_freq", "stereo_phase", "stages", "wet_dry"], [])
-        t = gtk.Table(1, 7)
+        t = gtk.Table(2, 7)
         add_slider_row(t, 0, "Center", self.path, values, "center_freq", 100, 20000)
         add_slider_row(t, 1, "Mod depth", self.path, values, "mod_depth", 0, 4000)
         add_slider_row(t, 2, "Feedback", self.path, values, "fb_amt", -1, 1)
@@ -120,7 +126,7 @@ class ChorusWindow(gtk.Window):
         self.path = "/instr/%s/insert%s/engine" % (instrument, "" if output == 1 else str(output))
         self.set_title("Chorus - %s" % instrument)
         values = GetThings(self.path + "/status", ["min_delay", "mod_depth", "lfo_freq", "stereo_phase", "stages", "wet_dry"], [])
-        t = gtk.Table(1, 5)
+        t = gtk.Table(2, 5)
         add_slider_row(t, 0, "Min. delay", self.path, values, "min_delay", 1, 20)
         add_slider_row(t, 1, "Mod depth", self.path, values, "mod_depth", 1, 20)
         add_slider_row(t, 2, "LFO frequency", self.path, values, "lfo_freq", 0, 20)
@@ -128,9 +134,43 @@ class ChorusWindow(gtk.Window):
         add_slider_row(t, 4, "Wet/dry", self.path, values, "wet_dry", 0, 1)
         self.add(t)
 
+class FBRWindow(gtk.Window):
+    def __init__(self, instrument, output):
+        gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
+        self.path = "/instr/%s/insert%s/engine" % (instrument, "" if output == 1 else str(output))
+        self.set_title("Feedback Reducer - %s" % instrument)
+        values = GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
+        t = gtk.Table(4, 17)
+        cols = [
+            ("Active", 0, 1, "active", 'checkbox'), 
+            ("Center Freq", 10, 20000, "center", 'slider'),
+            ("Filter Q", 0.1, 10, "q", 'slider'),
+            ("Gain", -24, 24, "gain", 'slider'),
+        ]
+        for i in range(len(cols)):
+            par = cols[i]
+            t.attach(bold_label(par[0], halign=0.5), i, i + 1, 0, 1, gtk.SHRINK | gtk.FILL)
+            for j in range(16):
+                value = getattr(values, par[3])[j]
+                if par[4] == 'slider':
+                    adj = gtk.Adjustment(value, par[1], par[2], 1, 6, 0)
+                    adj.connect("value_changed", lambda adj, param, band: effect_value_changed_array_float(adj.get_value(), self.path + "/" + param, band), par[3], j)
+                    slider = gtk.HScale(adj)
+                    slider.set_size_request(120, -1)
+                    t.attach(slider, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
+                else:
+                    cb = gtk.CheckButton(par[0])
+                    cb.set_active(value > 0)
+                    cb.connect("clicked", lambda cb, param, band: effect_value_changed_array_int(1 if cb.get_active() else 0, self.path + "/" + param, band), par[3], j)
+                    t.attach(cb, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
+                
+        
+        self.add(t)
+
 engine_window_map = {
     'phaser': PhaserWindow,
     'chorus': ChorusWindow,
+    'feedback_reducer': FBRWindow,
 }
 
 class MainWindow(gtk.Window):
