@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
     struct cbox_module_manifest *mptr;
     struct cbox_layer *layer;
     const char *config_name = NULL;
-    const char *instrument_name = "default";
+    const char *instrument_name = NULL;
     const char *scene_name = NULL;
     const char *effect_preset_name = NULL;
     const char *drum_pattern_name = NULL;
@@ -196,6 +196,25 @@ int main(int argc, char *argv[])
     }
     
     cbox_instruments_init(&app.io);
+    
+    if (!scene_name && !instrument_name)
+    {
+        scene_name = cbox_config_get_string("init", "scene");
+        instrument_name = cbox_config_get_string("init", "instrument");
+        if (!scene_name && !instrument_name)
+        {
+            if (cbox_config_has_section("scene:default"))
+                scene_name = "default";
+            else
+            if (cbox_config_has_section("instrument:default"))
+                instrument_name = "default";
+            else
+            {
+                fprintf(stderr, "No default scene or default instrument defined.\n");
+                goto fail;
+            }
+        }
+    }
     
     if (scene_name)
     {
