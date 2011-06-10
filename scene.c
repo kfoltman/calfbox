@@ -29,14 +29,19 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
 {
     struct cbox_scene *s = ct->user_data;
     
-    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    if (!strcmp(cmd->command, "/transpose") && !strcmp(cmd->arg_types, "i"))
+    {
+        s->transpose = *(int *)cmd->arg_values[0];
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
 
-        if (!cbox_execute_on(fb, NULL, "/name", "s", error, s->name))
-            return FALSE;
-        if (!cbox_execute_on(fb, NULL, "/title", "s", error, s->title))
+        if (!cbox_execute_on(fb, NULL, "/name", "s", error, s->name) || 
+            !cbox_execute_on(fb, NULL, "/title", "s", error, s->title) ||
+            !cbox_execute_on(fb, NULL, "/transpose", "i", error, s->transpose))
             return FALSE;
         
         for (int i = 0; i < s->layer_count; i++)
@@ -96,6 +101,7 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
         cbox_scene_add_layer(s, l);        
     }
     
+    s->transpose = cbox_config_get_int(section, "transpose", 0);
     s->title = g_strdup(cbox_config_get_string_with_default(section, "title", ""));
     g_free(section);
     s->cmd_target.process_cmd = cbox_scene_process_cmd;
@@ -118,6 +124,7 @@ struct cbox_scene *cbox_scene_new()
     s->instrument_count = 0;
     s->cmd_target.process_cmd = cbox_scene_process_cmd;
     s->cmd_target.user_data = s;
+    s->transpose = 0;
     return s;
 }
 

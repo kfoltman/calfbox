@@ -183,12 +183,12 @@ class MainWindow(gtk.Window):
         
     def create(self):
         rt = GetThings("/rt/status", ['audio_channels'], [])
-        scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title'], [])
+        scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title','transpose'], [])
         
         self.master_info = left_label("")
         self.timesig_info = left_label("")
         
-        t = gtk.Table(2, 5)
+        t = gtk.Table(2, 6)
         t.set_col_spacings(5)
         t.set_row_spacings(5)
         
@@ -208,6 +208,11 @@ class MainWindow(gtk.Window):
         self.tempo_adj = gtk.Adjustment(40, 40, 300, 1, 5, 0)
         self.tempo_adj.connect('value_changed', tempo_value_changed)
         t.attach(gtk.HScale(self.tempo_adj), 1, 2, 4, 5)
+        
+        t.attach(bold_label("Transpose"), 0, 1, 5, 6, gtk.SHRINK | gtk.FILL)
+        self.transpose_adj = gtk.Adjustment(scene.transpose, -24, 24, 1, 5, 0)
+        self.transpose_adj.connect('value_changed', effect_value_changed_int, '/scene/transpose')
+        t.attach(gtk.SpinButton(self.transpose_adj), 1, 2, 5, 6, gtk.SHRINK)
         
         self.vbox.add(t)
         

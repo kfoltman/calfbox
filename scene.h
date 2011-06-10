@@ -36,6 +36,7 @@ struct cbox_scene
     int layer_count;
     struct cbox_instrument *instruments[MAX_MODULES_PER_SCENE];
     int instrument_count;
+    int transpose;
 };
 
 extern struct cbox_scene *cbox_scene_new();

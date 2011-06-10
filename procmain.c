@@ -140,9 +140,10 @@ int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbo
                     if (data[1] < lp->low_note || data[1] > lp->high_note)
                         continue;
                     // transpose
-                    if (lp->transpose)
+                    int transpose = lp->transpose + scene->transpose;
+                    if (transpose)
                     {
-                        int note = data[1] + lp->transpose;
+                        int note = data[1] + transpose;
                         if (note < 0 || note > 127)
                             continue;
                         data[1] = (uint8_t)note;
