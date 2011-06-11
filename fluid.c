@@ -40,6 +40,7 @@ GQuark cbox_fluidsynth_error_quark()
 
 static void fluidsynth_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 static void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
+static gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 static void fluidsynth_destroy(struct cbox_module *module);
 
 struct fluidsynth_module
@@ -52,6 +53,33 @@ struct fluidsynth_module
     int output_pairs;
     float **left_outputs, **right_outputs;
 };
+
+static gboolean select_patch_by_name(struct fluidsynth_module *m, int channel, const gchar *preset, GError **error)
+{
+    int found = 0;
+    
+    fluid_sfont_t* sfont = fluid_synth_get_sfont(m->synth, 0);
+    fluid_preset_t tmp;
+
+    sfont->iteration_start(sfont);            
+    while(sfont->iteration_next(sfont, &tmp))
+    {
+        // trailing spaces are common in some SF2s
+        const char *pname = tmp.get_name(&tmp);
+        int len = strlen(pname);
+        while (len > 0 && pname[len - 1] == ' ')
+            len--;
+            
+        if (!strncmp(pname, preset, len) && preset[len] == '\0')
+        {
+            fluid_synth_program_select(m->synth, channel, m->sfid, tmp.get_banknum(&tmp), tmp.get_num(&tmp));
+            return TRUE;
+        }
+    }
+    
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Preset not found: %s", preset);
+    return FALSE;
+}
 
 struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
@@ -90,6 +118,7 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
         m->left_outputs = malloc(sizeof(float *) * (m->output_pairs + 2));
         m->right_outputs = malloc(sizeof(float *) * (m->output_pairs + 2));
     }
+    m->module.cmd_target.process_cmd = fluidsynth_process_cmd;
     m->module.process_event = fluidsynth_process_event;
     m->module.process_block = fluidsynth_process_block;
     m->module.destroy = fluidsynth_destroy;
@@ -117,31 +146,11 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
         fluid_synth_sfont_select(m->synth, i, m->sfid);
         if (preset)
         {
-            int found = 0;
-            
-            fluid_sfont_t* sfont = fluid_synth_get_sfont(m->synth, 0);
-            fluid_preset_t tmp;
-
-            sfont->iteration_start(sfont);            
-            while(sfont->iteration_next(sfont, &tmp))
+            if (!select_patch_by_name(m, i, preset, error))
             {
-                // trailing spaces are common in some SF2s
-                const char *pname = tmp.get_name(&tmp);
-                int len = strlen(pname);
-                while (len > 0 && pname[len - 1] == ' ')
-                    len--;
-                    
-                if (!strncmp(pname, preset, len) && preset[len] == '\0')
-                {
-                    fluid_synth_bank_select(m->synth, i, tmp.get_banknum(&tmp));
-                    fluid_synth_program_change(m->synth, i, tmp.get_num(&tmp));
-                    found = 1;
-                    break;
-                }
+                cbox_module_destroy(&m->module);
+                return NULL;
             }
-            
-            if (!found)
-                g_error("Preset not found: %s", preset);
         }
         g_free(key);
     }
@@ -206,6 +215,56 @@ void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, u
 
             }
     }
+}
+
+gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct fluidsynth_module *m = (struct fluidsynth_module *)ct->user_data;
+    
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (int i = 0; i < 16; i++)
+        {
+            fluid_synth_channel_info_t ci;
+            fluid_synth_get_channel_info(m->synth, i, &ci);
+            if (!cbox_execute_on(fb, NULL, "/patch", "iis", error, 1 + i, ci.program + 128 * ci.bank, ci.name))
+                return FALSE;
+        }
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/patches") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        fluid_sfont_t* sfont = fluid_synth_get_sfont(m->synth, 0);
+        fluid_preset_t tmp;
+
+        sfont->iteration_start(sfont);            
+        while(sfont->iteration_next(sfont, &tmp))
+        {
+            const char *pname = tmp.get_name(&tmp);
+            if (!cbox_execute_on(fb, NULL, "/patch", "is", error, (int)(tmp.get_num(&tmp) + 128 * tmp.get_banknum(&tmp)), pname))
+                return FALSE;
+        }
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/set_patch") && !strcmp(cmd->arg_types, "ii"))
+    {
+        int channel = *(int *)cmd->arg_values[0];
+        if (channel < 1 || channel > 16)
+        {
+            g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Invalid channel %d", channel);
+            return FALSE;
+        }
+        int value = *(int *)cmd->arg_values[1];
+        fluid_synth_program_select(m->synth, channel - 1, m->sfid, value >> 7, value & 127);
+        return TRUE;
+    }
+    else
+        return cbox_set_command_error(error, cmd);
+    return TRUE;
 }
 
 void fluidsynth_destroy(struct cbox_module *module)
