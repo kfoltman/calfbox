@@ -96,6 +96,46 @@ class StreamWindow(gtk.VBox):
         self.status_label.set_markup("<b>File:</b> %s\n<b>Pos:</b> %s" % (attribs.filename, attribs.pos))
         return True
 
+class FluidsynthWindow(gtk.VBox):
+    def __init__(self, instrument):
+        gtk.Widget.__init__(self)
+        self.path = "/instr/%s/engine" % instrument
+        
+        self.patches = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
+        patches = GetThings("%s/patches" % self.path, ["%patch"], []).patch
+        self.mapping = {}
+        for id in patches:
+            self.mapping[id] = len(self.mapping)
+            self.patches.append((patches[id], id))
+        
+        self.status_label = gtk.Label("")
+        panel = gtk.VBox(spacing=5)
+        panel.add(self.status_label)
+        self.table = gtk.Table(2, 16)
+
+        attribs = GetThings("%s/status" % self.path, ['%patch'], [])
+
+        for i in range(0, 16):
+            self.table.attach(bold_label("Channel %s" % (1 + i)), 0, 1, i, i + 1)
+            cb = gtk.ComboBox(self.patches)
+            cell = gtk.CellRendererText()
+            cb.pack_start(cell, True)
+            cb.add_attribute(cell, 'text', 0)
+            cb.set_active(self.mapping[attribs.patch[i + 1][0]])
+            cb.connect('changed', self.patch_combo_changed, i + 1)
+            self.table.attach(cb, 1, 2, i, i + 1)
+        panel.add(self.table)
+        self.add(panel)
+        self.refresh_id = glib.timeout_add(1, lambda: self.update())
+
+    def update(self):
+        #self.status_label.set_markup(s)
+        return True
+        
+    def patch_combo_changed(self, combo, channel):
+        print "combo: %s channel: %s" % (combo.get_active(), channel)
+        cbox.do_cmd(self.path + "/set_patch", None, [int(channel), int(self.patches[combo.get_active()][1])])
+
 def add_slider_row(t, row, label, path, values, item, min, max, setter = effect_value_changed_float):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL)
     adj = gtk.Adjustment(getattr(values, item), min, max, 1, 6, 0)
@@ -257,6 +297,9 @@ class MainWindow(gtk.Window):
             if i[1] == 'stream_player':
                 b.add(gtk.HSeparator())
                 b.add(StreamWindow(i[0]))
+            elif i[1] == 'fluidsynth':
+                b.add(gtk.HSeparator())
+                b.add(FluidsynthWindow(i[0]))
             self.vbox.add(f)
         self.update()
         
