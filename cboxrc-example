@@ -52,20 +52,28 @@ engine=fluidsynth
 sf2=ProgMegaBank.sf2
 reverb=1
 chorus=1
+channel1=SP250
+channel2=jRhodes3a
+channel3=P5 Brass
 
 [instrument:progmega_cheap]
 engine=fluidsynth
 sf2=ProgMegaBank.sf2
 reverb=0
 chorus=0
+channel1=SP250
+channel2=jRhodes3a
+channel3=P5 Brass
 
 [instrument:progmega_fx]
 engine=fluidsynth
 sf2=ProgMegaBank.sf2
 reverb=0
 chorus=0
-
 insert=chain
+channel1=SP250
+channel2=jRhodes3a
+channel3=P5 Brass
 
 [fxpreset:chain]
 engine=fxchain
