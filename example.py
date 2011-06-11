@@ -244,7 +244,7 @@ class MainWindow(gtk.Window):
                 cb.add_attribute(cell, 'text', 0)
                 cb.connect('changed', output_combo_value_changed, i[0], o)
                 t.attach(cb, 1, 2, y, y + 1, gtk.SHRINK)
-                adj = gtk.Adjustment(idata.gain[o], -96, 0, 1, 6, 0)
+                adj = gtk.Adjustment(idata.gain[o], -96, 12, 1, 6, 0)
                 adj.connect('value_changed', gain_value_changed, i[0], o)
                 t.attach(gtk.HScale(adj), 2, 3, y, y + 1)
                 fx = gtk.Label(idata.insert_engine[o])
