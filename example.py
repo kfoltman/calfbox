@@ -71,9 +71,9 @@ class GetThings:
         cbox.do_cmd(cmd, update_callback, args)
 
 class StreamWindow(gtk.VBox):
-    def __init__(self, instrument):
+    def __init__(self, instrument, path):
         gtk.Widget.__init__(self)
-        self.path = "/instr/%s/engine" % instrument
+        self.path = path
         self.status_label = gtk.Label("")
         self.play_button = gtk.Button(label = "_Play")
         self.rewind_button = gtk.Button(label = "_Rewind")
@@ -97,9 +97,9 @@ class StreamWindow(gtk.VBox):
         return True
 
 class FluidsynthWindow(gtk.VBox):
-    def __init__(self, instrument):
+    def __init__(self, instrument, path):
         gtk.Widget.__init__(self)
-        self.path = "/instr/%s/engine" % instrument
+        self.path = path
         
         self.patches = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
         patches = GetThings("%s/patches" % self.path, ["%patch"], []).patch
@@ -108,10 +108,12 @@ class FluidsynthWindow(gtk.VBox):
             self.mapping[id] = len(self.mapping)
             self.patches.append((patches[id], id))
         
-        self.status_label = gtk.Label("")
         panel = gtk.VBox(spacing=5)
-        panel.add(self.status_label)
+        #self.status_label = gtk.Label("")
+        #panel.add(self.status_label)
+        expander = gtk.Expander("Patches")
         self.table = gtk.Table(2, 16)
+        expander.add(self.table)
 
         attribs = GetThings("%s/status" % self.path, ['%patch'], [])
 
@@ -124,7 +126,7 @@ class FluidsynthWindow(gtk.VBox):
             cb.set_active(self.mapping[attribs.patch[i + 1][0]])
             cb.connect('changed', self.patch_combo_changed, i + 1)
             self.table.attach(cb, 1, 2, i, i + 1)
-        panel.add(self.table)
+        panel.add(expander)
         self.add(panel)
         self.refresh_id = glib.timeout_add(1, lambda: self.update())
 
@@ -211,6 +213,8 @@ engine_window_map = {
     'phaser': PhaserWindow,
     'chorus': ChorusWindow,
     'feedback_reducer': FBRWindow,
+    'stream_player' : StreamWindow,
+    'fluidsynth' : FluidsynthWindow
 }
 
 class MainWindow(gtk.Window):
@@ -299,12 +303,9 @@ class MainWindow(gtk.Window):
                     t.attach(fx, 4, 5, y, y + 1)
                     fx.connect("clicked", lambda button, instr, output, wclass: wclass(instr, output).show_all(), i[0], o, engine_window_map[idata.insert_engine[o]])
                 y += 1
-            if i[1] == 'stream_player':
+            if i[1] in engine_window_map:
                 b.add(gtk.HSeparator())
-                b.add(StreamWindow(i[0]))
-            elif i[1] == 'fluidsynth':
-                b.add(gtk.HSeparator())
-                b.add(FluidsynthWindow(i[0]))
+                b.add(engine_window_map[i[1]](i[0], "/instr/%s/engine" % i[0]))
             self.vbox.add(f)
         self.update()
         
