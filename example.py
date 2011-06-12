@@ -84,6 +84,9 @@ class GetThings:
                     getattr(self, cmd)[args[0]] = args[1:]
         cbox.do_cmd(cmd, update_callback, args)
 
+def cfg_sections(prefix = ""):
+    return GetThings('/config/sections', ['*section'], [str(prefix)]).section
+
 def cfg_get(section, key):
     return GetThings('/config/get', ['value'], [str(section), str(key)]).value
 
@@ -284,6 +287,14 @@ class MainWindow(gtk.Window):
         self.refresh_id = glib.timeout_add(30, lambda: self.update())
 
     def create_master(self, scene):
+        self.scene_list = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+        for s in cfg_sections("scene:"):
+            title = cfg_get(s, "title")
+            if title is None:
+                self.scene_list.append((s[6:], ""))
+            else:
+                self.scene_list.append((s[6:], "(%s)" % title))
+        
         self.master_info = left_label("")
         self.timesig_info = left_label("")
         
@@ -292,7 +303,16 @@ class MainWindow(gtk.Window):
         t.set_row_spacings(5)
         
         t.attach(bold_label("Scene"), 0, 1, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-        t.attach(left_label(scene.name), 1, 2, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+        cb = gtk.ComboBox(self.scene_list)
+        cell = gtk.CellRendererText()
+        cb.pack_start(cell, False)
+        cb.add_attribute(cell, 'text', 0)
+        cell = gtk.CellRendererText()
+        cell.props.foreground = "blue"
+        cb.pack_end(cell, True)
+        cb.add_attribute(cell, 'text', 1)
+        cb.connect('changed', self.scene_combo_changed)
+        t.attach(cb, 1, 2, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         
         t.attach(bold_label("Title"), 0, 1, 1, 2, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         t.attach(left_label(scene.title), 1, 2, 1, 2, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
@@ -318,10 +338,12 @@ class MainWindow(gtk.Window):
         rt = GetThings("/rt/status", ['audio_channels'], [])
         scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title', 'transpose'], [])
         
-        nb = gtk.Notebook()
-        self.vbox.add(nb)
-        nb.append_page(self.create_master(scene), gtk.Label("Master"))
-        
+        self.nb = gtk.Notebook()
+        self.vbox.add(self.nb)
+        self.nb.append_page(self.create_master(scene), gtk.Label("Master"))
+        self.create_instrument_pages(scene, rt)
+
+    def create_instrument_pages(self, scene, rt):
         for i in scene.instrument:
             idata = GetThings("/instr/%s/status" % i[0], ['%gain', '%output', 'aux_offset', '%insert_engine'], [])
             #attribs = GetThings("/scene/instr_info", ['engine', 'name'], [i])
@@ -367,14 +389,27 @@ class MainWindow(gtk.Window):
             if i[1] in engine_window_map:
                 b.pack_start(gtk.HSeparator(), False, False)
                 b.pack_start(engine_window_map[i[1]](i[0], "/instr/%s/engine" % i[0]), True, True)
-            nb.append_page(b, gtk.Label(i[0]))
+            self.nb.append_page(b, gtk.Label(i[0]))
         self.update()
+        
+    def delete_instrument_pages(self):
+        while self.nb.get_n_pages() > 1:
+            self.nb.remove_page(self.nb.get_n_pages() - 1)
         
     def update(self):
         master = GetThings("/master/status", ['pos', 'tempo', 'timesig'], [])
         self.master_info.set_markup('%s' % master.pos)
         self.timesig_info.set_markup("%s/%s" % tuple(master.timesig))
         self.tempo_adj.set_value(master.tempo)
+        return True
+        
+    def scene_combo_changed(self, cb):
+        cbox.do_cmd("/scene/load", None, [self.scene_list[cb.get_active()][0]])
+        self.delete_instrument_pages()
+        rt = GetThings("/rt/status", ['audio_channels'], [])
+        scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title', 'transpose'], [])
+        self.create_instrument_pages(scene, rt)
+        self.nb.show_all()
         return True
 
 def do_quit(window, event):

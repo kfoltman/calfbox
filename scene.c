@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "config-api.h"
 #include "errors.h"
 #include "instr.h"
@@ -32,6 +33,15 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     if (!strcmp(cmd->command, "/transpose") && !strcmp(cmd->arg_types, "i"))
     {
         s->transpose = *(int *)cmd->arg_values[0];
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_scene *scene = cbox_scene_load((const gchar *)cmd->arg_values[0], error);
+        if (!scene)
+            return FALSE;
+        struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
+        cbox_scene_destroy(old_scene);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
