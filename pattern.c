@@ -438,7 +438,6 @@ int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_not
                 group &= ~(1 << i);
                 notes->notes[c][g] = group;
                 note_offs++;
-                g_message("Note off %d channel %d", n, c);
             }
         }
         // all Note Offs emitted without buffer overflow - channel is no longer active
