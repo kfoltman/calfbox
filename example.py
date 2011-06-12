@@ -28,6 +28,13 @@ def standard_align(w, xo, yo, xs, ys):
     a = gtk.Alignment(xo, yo, xs, ys)
     a.add(w)
     return a
+    
+def standard_filter(patterns, name):
+    f = gtk.FileFilter()
+    for p in patterns:
+        f.add_pattern(p)
+    f.set_name(name)
+    return f
 
 def checkbox_changed_bool(adjustment, path, *items):
     cbox.do_cmd(path, None, list(items) + [1 if adjustment.get_active() else 0])
@@ -81,10 +88,20 @@ class StreamWindow(gtk.VBox):
     def __init__(self, instrument, path):
         gtk.Widget.__init__(self)
         self.path = path
-        self.status_label = gtk.Label("")
         
         panel = gtk.VBox(spacing=5)
-        panel.add(self.status_label)
+        
+        self.filebutton = gtk.FileChooserButton("Streamed file")
+        self.filebutton.set_action(gtk.FILE_CHOOSER_ACTION_OPEN)
+        self.filebutton.set_local_only(True)
+        self.filebutton.set_filename(GetThings("%s/status" % self.path, ['filename'], []).filename)
+        self.filebutton.add_filter(standard_filter(["*.wav", "*.WAV", "*.ogg", "*.OGG", "*.flac", "*.FLAC"], "All loadable audio files"))
+        self.filebutton.add_filter(standard_filter(["*.wav", "*.WAV"], "RIFF WAVE files"))
+        self.filebutton.add_filter(standard_filter(["*.ogg", "*.OGG"], "OGG container files"))
+        self.filebutton.add_filter(standard_filter(["*.flac", "*.FLAC"], "FLAC files"))
+        self.filebutton.add_filter(standard_filter(["*"], "All files"))
+        self.filebutton.connect('file-set', self.file_set)
+        panel.add(self.filebutton)
 
         self.adjustment = gtk.Adjustment()
         self.adjustment_handler = self.adjustment.connect('value-changed', self.pos_slider_moved)
@@ -108,7 +125,6 @@ class StreamWindow(gtk.VBox):
 
     def update(self):
         attribs = GetThings("%s/status" % self.path, ['filename', 'pos', 'length', 'playing'], [])
-        self.status_label.set_markup("<b>File:</b> %s" % (attribs.filename,))
         self.adjustment.handler_block(self.adjustment_handler)
         try:
             self.adjustment.set_all(attribs.pos, 0, attribs.length, 44100, 44100 * 10, 0)
@@ -118,6 +134,10 @@ class StreamWindow(gtk.VBox):
         
     def pos_slider_moved(self, adjustment):
         cbox.do_cmd("%s/seek" % self.path, None, [int(adjustment.get_value())])
+        
+    def file_set(self, button):
+        cbox.do_cmd("%s/load" % self.path, None, [button.get_filename(), -1])
+        
 
 class FluidsynthWindow(gtk.VBox):
     def __init__(self, instrument, path):
