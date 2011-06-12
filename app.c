@@ -426,6 +426,9 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         if (!strncmp(obj, "master/", 7))
             return cbox_execute_sub(&app.rt->master->cmd_target, fb, cmd, pos, error);
         else
+        if (!strncmp(obj, "config/", 7))
+            return cbox_execute_sub(&app.config_cmd_target, fb, cmd, pos, error);
+        else
         if (!strncmp(obj, "scene/", 6))
             return cbox_execute_sub(&app.rt->scene->cmd_target, fb, cmd, pos, error);
         else
@@ -462,6 +465,47 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     }
 }
 
+struct config_foreach_data
+{
+    const char *prefix;
+    struct cbox_command_target *fb;
+    GError **error;
+    gboolean success;
+};
+
+void api_config_cb(void *user_data, const char *key)
+{
+    struct config_foreach_data *cfd = user_data;
+    if (!cfd->success)
+        return;
+    if (cfd->prefix && strncmp(cfd->prefix, key, strlen(cfd->prefix)))
+        return;
+    
+    if (!cbox_execute_on(cfd->fb, NULL, "/section", "s", cfd->error, key))
+    {
+        cfd->success = FALSE;
+        return;
+    }
+}
+
+static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    if (!strcmp(cmd->command, "/sections") && (!strcmp(cmd->arg_types, "") || !strcmp(cmd->arg_types, "s")))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        struct config_foreach_data cfd = {cmd->arg_types[0] == 's' ? (const char *)cmd->arg_values[0] : NULL, fb, error, TRUE};
+        cbox_config_foreach_section(api_config_cb, &cfd);
+        return cfd.success;
+    }
+    else
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+        return FALSE;
+    }
+}
+
 struct cbox_app app =
 {
     .rt = NULL,
@@ -469,6 +513,11 @@ struct cbox_app app =
     .cmd_target =
     {
         .process_cmd = app_process_cmd,
+        .user_data = &app
+    },
+    .config_cmd_target =
+    {
+        .process_cmd = config_process_cmd,
         .user_data = &app
     }
 };
