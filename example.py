@@ -31,6 +31,14 @@ def output_combo_value_changed(combo, instr, output_pair):
     if combo.get_active() != -1:
         cbox.do_cmd("/instr/%s/set_output" % instr, None, [output_pair, 1 + combo.get_active()])
 
+def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustment_changed_float):
+    t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL)
+    adj = gtk.Adjustment(getattr(values, item), min, max, 1, 6, 0)
+    adj.connect("value_changed", setter, path + "/" + item)
+    hsc = gtk.HScale(adj)
+    hsc.set_size_request(120, -1)
+    t.attach(hsc, 1, 2, row, row+1)
+
 class GetThings:
     def __init__(self, cmd, anames, args):
         for i in anames:
@@ -98,14 +106,16 @@ class FluidsynthWindow(gtk.VBox):
             self.mapping[id] = len(self.mapping)
             self.patches.append((patches[id], id))
         
+        attribs = GetThings("%s/status" % self.path, ['%patch', 'polyphony'], [])
+
         panel = gtk.VBox(spacing=5)
-        #self.status_label = gtk.Label("")
-        #panel.add(self.status_label)
+        table = gtk.Table(2, 1)
+        add_slider_row(table, 0, "Polyphony", self.path, attribs, "polyphony", 2, 256, adjustment_changed_int)
+        panel.add(table)
+        
         expander = gtk.Expander("Patches")
         self.table = gtk.Table(2, 16)
         expander.add(self.table)
-
-        attribs = GetThings("%s/status" % self.path, ['%patch'], [])
 
         for i in range(0, 16):
             self.table.attach(bold_label("Channel %s" % (1 + i)), 0, 1, i, i + 1)
@@ -127,14 +137,6 @@ class FluidsynthWindow(gtk.VBox):
     def patch_combo_changed(self, combo, channel):
         print "combo: %s channel: %s" % (combo.get_active(), channel)
         cbox.do_cmd(self.path + "/set_patch", None, [int(channel), int(self.patches[combo.get_active()][1])])
-
-def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustment_changed_float):
-    t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL)
-    adj = gtk.Adjustment(getattr(values, item), min, max, 1, 6, 0)
-    adj.connect("value_changed", setter, path + "/" + item)
-    hsc = gtk.HScale(adj)
-    hsc.set_size_request(100, -1)
-    t.attach(hsc, 1, 2, row, row+1)
 
 class PluginWindow(gtk.Window):
     def __init__(self, instrument, output, plugin_name, main_window):
