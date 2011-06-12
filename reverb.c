@@ -53,6 +53,7 @@ struct reverb_params
     float wetamt;
     float dryamt;
     float lowpass, highpass;
+    float diffusion;
 };
 
 struct reverb_module
@@ -73,6 +74,7 @@ gboolean reverb_process_cmd(struct cbox_command_target *ct, struct cbox_command_
     EFFECT_PARAM("/wet_amt", "f", wetamt, double, dB2gain_simple, -100, 100) else
     EFFECT_PARAM("/dry_amt", "f", dryamt, double, dB2gain_simple, -100, 100) else
     EFFECT_PARAM("/decay_time", "f", decay_time, double, , 500, 5000) else
+    EFFECT_PARAM("/diffusion", "f", diffusion, double, , 0, 1) else
     EFFECT_PARAM("/lowpass", "f", lowpass, double, , 30, 20000) else
     EFFECT_PARAM("/highpass", "f", highpass, double, , 30, 20000) else
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
@@ -82,6 +84,7 @@ gboolean reverb_process_cmd(struct cbox_command_target *ct, struct cbox_command_
         return cbox_execute_on(fb, NULL, "/wet_amt", "f", error, gain2dB_simple(m->params->wetamt)) &&
             cbox_execute_on(fb, NULL, "/dry_amt", "f", error, gain2dB_simple(m->params->dryamt)) &&
             cbox_execute_on(fb, NULL, "/decay_time", "f", error, m->params->decay_time) &&
+            cbox_execute_on(fb, NULL, "/diffusion", "f", error, m->params->diffusion) &&
             cbox_execute_on(fb, NULL, "/lowpass", "f", error, m->params->lowpass) &&
             cbox_execute_on(fb, NULL, "/highpass", "f", error, m->params->highpass);
     }
@@ -145,11 +148,11 @@ void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
         storage = bprev->delay_storage;
         for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
         {
-            temp[u][i] += cbox_onepolef_process_sample(&b->filter_state, &m->filter_coeffs[u&1], storage[pos & (DELAY_BUFFER - 1)]) * gain;
+            temp[u][i] += cbox_onepolef_process_sample(&b->filter_state, &m->filter_coeffs[u&1], storage[pos & (DELAY_BUFFER - 1)] * gain);
             pos++;
         }
 
-        float w = 0.45;
+        float w = p->diffusion;
         for (int a = 0; a < ALLPASS_UNITS_PER_BLOCK; a++)
         {
             pos = m->pos;
@@ -221,6 +224,7 @@ struct cbox_module *reverb_create(void *user_data, const char *cfg_section, int 
     
     float tpdsr = 2 * M_PI / srate;
     
+    m->params->diffusion = cbox_config_get_float(cfg_section, "diffusion", 0.45);
     m->params->lowpass = cbox_config_get_float(cfg_section, "lowpass", 8000.f);
     m->params->highpass = cbox_config_get_float(cfg_section, "highpass", 35.f);
     

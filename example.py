@@ -175,13 +175,14 @@ class ChorusWindow(PluginWindow):
 class ReverbWindow(PluginWindow):
     def __init__(self, instrument, output, main_window):
         PluginWindow.__init__(self, instrument, output, "Reverb", main_window)
-        values = GetThings(self.path + "/status", ["decay_time", "dry_amt", "wet_amt", "lowpass", "highpass"], [])
-        t = gtk.Table(2, 5)
+        values = GetThings(self.path + "/status", ["decay_time", "dry_amt", "wet_amt", "lowpass", "highpass", "diffusion"], [])
+        t = gtk.Table(2, 6)
         add_slider_row(t, 0, "Decay time", self.path, values, "decay_time", 500, 5000)
         add_slider_row(t, 1, "Dry amount", self.path, values, "dry_amt", -100, 12)
         add_slider_row(t, 2, "Wet amount", self.path, values, "wet_amt", -100, 12)
         add_slider_row(t, 3, "Lowpass", self.path, values, "lowpass", 300, 20000)
         add_slider_row(t, 4, "Highpass", self.path, values, "highpass", 30, 2000)
+        add_slider_row(t, 5, "Diffusion", self.path, values, "diffusion", 0.2, 0.8)
         self.add(t)
 
 class FBRWindow(PluginWindow):
