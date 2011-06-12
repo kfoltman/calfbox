@@ -225,6 +225,8 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
+        if (!cbox_execute_on(fb, NULL, "/polyphony", "i", error, fluid_synth_get_polyphony(m->synth)))
+            return FALSE;
         for (int i = 0; i < 16; i++)
         {
             fluid_synth_channel_info_t ci;
@@ -259,8 +261,17 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             return FALSE;
         }
         int value = *(int *)cmd->arg_values[1];
-        fluid_synth_program_select(m->synth, channel - 1, m->sfid, value >> 7, value & 127);
-        return TRUE;
+        return fluid_synth_program_select(m->synth, channel - 1, m->sfid, value >> 7, value & 127) == FLUID_OK;
+    }
+    else if (!strcmp(cmd->command, "/polyphony") && !strcmp(cmd->arg_types, "i"))
+    {
+        int polyphony = *(int *)cmd->arg_values[0];
+        if (polyphony < 2 || polyphony > 256)
+        {
+            g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Invalid polyphony %d (must be between 2 and 256)", polyphony);
+            return FALSE;
+        }
+        return fluid_synth_set_polyphony(m->synth, polyphony) == FLUID_OK;
     }
     else
         return cbox_set_command_error(error, cmd);
