@@ -33,9 +33,10 @@ struct cbox_layer
     uint8_t high_note;
     int8_t transpose;
     int8_t fixed_note;
-    int disable_aftertouch;
-    int invert_sustain;
-    int consume;
+    gboolean disable_aftertouch;
+    gboolean invert_sustain;
+    gboolean consume;
+    gboolean ignore_scene_transpose;
 };
 
 extern struct cbox_layer *cbox_layer_new(const char *name, GError **error);
