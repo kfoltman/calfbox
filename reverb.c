@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -44,16 +45,50 @@ struct cbox_reverb_block
     struct cbox_onepolef_state filter_state;
 };
 
+#define MODULE_PARAMS reverb_params
+
+struct reverb_params
+{
+    float decay_time;
+    float wetamt;
+    float dryamt;
+    float lowpass, highpass;
+};
+
 struct reverb_module
 {
     struct cbox_module module;
 
     struct cbox_reverb_block blocks[REVERB_BLOCKS];
     struct cbox_onepolef_coeffs filter_coeffs[2];
+    struct reverb_params *params, *old_params;
     int pos;
-    int length;
-    float wetamt, dryamt;
+    int srate;
 };
+
+gboolean reverb_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct reverb_module *m = (struct reverb_module *)ct->user_data;
+    
+    EFFECT_PARAM("/wet_amt", "f", wetamt, double, dB2gain_simple, -100, 100) else
+    EFFECT_PARAM("/dry_amt", "f", dryamt, double, dB2gain_simple, -100, 100) else
+    EFFECT_PARAM("/decay_time", "f", decay_time, double, , 500, 5000) else
+    EFFECT_PARAM("/lowpass", "f", lowpass, double, , 30, 20000) else
+    EFFECT_PARAM("/highpass", "f", highpass, double, , 30, 20000) else
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        return cbox_execute_on(fb, NULL, "/wet_amt", "f", error, gain2dB_simple(m->params->wetamt)) &&
+            cbox_execute_on(fb, NULL, "/dry_amt", "f", error, gain2dB_simple(m->params->dryamt)) &&
+            cbox_execute_on(fb, NULL, "/decay_time", "f", error, m->params->decay_time) &&
+            cbox_execute_on(fb, NULL, "/lowpass", "f", error, m->params->lowpass) &&
+            cbox_execute_on(fb, NULL, "/highpass", "f", error, m->params->highpass);
+    }
+    else
+        return cbox_set_command_error(error, cmd);
+    return TRUE;
+}
 
 void reverb_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
@@ -63,10 +98,19 @@ void reverb_process_event(struct cbox_module *module, const uint8_t *data, uint3
 void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct reverb_module *m = (struct reverb_module *)module;
+    struct reverb_params *p = m->params;
     
-    int rv = m->length;
-    float dryamt = m->dryamt;
-    float wetamt = m->wetamt;
+    float rv = p->decay_time * m->srate / 1000;
+    float dryamt = p->dryamt;
+    float wetamt = p->wetamt;
+
+    if (p != m->old_params)
+    {
+        float tpdsr = 2 * M_PI / m->srate;
+        cbox_onepolef_set_lowpass(&m->filter_coeffs[0], p->lowpass * tpdsr);
+        cbox_onepolef_set_highpass(&m->filter_coeffs[1], p->highpass * tpdsr);
+        m->old_params = p;
+    }
 
     float temp[REVERB_BLOCKS][CBOX_BLOCK_SIZE];
     
@@ -78,14 +122,6 @@ void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
         temp[3][i] = 0;
     }
     
-/*
-    static int dvs[REVERB_BLOCKS][ALLPASS_UNITS_PER_BLOCK + 1] = {
-        {931, 873, 715, 133},
-        {1054, 1519, 973, 461},
-        {617, 741, 777, 251},
-        {1119, 1477, 933, 379},
-    };
-    */
     static int dvs[REVERB_BLOCKS][ALLPASS_UNITS_PER_BLOCK + 1] = {
         {731, 873, 1215, 133},
         {1054, 1519, 973, 461},
@@ -164,10 +200,14 @@ struct cbox_module *reverb_create(void *user_data, const char *cfg_section, int 
     cbox_module_init(&m->module, m, 2, 2);
     m->module.process_event = reverb_process_event;
     m->module.process_block = reverb_process_block;
+    m->module.cmd_target.process_cmd = reverb_process_cmd;
     m->pos = 0;
-    m->length = cbox_config_get_float(cfg_section, "reverb_time", 1000) * srate / 1000;
-    m->dryamt = cbox_config_get_gain_db(cfg_section, "dry_gain", 0.f);
-    m->wetamt = cbox_config_get_gain_db(cfg_section, "wet_gain", -6.f);
+    m->srate = srate;
+    m->old_params = NULL;
+    m->params = malloc(sizeof(struct reverb_params));
+    m->params->decay_time = cbox_config_get_float(cfg_section, "reverb_time", 1000);
+    m->params->dryamt = cbox_config_get_gain_db(cfg_section, "dry_gain", 0.f);
+    m->params->wetamt = cbox_config_get_gain_db(cfg_section, "wet_gain", -6.f);
     for (int u = 0; u < REVERB_BLOCKS; u++)
     {
         struct cbox_reverb_block *b = &m->blocks[u];
@@ -181,8 +221,8 @@ struct cbox_module *reverb_create(void *user_data, const char *cfg_section, int 
     
     float tpdsr = 2 * M_PI / srate;
     
-    cbox_onepolef_set_lowpass(&m->filter_coeffs[0], cbox_config_get_float(cfg_section, "lowpass", 8000.f) * tpdsr);
-    cbox_onepolef_set_highpass(&m->filter_coeffs[1], cbox_config_get_float(cfg_section, "highpass", 35.f) * tpdsr);
+    m->params->lowpass = cbox_config_get_float(cfg_section, "lowpass", 8000.f);
+    m->params->highpass = cbox_config_get_float(cfg_section, "highpass", 35.f);
     
     return &m->module;
 }
