@@ -82,16 +82,24 @@ class StreamWindow(gtk.VBox):
         gtk.Widget.__init__(self)
         self.path = path
         self.status_label = gtk.Label("")
+        
+        panel = gtk.VBox(spacing=5)
+        panel.add(self.status_label)
+
+        self.adjustment = gtk.Adjustment()
+        self.adjustment_handler = self.adjustment.connect('value-changed', self.pos_slider_moved)
+        self.progress = standard_hslider(self.adjustment)
+        panel.pack_start(self.progress, False, False)
+
         self.play_button = gtk.Button(label = "_Play")
         self.rewind_button = gtk.Button(label = "_Rewind")
         self.stop_button = gtk.Button(label = "_Stop")
-        panel = gtk.VBox(spacing=5)
-        panel.add(self.status_label)
         buttons = gtk.HBox(spacing = 5)
         buttons.add(self.play_button)
         buttons.add(self.rewind_button)
         buttons.add(self.stop_button)
-        panel.add(buttons)
+        panel.pack_start(buttons, False, False)
+        
         self.add(panel)
         self.play_button.connect('clicked', lambda x: cbox.do_cmd("%s/play" % self.path, None, []))
         self.rewind_button.connect('clicked', lambda x: cbox.do_cmd("%s/seek" % self.path, None, [0]))
@@ -99,9 +107,17 @@ class StreamWindow(gtk.VBox):
         self.refresh_id = glib.timeout_add(30, lambda: self.update())
 
     def update(self):
-        attribs = GetThings("%s/status" % self.path, ['filename', 'pos', 'playing'], [])
-        self.status_label.set_markup("<b>File:</b> %s\n<b>Pos:</b> %s" % (attribs.filename, attribs.pos))
+        attribs = GetThings("%s/status" % self.path, ['filename', 'pos', 'length', 'playing'], [])
+        self.status_label.set_markup("<b>File:</b> %s" % (attribs.filename,))
+        self.adjustment.handler_block(self.adjustment_handler)
+        try:
+            self.adjustment.set_all(attribs.pos, 0, attribs.length, 44100, 44100 * 10, 0)
+        finally:
+            self.adjustment.handler_unblock(self.adjustment_handler)
         return True
+        
+    def pos_slider_moved(self, adjustment):
+        cbox.do_cmd("%s/seek" % self.path, None, [int(adjustment.get_value())])
 
 class FluidsynthWindow(gtk.VBox):
     def __init__(self, instrument, path):

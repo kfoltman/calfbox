@@ -636,6 +636,7 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
         {
             return cbox_execute_on(fb, NULL, "/filename", "s", error, m->stream->filename) &&
                 cbox_execute_on(fb, NULL, "/pos", "i", error, m->stream->readptr) &&
+                cbox_execute_on(fb, NULL, "/length", "i", error, m->stream->info.frames) &&
                 cbox_execute_on(fb, NULL, "/playing", "i", error, m->stream->phase != STOPPED);
         }
         else
