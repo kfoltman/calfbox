@@ -18,6 +18,17 @@ def left_label(text):
     l.set_alignment(0, 0.5)
     return l
 
+def standard_hslider(adj):
+    sc = gtk.HScale(adj)
+    sc.set_size_request(160, -1)
+    sc.set_value_pos(gtk.POS_RIGHT)
+    return sc
+    
+def standard_align(w, xo, yo, xs, ys):
+    a = gtk.Alignment(xo, yo, xs, ys)
+    a.add(w)
+    return a
+
 def checkbox_changed_bool(adjustment, path, *items):
     cbox.do_cmd(path, None, list(items) + [1 if adjustment.get_active() else 0])
 
@@ -32,12 +43,10 @@ def output_combo_value_changed(combo, instr, output_pair):
         cbox.do_cmd("/instr/%s/set_output" % instr, None, [output_pair, 1 + combo.get_active()])
 
 def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustment_changed_float):
-    t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL)
+    t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
     adj = gtk.Adjustment(getattr(values, item), min, max, 1, 6, 0)
     adj.connect("value_changed", setter, path + "/" + item)
-    hsc = gtk.HScale(adj)
-    hsc.set_size_request(120, -1)
-    t.attach(hsc, 1, 2, row, row+1)
+    t.attach(standard_hslider(adj), 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
 
 class GetThings:
     def __init__(self, cmd, anames, args):
@@ -111,22 +120,27 @@ class FluidsynthWindow(gtk.VBox):
         panel = gtk.VBox(spacing=5)
         table = gtk.Table(2, 1)
         add_slider_row(table, 0, "Polyphony", self.path, attribs, "polyphony", 2, 256, adjustment_changed_int)
-        panel.add(table)
+        panel.pack_start(table, False, False)
         
-        expander = gtk.Expander("Patches")
         self.table = gtk.Table(2, 16)
-        expander.add(self.table)
+        self.table.set_col_spacings(5)
 
         for i in range(0, 16):
-            self.table.attach(bold_label("Channel %s" % (1 + i)), 0, 1, i, i + 1)
+            self.table.attach(bold_label("Channel %s" % (1 + i)), 0, 1, i, i + 1, gtk.SHRINK, gtk.SHRINK)
             cb = gtk.ComboBox(self.patches)
             cell = gtk.CellRendererText()
             cb.pack_start(cell, True)
             cb.add_attribute(cell, 'text', 0)
             cb.set_active(self.mapping[attribs.patch[i + 1][0]])
             cb.connect('changed', self.patch_combo_changed, i + 1)
-            self.table.attach(cb, 1, 2, i, i + 1)
-        panel.add(expander)
+            self.table.attach(cb, 1, 2, i, i + 1, gtk.SHRINK, gtk.SHRINK)
+        scroller = gtk.ScrolledWindow()
+        scroller.set_size_request(-1, 160)
+        scroller.set_shadow_type(gtk.SHADOW_NONE);
+        scroller.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC);
+        scroller.add_with_viewport(self.table)
+
+        panel.pack_start(scroller, True, True)
         self.add(panel)
         self.refresh_id = glib.timeout_add(1, lambda: self.update())
 
@@ -135,7 +149,6 @@ class FluidsynthWindow(gtk.VBox):
         return True
         
     def patch_combo_changed(self, combo, channel):
-        print "combo: %s channel: %s" % (combo.get_active(), channel)
         cbox.do_cmd(self.path + "/set_patch", None, [int(channel), int(self.patches[combo.get_active()][1])])
 
 class PluginWindow(gtk.Window):
@@ -204,14 +217,12 @@ class FBRWindow(PluginWindow):
                 if par[4] == 'slider':
                     adj = gtk.Adjustment(value, par[1], par[2], 1, 6, 0)
                     adj.connect("value_changed", adjustment_changed_float, self.path + "/" + par[3], int(j))
-                    slider = gtk.HScale(adj)
-                    slider.set_size_request(120, -1)
-                    t.attach(slider, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
+                    t.attach(standard_hslider(adj), i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
                 else:
                     cb = gtk.CheckButton(par[0])
                     cb.set_active(value > 0)
                     cb.connect("clicked", checkbox_changed_bool, self.path + "/" + par[3], int(j))
-                    t.attach(cb, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
+                    t.attach(cb, i, i + 1, j + 1, j + 2, gtk.SHRINK | gtk.FILL)
                 
         
         self.add(t)
@@ -241,30 +252,28 @@ class MainWindow(gtk.Window):
         t.set_col_spacings(5)
         t.set_row_spacings(5)
         
-        t.attach(bold_label("Scene"), 0, 1, 0, 1, gtk.SHRINK | gtk.FILL)
-        t.attach(left_label(scene.name), 1, 2, 0, 1)
+        t.attach(bold_label("Scene"), 0, 1, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+        t.attach(left_label(scene.name), 1, 2, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         
-        t.attach(bold_label("Title"), 0, 1, 1, 2, gtk.SHRINK | gtk.FILL)
-        t.attach(left_label(scene.title), 1, 2, 1, 2)
+        t.attach(bold_label("Title"), 0, 1, 1, 2, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+        t.attach(left_label(scene.title), 1, 2, 1, 2, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         
-        t.attach(bold_label("Play pos"), 0, 1, 2, 3, gtk.SHRINK | gtk.FILL)
-        t.attach(self.master_info, 1, 2, 2, 3)
+        t.attach(bold_label("Play pos"), 0, 1, 2, 3, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+        t.attach(self.master_info, 1, 2, 2, 3, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         
-        t.attach(bold_label("Time sig"), 0, 1, 3, 4, gtk.SHRINK)
-        t.attach(self.timesig_info, 1, 2, 3, 4)
+        t.attach(bold_label("Time sig"), 0, 1, 3, 4, gtk.SHRINK, gtk.SHRINK)
+        t.attach(self.timesig_info, 1, 2, 3, 4, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         
-        t.attach(bold_label("Tempo"), 0, 1, 4, 5, gtk.SHRINK | gtk.FILL)
+        t.attach(bold_label("Tempo"), 0, 1, 4, 5, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         self.tempo_adj = gtk.Adjustment(40, 40, 300, 1, 5, 0)
         self.tempo_adj.connect('value_changed', adjustment_changed_float, "/master/set_tempo")
-        t.attach(gtk.HScale(self.tempo_adj), 1, 2, 4, 5, gtk.EXPAND | gtk.FILL)
+        t.attach(standard_hslider(self.tempo_adj), 1, 2, 4, 5, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
 
-        t.attach(bold_label("Transpose"), 0, 1, 5, 6, gtk.SHRINK | gtk.FILL)
+        t.attach(bold_label("Transpose"), 0, 1, 5, 6, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         self.transpose_adj = gtk.Adjustment(scene.transpose, -24, 24, 1, 5, 0)
         self.transpose_adj.connect('value_changed', adjustment_changed_int, '/scene/transpose')
-        t.attach(gtk.SpinButton(self.transpose_adj), 1, 2, 5, 6, gtk.SHRINK)
-        a = gtk.Alignment(0, 0, 1, 0)
-        a.add(t)
-        return a
+        t.attach(standard_align(gtk.SpinButton(self.transpose_adj), 0, 0, 0, 0), 1, 2, 5, 6, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+        return t
 
     def create(self):
         rt = GetThings("/rt/status", ['audio_channels'], [])
@@ -280,21 +289,22 @@ class MainWindow(gtk.Window):
             #markup += '<b>Instrument %d:</b> engine %s, name %s\n' % (i, attribs.engine, attribs.name)
             b = gtk.VBox(spacing = 5)
             b.set_border_width(5)
-            b.add(gtk.Label("Engine: %s" % i[1]))
-            b.add(gtk.HSeparator())
+            b.pack_start(gtk.Label("Engine: %s" % i[1]), False, False)
+            b.pack_start(gtk.HSeparator(), False, False)
             t = gtk.Table(1 + len(idata.output), 5)
-            t.attach(bold_label("Instr. output", 0.5), 0, 1, 0, 1, gtk.SHRINK)
-            t.attach(bold_label("Send to", 0.5), 1, 2, 0, 1, gtk.SHRINK)
-            t.attach(bold_label("Gain [dB]", 0.5), 2, 3, 0, 1)
-            t.attach(bold_label("Effect", 0.5), 3, 5, 0, 1)
-            b.add(t)
+            t.set_col_spacings(5)
+            t.attach(bold_label("Instr. output", 0.5), 0, 1, 0, 1, gtk.SHRINK, gtk.SHRINK)
+            t.attach(bold_label("Send to", 0.5), 1, 2, 0, 1, gtk.SHRINK, gtk.SHRINK)
+            t.attach(bold_label("Gain [dB]", 0.5), 2, 3, 0, 1, 0, gtk.SHRINK)
+            t.attach(bold_label("Effect", 0.5), 3, 5, 0, 1, 0, gtk.SHRINK)
+            b.pack_start(t, False, False)
             y = 1
             for o in idata.output.keys():
                 if 2 * (o - 1) < idata.aux_offset:
                     output_name = "Out %s" % o
                 else:
                     output_name = "Aux %s" % (o - idata.aux_offset / 2)
-                t.attach(gtk.Label(output_name), 0, 1, y, y + 1, gtk.SHRINK)
+                t.attach(gtk.Label(output_name), 0, 1, y, y + 1, gtk.SHRINK, gtk.SHRINK)
                 ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
                 for out in range(0, rt.audio_channels[1]/2):
                     ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
@@ -304,25 +314,21 @@ class MainWindow(gtk.Window):
                 cb.pack_start(cell, True)
                 cb.add_attribute(cell, 'text', 0)
                 cb.connect('changed', output_combo_value_changed, i[0], o)
-                t.attach(cb, 1, 2, y, y + 1, gtk.SHRINK)
+                t.attach(cb, 1, 2, y, y + 1, gtk.SHRINK, gtk.SHRINK)
                 adj = gtk.Adjustment(idata.gain[o], -96, 12, 1, 6, 0)
                 adj.connect('value_changed', adjustment_changed_float, "/instr/%s/set_gain" % i[0], int(o))
-                sc = gtk.HScale(adj)
-                sc.set_size_request(120, -1)
-                t.attach(sc, 2, 3, y, y + 1)
+                t.attach(standard_hslider(adj), 2, 3, y, y + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
                 fx = gtk.Label(idata.insert_engine[o])
-                t.attach(fx, 3, 4, y, y + 1)
+                t.attach(fx, 3, 4, y, y + 1, 0, gtk.SHRINK)
                 if idata.insert_engine[o] in engine_window_map:
                     fx = gtk.Button("_Edit")
-                    t.attach(fx, 4, 5, y, y + 1)
+                    t.attach(fx, 4, 5, y, y + 1, 0, gtk.SHRINK)
                     fx.connect("clicked", lambda button, instr, output, wclass, main_window: wclass(instr, output, main_window).show_all(), i[0], o, engine_window_map[idata.insert_engine[o]], self)
                 y += 1
             if i[1] in engine_window_map:
-                b.add(gtk.HSeparator())
-                b.add(engine_window_map[i[1]](i[0], "/instr/%s/engine" % i[0]))
-            a = gtk.Alignment(0, 0, 1, 0)
-            a.add(b)
-            nb.append_page(a, gtk.Label(i[0]))
+                b.pack_start(gtk.HSeparator(), False, False)
+                b.pack_start(engine_window_map[i[1]](i[0], "/instr/%s/engine" % i[0]), True, True)
+            nb.append_page(b, gtk.Label(i[0]))
         self.update()
         
     def update(self):
