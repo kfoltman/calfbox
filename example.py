@@ -107,7 +107,7 @@ class StreamWindow(gtk.VBox):
         self.filebutton.add_filter(standard_filter(["*.flac", "*.FLAC"], "FLAC files"))
         self.filebutton.add_filter(standard_filter(["*"], "All files"))
         self.filebutton.connect('file-set', self.file_set)
-        panel.add(self.filebutton)
+        panel.pack_start(self.filebutton, False, False)
 
         self.adjustment = gtk.Adjustment()
         self.adjustment_handler = self.adjustment.connect('value-changed', self.pos_slider_moved)
