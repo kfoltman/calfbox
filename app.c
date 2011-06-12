@@ -499,6 +499,16 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
         cbox_config_foreach_section(api_config_cb, &cfd);
         return cfd.success;
     }
+    else if (!strcmp(cmd->command, "/get") && !strcmp(cmd->arg_types, "ss"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        const char *value = cbox_config_get_string((const char *)cmd->arg_values[0], (const char *)cmd->arg_values[1]);
+        if (!value)
+            return TRUE;
+        return cbox_execute_on(fb, NULL, "/value", "s", error, value);
+    }
     else
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);

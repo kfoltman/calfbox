@@ -84,6 +84,9 @@ class GetThings:
                     getattr(self, cmd)[args[0]] = args[1:]
         cbox.do_cmd(cmd, update_callback, args)
 
+def cfg_get(section, key):
+    return GetThings('/config/get', ['value'], [str(section), str(key)]).value
+
 class StreamWindow(gtk.VBox):
     def __init__(self, instrument, path):
         gtk.Widget.__init__(self)
