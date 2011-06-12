@@ -78,14 +78,6 @@ void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
         temp[3][i] = 0;
     }
     
-/*
-    static int dvs[REVERB_BLOCKS][ALLPASS_UNITS_PER_BLOCK + 1] = {
-        {931, 873, 715, 133},
-        {1054, 1519, 973, 461},
-        {617, 741, 777, 251},
-        {1119, 1477, 933, 379},
-    };
-    */
     static int dvs[REVERB_BLOCKS][ALLPASS_UNITS_PER_BLOCK + 1] = {
         {731, 873, 1215, 133},
         {1054, 1519, 973, 461},
