@@ -288,12 +288,15 @@ class MainWindow(gtk.Window):
 
     def create_master(self, scene):
         self.scene_list = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
-        for s in cfg_sections("scene:"):
+        
+        scenes = cfg_sections("scene:")
+        for s in scenes:
             title = cfg_get(s, "title")
             if title is None:
                 self.scene_list.append((s[6:], ""))
             else:
                 self.scene_list.append((s[6:], "(%s)" % title))
+                
         
         self.master_info = left_label("")
         self.timesig_info = left_label("")
@@ -311,11 +314,15 @@ class MainWindow(gtk.Window):
         cell.props.foreground = "blue"
         cb.pack_end(cell, True)
         cb.add_attribute(cell, 'text', 1)
+        index = [index for index, value in zip(range(len(scenes)), scenes) if value == "scene:%s" % scene.name]
+        if len(index):
+            cb.set_active(index[0])
         cb.connect('changed', self.scene_combo_changed)
         t.attach(cb, 1, 2, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-        
+
+        self.title_label = left_label(scene.title)
         t.attach(bold_label("Title"), 0, 1, 1, 2, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-        t.attach(left_label(scene.title), 1, 2, 1, 2, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+        t.attach(self.title_label, 1, 2, 1, 2, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         
         t.attach(bold_label("Play pos"), 0, 1, 2, 3, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         t.attach(self.master_info, 1, 2, 2, 3, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
@@ -410,6 +417,7 @@ class MainWindow(gtk.Window):
         scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title', 'transpose'], [])
         self.create_instrument_pages(scene, rt)
         self.nb.show_all()
+        self.title_label.set_text(scene.title)
         return True
 
 def do_quit(window, event):
