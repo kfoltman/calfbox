@@ -28,7 +28,22 @@ def standard_align(w, xo, yo, xs, ys):
     a = gtk.Alignment(xo, yo, xs, ys)
     a.add(w)
     return a
+
+def standard_combo(list_store, active_item = None):
+    cb = gtk.ComboBox(list_store)
+    if active_item is not None:
+        cb.set_active(active_item)
+    cell = gtk.CellRendererText()
+    cb.pack_start(cell, True)
+    cb.add_attribute(cell, 'text', 0)
+    return cb
     
+def ls_index(list_store, value, column):
+    for i in range(len(list_store)):
+        if list_store[i][column] == value:
+            return i
+    return None
+
 def standard_filter(patterns, name):
     f = gtk.FileFilter()
     for p in patterns:
@@ -169,11 +184,7 @@ class FluidsynthWindow(gtk.VBox):
 
         for i in range(0, 16):
             self.table.attach(bold_label("Channel %s" % (1 + i)), 0, 1, i, i + 1, gtk.SHRINK, gtk.SHRINK)
-            cb = gtk.ComboBox(self.patches)
-            cell = gtk.CellRendererText()
-            cb.pack_start(cell, True)
-            cb.add_attribute(cell, 'text', 0)
-            cb.set_active(self.mapping[attribs.patch[i + 1][0]])
+            cb = standard_combo(self.patches, self.mapping[attribs.patch[i + 1][0]])
             cb.connect('changed', self.patch_combo_changed, i + 1)
             self.table.attach(cb, 1, 2, i, i + 1, gtk.SHRINK, gtk.SHRINK)
         scroller = gtk.ScrolledWindow()
@@ -351,8 +362,19 @@ class MainWindow(gtk.Window):
         self.create_instrument_pages(scene, rt)
 
     def create_instrument_pages(self, scene, rt):
+        fxpreset_ls = {}
+        
+        for preset in cfg_sections("fxpreset:"):
+            engine = cfg_get(preset, "engine")
+            if engine not in fxpreset_ls:
+                fxpreset_ls[engine] = gtk.ListStore(gobject.TYPE_STRING)
+            fxpreset_ls[engine].append((preset[9:],))
+        fx_ls = gtk.ListStore(gobject.TYPE_STRING)
+        for fx in ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer']:
+            fx_ls.append((fx,))
+            
         for i in scene.instrument:
-            idata = GetThings("/instr/%s/status" % i[0], ['%gain', '%output', 'aux_offset', '%insert_engine'], [])
+            idata = GetThings("/instr/%s/status" % i[0], ['%gain', '%output', 'aux_offset', '%insert_engine', '%insert_preset'], [])
             #attribs = GetThings("/scene/instr_info", ['engine', 'name'], [i])
             #markup += '<b>Instrument %d:</b> engine %s, name %s\n' % (i, attribs.engine, attribs.name)
             b = gtk.VBox(spacing = 5)
@@ -364,10 +386,13 @@ class MainWindow(gtk.Window):
             t.attach(bold_label("Instr. output", 0.5), 0, 1, 0, 1, gtk.SHRINK, gtk.SHRINK)
             t.attach(bold_label("Send to", 0.5), 1, 2, 0, 1, gtk.SHRINK, gtk.SHRINK)
             t.attach(bold_label("Gain [dB]", 0.5), 2, 3, 0, 1, 0, gtk.SHRINK)
-            t.attach(bold_label("Effect", 0.5), 3, 5, 0, 1, 0, gtk.SHRINK)
+            t.attach(bold_label("Effect", 0.5), 3, 6, 0, 1, 0, gtk.SHRINK)
             b.pack_start(t, False, False)
             y = 1
             for o in idata.output.keys():
+                engine = idata.insert_engine[o]
+                preset = idata.insert_preset[o]
+                
                 if 2 * (o - 1) < idata.aux_offset:
                     output_name = "Out %s" % o
                 else:
@@ -376,21 +401,22 @@ class MainWindow(gtk.Window):
                 ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
                 for out in range(0, rt.audio_channels[1]/2):
                     ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
-                cb = gtk.ComboBox(ls)
-                cb.set_active(idata.output[o] - 1)
-                cell = gtk.CellRendererText()
-                cb.pack_start(cell, True)
-                cb.add_attribute(cell, 'text', 0)
+                cb = standard_combo(ls, idata.output[o] - 1)
                 cb.connect('changed', output_combo_value_changed, i[0], o)
                 t.attach(cb, 1, 2, y, y + 1, gtk.SHRINK, gtk.SHRINK)
                 adj = gtk.Adjustment(idata.gain[o], -96, 12, 1, 6, 0)
                 adj.connect('value_changed', adjustment_changed_float, "/instr/%s/set_gain" % i[0], int(o))
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
-                fx = gtk.Label(idata.insert_engine[o])
+                fx = standard_combo(fx_ls, ls_index(fx_ls, engine, 0))
                 t.attach(fx, 3, 4, y, y + 1, 0, gtk.SHRINK)
-                if idata.insert_engine[o] in engine_window_map:
-                    fx = gtk.Button("_Edit")
+                fx.set_sensitive(False)
+                if engine in fxpreset_ls:
+                    fx = standard_combo(fxpreset_ls[engine], ls_index(fxpreset_ls[engine], preset, 0))
                     t.attach(fx, 4, 5, y, y + 1, 0, gtk.SHRINK)
+                    fx.set_sensitive(False)
+                if engine in engine_window_map:
+                    fx = gtk.Button("_Edit")
+                    t.attach(fx, 5, 6, y, y + 1, 0, gtk.SHRINK)
                     fx.connect("clicked", lambda button, instr, output, wclass, main_window: wclass(instr, output, main_window).show_all(), i[0], o, engine_window_map[idata.insert_engine[o]], self)
                 y += 1
             if i[1] in engine_window_map:
