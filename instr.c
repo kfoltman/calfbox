@@ -62,7 +62,8 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
             if (!(cbox_execute_on(fb, NULL, "/gain_linear", "if", error, 1 + i, instr->outputs[i].gain) &&
                 cbox_execute_on(fb, NULL, "/gain", "if", error, 1 + i, gain2dB_simple(instr->outputs[i].gain)) &&
                 cbox_execute_on(fb, NULL, "/output", "ii", error, 1 + i, instr->outputs[i].output_bus + 1) &&
-                cbox_execute_on(fb, NULL, "/insert_engine", "is", error, 1 + i, instr->outputs[i].insert ? instr->outputs[i].insert->engine_name : "")))
+                cbox_execute_on(fb, NULL, "/insert_engine", "is", error, 1 + i, instr->outputs[i].insert ? instr->outputs[i].insert->engine_name : "") &&
+                cbox_execute_on(fb, NULL, "/insert_preset", "is", error, 1 + i, instr->outputs[i].insert ? instr->outputs[i].insert->instance_name : "")))
                 return FALSE;
         }
         return TRUE;

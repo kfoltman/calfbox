@@ -158,6 +158,7 @@ struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **er
         g_prefix_error(error, "Could not instantiate FX preset '%s': ", name);
         goto fxpreset_error;
     }
+    effect->instance_name = g_strdup(name);
     g_free(section);
     return effect;
     
