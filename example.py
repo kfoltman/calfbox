@@ -60,9 +60,9 @@ def adjustment_changed_int(adjustment, path, *items):
 def adjustment_changed_float(adjustment, path, *items):
     cbox.do_cmd(path, None, list(items) + [float(adjustment.get_value())])
 
-def output_combo_value_changed(combo, instr, output_pair):
+def combo_value_changed(combo, path, value_offset = 0):
     if combo.get_active() != -1:
-        cbox.do_cmd("/instr/%s/set_output" % instr, None, [output_pair, 1 + combo.get_active()])
+        cbox.do_cmd(path, None, [value_offset + combo.get_active()])
 
 def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustment_changed_float):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
@@ -209,7 +209,7 @@ class PluginWindow(gtk.Window):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_UTILITY)
         self.set_transient_for(main_window)
-        self.path = "/instr/%s/insert%s/engine" % (instrument, "" if output == 1 else str(output))
+        self.path = "/instr/%s/output/%s/engine" % (instrument, output)
         self.set_title("%s - %s" % (plugin_name, instrument))
 
 class PhaserWindow(PluginWindow):
@@ -374,14 +374,15 @@ class MainWindow(gtk.Window):
             fx_ls.append((fx,))
             
         for i in scene.instrument:
-            idata = GetThings("/instr/%s/status" % i[0], ['%gain', '%output', 'aux_offset', '%insert_engine', '%insert_preset'], [])
+            ipath = "/instr/%s" % i[0]
+            idata = GetThings(ipath + "/status", ['outputs', 'aux_offset'], [])
             #attribs = GetThings("/scene/instr_info", ['engine', 'name'], [i])
             #markup += '<b>Instrument %d:</b> engine %s, name %s\n' % (i, attribs.engine, attribs.name)
             b = gtk.VBox(spacing = 5)
             b.set_border_width(5)
             b.pack_start(gtk.Label("Engine: %s" % i[1]), False, False)
             b.pack_start(gtk.HSeparator(), False, False)
-            t = gtk.Table(1 + len(idata.output), 5)
+            t = gtk.Table(1 + idata.outputs, 5)
             t.set_col_spacings(5)
             t.attach(bold_label("Instr. output", 0.5), 0, 1, 0, 1, gtk.SHRINK, gtk.SHRINK)
             t.attach(bold_label("Send to", 0.5), 1, 2, 0, 1, gtk.SHRINK, gtk.SHRINK)
@@ -389,9 +390,11 @@ class MainWindow(gtk.Window):
             t.attach(bold_label("Effect", 0.5), 3, 6, 0, 1, 0, gtk.SHRINK)
             b.pack_start(t, False, False)
             y = 1
-            for o in idata.output.keys():
-                engine = idata.insert_engine[o]
-                preset = idata.insert_preset[o]
+            for o in range(1, idata.outputs + 1):
+                opath = "%s/output/%s" % (ipath, o)
+                odata = GetThings(opath + "/status", ['gain', 'output', 'insert_engine', 'insert_preset'], [])
+                engine = odata.insert_engine
+                preset = odata.insert_preset
                 
                 if 2 * (o - 1) < idata.aux_offset:
                     output_name = "Out %s" % o
@@ -401,11 +404,11 @@ class MainWindow(gtk.Window):
                 ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
                 for out in range(0, rt.audio_channels[1]/2):
                     ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
-                cb = standard_combo(ls, idata.output[o] - 1)
-                cb.connect('changed', output_combo_value_changed, i[0], o)
+                cb = standard_combo(ls, odata.output - 1)
+                cb.connect('changed', combo_value_changed, opath + '/output', 1)
                 t.attach(cb, 1, 2, y, y + 1, gtk.SHRINK, gtk.SHRINK)
-                adj = gtk.Adjustment(idata.gain[o], -96, 12, 1, 6, 0)
-                adj.connect('value_changed', adjustment_changed_float, "/instr/%s/set_gain" % i[0], int(o))
+                adj = gtk.Adjustment(odata.gain, -96, 12, 1, 6, 0)
+                adj.connect('value_changed', adjustment_changed_float, opath + '/gain')
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
                 fx = standard_combo(fx_ls, ls_index(fx_ls, engine, 0))
                 t.attach(fx, 3, 4, y, y + 1, 0, gtk.SHRINK)
@@ -417,7 +420,7 @@ class MainWindow(gtk.Window):
                 if engine in engine_window_map:
                     fx = gtk.Button("_Edit")
                     t.attach(fx, 5, 6, y, y + 1, 0, gtk.SHRINK)
-                    fx.connect("clicked", lambda button, instr, output, wclass, main_window: wclass(instr, output, main_window).show_all(), i[0], o, engine_window_map[idata.insert_engine[o]], self)
+                    fx.connect("clicked", lambda button, instr, output, wclass, main_window: wclass(instr, output, main_window).show_all(), i[0], o, engine_window_map[engine], self)
                 y += 1
             if i[1] in engine_window_map:
                 b.pack_start(gtk.HSeparator(), False, False)

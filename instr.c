@@ -37,14 +37,49 @@ void cbox_instruments_init(struct cbox_io *io)
     instruments.io = io;
 }
 
-gboolean verify_output_idx(struct cbox_instrument *instr, int output, GError **error)
+static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr, struct cbox_instrument_output *output, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
 {
-    if (output < 1 || output > instr->module->outputs / 2)
+    if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Output number %d out of range (1-%d)'", output, instr->module->outputs / 2);
-        return FALSE;
+        if (!(cbox_execute_on(fb, NULL, "/gain_linear", "f", error, output->gain) &&
+            cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
+            cbox_execute_on(fb, NULL, "/output", "i", error, output->output_bus + 1) &&
+            cbox_execute_on(fb, NULL, "/insert_engine", "s", error, output->insert ? output->insert->engine_name : "") &&
+            cbox_execute_on(fb, NULL, "/insert_preset", "s", error, output->insert ? output->insert->instance_name : "")))
+            return FALSE;
+        return TRUE;
     }
-    return TRUE;
+    if (!strcmp(subcmd, "/gain") && !strcmp(cmd->arg_types, "f"))
+    {
+        double dB = *(double *)cmd->arg_values[0];
+        if (dB < -96)
+            output->gain = 0;
+        else
+            output->gain = dB2gain(dB);
+        return TRUE;
+    }
+    if (!strcmp(subcmd, "/output") && !strcmp(cmd->arg_types, "i"))
+    {
+        int obus = *(int *)cmd->arg_values[0];
+        // XXXKF add error checking
+        output->output_bus = obus - 1;
+        return TRUE;
+    }
+    if (!strncmp(subcmd, "/engine/", 8))
+    {
+        if (!output->insert)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The instrument %s has no insert effect on this outut", instr->module->instance_name);
+            return FALSE;
+        }
+        if (!output->insert->cmd_target.process_cmd)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", output->insert->engine_name);
+            return FALSE;
+        }
+        return cbox_execute_sub(&output->insert->cmd_target, fb, cmd, subcmd + 7, error);
+    }
+    return cbox_set_command_error(error, cmd);            
 }
 
 gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -52,45 +87,33 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
     struct cbox_instrument *instr = ct->user_data;
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
         if (!cbox_execute_on(fb, NULL, "/engine", "s", error, instr->module->engine_name))
             return FALSE;
         if (!cbox_execute_on(fb, NULL, "/aux_offset", "i", error, instr->module->aux_offset))
             return FALSE;
-
-        for (int i = 0; i < instr->module->outputs / 2; i++)
+        if (!cbox_execute_on(fb, NULL, "/outputs", "i", error, instr->module->outputs / 2))
+            return FALSE;
+        return TRUE;
+    }
+    else if (!strncmp(cmd->command, "/output/", 8))
+    {
+        const char *num = cmd->command + 8;
+        const char *slash = strchr(num, '/');
+        if (!slash)
+            return cbox_set_command_error(error, cmd);            
+        
+        gchar *numcopy = g_strndup(num, slash-num);
+        int output_num = atoi(numcopy);
+        if (output_num < 1 || output_num > instr->module->outputs / 2)
         {
-            if (!(cbox_execute_on(fb, NULL, "/gain_linear", "if", error, 1 + i, instr->outputs[i].gain) &&
-                cbox_execute_on(fb, NULL, "/gain", "if", error, 1 + i, gain2dB_simple(instr->outputs[i].gain)) &&
-                cbox_execute_on(fb, NULL, "/output", "ii", error, 1 + i, instr->outputs[i].output_bus + 1) &&
-                cbox_execute_on(fb, NULL, "/insert_engine", "is", error, 1 + i, instr->outputs[i].insert ? instr->outputs[i].insert->engine_name : "") &&
-                cbox_execute_on(fb, NULL, "/insert_preset", "is", error, 1 + i, instr->outputs[i].insert ? instr->outputs[i].insert->instance_name : "")))
-                return FALSE;
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid output index %s for command %s", numcopy, cmd->command);
+            g_free(numcopy);
+            return FALSE;
         }
-        return TRUE;
-    }
-    else if (!strcmp(cmd->command, "/set_gain") && !strcmp(cmd->arg_types, "if"))
-    {
-        int output = *(int *)cmd->arg_values[0];
-        if (!verify_output_idx(instr, output, error))
-            return FALSE;
-        double gain = *(double *)cmd->arg_values[1];
-        if (gain < -96)
-            gain = 0;
-        else
-            gain = dB2gain(gain);
-        instr->outputs[output - 1].gain = gain;
-        return TRUE;
-    }
-    else
-    if (!strcmp(cmd->command, "/set_output") && !strcmp(cmd->arg_types, "ii"))
-    {
-        int output = *(int *)cmd->arg_values[0];
-        if (!verify_output_idx(instr, output, error))
-            return FALSE;
-        int obus = *(int *)cmd->arg_values[1];
-        // XXXKF add error checking
-        instr->outputs[output - 1].output_bus = obus - 1;
-        return TRUE;
+        g_free(numcopy);
+        return cbox_instrument_output_process_cmd(instr, &instr->outputs[output_num - 1], fb, cmd, slash, error);
     }
     else
     if (!strncmp(cmd->command, "/engine/",8))
@@ -103,23 +126,8 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
         return cbox_execute_sub(&instr->module->cmd_target, fb, cmd, cmd->command + 7, error);
     }
     else
-    if (!strncmp(cmd->command, "/insert/engine/",8 + 7))
     {
-        if (!instr->outputs[0].insert)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The instrument %s has no insert effect", instr->module->instance_name);
-            return FALSE;
-        }
-        if (!instr->outputs[0].insert->cmd_target.process_cmd)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", instr->module->engine_name);
-            return FALSE;
-        }
-        return cbox_execute_sub(&instr->outputs[0].insert->cmd_target, fb, cmd, cmd->command + 7 + 7, error);
-    }
-    else
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+        cbox_set_command_error(error, cmd);
         return FALSE;
     }
 }
