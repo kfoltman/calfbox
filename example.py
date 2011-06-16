@@ -362,16 +362,22 @@ class MainWindow(gtk.Window):
         self.create_instrument_pages(scene, rt)
 
     def create_instrument_pages(self, scene, rt):
-        fxpreset_ls = {}
+        self.path_widgets = {}
+        self.fxpreset_ls = {}
+        
+        engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer']
         
         for preset in cfg_sections("fxpreset:"):
             engine = cfg_get(preset, "engine")
-            if engine not in fxpreset_ls:
-                fxpreset_ls[engine] = gtk.ListStore(gobject.TYPE_STRING)
-            fxpreset_ls[engine].append((preset[9:],))
+            if engine not in self.fxpreset_ls:
+                self.fxpreset_ls[engine] = gtk.ListStore(gobject.TYPE_STRING)
+            self.fxpreset_ls[engine].append((preset[9:],))
+        
         fx_ls = gtk.ListStore(gobject.TYPE_STRING)
-        for fx in ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer']:
-            fx_ls.append((fx,))
+        for engine in engines:
+            if engine not in self.fxpreset_ls:
+                self.fxpreset_ls[engine] = gtk.ListStore(gobject.TYPE_STRING)
+            fx_ls.append((engine,))
             
         for i in scene.instrument:
             ipath = "/instr/%s" % i[0]
@@ -410,17 +416,24 @@ class MainWindow(gtk.Window):
                 adj = gtk.Adjustment(odata.gain, -96, 12, 1, 6, 0)
                 adj.connect('value_changed', adjustment_changed_float, opath + '/gain')
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
-                fx = standard_combo(fx_ls, ls_index(fx_ls, engine, 0))
-                t.attach(fx, 3, 4, y, y + 1, 0, gtk.SHRINK)
-                fx.set_sensitive(False)
-                if engine in fxpreset_ls:
-                    fx = standard_combo(fxpreset_ls[engine], ls_index(fxpreset_ls[engine], preset, 0))
-                    t.attach(fx, 4, 5, y, y + 1, 0, gtk.SHRINK)
-                    fx.set_sensitive(False)
-                if engine in engine_window_map:
-                    fx = gtk.Button("_Edit")
-                    t.attach(fx, 5, 6, y, y + 1, 0, gtk.SHRINK)
-                    fx.connect("clicked", lambda button, instr, output, wclass, main_window: wclass(instr, output, main_window).show_all(), i[0], o, engine_window_map[engine], self)
+                
+                fx_engine = standard_combo(fx_ls, ls_index(fx_ls, engine, 0))
+                fx_engine.connect('changed', self.fx_engine_changed, opath)
+                t.attach(fx_engine, 3, 4, y, y + 1, 0, gtk.SHRINK)
+                
+                if engine in self.fxpreset_ls:
+                    fx_preset = standard_combo(self.fxpreset_ls[engine], ls_index(self.fxpreset_ls[engine], preset, 0))
+                else:
+                    fx_preset = standard_combo(None, 0)
+                fx_preset.connect('changed', self.fx_preset_changed, opath)
+                t.attach(fx_preset, 4, 5, y, y + 1, 0, gtk.SHRINK)
+
+                fx_edit = gtk.Button("_Edit")
+                t.attach(fx_edit, 5, 6, y, y + 1, 0, gtk.SHRINK)
+                fx_edit.connect("clicked", self.edit_effect_clicked, opath, i[0], o)
+                fx_edit.set_sensitive(engine in engine_window_map)
+                
+                self.path_widgets[opath] = (fx_engine, fx_preset, fx_edit)
                 y += 1
             if i[1] in engine_window_map:
                 b.pack_start(gtk.HSeparator(), False, False)
@@ -431,6 +444,23 @@ class MainWindow(gtk.Window):
     def delete_instrument_pages(self):
         while self.nb.get_n_pages() > 1:
             self.nb.remove_page(self.nb.get_n_pages() - 1)
+            
+    def edit_effect_clicked(self, button, opath, instr, output):
+        engine = GetThings(opath + "/status", ['insert_engine'], []).insert_engine
+        wclass = engine_window_map[engine]
+        wclass(instr, output, self).show_all()
+            
+    def fx_engine_changed(self, combo, opath):
+        engine = combo.get_model()[combo.get_active()][0]
+        cbox.do_cmd(opath + '/new_insert', None, [engine])
+        fx_engine, fx_preset, fx_edit = self.path_widgets[opath]
+        fx_preset.set_model(self.fxpreset_ls[engine])
+        fx_preset.set_active(0)
+        fx_edit.set_sensitive(engine in engine_window_map)
+        
+    def fx_preset_changed(self, combo, opath):
+        if combo.get_active() >= 0:
+            cbox.do_cmd(opath + '/load_preset', None, [combo.get_model()[combo.get_active()][0]])
         
     def update(self):
         master = GetThings("/master/status", ['pos', 'tempo', 'timesig'], [])
