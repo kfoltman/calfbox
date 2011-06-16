@@ -75,6 +75,24 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
         cbox_rt_swap_pointers(app.rt, (void **)&output->insert, effect);
         return TRUE;
     }
+    if (!strcmp(subcmd, "/new_insert") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_module *effect = NULL;
+        if (*(const char *)cmd->arg_values[0])
+        {
+            struct cbox_module_manifest *manifest = cbox_module_manifest_get_by_name((const char *)cmd->arg_values[0]);
+            if (!manifest)
+            {
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No effect engine '%s'", (const char *)cmd->arg_values[0]);
+                return FALSE;
+            }
+            effect = cbox_module_manifest_create_module(manifest, NULL, cbox_io_get_sample_rate(&app.io), "unnamed", error);
+            if (!effect)
+                return FALSE;
+        }
+        cbox_rt_swap_pointers(app.rt, (void **)&output->insert, effect);
+        return TRUE;
+    }
     if (!strncmp(subcmd, "/engine/", 8))
     {
         if (!output->insert)
