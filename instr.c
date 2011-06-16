@@ -16,10 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "config-api.h"
 #include "instr.h"
 #include "io.h"
 #include "module.h"
+#include "procmain.h"
 #include <glib.h>
 
 struct cbox_instruments
@@ -63,6 +65,14 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
         int obus = *(int *)cmd->arg_values[0];
         // XXXKF add error checking
         output->output_bus = obus - 1;
+        return TRUE;
+    }
+    if (!strcmp(subcmd, "/load_preset") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_module *effect = cbox_module_new_from_fx_preset((const char *)cmd->arg_values[0], error);
+        if (!effect)
+            return FALSE;
+        cbox_rt_swap_pointers(app.rt, (void **)&output->insert, effect);
         return TRUE;
     }
     if (!strncmp(subcmd, "/engine/", 8))
