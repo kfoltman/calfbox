@@ -441,6 +441,12 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         }
     }
     else
+    if (!strcmp(obj, "on_idle") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_app_on_idle();
+        return TRUE;
+    }
+    else
     if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))
     {
         g_message("Print: %s", (const char *)cmd->arg_values[0]);
@@ -514,6 +520,13 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
         return FALSE;
     }
+}
+
+void cbox_app_on_idle()
+{
+    cbox_io_poll_ports(&app.io);
+    if (app.rt)
+        cbox_rt_handle_cmd_queue(app.rt);    
 }
 
 struct cbox_app app =

@@ -463,6 +463,7 @@ class MainWindow(gtk.Window):
             cbox.do_cmd(opath + '/load_preset', None, [combo.get_model()[combo.get_active()][0]])
         
     def update(self):
+        cbox.do_cmd("/on_idle", None, [])
         master = GetThings("/master/status", ['pos', 'tempo', 'timesig'], [])
         self.master_info.set_markup('%s' % master.pos)
         self.timesig_info.set_markup("%s/%s" % tuple(master.timesig))

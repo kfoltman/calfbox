@@ -40,4 +40,6 @@ extern struct cbox_app app;
 
 struct cbox_menu *create_main_menu();
 
+extern void cbox_app_on_idle();
+
 #endif
