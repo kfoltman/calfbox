@@ -251,6 +251,15 @@ class ReverbWindow(PluginWindow):
         add_slider_row(t, 5, "Diffusion", self.path, values, "diffusion", 0.2, 0.8)
         self.add(t)
 
+class ToneControlWindow(PluginWindow):
+    def __init__(self, instrument, output, main_window):
+        PluginWindow.__init__(self, instrument, output, "Tone Control", main_window)
+        values = GetThings(self.path + "/status", ["lowpass", "highpass"], [])
+        t = gtk.Table(2, 2)
+        add_slider_row(t, 0, "Lowpass", self.path, values, "lowpass", 1000, 20000)
+        add_slider_row(t, 1, "Highpass", self.path, values, "highpass", 5, 1000)
+        self.add(t)
+
 class FBRWindow(PluginWindow):
     def __init__(self, instrument, output, main_window):
         PluginWindow.__init__(self, instrument, output, "Feedback Reducer", main_window)
@@ -285,9 +294,12 @@ engine_window_map = {
     'chorus': ChorusWindow,
     'reverb' : ReverbWindow,
     'feedback_reducer': FBRWindow,
+    'tone_control': ToneControlWindow,
     'stream_player' : StreamWindow,
     'fluidsynth' : FluidsynthWindow
 }
+
+effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control']
 
 class MainWindow(gtk.Window):
     def __init__(self):
@@ -365,8 +377,6 @@ class MainWindow(gtk.Window):
         self.path_widgets = {}
         self.fxpreset_ls = {}
         
-        engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer']
-        
         for preset in cfg_sections("fxpreset:"):
             engine = cfg_get(preset, "engine")
             if engine not in self.fxpreset_ls:
@@ -374,7 +384,7 @@ class MainWindow(gtk.Window):
             self.fxpreset_ls[engine].append((preset[9:],))
         
         fx_ls = gtk.ListStore(gobject.TYPE_STRING)
-        for engine in engines:
+        for engine in effect_engines:
             if engine not in self.fxpreset_ls:
                 self.fxpreset_ls[engine] = gtk.ListStore(gobject.TYPE_STRING)
             fx_ls.append((engine,))
