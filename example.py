@@ -264,7 +264,7 @@ class FBRWindow(PluginWindow):
     def __init__(self, instrument, output, main_window):
         PluginWindow.__init__(self, instrument, output, "Feedback Reducer", main_window)
         values = GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
-        t = gtk.Table(4, 17)
+        t = gtk.Table(4, 18)
         cols = [
             ("Active", 0, 1, "active", 'checkbox'), 
             ("Center Freq", 10, 20000, "center", 'slider'),
@@ -288,6 +288,20 @@ class FBRWindow(PluginWindow):
                 
         
         self.add(t)
+        self.ready_label = gtk.Label("-")
+        t.attach(self.ready_label, 0, 2, 17, 18)
+        self.refresh_id = glib.timeout_add(30, lambda: self.update())
+        sbutton = gtk.Button("_Start")
+        sbutton.connect("clicked", lambda button, path: cbox.do_cmd(path + "/start", None, []), self.path)
+        t.attach(sbutton, 2, 4, 17, 18)
+        
+    def update(self):
+        values = GetThings(self.path + "/status", ["finished"], [])
+        if values.finished > 0:
+            self.ready_label.set_text("Ready")
+        else:
+            self.ready_label.set_text("Not Ready")
+        return True
 
 engine_window_map = {
     'phaser': PhaserWindow,
