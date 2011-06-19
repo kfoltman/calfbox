@@ -55,6 +55,16 @@ void jack_input_process_block(struct cbox_module *module, cbox_sample_t **inputs
     m->offset = (m->offset + CBOX_BLOCK_SIZE) % app.io.buffer_size;
 }
 
+static gboolean validate_input_index(int input, const char *cfg_section, const char *type, GError **error)
+{
+    if (input < 1 || input > app.io.input_count)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_OUT_OF_RANGE, "%s: invalid value for %s (%d), allowed values are 1..%d", cfg_section, type, input, app.io.input_count);
+        return FALSE;
+    }
+    return TRUE;
+}
+
 struct cbox_module *jack_input_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     static int inited = 0;
@@ -63,13 +73,20 @@ struct cbox_module *jack_input_create(void *user_data, const char *cfg_section, 
         inited = 1;
     }
     
+    int left_input = cbox_config_get_int(cfg_section, "left_input", 1);
+    int right_input = cbox_config_get_int(cfg_section, "right_input", 2);
+    if (!validate_input_index(left_input, cfg_section, "left_input", error))
+        return NULL;
+    if (!validate_input_index(right_input, cfg_section, "right_input", error))
+        return NULL;
+    
     struct jack_input_module *m = malloc(sizeof(struct jack_input_module));
     cbox_module_init(&m->module, m, 0, 2);
     m->module.process_event = jack_input_process_event;
     m->module.process_block = jack_input_process_block;
     
-    m->inputs[0] = cbox_config_get_int(cfg_section, "left_input", 1) - 1;
-    m->inputs[1] = cbox_config_get_int(cfg_section, "right_input", 2) - 1;
+    m->inputs[0] = left_input - 1;
+    m->inputs[1] = right_input - 1;
     m->offset = 0;
     
     return &m->module;
