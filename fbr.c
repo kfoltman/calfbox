@@ -71,6 +71,7 @@ struct feedback_reducer_module
     
     float analysis_buffer[ANALYSIS_BUFFER_SIZE];
     float *wrptr;
+    int analysed;
 
     complex float fft_buffers[2][ANALYSIS_BUFFER_SIZE];
 
@@ -119,6 +120,105 @@ static int do_fft(struct feedback_reducer_module *m)
     return ANALYSIS_BUFFER_BITS & 1;
 }
 
+#define PEAK_REGION_RADIUS 3
+
+struct potential_peak_info
+{
+    int bin;
+    float avg;
+    float centre;
+    float peak;
+    float dist;
+    float points;
+};
+
+static int peak_compare(const void *peak1, const void *peak2)
+{
+    const struct potential_peak_info *pi1 = peak1;
+    const struct potential_peak_info *pi2 = peak2;
+    
+    if (pi1->points < pi2->points)
+        return +1;
+    if (pi1->points > pi2->points)
+        return -1;
+    return 0;
+}
+
+static int find_peaks(complex float *spectrum, float srate, float peak_freqs[16])
+{
+    struct potential_peak_info pki[ANALYSIS_BUFFER_SIZE / 2 + 1];
+    for (int i = 0; i <= ANALYSIS_BUFFER_SIZE / 2; i++)
+    {
+        pki[i].bin = i;
+        pki[i].points = 0.f;
+    }
+    float gmax = 0;
+    for (int i = PEAK_REGION_RADIUS; i <= ANALYSIS_BUFFER_SIZE / 2 - PEAK_REGION_RADIUS; i++)
+    {
+        struct potential_peak_info *pi = &pki[i];
+        float sum = 0;
+        float sumf = 0;
+        float peak = 0;
+        for (int j = -PEAK_REGION_RADIUS; j <= PEAK_REGION_RADIUS; j++)
+        {
+            float f = (i + j);
+            float bin = cabs(spectrum[i + j]);
+            if (bin > peak)
+                peak = bin;
+            sum += bin;
+            sumf += f * bin;
+        }
+        pki[i].avg = sum / (2 * PEAK_REGION_RADIUS + 1);
+        pki[i].peak = peak;
+        pki[i].centre = sumf / sum;
+        pki[i].dist = (sumf / sum - i);
+        if (peak > gmax)
+            gmax = peak;
+        // printf("Bin %d sumf/sum %f avg %f peak %f p/a %f dist %f val %f\n", i, sumf / sum, pki[i].avg, peak, peak / pki[i].avg, sumf/sum - i, cabs(spectrum[i]));
+    }
+    for (int i = PEAK_REGION_RADIUS; i <= ANALYSIS_BUFFER_SIZE / 2 - PEAK_REGION_RADIUS; i++)
+    {
+        struct potential_peak_info *tpi = &pki[i];
+        // ignore peaks below -40dB of the max bin
+        if (pki[(int)tpi->centre].peak < gmax * 0.01)
+            continue;
+        pki[(int)tpi->centre].points += 1;
+    }
+    for (int i = 0; i <= ANALYSIS_BUFFER_SIZE / 2; i++)
+    {
+        float freq = i * srate / ANALYSIS_BUFFER_SIZE;
+        // printf("Bin %d freq %f points %f\n", i, freq, pki[i].points);
+    }
+    qsort(pki, ANALYSIS_BUFFER_SIZE / 2 + 1, sizeof(struct potential_peak_info), peak_compare);
+    
+    float peaks[16];
+    int peak_count = 0;
+    for (int i = 0; i <= ANALYSIS_BUFFER_SIZE / 2; i++)
+    {
+        if (pki[i].points <= 1)
+            break;
+        if (pki[i].peak <= 0.0001)
+            break;
+        gboolean dupe = FALSE;
+        for (int j = 0; j < peak_count; j++)
+        {
+            if (fabs(peaks[j] - pki[i].centre) < PEAK_REGION_RADIUS)
+            {
+                dupe = TRUE;
+                break;
+            }
+        }
+        if (dupe)
+            continue;
+        peak_freqs[peak_count] = pki[i].centre * srate / ANALYSIS_BUFFER_SIZE;
+        peaks[peak_count++] = pki[i].centre;
+        printf("Mul %f freq %f points %f peak %f\n", pki[i].centre, pki[i].centre * srate / ANALYSIS_BUFFER_SIZE, pki[i].points, pki[i].peak);
+        if (peak_count == 4)
+            break;
+    }
+    return peak_count;
+}
+
 static void redo_filters(struct feedback_reducer_module *m)
 {
     for (int i = 0; i < MAX_FBR_BANDS; i++)
@@ -142,13 +242,33 @@ gboolean feedback_reducer_process_cmd(struct cbox_command_target *ct, struct cbo
     EFFECT_PARAM_ARRAY("/gain", "f", bands, gain, double, dB2gain_simple, -100, 100) else
     if (!strcmp(cmd->command, "/start") && !strcmp(cmd->arg_types, ""))
     {
+        m->analysed = 0;
         cbox_rt_swap_pointers(app.rt, (void **)&m->wrptr, m->analysis_buffer);
     }
     else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        if (!cbox_execute_on(fb, NULL, "/finished", "i", error, m->wrptr == m->analysis_buffer + ANALYSIS_BUFFER_SIZE))
+        
+        if (m->wrptr == m->analysis_buffer + ANALYSIS_BUFFER_SIZE && m->analysed == 0)
+        {
+            float freqs[16];
+            int count = find_peaks(m->fft_buffers[do_fft(m)], m->srate, freqs);
+            struct feedback_reducer_params *p = malloc(sizeof(struct feedback_reducer_params));
+            memcpy(p->bands + count, &m->params->bands[0], sizeof(struct fbr_band) * (MAX_FBR_BANDS - count));
+            for (int i = 0; i < count; i++)
+            {
+                p->bands[i].active = TRUE;
+                p->bands[i].center = freqs[i];
+                p->bands[i].q = freqs[i] / 50; // each band ~100 Hz (not really sure about filter Q vs bandwidth)
+                p->bands[i].gain = 0.125;
+            }
+            free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, p)); \
+            m->analysed = 1;
+            if (!cbox_execute_on(fb, NULL, "/refresh", "i", error, 1))
+                return FALSE;
+        }
+        if (!cbox_execute_on(fb, NULL, "/finished", "i", error, m->analysed))
             return FALSE;
         for (int i = 0; i < MAX_FBR_BANDS; i++)
         {
@@ -260,6 +380,7 @@ struct cbox_module *feedback_reducer_create(void *user_data, const char *cfg_sec
     struct feedback_reducer_params *p = malloc(sizeof(struct feedback_reducer_params));
     m->params = p;
     m->old_params = NULL;
+    m->analysed = 0;
     
     for (int i = 0; i < MAX_FBR_BANDS; i++)
     {
@@ -269,18 +390,6 @@ struct cbox_module *feedback_reducer_create(void *user_data, const char *cfg_sec
         p->bands[i].gain = get_band_param_db(cfg_section, i, "gain", 0);
     }
     redo_filters(m);
-
-    /*
-    for (int i = 0; i < ANALYSIS_BUFFER_SIZE; i++)
-    {
-        m->analysis_buffer[i] = 10000 * cos(i * 300.31 * 2 * M_PI / ANALYSIS_BUFFER_SIZE);
-    }
-    int idx = do_fft(m);
-    for (int i = 0; i <= ANALYSIS_BUFFER_SIZE / 2; i++)
-    {
-        printf("[%d] = %f\n", i, (i == 0 ? 1 : 2) * cabs(m->fft_buffers[idx][i]));
-    }
-    */
     
     return &m->module;
 }

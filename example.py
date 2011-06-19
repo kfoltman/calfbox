@@ -265,27 +265,28 @@ class FBRWindow(PluginWindow):
         PluginWindow.__init__(self, instrument, output, "Feedback Reducer", main_window)
         values = GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
         t = gtk.Table(4, 18)
-        cols = [
+        self.cols = [
             ("Active", 0, 1, "active", 'checkbox'), 
             ("Center Freq", 10, 20000, "center", 'slider'),
-            ("Filter Q", 0.1, 10, "q", 'slider'),
+            ("Filter Q", 0.1, 100, "q", 'slider'),
             ("Gain", -24, 24, "gain", 'slider'),
         ]
-        for i in range(len(cols)):
-            par = cols[i]
+        self.widgets = {}
+        for i in range(len(self.cols)):
+            par = self.cols[i]
             t.attach(bold_label(par[0], halign=0.5), i, i + 1, 0, 1, gtk.SHRINK | gtk.FILL)
             for j in range(16):
                 value = getattr(values, par[3])[j]
                 if par[4] == 'slider':
                     adj = gtk.Adjustment(value, par[1], par[2], 1, 6, 0)
                     adj.connect("value_changed", adjustment_changed_float, self.path + "/" + par[3], int(j))
-                    t.attach(standard_hslider(adj), i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
+                    widget = standard_hslider(adj)
                 else:
-                    cb = gtk.CheckButton(par[0])
-                    cb.set_active(value > 0)
-                    cb.connect("clicked", checkbox_changed_bool, self.path + "/" + par[3], int(j))
-                    t.attach(cb, i, i + 1, j + 1, j + 2, gtk.SHRINK | gtk.FILL)
-                
+                    widget = gtk.CheckButton(par[0])
+                    widget.set_active(value > 0)
+                    widget.connect("clicked", checkbox_changed_bool, self.path + "/" + par[3], int(j))
+                t.attach(widget, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
+                self.widgets[(i, j)] = widget
         
         self.add(t)
         self.ready_label = gtk.Label("-")
@@ -295,8 +296,22 @@ class FBRWindow(PluginWindow):
         sbutton.connect("clicked", lambda button, path: cbox.do_cmd(path + "/start", None, []), self.path)
         t.attach(sbutton, 2, 4, 17, 18)
         
+    def refresh_values(self):
+        values = GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
+        for i in range(len(self.cols)):
+            par = self.cols[i]
+            for j in range(16):
+                value = getattr(values, par[3])[j]
+                if par[4] == 'slider':
+                    self.widgets[(i, j)].get_adjustment().set_value(value)
+                else:
+                    self.widgets[(i, j)].set_active(value > 0)
+        
     def update(self):
-        values = GetThings(self.path + "/status", ["finished"], [])
+        values = GetThings(self.path + "/status", ["finished", "refresh"], [])
+        if values.refresh:
+            self.refresh_values()
+        
         if values.finished > 0:
             self.ready_label.set_text("Ready")
         else:
