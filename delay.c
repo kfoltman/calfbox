@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -30,15 +31,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define MAX_DELAY_LENGTH 65536
 
+struct delay_params
+{
+    float time;
+    float wet_dry, fb_amt;
+};
+
 struct delay_module
 {
     struct cbox_module module;
 
     float storage[MAX_DELAY_LENGTH][2];
+    struct delay_params *params;
     int pos;
-    int length;
-    float wetamt, dryamt, fbamt;
+    int srate;
 };
+
+#define MODULE_PARAMS delay_params
+
+gboolean delay_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct delay_module *m = (struct delay_module *)ct->user_data;
+    
+    EFFECT_PARAM("/time", "f", time, double, , 1, 1000) else
+    EFFECT_PARAM("/fb_amt", "f", fb_amt, double, , 0, 1) else
+    EFFECT_PARAM("/wet_dry", "f", wet_dry, double, , 0, 1) else
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        return cbox_execute_on(fb, NULL, "/time", "f", error, m->params->time) &&
+            cbox_execute_on(fb, NULL, "/fb_amt", "f", error, m->params->fb_amt) &&
+            cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry);
+    }
+    else
+        return cbox_set_command_error(error, cmd);
+    return TRUE;
+}
 
 void delay_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
@@ -49,11 +78,11 @@ void delay_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbo
 {
     struct delay_module *m = (struct delay_module *)module;
     
-    int pos = m->pos ;
-    int dv = m->length;
-    float dryamt = m->dryamt;
-    float wetamt = m->wetamt;
-    float fbamt = m->fbamt;
+    int pos = m->pos;
+    int dv = m->params->time * m->srate / 1000.0;
+    float dryamt = 1 - m->params->wet_dry;
+    float wetamt = m->params->wet_dry;
+    float fbamt = m->params->fb_amt;
     
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
@@ -84,13 +113,16 @@ struct cbox_module *delay_create(void *user_data, const char *cfg_section, int s
     
     struct delay_module *m = malloc(sizeof(struct delay_module));
     cbox_module_init(&m->module, m, 2, 2);
+    struct delay_params *p = malloc(sizeof(struct delay_params));
+    m->srate = srate;
+    m->params = p;
     m->module.process_event = delay_process_event;
     m->module.process_block = delay_process_block;
+    m->module.cmd_target.process_cmd = delay_process_cmd;
     m->pos = 0;
-    m->length = cbox_config_get_float(cfg_section, "delay", 250) * srate / 1000;
-    m->dryamt = cbox_config_get_gain_db(cfg_section, "dry_gain", 1.f);
-    m->wetamt = cbox_config_get_gain_db(cfg_section, "wet_gain", -6.f);
-    m->fbamt = cbox_config_get_gain_db(cfg_section, "feedback_gain", -12.f);
+    p->time = cbox_config_get_float(cfg_section, "delay", 250);
+    p->wet_dry = cbox_config_get_float(cfg_section, "wet_dry", 0.3);
+    p->fb_amt = cbox_config_get_gain_db(cfg_section, "feedback_gain", -12.f);
     for (i = 0; i < MAX_DELAY_LENGTH; i++)
         m->storage[i][0] = m->storage[i][1] = 0.f;
     

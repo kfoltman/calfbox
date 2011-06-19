@@ -238,6 +238,16 @@ class ChorusWindow(PluginWindow):
         add_slider_row(t, 4, "Wet/dry", self.path, values, "wet_dry", 0, 1)
         self.add(t)
 
+class DelayWindow(PluginWindow):
+    def __init__(self, instrument, output, main_window):
+        PluginWindow.__init__(self, instrument, output, "Delay", main_window)
+        values = GetThings(self.path + "/status", ["time", "fb_amt", "wet_dry"], [])
+        t = gtk.Table(2, 3)
+        add_slider_row(t, 0, "Delay time (ms)", self.path, values, "time", 1, 1000)
+        add_slider_row(t, 1, "Feedback", self.path, values, "fb_amt", 0, 1)
+        add_slider_row(t, 2, "Wet/dry", self.path, values, "wet_dry", 0, 1)
+        self.add(t)
+
 class ReverbWindow(PluginWindow):
     def __init__(self, instrument, output, main_window):
         PluginWindow.__init__(self, instrument, output, "Reverb", main_window)
@@ -321,6 +331,7 @@ class FBRWindow(PluginWindow):
 engine_window_map = {
     'phaser': PhaserWindow,
     'chorus': ChorusWindow,
+    'delay': DelayWindow,
     'reverb' : ReverbWindow,
     'feedback_reducer': FBRWindow,
     'tone_control': ToneControlWindow,
@@ -328,7 +339,7 @@ engine_window_map = {
     'fluidsynth' : FluidsynthWindow
 }
 
-effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control']
+effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay']
 
 class MainWindow(gtk.Window):
     def __init__(self):

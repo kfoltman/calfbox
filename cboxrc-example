@@ -89,9 +89,8 @@ lfo_freq=3
 [fxpreset:stream_delay]
 engine=delay
 delay=250
-wet_gain=-12
-dry_gain=0
-feedback_gain=-6
+wet_amt=0.25
+feedback_gain=-12
 
 [autojack]
 soundcard0=Omega
