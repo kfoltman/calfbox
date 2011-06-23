@@ -114,8 +114,7 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
     s->transpose = cbox_config_get_int(section, "transpose", 0);
     s->title = g_strdup(cbox_config_get_string_with_default(section, "title", ""));
     g_free(section);
-    s->cmd_target.process_cmd = cbox_scene_process_cmd;
-    s->cmd_target.user_data = s;
+    cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
     s->name = g_strdup(name);
     return s;
 
@@ -132,8 +131,7 @@ struct cbox_scene *cbox_scene_new()
     s->title = g_strdup("");
     s->layer_count = 0;
     s->instrument_count = 0;
-    s->cmd_target.process_cmd = cbox_scene_process_cmd;
-    s->cmd_target.user_data = s;
+    cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
     s->transpose = 0;
     return s;
 }

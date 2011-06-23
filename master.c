@@ -86,8 +86,7 @@ void cbox_master_init(struct cbox_master *master)
     master->timesig_nom = 4;
     master->timesig_denom = 4;
     master->state = CMTS_STOP;
-    master->cmd_target.user_data = master;
-    master->cmd_target.process_cmd = master_process_cmd;
+    cbox_command_target_init(&master->cmd_target, master_process_cmd, master);
 }
 
 void cbox_master_set_sample_rate(struct cbox_master *master, int srate)

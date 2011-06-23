@@ -242,8 +242,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
     instr = malloc(sizeof(struct cbox_instrument));
     instr->module = module;
     instr->outputs = outputs;
-    instr->cmd_target.user_data = instr;
-    instr->cmd_target.process_cmd = cbox_instrument_process_cmd;
+    cbox_command_target_init(&instr->cmd_target, cbox_instrument_process_cmd, instr);
     
     g_hash_table_insert(instruments.hash, g_strdup(name), instr);
     

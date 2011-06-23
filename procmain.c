@@ -68,8 +68,7 @@ struct cbox_rt *cbox_rt_new()
     rt->mpb.time = 0;
     rt->mpb.active_notes = &rt->active_notes;
     cbox_midi_playback_active_notes_init(&rt->active_notes);
-    rt->cmd_target.user_data = rt;
-    rt->cmd_target.process_cmd = cbox_rt_process_cmd;
+    cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
     return rt;
 }
 

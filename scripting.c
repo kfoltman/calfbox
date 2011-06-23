@@ -216,8 +216,7 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
     arg_types[len] = '\0';
     
     struct cbox_command_target target;
-    target.user_data = callback;
-    target.process_cmd = bridge_to_python_callback;
+    cbox_command_target_init(&target, bridge_to_python_callback, callback);
     
     // cbox_osc_command_dump(&cmd);
     gboolean result = ct->process_cmd(ct, callback != Py_None ? &target : NULL, &cmd, &error);
