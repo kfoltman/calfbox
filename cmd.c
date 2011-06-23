@@ -71,6 +71,9 @@ gboolean cbox_execute_on_v(struct cbox_command_target *ct, struct cbox_command_t
                 memcpy(pv, &fv, sizeof(double));
                 cmd.arg_values[i] = pv;
                 break;
+            case 'b':
+                cmd.arg_values[i] = va_arg(av, struct cbox_blob *);
+                break;
             default:
                 g_error("Invalid format character '%c' for command '%s'", args[i], cmd_name);
                 assert(0);
@@ -97,6 +100,12 @@ gboolean cbox_osc_command_dump(const struct cbox_osc_command *cmd)
             case 'f':
                 g_message("Args[%d] = %f", i, *(double *)cmd->arg_values[i]);
                 break;
+            case 'b':
+            {
+                struct cbox_blob *b = cmd->arg_values[i];
+                g_message("Args[%d] = (%p, %d)", i, b->data, (int)b->size);
+                break;
+            }
             default:
                 g_error("Invalid format character '%c' for command '%s'", cmd->arg_types[i], cmd->command);
                 assert(0);

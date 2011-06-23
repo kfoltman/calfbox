@@ -96,6 +96,12 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
             PyList_SetItem(arg_values, i, PyFloat_FromDouble(*(double *)cmd->arg_values[i]));
         }
         else
+        if (cmd->arg_types[i] == 'b')
+        {
+            struct cbox_blob *blob = cmd->arg_values[i];
+            PyList_SetItem(arg_values, i, PyBuffer_FromMemory(blob->data, blob->size));
+        }
+        else
         {
             PyList_SetItem(arg_values, i, Py_None);
             Py_INCREF(Py_None);
@@ -165,6 +171,7 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
     cmd.arg_types = arg_types;
     cmd.arg_values = arg_values;
     double *arg_space = extra;
+    gboolean free_blobs = FALSE;
     for (int i = 0; i < len; i++)
     {
         cmd.arg_values[i] = &arg_space[i];
@@ -188,6 +195,22 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
             arg_values[i] = PyString_AsString(value);
         }
         else
+        if (PyObject_CheckBuffer(value))
+        {
+            Py_buffer view;
+            if (0 == PyObject_GetBuffer(value, &view, PyBUF_SIMPLE))
+            {
+                struct cbox_blob *blob = malloc(sizeof(struct cbox_blob));
+                blob->data = view.buf;
+                blob->size= view.len;
+                arg_types[i] = 'b';
+                arg_values[i] = blob;
+                free_blobs = TRUE;
+            }
+            else
+                arg_types[i] = 'N';
+        }
+        else
             assert(0);
     }
     arg_types[len] = '\0';
@@ -198,6 +221,15 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
     
     // cbox_osc_command_dump(&cmd);
     gboolean result = ct->process_cmd(ct, callback != Py_None ? &target : NULL, &cmd, &error);
+    
+    if (free_blobs)
+    {
+        for (int i = 0; i < len; i++)
+        {
+            if (arg_types[i] == 'b')
+                free(arg_values[i]);
+        }
+    }
     free(arg_space);
     free(arg_values);
     free(arg_types);
