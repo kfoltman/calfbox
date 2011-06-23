@@ -105,22 +105,23 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
     
     PyObject *args = PyTuple_New(3);
     PyTuple_SetItem(args, 0, PyString_FromString(cmd->command));
+    PyObject *pyfb = NULL;
     if (fb)
     {
         struct PyCboxCallback *fbcb = PyObject_New(struct PyCboxCallback, &CboxCallbackType);
         fbcb->target = fb;
-        
-        PyTuple_SetItem(args, 1, (PyObject *)fbcb);
+        pyfb = (PyObject *)fbcb;
     }
     else
     {
-        PyTuple_SetItem(args, 1, Py_None);
+        pyfb = Py_None;
         Py_INCREF(Py_None);
     }
+    PyTuple_SetItem(args, 1, pyfb);
     PyTuple_SetItem(args, 2, arg_values);
-//    PyTuple_SetItem(args, 2, PyList_New(strlen(cmd->arg_types)));
     
     PyObject *result = PyObject_Call(callback, args, NULL);
+    Py_DECREF(arg_values);
     
     if (fbcb)
         fbcb->target = NULL;
