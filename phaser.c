@@ -132,10 +132,9 @@ struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int 
     }
     
     struct phaser_module *m = malloc(sizeof(struct phaser_module));
-    cbox_module_init(&m->module, m, 2, 2);
+    cbox_module_init(&m->module, m, 2, 2, phaser_process_cmd);
     m->module.process_event = phaser_process_event;
     m->module.process_block = phaser_process_block;
-    m->module.cmd_target.process_cmd = phaser_process_cmd;
     m->tpdsr = 2.0 * M_PI / srate;
     m->phase = 0;
     struct phaser_params *p = malloc(sizeof(struct phaser_params));

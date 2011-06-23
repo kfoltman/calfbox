@@ -115,7 +115,7 @@ extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module
 
 extern struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **error);
 
-extern void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs);
+extern void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler);
 extern void cbox_module_destroy(struct cbox_module *module);
 
 #define EFFECT_PARAM_CLONE(res) \

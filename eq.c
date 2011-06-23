@@ -82,7 +82,7 @@ struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_sectio
     }
     
     struct parametric_eq_module *m = malloc(sizeof(struct parametric_eq_module));
-    cbox_module_init(&m->module, m, 2, 2);
+    cbox_module_init(&m->module, m, 2, 2, NULL);
     m->module.process_event = parametric_eq_process_event;
     m->module.process_block = parametric_eq_process_block;
     

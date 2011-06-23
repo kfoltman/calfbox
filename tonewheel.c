@@ -421,7 +421,7 @@ struct cbox_module *tonewheel_organ_create(void *user_data, const char *cfg_sect
     }
     
     struct tonewheel_organ_module *m = malloc(sizeof(struct tonewheel_organ_module));
-    cbox_module_init(&m->module, m, 0, 2);
+    cbox_module_init(&m->module, m, 0, 2, NULL);
     m->module.process_event = tonewheel_organ_process_event;
     m->module.process_block = tonewheel_organ_process_block;
     cbox_onepole_reset(&m->filter_anticlick);

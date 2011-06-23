@@ -372,10 +372,9 @@ struct cbox_module *feedback_reducer_create(void *user_data, const char *cfg_sec
     }
     
     struct feedback_reducer_module *m = malloc(sizeof(struct feedback_reducer_module));
-    cbox_module_init(&m->module, m, 2, 2);
+    cbox_module_init(&m->module, m, 2, 2, feedback_reducer_process_cmd);
     m->module.process_event = feedback_reducer_process_event;
     m->module.process_block = feedback_reducer_process_block;
-    m->module.cmd_target.process_cmd = feedback_reducer_process_cmd;
     m->srate = srate;
     struct feedback_reducer_params *p = malloc(sizeof(struct feedback_reducer_params));
     m->params = p;

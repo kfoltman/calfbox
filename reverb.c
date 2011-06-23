@@ -200,10 +200,9 @@ struct cbox_module *reverb_create(void *user_data, const char *cfg_section, int 
     }
     
     struct reverb_module *m = malloc(sizeof(struct reverb_module));
-    cbox_module_init(&m->module, m, 2, 2);
+    cbox_module_init(&m->module, m, 2, 2, reverb_process_cmd);
     m->module.process_event = reverb_process_event;
     m->module.process_block = reverb_process_block;
-    m->module.cmd_target.process_cmd = reverb_process_cmd;
     m->pos = 0;
     m->srate = srate;
     m->old_params = NULL;

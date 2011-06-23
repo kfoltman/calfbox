@@ -86,7 +86,7 @@ struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, int
     }
     
     struct fxchain_module *m = malloc(sizeof(struct fxchain_module));
-    cbox_module_init(&m->module, m, 2, 2);
+    cbox_module_init(&m->module, m, 2, 2, NULL);
     m->module.process_event = fxchain_process_event;
     m->module.process_block = fxchain_process_block;
     m->modules = malloc(sizeof(struct cbox_module *) * fx_count);

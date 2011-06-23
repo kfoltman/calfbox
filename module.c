@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "app.h"
+#include "cmd.h"
 #include "config-api.h"
 #include "module.h"
 
@@ -110,7 +111,7 @@ struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manife
     return module;
 }
 
-void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs)
+void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler)
 {
     module->user_data = user_data;
     module->instance_name = NULL;
@@ -120,8 +121,7 @@ void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, i
     module->outputs = outputs;
     module->aux_offset = outputs;
     
-    module->cmd_target.process_cmd = NULL;
-    module->cmd_target.user_data = module;
+    cbox_command_target_init(&module->cmd_target, cmd_handler, module);
     module->process_event = NULL;
     module->process_block = NULL;
     module->destroy = NULL;

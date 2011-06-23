@@ -23,6 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <malloc.h>
 #include <string.h>
 
+void cbox_command_target_init(struct cbox_command_target *ct, cbox_process_cmd cmd, void *user_data)
+{
+    ct->process_cmd = cmd;
+    ct->user_data = user_data;
+}
+
 gboolean cbox_execute_on(struct cbox_command_target *ct, struct cbox_command_target *fb, const char *cmd_name, const char *args, GError **error, ...)
 {
     va_list av;

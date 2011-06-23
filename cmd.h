@@ -23,6 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdarg.h>
 #include <stdint.h>
 
+struct cbox_command_target;
+
 struct cbox_blob
 {
     void *data;
@@ -36,12 +38,15 @@ struct cbox_osc_command
     void **arg_values;
 };
 
+typedef gboolean (*cbox_process_cmd)(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
+
 struct cbox_command_target
 {
     void *user_data;
-    
-    gboolean (*process_cmd)(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
+    cbox_process_cmd process_cmd;
 };
+
+void cbox_command_target_init(struct cbox_command_target *ct, cbox_process_cmd cmd, void *user_data);
 
 extern gboolean cbox_check_fb_channel(struct cbox_command_target *fb, const char *command, GError **error);
 

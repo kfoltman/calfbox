@@ -112,13 +112,12 @@ struct cbox_module *delay_create(void *user_data, const char *cfg_section, int s
     }
     
     struct delay_module *m = malloc(sizeof(struct delay_module));
-    cbox_module_init(&m->module, m, 2, 2);
+    cbox_module_init(&m->module, m, 2, 2, delay_process_cmd);
     struct delay_params *p = malloc(sizeof(struct delay_params));
     m->srate = srate;
     m->params = p;
     m->module.process_event = delay_process_event;
     m->module.process_block = delay_process_block;
-    m->module.cmd_target.process_cmd = delay_process_cmd;
     m->pos = 0;
     p->time = cbox_config_get_float(cfg_section, "delay", 250);
     p->wet_dry = cbox_config_get_float(cfg_section, "wet_dry", 0.3);

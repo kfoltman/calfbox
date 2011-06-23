@@ -107,18 +107,17 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
     }
     if (m->output_pairs == 1)
     {
-        cbox_module_init(&m->module, m, 0, 2 * m->output_pairs);
+        cbox_module_init(&m->module, m, 0, 2 * m->output_pairs, fluidsynth_process_cmd);
         m->left_outputs = NULL;
         m->right_outputs = NULL;
     }
     else
     {
         g_message("Multichannel mode enabled, %d output pairs, 2 effects", m->output_pairs);
-        cbox_module_init(&m->module, m, 0, 2 * m->output_pairs + 4); // direct + fx outputs
+        cbox_module_init(&m->module, m, 0, 2 * m->output_pairs + 4, fluidsynth_process_cmd); // direct + fx outputs
         m->left_outputs = malloc(sizeof(float *) * (m->output_pairs + 2));
         m->right_outputs = malloc(sizeof(float *) * (m->output_pairs + 2));
     }
-    m->module.cmd_target.process_cmd = fluidsynth_process_cmd;
     m->module.process_event = fluidsynth_process_event;
     m->module.process_block = fluidsynth_process_block;
     m->module.destroy = fluidsynth_destroy;
