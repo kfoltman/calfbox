@@ -355,6 +355,7 @@ struct cbox_module *feedback_reducer_create(void *user_data, const char *cfg_sec
     m->params = p;
     m->old_params = NULL;
     m->analysed = 0;
+    m->wrptr = NULL;
     
     for (int b = 0; b < MAX_FBR_BANDS; b++)
     {

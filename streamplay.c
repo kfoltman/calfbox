@@ -431,6 +431,7 @@ void stream_player_destroy(struct cbox_module *module)
 static struct stream_state *stream_state_new(const char *context, const gchar *filename, uint64_t loop, GError **error)
 {
     struct stream_state *stream = malloc(sizeof(struct stream_state));
+    memset(&stream->info, 0, sizeof(stream->info));
     stream->sndfile = sf_open(filename, SFM_READ, &stream->info);
     
     if (!stream->sndfile)

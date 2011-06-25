@@ -674,6 +674,7 @@ struct sampler_waveform *sampler_waveform_new_from_file(const char *context_name
         return NULL;
     }
     struct sampler_waveform *waveform = malloc(sizeof(struct sampler_waveform));
+    memset(&waveform->info, 0, sizeof(waveform->info));
     SNDFILE *sndfile = sf_open(filename, SFM_READ, &waveform->info);
     if (!sndfile)
     {

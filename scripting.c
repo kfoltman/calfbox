@@ -219,7 +219,9 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
     cbox_command_target_init(&target, bridge_to_python_callback, callback);
     
     // cbox_osc_command_dump(&cmd);
+    Py_INCREF(callback);
     gboolean result = ct->process_cmd(ct, callback != Py_None ? &target : NULL, &cmd, &error);
+    Py_DECREF(callback);
     
     if (free_blobs)
     {
