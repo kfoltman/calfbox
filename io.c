@@ -146,6 +146,8 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
                         autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port);
                     else
                         g_message("Connect: unmatched port index %d", (int)portidx);
+                    
+                    jack_free(names);
                 }
             }
             else if (use_name[0] == '~' || use_name[0] == '*')
@@ -165,6 +167,7 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
                 }
                 else
                     g_message("Connect: unmatched port regexp %s", use_name);
+                jack_free(names);
             }
             else
                 autoconnect_port(client, port, use_name, is_cbox_input, only_connect_port);

@@ -145,6 +145,7 @@ void cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer)
         if (scene->layers[i]->instrument == layer->instrument)
             break;
     }
+    layer->instrument->refcount++;
     if (i == scene->layer_count)
         scene->instruments[scene->instrument_count++] = layer->instrument;
     scene->layers[scene->layer_count++] = layer;
@@ -156,7 +157,12 @@ void cbox_scene_destroy(struct cbox_scene *scene)
     
     for (i = 0; i < scene->layer_count; i++)
     {
-        free(scene->layers[i]);
+        struct cbox_layer *l = scene->layers[i];
+        if (!--(l->instrument->refcount))
+        {
+            cbox_instrument_destroy(l->instrument);
+        }
+        free(l);
     }
     free(scene);
 }

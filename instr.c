@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "io.h"
 #include "module.h"
 #include "procmain.h"
+#include <assert.h>
 #include <glib.h>
 
 struct cbox_instruments
@@ -242,6 +243,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
     instr = malloc(sizeof(struct cbox_instrument));
     instr->module = module;
     instr->outputs = outputs;
+    instr->refcount = 0;
     cbox_command_target_init(&instr->cmd_target, cbox_instrument_process_cmd, instr);
     
     g_hash_table_insert(instruments.hash, g_strdup(name), instr);
@@ -256,6 +258,18 @@ error:
 struct cbox_io *cbox_instruments_get_io()
 {
     return instruments.io;
+}
+
+void cbox_instrument_destroy(struct cbox_instrument *instrument)
+{
+    assert(instrument->refcount == 0);
+    g_hash_table_remove(instruments.hash, instrument->module->instance_name);
+    for (int i = 0; i < instrument->module->outputs / 2; i ++)
+    {
+        if (instrument->outputs[i].insert)
+            cbox_module_destroy(instrument->outputs[i].insert);
+    }
+    cbox_module_destroy(instrument->module);
 }
 
 void cbox_instruments_close()

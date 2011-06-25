@@ -57,6 +57,7 @@ enum sample_loop_mode
 struct sampler_layer
 {
     enum sample_player_type mode;
+    struct sampler_waveform *waveform;
     int16_t *sample_data;
     uint32_t sample_offset;
     uint32_t loop_start;

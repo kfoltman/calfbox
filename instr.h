@@ -36,11 +36,13 @@ struct cbox_instrument
     struct cbox_module *module;
     struct cbox_instrument_output *outputs;
     struct cbox_command_target cmd_target;
+    int refcount;
 };
 
 extern void cbox_instruments_init(struct cbox_io *io);
 extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gboolean load, GError **error);
 extern struct cbox_io *cbox_instruments_get_io();
+extern void cbox_instrument_destroy(struct cbox_instrument *instrument);
 extern void cbox_instruments_close();
 
 extern void cbox_instrument_output_init(struct cbox_instrument_output *output);

@@ -277,8 +277,8 @@ ok:
         g_error_free(error);
     if (app.rt->effect)
         cbox_module_destroy(app.rt->effect);
-    if (app.rt->scene)
-        cbox_scene_destroy(app.rt->scene);
+    if (scene)
+        cbox_scene_destroy(scene);
     
     cbox_rt_destroy(app.rt);
     

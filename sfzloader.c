@@ -231,6 +231,7 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
         prg->layers[i] = p->data;
         p = g_list_next(p);
     }
+    g_list_free(ls.layers);
     return TRUE;
 }
 

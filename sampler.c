@@ -732,6 +732,7 @@ static void cbox_config_get_dahdsr(const char *cfg_section, const char *prefix, 
 
 void sampler_layer_init(struct sampler_layer *l)
 {
+    l->waveform = NULL;
     l->sample_data = NULL;
     l->sample_offset = 0;
     l->sample_end = 0;
@@ -769,6 +770,7 @@ void sampler_layer_init(struct sampler_layer *l)
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
 {
+    l->waveform = waveform;
     l->sample_data = waveform ? waveform->data : NULL;
     l->freq = (waveform && waveform->info.samplerate) ? waveform->info.samplerate : 44100;
     l->loop_end = waveform ? waveform->info.frames : 0;
@@ -926,6 +928,24 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program *p
     return TRUE;
 }
 
+static void destroy_layer(struct sampler_module *m, struct sampler_layer *l)
+{
+    if (l->waveform)
+    {
+        free(l->waveform->data);
+        free(l->waveform);
+    }
+    free(l);
+}
+
+static void destroy_program(struct sampler_module *m, struct sampler_program *prg)
+{
+    for (int i = 0; i < prg->layer_count; i++)
+        destroy_layer(m, prg->layers[i]);
+
+    free(prg->layers);
+}
+
 struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate, GError **error)
 {
     int result = 0;
@@ -996,6 +1016,8 @@ void sampler_destroy(struct cbox_module *module)
 {
     struct sampler_module *m = (struct sampler_module *)module;
     
+    for (int i = 0; i < m->program_count; i++)
+        destroy_program(m, &m->programs[i]);
 }
 
 struct cbox_module_livecontroller_metadata sampler_controllers[] = {
