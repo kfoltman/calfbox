@@ -333,7 +333,7 @@ eq_cols = [
     ("Active", 0, 1, "active", 'checkbox'), 
     ("Center Freq", 10, 20000, "center", 'log_slider'),
     ("Filter Q", 0.1, 100, "q", 'log_slider'),
-    ("Gain", -24, 24, "gain", 'slider'),
+    ("Gain", -36, 36, "gain", 'slider'),
 ]
 
 class EQWindow(EffectWindow):
@@ -515,7 +515,7 @@ class MainWindow(gtk.Window):
                 cb = standard_combo(ls, odata.output - 1)
                 cb.connect('changed', combo_value_changed, opath + '/output', 1)
                 t.attach(cb, 1, 2, y, y + 1, gtk.SHRINK, gtk.SHRINK)
-                adj = gtk.Adjustment(odata.gain, -96, 12, 1, 6, 0)
+                adj = gtk.Adjustment(odata.gain, -96, 24, 1, 6, 0)
                 adj.connect('value_changed', adjustment_changed_float, opath + '/gain')
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
                 
