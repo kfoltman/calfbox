@@ -7,7 +7,7 @@ calfbox_LDADD = $(JACK_DEPS_LIBS) $(GLIB_DEPS_LIBS) $(FLUIDSYNTH_DEPS_LIBS) $(PY
 
 AM_CFLAGS = $(JACK_DEPS_CFLAGS) $(GLIB_DEPS_CFLAGS) $(FLUIDSYNTH_DEPS_CFLAGS) $(PYTHON_DEPS_CFLAGS)
 
-noinst_HEADERS = app.h biquad-float.h cmd.h config-api.h dspmath.h errors.h hwcfg.h instr.h io.h layer.h master.h menu.h menuitem.h midi.h module.h onepole-int.h onepole-float.h pattern.h pattern-maker.h procmain.h sampler.h scene.h scripting.h sfzparser.h ui.h
+noinst_HEADERS = app.h biquad-float.h cmd.h config-api.h dspmath.h eq.h errors.h hwcfg.h instr.h io.h layer.h master.h menu.h menuitem.h midi.h module.h onepole-int.h onepole-float.h pattern.h pattern-maker.h procmain.h sampler.h scene.h scripting.h sfzparser.h ui.h
 
 EXTRA_DIST = cboxrc-example
 

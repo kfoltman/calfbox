@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
+#include "eq.h"
 #include "module.h"
 #include <complex.h>
 #include <glib.h>
@@ -47,17 +48,9 @@ static int map_table[ANALYSIS_BUFFER_SIZE];
 // Bit-reversed von Hann window
 static float von_hann_window_transposed[ANALYSIS_BUFFER_SIZE];
 
-struct fbr_band
-{
-    gboolean active;
-    float center;
-    float q;
-    float gain;
-};
-
 struct feedback_reducer_params
 {
-    struct fbr_band bands[MAX_FBR_BANDS];
+    struct eq_band bands[MAX_FBR_BANDS];
 };
 
 struct feedback_reducer_module
@@ -67,7 +60,7 @@ struct feedback_reducer_module
     struct feedback_reducer_params *params, *old_params;
 
     struct cbox_biquadf_coeffs coeffs[MAX_FBR_BANDS];
-    struct cbox_biquadf_state state[2][MAX_FBR_BANDS];
+    struct cbox_biquadf_state state[MAX_FBR_BANDS][2];
     
     float analysis_buffer[ANALYSIS_BUFFER_SIZE];
     float *wrptr;
@@ -223,7 +216,7 @@ static void redo_filters(struct feedback_reducer_module *m)
 {
     for (int i = 0; i < MAX_FBR_BANDS; i++)
     {
-        struct fbr_band *band = &m->params->bands[i];
+        struct eq_band *band = &m->params->bands[i];
         if (band->active)
         {
             cbox_biquadf_set_peakeq_rbj(&m->coeffs[i], band->center, band->q, band->gain, m->srate);
@@ -255,7 +248,7 @@ gboolean feedback_reducer_process_cmd(struct cbox_command_target *ct, struct cbo
             float freqs[16];
             int count = find_peaks(m->fft_buffers[do_fft(m)], m->srate, freqs);
             struct feedback_reducer_params *p = malloc(sizeof(struct feedback_reducer_params));
-            memcpy(p->bands + count, &m->params->bands[0], sizeof(struct fbr_band) * (MAX_FBR_BANDS - count));
+            memcpy(p->bands + count, &m->params->bands[0], sizeof(struct eq_band) * (MAX_FBR_BANDS - count));
             for (int i = 0; i < count; i++)
             {
                 p->bands[i].active = TRUE;
@@ -319,35 +312,17 @@ void feedback_reducer_process_block(struct cbox_module *module, cbox_sample_t **
                 continue;
             if (first)
             {
-                cbox_biquadf_process_to(&m->state[c][i], &m->coeffs[i], inputs[c], outputs[c]);
+                cbox_biquadf_process_to(&m->state[i][c], &m->coeffs[i], inputs[c], outputs[c]);
                 first = FALSE;
             }
             else
             {
-                cbox_biquadf_process(&m->state[c][i], &m->coeffs[i], outputs[c]);
+                cbox_biquadf_process(&m->state[i][c], &m->coeffs[i], outputs[c]);
             }
         }
         if (first)
             memcpy(outputs[c], inputs[c], sizeof(float) * CBOX_BLOCK_SIZE);
     }
-}
-
-static float get_band_param(const char *cfg_section, int band, const char *param, float defvalue)
-{
-    gchar *s = g_strdup_printf("band%d_%s", band + 1, param);
-    float v = cbox_config_get_float(cfg_section, s, defvalue);
-    g_free(s);
-    
-    return v;
-}
-
-static float get_band_param_db(const char *cfg_section, int band, const char *param, float defvalue)
-{
-    gchar *s = g_strdup_printf("band%d_%s", band + 1, param);
-    float v = cbox_config_get_gain_db(cfg_section, s, defvalue);
-    g_free(s);
-    
-    return v;
 }
 
 struct cbox_module *feedback_reducer_create(void *user_data, const char *cfg_section, int srate, GError **error)
@@ -381,14 +356,15 @@ struct cbox_module *feedback_reducer_create(void *user_data, const char *cfg_sec
     m->old_params = NULL;
     m->analysed = 0;
     
-    for (int i = 0; i < MAX_FBR_BANDS; i++)
+    for (int b = 0; b < MAX_FBR_BANDS; b++)
     {
-        p->bands[i].active = get_band_param(cfg_section, i, "active", 0) > 0;
-        p->bands[i].center = get_band_param(cfg_section, i, "center", 50 * pow(2.0, i / 2.0));
-        p->bands[i].q = get_band_param(cfg_section, i, "q", 0.707 * 2);
-        p->bands[i].gain = get_band_param_db(cfg_section, i, "gain", 0);
+        p->bands[b].active = cbox_eq_get_band_param(cfg_section, b, "active", 0) > 0;
+        p->bands[b].center = cbox_eq_get_band_param(cfg_section, b, "center", 50 * pow(2.0, b / 2.0));
+        p->bands[b].q = cbox_eq_get_band_param(cfg_section, b, "q", 0.707 * 2);
+        p->bands[b].gain = cbox_eq_get_band_param_db(cfg_section, b, "gain", 0);
     }
     redo_filters(m);
+    cbox_eq_reset_bands(m->state, MAX_FBR_BANDS);
     
     return &m->module;
 }

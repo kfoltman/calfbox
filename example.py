@@ -270,6 +270,38 @@ class ToneControlWindow(PluginWindow):
         add_slider_row(t, 1, "Highpass", self.path, values, "highpass", 5, 1000)
         self.add(t)
 
+eq_cols = [
+    ("Active", 0, 1, "active", 'checkbox'), 
+    ("Center Freq", 10, 20000, "center", 'slider'),
+    ("Filter Q", 0.1, 100, "q", 'slider'),
+    ("Gain", -24, 24, "gain", 'slider'),
+]
+
+class EQWindow(PluginWindow):
+    def __init__(self, instrument, output, main_window):
+        PluginWindow.__init__(self, instrument, output, "Feedback Reducer", main_window)
+        values = GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
+        t = gtk.Table(4, 5)
+        self.cols = eq_cols
+        self.widgets = {}
+        for i in range(len(self.cols)):
+            par = self.cols[i]
+            t.attach(bold_label(par[0], halign=0.5), i, i + 1, 0, 1, gtk.SHRINK | gtk.FILL)
+            for j in range(4):
+                value = getattr(values, par[3])[j]
+                if par[4] == 'slider':
+                    adj = gtk.Adjustment(value, par[1], par[2], 1, 6, 0)
+                    adj.connect("value_changed", adjustment_changed_float, self.path + "/" + par[3], int(j))
+                    widget = standard_hslider(adj)
+                else:
+                    widget = gtk.CheckButton(par[0])
+                    widget.set_active(value > 0)
+                    widget.connect("clicked", checkbox_changed_bool, self.path + "/" + par[3], int(j))
+                t.attach(widget, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
+                self.widgets[(i, j)] = widget
+        
+        self.add(t)
+        
 class FBRWindow(PluginWindow):
     def __init__(self, instrument, output, main_window):
         PluginWindow.__init__(self, instrument, output, "Feedback Reducer", main_window)
@@ -334,12 +366,13 @@ engine_window_map = {
     'delay': DelayWindow,
     'reverb' : ReverbWindow,
     'feedback_reducer': FBRWindow,
+    'parametric_eq': EQWindow,
     'tone_control': ToneControlWindow,
     'stream_player' : StreamWindow,
     'fluidsynth' : FluidsynthWindow
 }
 
-effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay']
+effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq']
 
 class MainWindow(gtk.Window):
     def __init__(self):
