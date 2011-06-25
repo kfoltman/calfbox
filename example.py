@@ -204,17 +204,38 @@ class FluidsynthWindow(gtk.VBox):
     def patch_combo_changed(self, combo, channel):
         cbox.do_cmd(self.path + "/set_patch", None, [int(channel), int(self.patches[combo.get_active()][1])])
 
-class PluginWindow(gtk.Window):
+class EffectWindow(gtk.Window):
     def __init__(self, instrument, output, plugin_name, main_window):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_UTILITY)
         self.set_transient_for(main_window)
         self.path = "/instr/%s/output/%s/engine" % (instrument, output)
         self.set_title("%s - %s" % (plugin_name, instrument))
+        
+    def create_param_table(self, cols, rows, values, extra_rows = 0):
+        t = gtk.Table(4, rows + 1 + extra_rows)
+        self.cols = eq_cols
+        self.table_widgets = {}
+        for i in range(len(self.cols)):
+            par = self.cols[i]
+            t.attach(bold_label(par[0], halign=0.5), i, i + 1, 0, 1, gtk.SHRINK | gtk.FILL)
+            for j in range(rows):
+                value = getattr(values, par[3])[j]
+                if par[4] == 'slider':
+                    adj = gtk.Adjustment(value, par[1], par[2], 1, 6, 0)
+                    adj.connect("value_changed", adjustment_changed_float, self.path + "/" + par[3], int(j))
+                    widget = standard_hslider(adj)
+                else:
+                    widget = gtk.CheckButton(par[0])
+                    widget.set_active(value > 0)
+                    widget.connect("clicked", checkbox_changed_bool, self.path + "/" + par[3], int(j))
+                t.attach(widget, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
+                self.table_widgets[(i, j)] = widget
+        return t
 
-class PhaserWindow(PluginWindow):
+class PhaserWindow(EffectWindow):
     def __init__(self, instrument, output, main_window):
-        PluginWindow.__init__(self, instrument, output, "Phaser", main_window)
+        EffectWindow.__init__(self, instrument, output, "Phaser", main_window)
         values = GetThings(self.path + "/status", ["center_freq", "mod_depth", "fb_amt", "lfo_freq", "stereo_phase", "stages", "wet_dry"], [])
         t = gtk.Table(2, 7)
         add_slider_row(t, 0, "Center", self.path, values, "center_freq", 100, 20000)
@@ -226,9 +247,9 @@ class PhaserWindow(PluginWindow):
         add_slider_row(t, 6, "Stages", self.path, values, "stages", 1, 12, setter = adjustment_changed_int)
         self.add(t)
 
-class ChorusWindow(PluginWindow):
+class ChorusWindow(EffectWindow):
     def __init__(self, instrument, output, main_window):
-        PluginWindow.__init__(self, instrument, output, "Chorus", main_window)
+        EffectWindow.__init__(self, instrument, output, "Chorus", main_window)
         values = GetThings(self.path + "/status", ["min_delay", "mod_depth", "lfo_freq", "stereo_phase", "stages", "wet_dry"], [])
         t = gtk.Table(2, 5)
         add_slider_row(t, 0, "Min. delay", self.path, values, "min_delay", 1, 20)
@@ -238,9 +259,9 @@ class ChorusWindow(PluginWindow):
         add_slider_row(t, 4, "Wet/dry", self.path, values, "wet_dry", 0, 1)
         self.add(t)
 
-class DelayWindow(PluginWindow):
+class DelayWindow(EffectWindow):
     def __init__(self, instrument, output, main_window):
-        PluginWindow.__init__(self, instrument, output, "Delay", main_window)
+        EffectWindow.__init__(self, instrument, output, "Delay", main_window)
         values = GetThings(self.path + "/status", ["time", "fb_amt", "wet_dry"], [])
         t = gtk.Table(2, 3)
         add_slider_row(t, 0, "Delay time (ms)", self.path, values, "time", 1, 1000)
@@ -248,9 +269,9 @@ class DelayWindow(PluginWindow):
         add_slider_row(t, 2, "Wet/dry", self.path, values, "wet_dry", 0, 1)
         self.add(t)
 
-class ReverbWindow(PluginWindow):
+class ReverbWindow(EffectWindow):
     def __init__(self, instrument, output, main_window):
-        PluginWindow.__init__(self, instrument, output, "Reverb", main_window)
+        EffectWindow.__init__(self, instrument, output, "Reverb", main_window)
         values = GetThings(self.path + "/status", ["decay_time", "dry_amt", "wet_amt", "lowpass", "highpass", "diffusion"], [])
         t = gtk.Table(2, 6)
         add_slider_row(t, 0, "Decay time", self.path, values, "decay_time", 500, 5000)
@@ -261,9 +282,9 @@ class ReverbWindow(PluginWindow):
         add_slider_row(t, 5, "Diffusion", self.path, values, "diffusion", 0.2, 0.8)
         self.add(t)
 
-class ToneControlWindow(PluginWindow):
+class ToneControlWindow(EffectWindow):
     def __init__(self, instrument, output, main_window):
-        PluginWindow.__init__(self, instrument, output, "Tone Control", main_window)
+        EffectWindow.__init__(self, instrument, output, "Tone Control", main_window)
         values = GetThings(self.path + "/status", ["lowpass", "highpass"], [])
         t = gtk.Table(2, 2)
         add_slider_row(t, 0, "Lowpass", self.path, values, "lowpass", 1000, 20000)
@@ -277,59 +298,17 @@ eq_cols = [
     ("Gain", -24, 24, "gain", 'slider'),
 ]
 
-class EQWindow(PluginWindow):
+class EQWindow(EffectWindow):
     def __init__(self, instrument, output, main_window):
-        PluginWindow.__init__(self, instrument, output, "Feedback Reducer", main_window)
+        EffectWindow.__init__(self, instrument, output, "Parametric Equalizer", main_window)
         values = GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
-        t = gtk.Table(4, 5)
-        self.cols = eq_cols
-        self.widgets = {}
-        for i in range(len(self.cols)):
-            par = self.cols[i]
-            t.attach(bold_label(par[0], halign=0.5), i, i + 1, 0, 1, gtk.SHRINK | gtk.FILL)
-            for j in range(4):
-                value = getattr(values, par[3])[j]
-                if par[4] == 'slider':
-                    adj = gtk.Adjustment(value, par[1], par[2], 1, 6, 0)
-                    adj.connect("value_changed", adjustment_changed_float, self.path + "/" + par[3], int(j))
-                    widget = standard_hslider(adj)
-                else:
-                    widget = gtk.CheckButton(par[0])
-                    widget.set_active(value > 0)
-                    widget.connect("clicked", checkbox_changed_bool, self.path + "/" + par[3], int(j))
-                t.attach(widget, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
-                self.widgets[(i, j)] = widget
+        self.add(self.create_param_table(eq_cols, 4, values))
         
-        self.add(t)
-        
-class FBRWindow(PluginWindow):
+class FBRWindow(EffectWindow):
     def __init__(self, instrument, output, main_window):
-        PluginWindow.__init__(self, instrument, output, "Feedback Reducer", main_window)
+        EffectWindow.__init__(self, instrument, output, "Feedback Reducer", main_window)
         values = GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
-        t = gtk.Table(4, 18)
-        self.cols = [
-            ("Active", 0, 1, "active", 'checkbox'), 
-            ("Center Freq", 10, 20000, "center", 'slider'),
-            ("Filter Q", 0.1, 100, "q", 'slider'),
-            ("Gain", -24, 24, "gain", 'slider'),
-        ]
-        self.widgets = {}
-        for i in range(len(self.cols)):
-            par = self.cols[i]
-            t.attach(bold_label(par[0], halign=0.5), i, i + 1, 0, 1, gtk.SHRINK | gtk.FILL)
-            for j in range(16):
-                value = getattr(values, par[3])[j]
-                if par[4] == 'slider':
-                    adj = gtk.Adjustment(value, par[1], par[2], 1, 6, 0)
-                    adj.connect("value_changed", adjustment_changed_float, self.path + "/" + par[3], int(j))
-                    widget = standard_hslider(adj)
-                else:
-                    widget = gtk.CheckButton(par[0])
-                    widget.set_active(value > 0)
-                    widget.connect("clicked", checkbox_changed_bool, self.path + "/" + par[3], int(j))
-                t.attach(widget, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
-                self.widgets[(i, j)] = widget
-        
+        t = self.create_param_table(eq_cols, 16, values, 1)        
         self.add(t)
         self.ready_label = gtk.Label("-")
         t.attach(self.ready_label, 0, 2, 17, 18)
@@ -345,9 +324,9 @@ class FBRWindow(PluginWindow):
             for j in range(16):
                 value = getattr(values, par[3])[j]
                 if par[4] == 'slider':
-                    self.widgets[(i, j)].get_adjustment().set_value(value)
+                    self.table_widgets[(i, j)].get_adjustment().set_value(value)
                 else:
-                    self.widgets[(i, j)].set_active(value > 0)
+                    self.table_widgets[(i, j)].set_active(value > 0)
         
     def update(self):
         values = GetThings(self.path + "/status", ["finished", "refresh"], [])
