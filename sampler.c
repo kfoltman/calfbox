@@ -30,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 
+#define MAX_RELEASED_GROUPS 4
+
 GQuark cbox_sampler_error_quark()
 {
     return g_quark_from_string("cbox-sampler-error-quark");
@@ -281,6 +283,8 @@ int skip_inactive_layers(struct sampler_program *prg, int first, int note, int v
     return -1;
 }
 
+static void sampler_voice_release(struct sampler_voice *v);
+
 void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
 {
     struct sampler_program *prg = c->program;
@@ -290,6 +294,11 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
     int lidx = skip_inactive_layers(prg, 0, note, vel);
     if (lidx < 0)
         return;
+    
+    // this might perhaps be optimized by mapping the group identifiers to flat-array indexes
+    // but I'm not going to do that until someone gives me an SFZ worth doing that work ;)
+    int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
+    
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         if (m->voices[i].mode == spt_inactive)
@@ -328,6 +337,23 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->pitcheg_depth = l->pitcheg_depth;
             v->fileg_depth = l->fileg_depth;
             v->loop_mode = l->loop_mode;
+            v->off_by = l->off_by;
+            if (l->exclusive_group >= 0 && exgroupcount < MAX_RELEASED_GROUPS)
+            {
+                gboolean found = FALSE;
+                for (int j = 0; j < exgroupcount; j++)
+                {
+                    if (exgroups[j] == l->exclusive_group)
+                    {
+                        found = TRUE;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    exgroups[exgroupcount++] = l->exclusive_group;
+                }
+            }
             cbox_biquadf_reset(&v->filter_left);
             cbox_biquadf_reset(&v->filter_right);
             cbox_envelope_reset(&v->amp_env);
@@ -336,6 +362,24 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             lidx = skip_inactive_layers(prg, lidx + 1, note, vel);
             if (lidx < 0)
                 break;
+        }
+    }
+    if (exgroupcount)
+    {
+        for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
+        {
+            if (m->voices[i].mode == spt_inactive)
+                continue;
+
+            for (int j = 0; j < exgroupcount; j++)
+            {
+                if (m->voices[i].off_by == exgroups[j] && m->voices[i].note != note)
+                {
+                    m->voices[i].released = 1;
+                    cbox_envelope_go_to(&m->voices[i].amp_env, 15);
+                    break;
+                }
+            }
         }
     }
 }
@@ -718,6 +762,8 @@ void sampler_layer_init(struct sampler_layer *l)
         l->velcurve[i] = -1;
     l->velcurve_quadratic = -1; // not known yet
     l->fil_veltrack = 0;
+    l->exclusive_group = -1;
+    l->off_by = -1;
 }
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
@@ -801,6 +847,8 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
         l->loop_mode = slm_one_shot;
     if (cbox_config_get_int(cfg_section, "loop_sustain", 0))
         l->loop_mode = slm_loop_sustain;
+    l->exclusive_group = cbox_config_get_int(cfg_section, "group", l->exclusive_group);
+    l->off_by = cbox_config_get_int(cfg_section, "off_by", l->off_by);
 }
 
 void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)

@@ -76,6 +76,7 @@ struct sampler_layer
     enum sample_loop_mode loop_mode;
     float velcurve[128];
     int velcurve_quadratic, fil_veltrack;
+    int exclusive_group, off_by;
 };
 
 struct sampler_program
@@ -104,6 +105,7 @@ struct sampler_voice
     int note;
     int vel;
     int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;
+    int off_by;
     float freq;
     float gain;
     float pan;

@@ -162,6 +162,10 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->tune = atof(value);
     else if (!strcmp(key, "transpose"))
         l->transpose = atoi(value);
+    else if (!strcmp(key, "group"))
+        l->exclusive_group = atoi(value);
+    else if (!strcmp(key, "off_by"))
+        l->off_by = atoi(value);
     else if (!strcmp(key, "velcurve_quadratic"))
         l->velcurve_quadratic = atoi(value);
     else if (!strcmp(key, "fil_veltrack"))

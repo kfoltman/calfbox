@@ -48,6 +48,13 @@ static inline void cbox_envelope_reset(struct cbox_envelope *env)
     env->cur_time = 0;
 }
 
+static inline void cbox_envelope_go_to(struct cbox_envelope *env, int stage)
+{
+    env->stage_start_value = env->cur_value;
+    env->cur_stage = stage;
+    env->cur_time = 0;
+}
+
 static inline float cbox_envelope_get_next(struct cbox_envelope *env, int released)
 {
     if (env->cur_stage < 0)
@@ -109,6 +116,13 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
     env->stages[3].next_if_released = -1;
     env->stages[3].keep_last_value = 0;
     env->stages[3].break_on_release = 0;
+
+    env->stages[15].end_value = 0;
+    env->stages[15].time = 0.01 * sr;
+    env->stages[15].next_if_pressed = -1;
+    env->stages[15].next_if_released = -1;
+    env->stages[15].keep_last_value = 0;
+    env->stages[15].break_on_release = 0;
 }
 
 struct cbox_dahdsr
@@ -177,6 +191,13 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[5].next_if_released = -1;
     env->stages[5].keep_last_value = 0;
     env->stages[5].break_on_release = 0;
+
+    env->stages[15].end_value = 0;
+    env->stages[15].time = 0.01 * sr;
+    env->stages[15].next_if_pressed = -1;
+    env->stages[15].next_if_released = -1;
+    env->stages[15].keep_last_value = 0;
+    env->stages[15].break_on_release = 0;
 }
 
 #endif
