@@ -866,11 +866,22 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program *p
     g_clear_error(error);
     prg->prog_no = cbox_config_get_int(cfg_section, "program", 0);
 
+    char *sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
     char *spath = cbox_config_get_string(cfg_section, "sample_path");
     char *sfz = cbox_config_get_string(cfg_section, "sfz");
     if (sfz)
     {
-        return sampler_module_load_program_sfz(m, prg, sfz, spath, error);
+        if (sfz_path)
+        {
+            if (!spath)
+                spath = sfz_path;
+            sfz = g_build_filename(sfz_path, sfz, NULL);
+            gboolean result = sampler_module_load_program_sfz(m, prg, sfz, spath, error);;
+            g_free(sfz);
+            return result;
+        }
+        else
+            return sampler_module_load_program_sfz(m, prg, sfz, spath, error);
     }
     
     int layer_count = 0;
