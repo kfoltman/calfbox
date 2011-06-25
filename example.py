@@ -3,6 +3,7 @@ import pygtk
 import gtk
 import glib
 import gobject
+import math
 
 def callback(cmd, cb, args):
     print cmd, cb, args
@@ -24,6 +25,29 @@ def standard_hslider(adj):
     sc.set_value_pos(gtk.POS_RIGHT)
     return sc
     
+class LogMapper:
+    def __init__(self, min, max, format = "%f"):
+        self.min = min
+        self.max = max
+        self.format_string = format
+    def map(self, value):
+        return float(self.min) * ((float(self.max) / self.min) ** (value / 100.0))
+    def unmap(self, value):
+        return math.log(value / float(self.min)) * 100 / math.log(float(self.max) / self.min)
+    def format_value(self, value):
+        return self.format_string % self.map(value)
+    
+
+freq_format = "%0.1f"
+lfo_freq_mapper = LogMapper(0.01, 20, "%0.2f")
+
+def standard_mapped_hslider(adj, mapper):
+    sc = gtk.HScale(adj)
+    sc.set_size_request(160, -1)
+    sc.set_value_pos(gtk.POS_RIGHT)
+    sc.connect('format-value', lambda scale, value, mapper: mapper.format_value(value), mapper)
+    return sc
+
 def standard_align(w, xo, yo, xs, ys):
     a = gtk.Alignment(xo, yo, xs, ys)
     a.add(w)
@@ -60,6 +84,9 @@ def adjustment_changed_int(adjustment, path, *items):
 def adjustment_changed_float(adjustment, path, *items):
     cbox.do_cmd(path, None, list(items) + [float(adjustment.get_value())])
 
+def adjustment_changed_float_mapped(adjustment, path, mapper, *items):
+    cbox.do_cmd(path, None, list(items) + [mapper.map(adjustment.get_value())])
+
 def combo_value_changed(combo, path, value_offset = 0):
     if combo.get_active() != -1:
         cbox.do_cmd(path, None, [value_offset + combo.get_active()])
@@ -69,6 +96,12 @@ def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustm
     adj = gtk.Adjustment(getattr(values, item), min, max, 1, 6, 0)
     adj.connect("value_changed", setter, path + "/" + item)
     t.attach(standard_hslider(adj), 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+
+def add_mapped_slider_row(t, row, label, path, values, item, mapper, setter = adjustment_changed_float_mapped):
+    t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+    adj = gtk.Adjustment(mapper.unmap(getattr(values, item)), 0, 100, 1, 6, 0)
+    adj.connect("value_changed", setter, path + "/" + item, mapper)
+    t.attach(standard_mapped_hslider(adj, mapper), 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
 
 class GetThings:
     def __init__(self, cmd, anames, args):
@@ -225,6 +258,11 @@ class EffectWindow(gtk.Window):
                     adj = gtk.Adjustment(value, par[1], par[2], 1, 6, 0)
                     adj.connect("value_changed", adjustment_changed_float, self.path + "/" + par[3], int(j))
                     widget = standard_hslider(adj)
+                elif par[4] == 'log_slider':
+                    mapper = LogMapper(par[1], par[2], "%f")
+                    adj = gtk.Adjustment(mapper.unmap(value), 0, 100, 1, 6, 0)
+                    adj.connect("value_changed", adjustment_changed_float_mapped, self.path + "/" + par[3], mapper, int(j))
+                    widget = standard_mapped_hslider(adj, mapper)
                 else:
                     widget = gtk.CheckButton(par[0])
                     widget.set_active(value > 0)
@@ -238,10 +276,10 @@ class PhaserWindow(EffectWindow):
         EffectWindow.__init__(self, instrument, output, "Phaser", main_window)
         values = GetThings(self.path + "/status", ["center_freq", "mod_depth", "fb_amt", "lfo_freq", "stereo_phase", "stages", "wet_dry"], [])
         t = gtk.Table(2, 7)
-        add_slider_row(t, 0, "Center", self.path, values, "center_freq", 100, 20000)
+        add_mapped_slider_row(t, 0, "Center", self.path, values, "center_freq", LogMapper(100, 20000, freq_format))
         add_slider_row(t, 1, "Mod depth", self.path, values, "mod_depth", 0, 4000)
         add_slider_row(t, 2, "Feedback", self.path, values, "fb_amt", -1, 1)
-        add_slider_row(t, 3, "LFO frequency", self.path, values, "lfo_freq", 0, 20)
+        add_mapped_slider_row(t, 3, "LFO frequency", self.path, values, "lfo_freq", lfo_freq_mapper)
         add_slider_row(t, 4, "Stereo", self.path, values, "stereo_phase", 0, 360)
         add_slider_row(t, 5, "Wet/dry", self.path, values, "wet_dry", 0, 1)
         add_slider_row(t, 6, "Stages", self.path, values, "stages", 1, 12, setter = adjustment_changed_int)
@@ -254,7 +292,7 @@ class ChorusWindow(EffectWindow):
         t = gtk.Table(2, 5)
         add_slider_row(t, 0, "Min. delay", self.path, values, "min_delay", 1, 20)
         add_slider_row(t, 1, "Mod depth", self.path, values, "mod_depth", 1, 20)
-        add_slider_row(t, 2, "LFO frequency", self.path, values, "lfo_freq", 0, 20)
+        add_mapped_slider_row(t, 2, "LFO frequency", self.path, values, "lfo_freq", lfo_freq_mapper)
         add_slider_row(t, 3, "Stereo", self.path, values, "stereo_phase", 0, 360)
         add_slider_row(t, 4, "Wet/dry", self.path, values, "wet_dry", 0, 1)
         self.add(t)
@@ -277,8 +315,8 @@ class ReverbWindow(EffectWindow):
         add_slider_row(t, 0, "Decay time", self.path, values, "decay_time", 500, 5000)
         add_slider_row(t, 1, "Dry amount", self.path, values, "dry_amt", -100, 12)
         add_slider_row(t, 2, "Wet amount", self.path, values, "wet_amt", -100, 12)
-        add_slider_row(t, 3, "Lowpass", self.path, values, "lowpass", 300, 20000)
-        add_slider_row(t, 4, "Highpass", self.path, values, "highpass", 30, 2000)
+        add_mapped_slider_row(t, 3, "Lowpass", self.path, values, "lowpass", LogMapper(300, 20000, freq_format))
+        add_mapped_slider_row(t, 4, "Highpass", self.path, values, "highpass", LogMapper(30, 2000, freq_format))
         add_slider_row(t, 5, "Diffusion", self.path, values, "diffusion", 0.2, 0.8)
         self.add(t)
 
@@ -287,14 +325,14 @@ class ToneControlWindow(EffectWindow):
         EffectWindow.__init__(self, instrument, output, "Tone Control", main_window)
         values = GetThings(self.path + "/status", ["lowpass", "highpass"], [])
         t = gtk.Table(2, 2)
-        add_slider_row(t, 0, "Lowpass", self.path, values, "lowpass", 1000, 20000)
-        add_slider_row(t, 1, "Highpass", self.path, values, "highpass", 5, 1000)
+        add_mapped_slider_row(t, 0, "Lowpass", self.path, values, "lowpass", LogMapper(300, 20000, freq_format))
+        add_mapped_slider_row(t, 1, "Highpass", self.path, values, "highpass", LogMapper(30, 2000, freq_format))
         self.add(t)
 
 eq_cols = [
     ("Active", 0, 1, "active", 'checkbox'), 
-    ("Center Freq", 10, 20000, "center", 'slider'),
-    ("Filter Q", 0.1, 100, "q", 'slider'),
+    ("Center Freq", 10, 20000, "center", 'log_slider'),
+    ("Filter Q", 0.1, 100, "q", 'log_slider'),
     ("Gain", -24, 24, "gain", 'slider'),
 ]
 
@@ -325,6 +363,8 @@ class FBRWindow(EffectWindow):
                 value = getattr(values, par[3])[j]
                 if par[4] == 'slider':
                     self.table_widgets[(i, j)].get_adjustment().set_value(value)
+                elif par[4] == 'log_slider':
+                    self.table_widgets[(i, j)].get_adjustment().set_value(log_map(value, par[1], par[2]))
                 else:
                     self.table_widgets[(i, j)].set_active(value > 0)
         
