@@ -862,12 +862,15 @@ void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const
     sampler_layer_finalize(l, m);
 }
 
-static gboolean load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section, GError **error)
+static gboolean load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section, int pgm_id, GError **error)
 {
     int i;
 
     g_clear_error(error);
+    
     prg->prog_no = cbox_config_get_int(cfg_section, "program", 0);
+    if (pgm_id != -1)
+        prg->prog_no = pgm_id;
 
     char *sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
     char *spath = cbox_config_get_string(cfg_section, "sample_path");
@@ -987,10 +990,24 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     for (i = 0; i < m->program_count; i++)
     {
         gchar *s = g_strdup_printf("program%d", i);
-        char *p = g_strdup_printf("spgm:%s", cbox_config_get_string(cfg_section, s));
+        char *pgm_section = NULL;
+        int pgm_id = -1;
+        const char *pgm_name = cbox_config_get_string(cfg_section, s);
         g_free(s);
+        char *at = strchr(pgm_name, '@');
+        if (at)
+        {
+            pgm_id = atoi(at + 1);
+            s = g_strndup(pgm_name, at - pgm_name);
+            pgm_section = g_strdup_printf("spgm:%s", s);
+            g_free(s);
+        }
+        else
+        {
+            pgm_section = g_strdup_printf("spgm:%s", pgm_name);
+        }
         
-        if (!load_program(m, &m->programs[i], p, error))
+        if (!load_program(m, &m->programs[i], pgm_section, pgm_id, error))
         {
             success = 0;
             break;
