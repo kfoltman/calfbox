@@ -989,7 +989,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
                 active_voices++;
         
         return cbox_execute_on(fb, NULL, "/active_voices", "i", error, active_voices) &&
-            cbox_execute_on(fb, NULL, "/polyphony", "f", error, MAX_SAMPLER_VOICES);
+            cbox_execute_on(fb, NULL, "/polyphony", "i", error, MAX_SAMPLER_VOICES);
     }
     else
     if (!strcmp(cmd->command, "/patches") && !strcmp(cmd->arg_types, ""))
