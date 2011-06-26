@@ -215,18 +215,32 @@ class WithPatchTable:
             self.mapping[id] = len(self.mapping)
             self.patches.append((patches[id], id))
         
+        self.patch_combos = []
         self.table = gtk.Table(2, 16)
         self.table.set_col_spacings(5)
 
-        for i in range(0, 16):
+        for i in range(16):
             self.table.attach(bold_label("Channel %s" % (1 + i)), 0, 1, i, i + 1, gtk.SHRINK, gtk.SHRINK)
             cb = standard_combo(self.patches, self.mapping[attribs.patch[i + 1][0]])
             cb.connect('changed', self.patch_combo_changed, i + 1)
             self.table.attach(cb, 1, 2, i, i + 1, gtk.SHRINK, gtk.SHRINK)
+            self.patch_combos.append(cb)
+
+        self.refresh_id = glib.timeout_add(500, lambda: self.patch_combo_update())
 
     def patch_combo_changed(self, combo, channel):
         cbox.do_cmd(self.path + "/set_patch", None, [int(channel), int(self.patches[combo.get_active()][1])])
 
+    def patch_combo_update(self):
+        attribs = GetThings("%s/status" % self.path, ['%patch'], [])
+        for i in range(16):
+            cb = self.patch_combos[i]
+            patch_id = int(self.patches[cb.get_active()][1])
+            if patch_id != attribs.patch[i + 1][1]:
+                cb.set_active(self.mapping[attribs.patch[i + 1][0]])
+        #self.status_label.set_markup(s)
+        return True
+        
 class FluidsynthWindow(gtk.VBox, WithPatchTable):
     def __init__(self, instrument, path):
         gtk.Widget.__init__(self)
@@ -242,12 +256,7 @@ class FluidsynthWindow(gtk.VBox, WithPatchTable):
         WithPatchTable.__init__(self, attribs)
         panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True)
         self.add(panel)
-        self.refresh_id = glib.timeout_add(100, lambda: self.update())
 
-    def update(self):
-        #self.status_label.set_markup(s)
-        return True
-        
 class SamplerWindow(gtk.VBox, WithPatchTable):
     def __init__(self, instrument, path):
         gtk.Widget.__init__(self)
@@ -263,11 +272,6 @@ class SamplerWindow(gtk.VBox, WithPatchTable):
         WithPatchTable.__init__(self, attribs)
         panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True)
         self.add(panel)
-        self.refresh_id = glib.timeout_add(100, lambda: self.update())
-
-    def update(self):
-        #self.status_label.set_markup(s)
-        return True
         
 class EffectWindow(gtk.Window):
     def __init__(self, instrument, output, plugin_name, main_window):
