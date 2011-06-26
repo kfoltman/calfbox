@@ -16,8 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "config-api.h"
 #include "dspmath.h"
+#include "errors.h"
 #include "midi.h"
 #include "module.h"
 #include "sampler.h"
@@ -593,14 +595,14 @@ void sampler_program_change(struct sampler_module *m, struct sampler_channel *c,
     for (int i = 0; i < m->program_count; i++)
     {
         // XXXKF support banks
-        if (m->programs[i].prog_no == program)
+        if (m->programs[i]->prog_no == program)
         {
-            c->program = &m->programs[i];
+            c->program = m->programs[i];
             return;
         }
     }
     g_warning("Unknown program %d", program);
-    c->program = &m->programs[0];
+    c->program = m->programs[0];
 }
 
 void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
@@ -660,7 +662,7 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->modulation = 0;
     c->cutoff_ctl = 0;
     c->resonance_ctl = 0;
-    c->program = m->program_count ? &m->programs[0] : NULL;
+    c->program = m->program_count ? m->programs[0] : NULL;
 }
 
 struct sampler_waveform *sampler_waveform_new_from_file(const char *context_name, const char *filename, GError **error)
@@ -862,16 +864,24 @@ void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const
     sampler_layer_finalize(l, m);
 }
 
-static gboolean load_program(struct sampler_module *m, struct sampler_program *prg, const char *cfg_section, int pgm_id, GError **error)
+static gboolean load_program(struct sampler_module *m, struct sampler_program **pprg, const char *cfg_section, const char *name, int pgm_id, GError **error)
 {
     int i;
 
     g_clear_error(error);
     
+    struct sampler_program *prg = malloc(sizeof(struct sampler_program));
+    *pprg = prg;
+    
     prg->prog_no = cbox_config_get_int(cfg_section, "program", 0);
     if (pgm_id != -1)
         prg->prog_no = pgm_id;
 
+    char *name2 = cbox_config_get_string(cfg_section, "name");
+    if (name2)
+        prg->name = g_strdup(name2);
+    else
+        prg->name = g_strdup(name);
     char *sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
     char *spath = cbox_config_get_string(cfg_section, "sample_path");
     char *sfz = cbox_config_get_string(cfg_section, "sfz");
@@ -946,7 +956,79 @@ static void destroy_program(struct sampler_module *m, struct sampler_program *pr
     for (int i = 0; i < prg->layer_count; i++)
         destroy_layer(m, prg->layers[i]);
 
+    g_free(prg->name);
     free(prg->layers);
+    free(prg);
+}
+
+gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct sampler_module *m = (struct sampler_module *)ct->user_data;
+    
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (int i = 0; i < 16; i++)
+        {
+            struct sampler_channel *channel = &m->channels[i];
+            gboolean result;
+            if (channel->program)
+                result = cbox_execute_on(fb, NULL, "/patch", "iis", error, i + 1, channel->program->prog_no, channel->program->name);
+            else
+                result = cbox_execute_on(fb, NULL, "/patch", "iis", error, i + 1, -1, "");
+            if (!result)
+                return FALSE;
+            if (!(cbox_execute_on(fb, NULL, "/volume", "ii", error, i + 1, channel->volume) &&
+                cbox_execute_on(fb, NULL, "/pan", "ii", error, i + 1, channel->pan)))
+                return FALSE;
+        }
+        int active_voices = 0;
+        for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
+            if (m->voices[i].mode != spt_inactive)
+                active_voices++;
+        
+        return cbox_execute_on(fb, NULL, "/active_voices", "i", error, active_voices) &&
+            cbox_execute_on(fb, NULL, "/polyphony", "f", error, MAX_SAMPLER_VOICES);
+    }
+    else
+    if (!strcmp(cmd->command, "/patches") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (int i = 0; i < m->program_count; i++)
+        {
+            struct sampler_program *prog = m->programs[i];
+            gboolean result;
+            if (!cbox_execute_on(fb, NULL, "/patch", "is", error, prog->prog_no, prog->name))
+                return FALSE;
+        }
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/set_patch") && !strcmp(cmd->arg_types, "ii"))
+    {
+        int channel = *(int *)cmd->arg_values[0];
+        if (channel < 1 || channel > 16)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid channel %d", channel);
+            return FALSE;
+        }
+        int value = *(int *)cmd->arg_values[1];
+        struct sampler_program *pgm = NULL;
+        for (int i = 0; i < m->program_count; i++)
+        {
+            if (m->programs[i]->prog_no == value)
+            {
+                pgm = m->programs[i];
+                break;
+            }
+        }
+        cbox_rt_swap_pointers(app.rt, &m->channels[channel - 1].program, pgm);
+        return TRUE;
+    }
+    else
+        return cbox_set_command_error(error, cmd);
+    return TRUE;
 }
 
 struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate, GError **error)
@@ -960,7 +1042,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     }
     
     struct sampler_module *m = malloc(sizeof(struct sampler_module));
-    cbox_module_init(&m->module, m, 0, 2, NULL);
+    cbox_module_init(&m->module, m, 0, 2, sampler_process_cmd);
     m->module.process_event = sampler_process_event;
     m->module.process_block = sampler_process_block;
     m->module.destroy = sampler_destroy;
@@ -985,7 +1067,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
         cbox_module_destroy(&m->module);
         return FALSE;
     }
-    m->programs = malloc(sizeof(struct sampler_program) * m->program_count);
+    m->programs = malloc(sizeof(struct sampler_program *) * m->program_count);
     int success = 1;
     for (i = 0; i < m->program_count; i++)
     {
@@ -1007,7 +1089,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
             pgm_section = g_strdup_printf("spgm:%s", pgm_name);
         }
         
-        if (!load_program(m, &m->programs[i], pgm_section, pgm_id, error))
+        if (!load_program(m, &m->programs[i], pgm_section, pgm_section + 5, pgm_id, error))
         {
             success = 0;
             break;
@@ -1034,7 +1116,7 @@ void sampler_destroy(struct cbox_module *module)
     struct sampler_module *m = (struct sampler_module *)module;
     
     for (int i = 0; i < m->program_count; i++)
-        destroy_program(m, &m->programs[i]);
+        destroy_program(m, m->programs[i]);
 }
 
 struct cbox_module_livecontroller_metadata sampler_controllers[] = {

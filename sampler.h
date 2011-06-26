@@ -82,6 +82,7 @@ struct sampler_layer
 
 struct sampler_program
 {
+    gchar *name;
     int prog_no;
     struct sampler_layer **layers;
     int layer_count;
@@ -133,7 +134,7 @@ struct sampler_module
     int srate;
     struct sampler_voice voices[MAX_SAMPLER_VOICES];
     struct sampler_channel channels[16];
-    struct sampler_program *programs;
+    struct sampler_program **programs;
     int program_count;
 };
 

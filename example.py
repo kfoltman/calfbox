@@ -52,6 +52,15 @@ def standard_align(w, xo, yo, xs, ys):
     a = gtk.Alignment(xo, yo, xs, ys)
     a.add(w)
     return a
+    
+def standard_vscroll_window(width, height, content = None):
+    scroller = gtk.ScrolledWindow()
+    scroller.set_size_request(width, height)
+    scroller.set_shadow_type(gtk.SHADOW_NONE);
+    scroller.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC);
+    if content is not None:
+        scroller.add_with_viewport(content)
+    return scroller
 
 def standard_combo(list_store, active_item = None):
     cb = gtk.ComboBox(list_store)
@@ -113,7 +122,9 @@ class GetThings:
             else:
                 setattr(self, i, None)
         anames = set(anames)
+        self.seq = []
         def update_callback(cmd, fb, args):
+            self.seq.append((cmd, fb, args))
             cmd = cmd[1:]
             if cmd in anames:
                 if len(args) == 1:
@@ -131,6 +142,8 @@ class GetThings:
                 else:
                     getattr(self, cmd)[args[0]] = args[1:]
         cbox.do_cmd(cmd, update_callback, args)
+    def __str__(self):
+        return str(self.seq)
 
 def cfg_sections(prefix = ""):
     return GetThings('/config/sections', ['*section'], [str(prefix)]).section
@@ -193,24 +206,14 @@ class StreamWindow(gtk.VBox):
         cbox.do_cmd("%s/load" % self.path, None, [button.get_filename(), -1])
         
 
-class FluidsynthWindow(gtk.VBox):
-    def __init__(self, instrument, path):
-        gtk.Widget.__init__(self)
-        self.path = path
-        
+class WithPatchTable:
+    def __init__(self, attribs):
         self.patches = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
         patches = GetThings("%s/patches" % self.path, ["%patch"], []).patch
         self.mapping = {}
         for id in patches:
             self.mapping[id] = len(self.mapping)
             self.patches.append((patches[id], id))
-        
-        attribs = GetThings("%s/status" % self.path, ['%patch', 'polyphony'], [])
-
-        panel = gtk.VBox(spacing=5)
-        table = gtk.Table(2, 1)
-        add_slider_row(table, 0, "Polyphony", self.path, attribs, "polyphony", 2, 256, adjustment_changed_int)
-        panel.pack_start(table, False, False)
         
         self.table = gtk.Table(2, 16)
         self.table.set_col_spacings(5)
@@ -220,23 +223,52 @@ class FluidsynthWindow(gtk.VBox):
             cb = standard_combo(self.patches, self.mapping[attribs.patch[i + 1][0]])
             cb.connect('changed', self.patch_combo_changed, i + 1)
             self.table.attach(cb, 1, 2, i, i + 1, gtk.SHRINK, gtk.SHRINK)
-        scroller = gtk.ScrolledWindow()
-        scroller.set_size_request(-1, 160)
-        scroller.set_shadow_type(gtk.SHADOW_NONE);
-        scroller.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC);
-        scroller.add_with_viewport(self.table)
 
-        panel.pack_start(scroller, True, True)
+    def patch_combo_changed(self, combo, channel):
+        cbox.do_cmd(self.path + "/set_patch", None, [int(channel), int(self.patches[combo.get_active()][1])])
+
+class FluidsynthWindow(gtk.VBox, WithPatchTable):
+    def __init__(self, instrument, path):
+        gtk.Widget.__init__(self)
+        self.path = path
+        
+        attribs = GetThings("%s/status" % self.path, ['%patch', 'polyphony'], [])
+
+        panel = gtk.VBox(spacing=5)
+        table = gtk.Table(2, 1)
+        add_slider_row(table, 0, "Polyphony", self.path, attribs, "polyphony", 2, 256, adjustment_changed_int)
+        panel.pack_start(table, False, False)
+        
+        WithPatchTable.__init__(self, attribs)
+        panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True)
         self.add(panel)
-        self.refresh_id = glib.timeout_add(1, lambda: self.update())
+        self.refresh_id = glib.timeout_add(100, lambda: self.update())
 
     def update(self):
         #self.status_label.set_markup(s)
         return True
         
-    def patch_combo_changed(self, combo, channel):
-        cbox.do_cmd(self.path + "/set_patch", None, [int(channel), int(self.patches[combo.get_active()][1])])
+class SamplerWindow(gtk.VBox, WithPatchTable):
+    def __init__(self, instrument, path):
+        gtk.Widget.__init__(self)
+        self.path = path
+        
+        attribs = GetThings("%s/status" % self.path, ['%patch', 'polyphony'], [])
 
+        panel = gtk.VBox(spacing=5)
+        table = gtk.Table(2, 1)
+        add_slider_row(table, 0, "Polyphony", self.path, attribs, "polyphony", 2, 256, adjustment_changed_int)
+        panel.pack_start(table, False, False)
+        
+        WithPatchTable.__init__(self, attribs)
+        panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True)
+        self.add(panel)
+        self.refresh_id = glib.timeout_add(100, lambda: self.update())
+
+    def update(self):
+        #self.status_label.set_markup(s)
+        return True
+        
 class EffectWindow(gtk.Window):
     def __init__(self, instrument, output, plugin_name, main_window):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
@@ -388,7 +420,8 @@ engine_window_map = {
     'parametric_eq': EQWindow,
     'tone_control': ToneControlWindow,
     'stream_player' : StreamWindow,
-    'fluidsynth' : FluidsynthWindow
+    'fluidsynth' : FluidsynthWindow,
+    'sampler' : SamplerWindow
 }
 
 effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq']
