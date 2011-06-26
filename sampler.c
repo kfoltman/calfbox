@@ -1023,7 +1023,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
                 break;
             }
         }
-        cbox_rt_swap_pointers(app.rt, &m->channels[channel - 1].program, pgm);
+        cbox_rt_swap_pointers(app.rt, (void **)&m->channels[channel - 1].program, pgm);
         return TRUE;
     }
     else
