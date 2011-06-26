@@ -127,7 +127,7 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
     PyTuple_SetItem(args, 2, arg_values);
     
     PyObject *result = PyObject_Call(callback, args, NULL);
-    Py_DECREF(arg_values);
+    Py_DECREF(args);
     
     if (fbcb)
         fbcb->target = NULL;
