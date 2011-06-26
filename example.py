@@ -103,14 +103,24 @@ def combo_value_changed(combo, path, value_offset = 0):
 def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustment_changed_float):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
     adj = gtk.Adjustment(getattr(values, item), min, max, 1, 6, 0)
-    adj.connect("value_changed", setter, path + "/" + item)
-    t.attach(standard_hslider(adj), 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+    if setter is not None:
+        adj.connect("value_changed", setter, path + "/" + item)
+    slider = standard_hslider(adj)
+    t.attach(slider, 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+    if setter is None:
+        slider.set_sensitive(False)
 
 def add_mapped_slider_row(t, row, label, path, values, item, mapper, setter = adjustment_changed_float_mapped):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
     adj = gtk.Adjustment(mapper.unmap(getattr(values, item)), 0, 100, 1, 6, 0)
     adj.connect("value_changed", setter, path + "/" + item, mapper)
     t.attach(standard_mapped_hslider(adj, mapper), 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+
+def add_display_row(t, row, label, path, values, item):
+    t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+    w = left_label(getattr(values, item))
+    t.attach(w, 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+    return w
 
 class GetThings:
     def __init__(self, cmd, anames, args):
@@ -262,16 +272,24 @@ class SamplerWindow(gtk.VBox, WithPatchTable):
         gtk.Widget.__init__(self)
         self.path = path
         
-        attribs = GetThings("%s/status" % self.path, ['%patch', 'polyphony'], [])
+        attribs = GetThings("%s/status" % self.path, ['%patch', 'polyphony', 'active_voices'], [])
 
         panel = gtk.VBox(spacing=5)
-        table = gtk.Table(2, 1)
-        add_slider_row(table, 0, "Polyphony", self.path, attribs, "polyphony", 2, 256, adjustment_changed_int)
+        table = gtk.Table(2, 2)
+        table.set_col_spacings(5)
+        add_slider_row(table, 0, "Polyphony", self.path, attribs, "polyphony", 2, 256, None)
+        self.voices_widget = add_display_row(table, 1, "Voices in use", self.path, attribs, "active_voices")
         panel.pack_start(table, False, False)
         
         WithPatchTable.__init__(self, attribs)
         panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True)
         self.add(panel)
+        self.refresh_id = glib.timeout_add(200, lambda: self.voices_update())
+        
+    def voices_update(self):
+        attribs = GetThings("%s/status" % self.path, ['active_voices'], [])
+        self.voices_widget.set_text(str(attribs.active_voices))
+        return True
         
 class EffectWindow(gtk.Window):
     def __init__(self, instrument, output, plugin_name, main_window):
