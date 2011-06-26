@@ -892,7 +892,7 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
             if (!spath)
                 spath = sfz_path;
             sfz = g_build_filename(sfz_path, sfz, NULL);
-            gboolean result = sampler_module_load_program_sfz(m, prg, sfz, spath, error);;
+            gboolean result = sampler_module_load_program_sfz(m, prg, sfz, spath, error);
             g_free(sfz);
             return result;
         }
@@ -903,7 +903,7 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
     int layer_count = 0;
     for (i = 0; ; i++)
     {
-        gchar *s = g_strdup_printf("layer%d", i);
+        gchar *s = g_strdup_printf("layer%d", i + 1);
         char *p = cbox_config_get_string(cfg_section, s);
         g_free(s);
         
