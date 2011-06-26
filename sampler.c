@@ -127,7 +127,7 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
                 {
                     if (v->loop_start == (uint32_t)-1)
                         break;
-                    nextsample -= v->loop_start;
+                    nextsample -= v->loop_end - v->loop_start;
                 }
                 idata[s] = v->sample_data[nextsample];
                 nextsample++;
@@ -240,7 +240,7 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
                 {
                     if (v->loop_start == (uint32_t)-1)
                         break;
-                    nextsample -= v->loop_start;
+                    nextsample -= v->loop_end - v->loop_start;
                 }
                 idata[0][s] = v->sample_data[nextsample << 1];
                 idata[1][s] = v->sample_data[1 + (nextsample << 1)];
