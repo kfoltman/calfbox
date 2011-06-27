@@ -647,10 +647,14 @@ class MainWindow(gtk.Window):
             self.nb.remove_page(self.nb.get_n_pages() - 1)
             
     def edit_effect_clicked(self, button, opath, instr, output):
+        if opath in self.path_popups:
+            self.path_popups[opath].present()
+            return
         engine = GetThings(opath + "/status", ['insert_engine'], []).insert_engine
         wclass = engine_window_map[engine]
         popup = wclass(instr, output, self)
         popup.show_all()
+        popup.present()
         self.path_popups[opath] = popup
             
     def fx_engine_changed(self, combo, opath):
