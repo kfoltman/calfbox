@@ -290,7 +290,28 @@ class SamplerWindow(gtk.VBox, WithPatchTable):
         attribs = GetThings("%s/status" % self.path, ['active_voices'], [])
         self.voices_widget.set_text(str(attribs.active_voices))
         return True
-        
+
+class TableRowWidget:
+    def __init__(self, label, name, **kwargs):
+        self.label = label
+        self.name = name
+        self.kwargs = kwargs
+
+class SliderRow(TableRowWidget):
+    def __init__(self, label, name, minv, maxv, **kwargs):
+        TableRowWidget.__init__(self, label, name, **kwargs)
+        self.minv = minv
+        self.maxv = maxv
+    def add_row(self, table, row_no, path, values):
+        add_slider_row(table, row_no, self.label, path, values, self.name, self.minv, self.maxv, **self.kwargs)
+
+class MappedSliderRow(TableRowWidget):
+    def __init__(self, label, name, mapper, **kwargs):
+        TableRowWidget.__init__(self, label, name, **kwargs)
+        self.mapper = mapper
+    def add_row(self, table, row_no, path, values):
+        add_mapped_slider_row(table, row_no, self.label, path, values, self.name, self.mapper, **self.kwargs)
+
 class EffectWindow(gtk.Window):
     def __init__(self, instrument, output, plugin_name, main_window):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
@@ -298,6 +319,13 @@ class EffectWindow(gtk.Window):
         self.set_transient_for(main_window)
         self.path = "/instr/%s/output/%s/engine" % (instrument, output)
         self.set_title("%s - %s" % (plugin_name, instrument))
+        if hasattr(self, 'params'):
+            values = GetThings(self.path + "/status", [p.name for p in self.params], [])
+            t = gtk.Table(2, len(self.params))
+            for i in range(len(self.params)):
+                p = self.params[i]
+                p.add_row(t, i, self.path, values)
+            self.add(t)
         
     def create_param_table(self, cols, rows, values, extra_rows = 0):
         t = gtk.Table(4, rows + 1 + extra_rows)
@@ -326,62 +354,58 @@ class EffectWindow(gtk.Window):
         return t
 
 class PhaserWindow(EffectWindow):
+    params = [
+        MappedSliderRow("Center", "center_freq", LogMapper(100, 2000, freq_format)),
+        SliderRow("Mod depth", "mod_depth", 0, 4000),
+        SliderRow("Feedback", "fb_amt", -1, 1),
+        MappedSliderRow("LFO frequency", "lfo_freq", lfo_freq_mapper),
+        SliderRow("Stereo", "stereo_phase", 0, 360),
+        SliderRow("Wet/dry", "wet_dry", 0, 1),
+        SliderRow("Stages", "stages", 1, 12, setter = adjustment_changed_int)
+    ]
+    
     def __init__(self, instrument, output, main_window):
         EffectWindow.__init__(self, instrument, output, "Phaser", main_window)
-        values = GetThings(self.path + "/status", ["center_freq", "mod_depth", "fb_amt", "lfo_freq", "stereo_phase", "stages", "wet_dry"], [])
-        t = gtk.Table(2, 7)
-        add_mapped_slider_row(t, 0, "Center", self.path, values, "center_freq", LogMapper(100, 20000, freq_format))
-        add_slider_row(t, 1, "Mod depth", self.path, values, "mod_depth", 0, 4000)
-        add_slider_row(t, 2, "Feedback", self.path, values, "fb_amt", -1, 1)
-        add_mapped_slider_row(t, 3, "LFO frequency", self.path, values, "lfo_freq", lfo_freq_mapper)
-        add_slider_row(t, 4, "Stereo", self.path, values, "stereo_phase", 0, 360)
-        add_slider_row(t, 5, "Wet/dry", self.path, values, "wet_dry", 0, 1)
-        add_slider_row(t, 6, "Stages", self.path, values, "stages", 1, 12, setter = adjustment_changed_int)
-        self.add(t)
 
 class ChorusWindow(EffectWindow):
+    params = [
+        SliderRow("Min. delay", "min_delay", 1, 20),
+        SliderRow("Mod depth", "mod_depth", 1, 20),
+        MappedSliderRow("LFO frequency", "lfo_freq", lfo_freq_mapper),
+        SliderRow("Stereo", "stereo_phase", 0, 360),
+        SliderRow("Wet/dry", "wet_dry", 0, 1)
+    ]
     def __init__(self, instrument, output, main_window):
         EffectWindow.__init__(self, instrument, output, "Chorus", main_window)
-        values = GetThings(self.path + "/status", ["min_delay", "mod_depth", "lfo_freq", "stereo_phase", "stages", "wet_dry"], [])
-        t = gtk.Table(2, 5)
-        add_slider_row(t, 0, "Min. delay", self.path, values, "min_delay", 1, 20)
-        add_slider_row(t, 1, "Mod depth", self.path, values, "mod_depth", 1, 20)
-        add_mapped_slider_row(t, 2, "LFO frequency", self.path, values, "lfo_freq", lfo_freq_mapper)
-        add_slider_row(t, 3, "Stereo", self.path, values, "stereo_phase", 0, 360)
-        add_slider_row(t, 4, "Wet/dry", self.path, values, "wet_dry", 0, 1)
-        self.add(t)
 
 class DelayWindow(EffectWindow):
+    params = [
+        SliderRow("Delay time (ms)", "time", 1, 1000),
+        SliderRow("Feedback", "fb_amt", 0, 1),
+        SliderRow("Wet/dry", "wet_dry", 0, 1)
+    ]
     def __init__(self, instrument, output, main_window):
         EffectWindow.__init__(self, instrument, output, "Delay", main_window)
-        values = GetThings(self.path + "/status", ["time", "fb_amt", "wet_dry"], [])
-        t = gtk.Table(2, 3)
-        add_slider_row(t, 0, "Delay time (ms)", self.path, values, "time", 1, 1000)
-        add_slider_row(t, 1, "Feedback", self.path, values, "fb_amt", 0, 1)
-        add_slider_row(t, 2, "Wet/dry", self.path, values, "wet_dry", 0, 1)
-        self.add(t)
 
 class ReverbWindow(EffectWindow):
+    params = [
+        SliderRow("Decay time", "decay_time", 500, 5000),
+        SliderRow("Dry amount", "dry_amt", -100, 12),
+        SliderRow("Wet amount", "wet_amt", -100, 12),
+        MappedSliderRow("Lowpass", "lowpass", LogMapper(300, 20000, freq_format)),
+        MappedSliderRow("Highpass", "highpass", LogMapper(30, 2000, freq_format)),
+        SliderRow("Diffusion", "diffusion", 0.2, 0.8)
+    ]
     def __init__(self, instrument, output, main_window):
         EffectWindow.__init__(self, instrument, output, "Reverb", main_window)
-        values = GetThings(self.path + "/status", ["decay_time", "dry_amt", "wet_amt", "lowpass", "highpass", "diffusion"], [])
-        t = gtk.Table(2, 6)
-        add_slider_row(t, 0, "Decay time", self.path, values, "decay_time", 500, 5000)
-        add_slider_row(t, 1, "Dry amount", self.path, values, "dry_amt", -100, 12)
-        add_slider_row(t, 2, "Wet amount", self.path, values, "wet_amt", -100, 12)
-        add_mapped_slider_row(t, 3, "Lowpass", self.path, values, "lowpass", LogMapper(300, 20000, freq_format))
-        add_mapped_slider_row(t, 4, "Highpass", self.path, values, "highpass", LogMapper(30, 2000, freq_format))
-        add_slider_row(t, 5, "Diffusion", self.path, values, "diffusion", 0.2, 0.8)
-        self.add(t)
 
 class ToneControlWindow(EffectWindow):
+    params = [
+        MappedSliderRow("Lowpass", "lowpass", LogMapper(300, 20000, freq_format)),
+        MappedSliderRow("Highpass", "highpass", LogMapper(30, 2000, freq_format))
+    ]
     def __init__(self, instrument, output, main_window):
         EffectWindow.__init__(self, instrument, output, "Tone Control", main_window)
-        values = GetThings(self.path + "/status", ["lowpass", "highpass"], [])
-        t = gtk.Table(2, 2)
-        add_mapped_slider_row(t, 0, "Lowpass", self.path, values, "lowpass", LogMapper(300, 20000, freq_format))
-        add_mapped_slider_row(t, 1, "Highpass", self.path, values, "highpass", LogMapper(30, 2000, freq_format))
-        self.add(t)
 
 eq_cols = [
     ("Active", 0, 1, "active", 'checkbox'), 
