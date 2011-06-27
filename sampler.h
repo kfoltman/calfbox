@@ -63,6 +63,8 @@ struct sampler_layer
     uint32_t loop_start;
     uint32_t loop_end;
     uint32_t sample_end;
+    uint32_t loop_evolve;
+    uint32_t loop_overlap;
     float gain;
     float pan;
     float freq;
@@ -104,6 +106,8 @@ struct sampler_voice
     int16_t *sample_data;
     uint32_t pos, delta, loop_start, loop_end, sample_end;
     uint32_t frac_pos, frac_delta;
+    uint32_t loop_evolve, loop_overlap;
+    float loop_overlap_step;
     int note;
     int vel;
     int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;

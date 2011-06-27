@@ -131,6 +131,10 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->loop_start = atoi(value);
     else if (!strcmp(key, "loop_end") || !strcmp(key, "loopend"))
         l->loop_end = atoi(value);
+    else if (!strcmp(key, "loop_evolve") || !strcmp(key, "loopevolve"))
+        l->loop_evolve = atoi(value);
+    else if (!strcmp(key, "loop_overlap") || !strcmp(key, "loopoverlap"))
+        l->loop_overlap = atoi(value);
     else if (!strcmp(key, "loop_mode") || !strcmp(key, "loopmode"))
     {
         if (!strcmp(value, "one_shot"))

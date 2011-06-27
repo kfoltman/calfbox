@@ -106,6 +106,11 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
                 break;
             }
             v->pos = v->pos - v->loop_end + v->loop_start;
+            if (v->loop_end + v->loop_evolve < v->sample_end && ((int32_t) v->loop_start + (int32_t) v->loop_evolve) > 0)
+            {
+                v->loop_end += v->loop_evolve;
+                v->loop_start += v->loop_evolve;
+            }
         }
         
         float t = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
@@ -136,6 +141,17 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
                 idata[s++] = 0.f;
         }
         
+        if (v->loop_start != (uint32_t)-1 && v->pos >= v->loop_end - v->loop_overlap && v->loop_start > v->loop_overlap)
+        {
+            uint32_t nextsample = v->pos - (v->loop_end - v->loop_start);
+            float xfade = (v->pos - (v->loop_end - v->loop_overlap)) * v->loop_overlap_step;
+            for (int s = 0; s < 4 && xfade < 1; s++)
+            {
+                idata[s] += (v->sample_data[nextsample] - idata[s]) * xfade;
+                nextsample++;
+                xfade += v->loop_overlap_step;
+            }
+        }
         float sample = (-t*(t-1)*(t-2) * idata[0] + 3*(t+1)*(t-1)*(t-2) * idata[1] - 3*(t+1)*t*(t-2) * idata[2] + (t+1)*t*(t-1) * idata[3]) * (1.0 / 6.0);
         
         if (v->frac_pos > ~v->frac_delta)
@@ -216,6 +232,11 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
                 break;
             }
             v->pos = v->pos - v->loop_end + v->loop_start;
+            if (v->loop_end + v->loop_evolve < v->sample_end && ((int32_t) v->loop_start + (int32_t) v->loop_evolve) > 0)
+            {
+                v->loop_end += v->loop_evolve;
+                v->loop_start += v->loop_evolve;
+            }
         }
         
         float fr = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
@@ -248,6 +269,18 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
             }
             for(; s < 4; s++)
                 idata[0][s] = idata[1][s] = 0;
+        }
+        if (v->loop_start != (uint32_t)-1 && v->pos >= v->loop_end - v->loop_overlap && v->loop_start > v->loop_overlap)
+        {
+            uint32_t nextsample = v->pos - (v->loop_end - v->loop_start);
+            float xfade = (v->pos - (v->loop_end - v->loop_overlap)) * v->loop_overlap_step;
+            for (int s = 0; s < 4 && xfade < 1; s++)
+            {
+                idata[0][s] += (v->sample_data[nextsample << 1] - idata[0][s]) * xfade;
+                idata[1][s] += (v->sample_data[1 + (nextsample << 1)] - idata[1][s]) * xfade;
+                nextsample++;
+                xfade += v->loop_overlap_step;
+            }
         }
         
         float ch[2] = {0, 0};
@@ -317,6 +350,9 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->frac_pos = 0;
             v->loop_start = l->loop_start;
             v->loop_end = l->loop_end;
+            v->loop_evolve = l->loop_evolve;
+            v->loop_overlap = l->loop_overlap;
+            v->loop_overlap_step = 1.0 / l->loop_overlap;
             v->sample_end = l->sample_end;
             v->gain = l->gain * l->velcurve[vel];
             v->pan = l->pan;
@@ -741,6 +777,8 @@ void sampler_layer_init(struct sampler_layer *l)
     l->freq = 44100;
     l->loop_start = -1;
     l->loop_end = 0;
+    l->loop_evolve = 0;
+    l->loop_overlap = 0;
     l->gain = 1.0;
     l->pan = 0.5;
     l->mode = spt_mono16;
@@ -830,6 +868,8 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->sample_offset = cbox_config_get_int(cfg_section, "offset", l->sample_offset);
     l->loop_start = cbox_config_get_int(cfg_section, "loop_start", l->loop_start);
     l->loop_end = cbox_config_get_int(cfg_section, "loop_end", l->loop_end);
+    l->loop_evolve = cbox_config_get_int(cfg_section, "loop_evolve", l->loop_evolve);
+    l->loop_overlap = cbox_config_get_int(cfg_section, "loop_overlap", l->loop_overlap);
     l->gain = cbox_config_get_gain_db(cfg_section, "gain", 0.0);
     l->pan = cbox_config_get_float(cfg_section, "pan", l->pan);
     l->note_scaling = cbox_config_get_float(cfg_section, "note_scaling", l->note_scaling);
