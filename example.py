@@ -109,12 +109,15 @@ def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustm
     t.attach(slider, 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
     if setter is None:
         slider.set_sensitive(False)
+    return (slider, adj)
 
 def add_mapped_slider_row(t, row, label, path, values, item, mapper, setter = adjustment_changed_float_mapped):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
     adj = gtk.Adjustment(mapper.unmap(getattr(values, item)), 0, 100, 1, 6, 0)
     adj.connect("value_changed", setter, path + "/" + item, mapper)
-    t.attach(standard_mapped_hslider(adj, mapper), 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+    slider = standard_mapped_hslider(adj, mapper)
+    t.attach(slider, 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+    return (slider, adj)
 
 def add_display_row(t, row, label, path, values, item):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
@@ -303,29 +306,36 @@ class SliderRow(TableRowWidget):
         self.minv = minv
         self.maxv = maxv
     def add_row(self, table, row_no, path, values):
-        add_slider_row(table, row_no, self.label, path, values, self.name, self.minv, self.maxv, **self.kwargs)
+        return add_slider_row(table, row_no, self.label, path, values, self.name, self.minv, self.maxv, **self.kwargs)
+    def update(self, values, slider, adjustment):
+        adjustment.set_value(getattr(values, self.name))
 
 class MappedSliderRow(TableRowWidget):
     def __init__(self, label, name, mapper, **kwargs):
         TableRowWidget.__init__(self, label, name, **kwargs)
         self.mapper = mapper
     def add_row(self, table, row_no, path, values):
-        add_mapped_slider_row(table, row_no, self.label, path, values, self.name, self.mapper, **self.kwargs)
+        return add_mapped_slider_row(table, row_no, self.label, path, values, self.name, self.mapper, **self.kwargs)
+    def update(self, values, slider, adjustment):
+        adjustment.set_value(self.mapper.unmap(getattr(values, self.name)))
 
 class EffectWindow(gtk.Window):
     def __init__(self, instrument, output, plugin_name, main_window):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_UTILITY)
         self.set_transient_for(main_window)
+        self.main_window = main_window
         self.path = "/instr/%s/output/%s/engine" % (instrument, output)
         self.set_title("%s - %s" % (plugin_name, instrument))
         if hasattr(self, 'params'):
             values = GetThings(self.path + "/status", [p.name for p in self.params], [])
+            self.refreshers = []
             t = gtk.Table(2, len(self.params))
             for i in range(len(self.params)):
                 p = self.params[i]
-                p.add_row(t, i, self.path, values)
+                self.refreshers.append((p, p.add_row(t, i, self.path, values)))
             self.add(t)
+        self.connect('delete_event', self.on_close)
         
     def create_param_table(self, cols, rows, values, extra_rows = 0):
         t = gtk.Table(4, rows + 1 + extra_rows)
@@ -352,6 +362,15 @@ class EffectWindow(gtk.Window):
                 t.attach(widget, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
                 self.table_widgets[(i, j)] = widget
         return t
+        
+    def refresh(self):
+        if hasattr(self, 'params'):
+            values = GetThings(self.path + "/status", [p.name for p in self.params], [])
+            for param, state in self.refreshers:
+                param.update(values, *state)
+                
+    def on_close(self, widget, event):
+        self.main_window.on_effect_popup_close(self)
 
 class PhaserWindow(EffectWindow):
     params = [
@@ -546,6 +565,7 @@ class MainWindow(gtk.Window):
 
     def create_instrument_pages(self, scene, rt):
         self.path_widgets = {}
+        self.path_popups = {}
         self.fxpreset_ls = {}
         
         for preset in cfg_sections("fxpreset:"):
@@ -629,9 +649,15 @@ class MainWindow(gtk.Window):
     def edit_effect_clicked(self, button, opath, instr, output):
         engine = GetThings(opath + "/status", ['insert_engine'], []).insert_engine
         wclass = engine_window_map[engine]
-        wclass(instr, output, self).show_all()
+        popup = wclass(instr, output, self)
+        popup.show_all()
+        self.path_popups[opath] = popup
             
     def fx_engine_changed(self, combo, opath):
+        if opath in self.path_popups:
+            self.path_popups[opath].destroy()
+            del self.path_popups[opath]
+            
         engine = combo.get_model()[combo.get_active()][0]
         cbox.do_cmd(opath + '/new_insert', None, [engine])
         fx_engine, fx_preset, fx_edit = self.path_widgets[opath]
@@ -642,6 +668,8 @@ class MainWindow(gtk.Window):
     def fx_preset_changed(self, combo, opath):
         if combo.get_active() >= 0:
             cbox.do_cmd(opath + '/load_preset', None, [combo.get_model()[combo.get_active()][0]])
+        if opath in self.path_popups:
+            self.path_popups[opath].refresh()
         
     def update(self):
         cbox.do_cmd("/on_idle", None, [])
@@ -660,6 +688,9 @@ class MainWindow(gtk.Window):
         self.nb.show_all()
         self.title_label.set_text(scene.title)
         return True
+    
+    def on_effect_popup_close(self, popup):
+        del self.path_popups[popup.path[0:-7]]
 
 def do_quit(window, event):
     gtk.main_quit()
