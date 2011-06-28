@@ -92,6 +92,13 @@ void phaser_process_event(struct cbox_module *module, const uint8_t *data, uint3
     struct phaser_module *m = (struct phaser_module *)module;
 }
 
+static inline float clip_w(float w)
+{
+    if (w > 0.9 * M_PI)
+        return 0.9 * M_PI;
+    return w;
+}
+
 void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct phaser_module *m = (struct phaser_module *)module;
@@ -103,8 +110,16 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     if (stages < 0 || stages > NO_STAGES)
         stages = 0;
 
-    cbox_onepolef_set_allpass(&m->coeffs[0], m->tpdsr * (p->center + p->mdepth * sin(m->phase)));
-    cbox_onepolef_set_allpass(&m->coeffs[1], m->tpdsr * (p->center + p->mdepth * sin(m->phase + p->sphase)));
+    if (p->mdepth)
+    {
+        cbox_onepolef_set_allpass(&m->coeffs[0], clip_w(m->tpdsr * p->center * cent2factor(p->mdepth * sin(m->phase))));
+        cbox_onepolef_set_allpass(&m->coeffs[1], clip_w(m->tpdsr * p->center * cent2factor(p->mdepth * sin(m->phase + p->sphase))));
+    }
+    else
+    {
+        cbox_onepolef_set_allpass(&m->coeffs[0], m->tpdsr * p->center);
+        cbox_onepolef_set_allpass(&m->coeffs[1], m->tpdsr * p->center);
+    }
     m->phase += p->lfo_freq * CBOX_BLOCK_SIZE * m->tpdsr;
     
     for (c = 0; c < 2; c++)
@@ -142,7 +157,7 @@ struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int 
     p->sphase = deg2rad(cbox_config_get_float(cfg_section, "stereo_phase", 90.f));
     p->lfo_freq = cbox_config_get_float(cfg_section, "lfo_freq", 1.f);
     p->center = cbox_config_get_float(cfg_section, "center_freq", 1500.f);
-    p->mdepth = cbox_config_get_float(cfg_section, "mod_depth", 500.f);
+    p->mdepth = cbox_config_get_float(cfg_section, "mod_depth", 1200.f);
     p->fb_amt = cbox_config_get_float(cfg_section, "feedback", 0.f);
     p->wet_dry = cbox_config_get_float(cfg_section, "wet_dry", 0.5f);
     p->stages = cbox_config_get_int(cfg_section, "stages", NO_STAGES);

@@ -375,7 +375,7 @@ class EffectWindow(gtk.Window):
 class PhaserWindow(EffectWindow):
     params = [
         MappedSliderRow("Center", "center_freq", LogMapper(100, 2000, freq_format)),
-        SliderRow("Mod depth", "mod_depth", 0, 4000),
+        SliderRow("Mod depth", "mod_depth", 0, 7200),
         SliderRow("Feedback", "fb_amt", -1, 1),
         MappedSliderRow("LFO frequency", "lfo_freq", lfo_freq_mapper),
         SliderRow("Stereo", "stereo_phase", 0, 360),

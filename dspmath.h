@@ -87,6 +87,11 @@ static inline void copybf(float *to, float *from)
     memcpy(to, from, sizeof(float) * CBOX_BLOCK_SIZE);
 }
 
+static inline float cent2factor(float cent)
+{
+    return pow(2.0, cent / 1200.0); // I think this may be optimised using exp()
+}
+
 static inline float dB2gain(float dB)
 {
     return pow(2.0, dB / 6.0);
