@@ -44,6 +44,32 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         cbox_scene_destroy(old_scene);
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/load_layer") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_layer *layer = cbox_layer_load((const gchar *)cmd->arg_values[0], error);
+        if (!layer)
+            return FALSE;
+        struct cbox_scene *scene = cbox_scene_new();
+        if (!scene) // not really expected
+            return FALSE;
+        cbox_scene_add_layer(scene, layer);
+        struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
+        cbox_scene_destroy(old_scene);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/load_instrument") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_layer *layer = cbox_layer_new((const gchar *)cmd->arg_values[0], error);
+        if (!layer)
+            return FALSE;
+        struct cbox_scene *scene = cbox_scene_new();
+        if (!scene) // not really expected
+            return FALSE;
+        cbox_scene_add_layer(scene, layer);
+        struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
+        cbox_scene_destroy(old_scene);
+        return TRUE;
+    }
     else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
@@ -145,7 +171,6 @@ void cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer)
         if (scene->layers[i]->instrument == layer->instrument)
             break;
     }
-    layer->instrument->refcount++;
     if (i == scene->layer_count)
         scene->instruments[scene->instrument_count++] = layer->instrument;
     scene->layers[scene->layer_count++] = layer;
@@ -153,16 +178,7 @@ void cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer)
 
 void cbox_scene_destroy(struct cbox_scene *scene)
 {
-    int i;
-    
-    for (i = 0; i < scene->layer_count; i++)
-    {
-        struct cbox_layer *l = scene->layers[i];
-        if (!--(l->instrument->refcount))
-        {
-            cbox_instrument_destroy(l->instrument);
-        }
-        free(l);
-    }
+    for (int i = 0; i < scene->layer_count; i++)
+        cbox_layer_destroy(scene->layers[i]);
     free(scene);
 }

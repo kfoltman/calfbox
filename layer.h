@@ -41,5 +41,6 @@ struct cbox_layer
 
 extern struct cbox_layer *cbox_layer_new(const char *name, GError **error);
 extern struct cbox_layer *cbox_layer_load(const char *module_name, GError **error);
+extern void cbox_layer_destroy(struct cbox_layer *layer);
 
 #endif

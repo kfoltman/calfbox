@@ -70,6 +70,7 @@ struct cbox_layer *cbox_layer_load(const char *name, GError **error)
     l->invert_sustain = cbox_config_get_int(section, "invert_sustain", 0);
     l->consume = cbox_config_get_int(section, "consume", 0);
     l->ignore_scene_transpose = cbox_config_get_int(section, "ignore_scene_transpose", 0);
+    l->instrument->refcount++;
     
     g_free(section);
     
@@ -107,10 +108,20 @@ extern struct cbox_layer *cbox_layer_new(const char *module_name, GError **error
     l->invert_sustain = FALSE;
     l->consume = FALSE;
     l->ignore_scene_transpose = FALSE;
+    l->instrument->refcount++;
     
     return l;
 
 error:
     free(l);
     return NULL;
+}
+
+void cbox_layer_destroy(struct cbox_layer *layer)
+{
+    if (!--(layer->instrument->refcount))
+    {
+        cbox_instrument_destroy(layer->instrument);
+    }
+    free(layer);
 }
