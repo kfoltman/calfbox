@@ -495,6 +495,7 @@ class SceneDialog(gtk.Dialog):
     def __init__(self, parent):
         gtk.Dialog.__init__(self, "Select a scene", parent, gtk.DIALOG_MODAL, 
             (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
+        self.set_default_response(gtk.RESPONSE_OK)
         model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         
         for s in cfg_sections("scene:"):
@@ -514,6 +515,7 @@ class SceneDialog(gtk.Dialog):
         scenes.show()
         scenes.grab_focus()
         self.scenes = scenes
+        self.scenes.connect('row-activated', lambda w, path, column: self.response(gtk.RESPONSE_OK))
     def get_selected_scene(self):
         return self.scenes.get_model()[self.scenes.get_cursor()[0][0]]
 
@@ -586,6 +588,9 @@ class MainWindow(gtk.Window):
                     cbox.do_cmd("/scene/load_layer", None, [scene[2][6:]])
                 elif scene[1] == 'Instrument':
                     cbox.do_cmd("/scene/load_instrument", None, [scene[2][11:]])
+                scene = GetThings("/scene/status", ['name', 'title'], [])
+                self.scene_label.set_text(scene.name)
+                self.title_label.set_text(scene.title)
                 self.refresh_instrument_pages()
         finally:
             d.destroy()
