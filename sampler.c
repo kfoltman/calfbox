@@ -239,8 +239,6 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
             }
         }
         
-        float fr = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
-
         float idata[2][4];
         if (v->pos + 4 < v->loop_end)
         {
@@ -284,9 +282,9 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
         }
         
         float ch[2] = {0, 0};
+        float t = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
         for (int c = 0; c < 2; c++)
         {
-            float t = fr;
             ch[c] = (-t*(t-1)*(t-2) * idata[c][0] + 3*(t+1)*(t-1)*(t-2) * idata[c][1] - 3*(t+1)*t*(t-2) * idata[c][2] + (t+1)*t*(t-1) * idata[c][3]) * (1.0 / 6.0);
         }
         
