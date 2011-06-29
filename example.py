@@ -536,7 +536,7 @@ class MainWindow(gtk.Window):
         t.set_row_spacings(5)
         
         t.attach(bold_label("Scene"), 0, 1, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-        self.scene_label = gtk.Label(scene.name)
+        self.scene_label = left_label(scene.name)
         t.attach(self.scene_label, 1, 2, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
 
         self.title_label = left_label(scene.title)
