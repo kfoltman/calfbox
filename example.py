@@ -491,6 +491,32 @@ engine_window_map = {
 
 effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq']
 
+class SceneDialog(gtk.Dialog):
+    def __init__(self, parent):
+        gtk.Dialog.__init__(self, "Select a scene", parent, gtk.DIALOG_MODAL, 
+            (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
+        model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
+        
+        for s in cfg_sections("scene:"):
+            title = cfg_get(s, "title")
+            model.append((s[6:], "Scene", s))
+        for s in cfg_sections("instrument:"):
+            title = cfg_get(s, "title")
+            model.append((s[11:], "Instrument", s))
+        for s in cfg_sections("layer:"):
+            title = cfg_get(s, "title")
+            model.append((s[6:], "Layer", s))
+                
+        scenes = gtk.TreeView(model)
+        scenes.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=0)
+        scenes.insert_column_with_attributes(1, "Type", gtk.CellRendererText(), text=1)
+        self.vbox.pack_start(scenes)
+        scenes.show()
+        scenes.grab_focus()
+        self.scenes = scenes
+    def get_selected_scene(self):
+        return self.scenes.get_model()[self.scenes.get_cursor()[0][0]]
+
 class MainWindow(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
@@ -501,16 +527,7 @@ class MainWindow(gtk.Window):
 
     def create_master(self, scene):
         self.scene_list = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
-        
-        scenes = cfg_sections("scene:")
-        for s in scenes:
-            title = cfg_get(s, "title")
-            if title is None:
-                self.scene_list.append((s[6:], ""))
-            else:
-                self.scene_list.append((s[6:], "(%s)" % title))
                 
-        
         self.master_info = left_label("")
         self.timesig_info = left_label("")
         
@@ -519,19 +536,8 @@ class MainWindow(gtk.Window):
         t.set_row_spacings(5)
         
         t.attach(bold_label("Scene"), 0, 1, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-        cb = gtk.ComboBox(self.scene_list)
-        cell = gtk.CellRendererText()
-        cb.pack_start(cell, False)
-        cb.add_attribute(cell, 'text', 0)
-        cell = gtk.CellRendererText()
-        cell.props.foreground = "blue"
-        cb.pack_end(cell, True)
-        cb.add_attribute(cell, 'text', 1)
-        index = [index for index, value in zip(range(len(scenes)), scenes) if value == "scene:%s" % scene.name]
-        if len(index):
-            cb.set_active(index[0])
-        cb.connect('changed', self.scene_combo_changed)
-        t.attach(cb, 1, 2, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+        self.scene_label = gtk.Label(scene.name)
+        t.attach(self.scene_label, 1, 2, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
 
         self.title_label = left_label(scene.title)
         t.attach(bold_label("Title"), 0, 1, 1, 2, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
@@ -554,7 +560,53 @@ class MainWindow(gtk.Window):
         t.attach(standard_align(gtk.SpinButton(self.transpose_adj), 0, 0, 0, 0), 1, 2, 5, 6, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         return t
 
+    def create_menu(self, title, items):
+        menuitem = gtk.MenuItem(title)
+        if items is not None:
+            menu = gtk.Menu()
+            menuitem.set_submenu(menu)
+            for label, meth in items:
+                mit = gtk.MenuItem(label)
+                mit.connect('activate', meth)
+                menu.append(mit)
+        return menuitem
+
+    def quit(self, w):
+        self.destroy()
+        
+    def load_scene(self, w):
+        d = SceneDialog(self)
+        response = d.run()
+        try:
+            if response == gtk.RESPONSE_OK:
+                scene = d.get_selected_scene()
+                if scene[1] == 'Scene':
+                    cbox.do_cmd("/scene/load", None, [scene[2][6:]])
+                elif scene[1] == 'Layer':
+                    cbox.do_cmd("/scene/load_layer", None, [scene[2][6:]])
+                elif scene[1] == 'Instrument':
+                    cbox.do_cmd("/scene/load_instrument", None, [scene[2][11:]])
+                self.refresh_instrument_pages()
+        finally:
+            d.destroy()
+
+    def refresh_instrument_pages(self):
+        self.delete_instrument_pages()
+        rt = GetThings("/rt/status", ['audio_channels'], [])
+        scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title', 'transpose'], [])
+        self.create_instrument_pages(scene, rt)
+        self.nb.show_all()
+        self.title_label.set_text(scene.title)
+
     def create(self):
+        self.menu_bar = gtk.MenuBar()
+        
+        self.menu_bar.append(self.create_menu("_Scene", [
+            ("_Load", self.load_scene),
+            ("_Quit", self.quit),
+        ]))
+        
+        self.vbox.pack_start(self.menu_bar, False, False)
         rt = GetThings("/rt/status", ['audio_channels'], [])
         scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title', 'transpose'], [])
         
@@ -682,27 +734,17 @@ class MainWindow(gtk.Window):
         self.timesig_info.set_markup("%s/%s" % tuple(master.timesig))
         self.tempo_adj.set_value(master.tempo)
         return True
-        
-    def scene_combo_changed(self, cb):
-        cbox.do_cmd("/scene/load", None, [self.scene_list[cb.get_active()][0]])
-        self.delete_instrument_pages()
-        rt = GetThings("/rt/status", ['audio_channels'], [])
-        scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title', 'transpose'], [])
-        self.create_instrument_pages(scene, rt)
-        self.nb.show_all()
-        self.title_label.set_text(scene.title)
-        return True
     
     def on_effect_popup_close(self, popup):
         del self.path_popups[popup.path[0:-7]]
 
-def do_quit(window, event):
+def do_quit(window):
     gtk.main_quit()
 
 w = MainWindow()
 w.set_title("My UI")
 w.show_all()
-w.connect('delete_event', do_quit)
+w.connect('destroy', do_quit)
 
 gtk.main()
 
