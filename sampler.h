@@ -123,6 +123,7 @@ struct sampler_voice
     struct sampler_channel *channel;
     struct cbox_envelope amp_env, filter_env, pitch_env;
     enum sample_loop_mode loop_mode;
+    int serial_no;
 };
 
 struct sampler_waveform
@@ -140,6 +141,8 @@ struct sampler_module
     struct sampler_channel channels[16];
     struct sampler_program **programs;
     int program_count;
+    int active_voices, max_voices;
+    int serial_no;
 };
 
 extern void sampler_layer_init(struct sampler_layer *l);

@@ -280,7 +280,7 @@ class SamplerWindow(gtk.VBox, WithPatchTable):
         panel = gtk.VBox(spacing=5)
         table = gtk.Table(2, 2)
         table.set_col_spacings(5)
-        add_slider_row(table, 0, "Polyphony", self.path, attribs, "polyphony", 2, 256, None)
+        add_slider_row(table, 0, "Polyphony", self.path, attribs, "polyphony", 1, 128, adjustment_changed_int)
         self.voices_widget = add_display_row(table, 1, "Voices in use", self.path, attribs, "active_voices")
         panel.pack_start(table, False, False)
         

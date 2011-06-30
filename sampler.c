@@ -343,6 +343,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             
             freq *= pow(2.0, ((note - l->root_note) * l->note_scaling + l->tune + l->transpose * 100) / 1200.0);
             
+            v->serial_no = m->serial_no;
             v->sample_data = l->sample_data;
             v->pos = l->sample_offset;
             v->frac_pos = 0;
@@ -506,6 +507,35 @@ void sampler_stop_all(struct sampler_module *m, struct sampler_channel *c)
     }
 }
 
+void sampler_steal_voice(struct sampler_module *m)
+{
+    int max_age = 0, voice_found = -1;
+    for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
+    {
+        struct sampler_voice *v = &m->voices[i];
+        if (v->mode == spt_inactive)
+            continue;
+        if (v->amp_env.cur_stage == 15)
+            continue;
+        int age = m->serial_no - v->serial_no;
+        if (v->loop_start == -1)
+            age += (int)(v->pos * 100.0 / v->loop_end);
+        else
+        if (v->released)
+            age += 10;
+        if (age > max_age)
+        {
+            max_age = age;
+            voice_found = i;
+        }
+    }
+    if (voice_found != -1)
+    {
+        m->voices[voice_found].released = 1;
+        cbox_envelope_go_to(&m->voices[voice_found].amp_env, 15);        
+    }
+}
+
 void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct sampler_module *m = (struct sampler_module *)module;
@@ -515,12 +545,16 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
         outputs[0][i] = outputs[1][i] = 0.f;
     
+    int vcount = 0, vrel = 0;
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
         
         if (v->mode != spt_inactive)
         {
+            if (v->amp_env.cur_stage == 15)
+                vrel++;
+            vcount++;
             struct sampler_channel *c = v->channel;
             
             float amp_env = cbox_envelope_get_next(&v->amp_env, v->released);
@@ -567,7 +601,11 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             v->last_lgain = v->lgain;
             v->last_rgain = v->rgain;
         }
-    }    
+    }
+    m->active_voices = vcount;
+    if (vcount - vrel > m->max_voices)
+        sampler_steal_voice(m);
+    m->serial_no++;
 }
 
 void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int cc, int val)
@@ -1021,12 +1059,8 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
                 cbox_execute_on(fb, NULL, "/pan", "ii", error, i + 1, channel->pan)))
                 return FALSE;
         }
-        int active_voices = 0;
-        for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
-            if (m->voices[i].mode != spt_inactive)
-                active_voices++;
         
-        return cbox_execute_on(fb, NULL, "/active_voices", "i", error, active_voices) &&
+        return cbox_execute_on(fb, NULL, "/active_voices", "i", error, m->active_voices) &&
             cbox_execute_on(fb, NULL, "/polyphony", "i", error, MAX_SAMPLER_VOICES);
     }
     else
@@ -1041,6 +1075,17 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
             if (!cbox_execute_on(fb, NULL, "/patch", "is", error, prog->prog_no, prog->name))
                 return FALSE;
         }
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/polyphony") && !strcmp(cmd->arg_types, "i"))
+    {
+        int polyphony = *(int *)cmd->arg_values[0];
+        if (polyphony < 1 || polyphony > MAX_SAMPLER_VOICES)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid polyphony %d (must be between 1 and %d)", polyphony, (int)MAX_SAMPLER_VOICES);
+            return FALSE;
+        }
+        m->max_voices = polyphony;
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/set_patch") && !strcmp(cmd->arg_types, "ii"))
@@ -1079,6 +1124,13 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
         inited = 1;
     }
     
+    int max_voices = cbox_config_get_int(cfg_section, "polyphony", MAX_SAMPLER_VOICES);
+    if (max_voices < 1 || max_voices > MAX_SAMPLER_VOICES)
+    {
+        g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_INVALID_LAYER, "%s: invalid polyphony value", cfg_section);
+        return NULL;
+    }
+    
     struct sampler_module *m = malloc(sizeof(struct sampler_module));
     cbox_module_init(&m->module, m, 0, 2, sampler_process_cmd);
     m->module.process_event = sampler_process_event;
@@ -1086,6 +1138,8 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     m->module.destroy = sampler_destroy;
     m->srate = srate;
     m->programs = NULL;
+    m->max_voices = max_voices;
+    m->serial_no = 0;
             
     for (i = 0; ; i++)
     {
@@ -1142,6 +1196,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
         m->voices[i].mode = spt_inactive;
+    m->active_voices = 0;
     
     for (i = 0; i < 16; i++)
         init_channel(m, &m->channels[i]);
