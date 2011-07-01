@@ -80,6 +80,7 @@ struct sampler_layer
     float velcurve[128];
     int velcurve_quadratic, fil_veltrack;
     int exclusive_group, off_by;
+    int output_pair_no;
 };
 
 struct sampler_program
@@ -123,6 +124,7 @@ struct sampler_voice
     struct sampler_channel *channel;
     struct cbox_envelope amp_env, filter_env, pitch_env;
     enum sample_loop_mode loop_mode;
+    int output_pair_no;
     int serial_no;
 };
 
@@ -143,6 +145,7 @@ struct sampler_module
     int program_count;
     int active_voices, max_voices;
     int serial_no;
+    int output_pairs, aux_pairs;
 };
 
 extern void sampler_layer_init(struct sampler_layer *l);

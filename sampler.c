@@ -343,6 +343,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             
             freq *= pow(2.0, ((note - l->root_note) * l->note_scaling + l->tune + l->transpose * 100) / 1200.0);
             
+            v->output_pair_no = l->output_pair_no % m->output_pairs;
             v->serial_no = m->serial_no;
             v->sample_data = l->sample_data;
             v->pos = l->sample_offset;
@@ -542,8 +543,12 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     
     //float channels[2][CBOX_BLOCK_SIZE];
     
-    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
-        outputs[0][i] = outputs[1][i] = 0.f;
+    for (int c = 0; c < m->output_pairs + m->aux_pairs; c++)
+    {
+        int oo = 2 * c;
+        for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+            outputs[oo][i] = outputs[oo + 1][i] = 0.f;
+    }
     
     int vcount = 0, vrel = 0;
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
@@ -594,9 +599,9 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
             
             if (v->mode == spt_stereo16)
-                process_voice_stereo(v, outputs);
+                process_voice_stereo(v, outputs + v->output_pair_no * 2);
             else
-                process_voice_mono(v, outputs);
+                process_voice_mono(v, outputs + v->output_pair_no * 2);
             
             v->last_lgain = v->lgain;
             v->last_rgain = v->rgain;
@@ -842,6 +847,7 @@ void sampler_layer_init(struct sampler_layer *l)
     l->fil_veltrack = 0;
     l->exclusive_group = -1;
     l->off_by = -1;
+    l->output_pair_no = 0;
 }
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
@@ -930,6 +936,7 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
         l->loop_mode = slm_loop_sustain;
     l->exclusive_group = cbox_config_get_int(cfg_section, "group", l->exclusive_group);
     l->off_by = cbox_config_get_int(cfg_section, "off_by", l->off_by);
+    l->output_pair_no = cbox_config_get_int(cfg_section, "output_pair_no", l->output_pair_no);
 }
 
 void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
@@ -1130,9 +1137,24 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
         g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_INVALID_LAYER, "%s: invalid polyphony value", cfg_section);
         return NULL;
     }
+    int output_pairs = cbox_config_get_int(cfg_section, "output_pairs", 1);
+    if (output_pairs < 1 || output_pairs > 16)
+    {
+        g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_INVALID_LAYER, "%s: invalid output pairs value", cfg_section);
+        return NULL;
+    }
+    int aux_pairs = cbox_config_get_int(cfg_section, "aux_pairs", 0);
+    if (aux_pairs < 0 || aux_pairs > 4)
+    {
+        g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_INVALID_LAYER, "%s: invalid aux pairs value", cfg_section);
+        return NULL;
+    }
     
     struct sampler_module *m = malloc(sizeof(struct sampler_module));
-    cbox_module_init(&m->module, m, 0, 2, sampler_process_cmd);
+    cbox_module_init(&m->module, m, 0, (output_pairs + aux_pairs) * 2, sampler_process_cmd);
+    m->output_pairs = output_pairs;
+    m->aux_pairs = aux_pairs;
+    m->module.aux_offset = m->output_pairs * 2;
     m->module.process_event = sampler_process_event;
     m->module.process_block = sampler_process_block;
     m->module.destroy = sampler_destroy;
