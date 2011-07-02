@@ -74,8 +74,10 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
     
     if (layer)
     {
-        cbox_scene_add_layer(scene, layer);
-        switch_scene(item, scene, "instrument");
+        if (!cbox_scene_add_layer(scene, layer, &error))
+            cbox_print_error(error);
+        else
+            switch_scene(item, scene, "instrument");
     }
     else
     {
@@ -93,8 +95,10 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
     
     if (layer)
     {
-        cbox_scene_add_layer(scene, layer);
-        switch_scene(item, scene, "layer");
+        if (cbox_scene_add_layer(scene, layer, &error))
+            switch_scene(item, scene, "layer");
+        else
+            cbox_print_error(error);
     }
     else
     {

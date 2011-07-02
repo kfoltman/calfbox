@@ -23,7 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define MAX_LAYERS_PER_SCENE 16
 #define MAX_MODULES_PER_SCENE 16
+#define MAX_AUXBUSES_PER_SCENE 8
 
+struct cbox_aux_bus;
 struct cbox_instrument;
 
 struct cbox_scene
@@ -36,12 +38,15 @@ struct cbox_scene
     int layer_count;
     struct cbox_instrument *instruments[MAX_MODULES_PER_SCENE];
     int instrument_count;
+    struct cbox_aux_bus *aux_buses[MAX_AUXBUSES_PER_SCENE];
+    int aux_bus_count;
     int transpose;
 };
 
 extern struct cbox_scene *cbox_scene_new();
-extern void cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer);
+extern gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error);
 extern struct cbox_scene *cbox_scene_load(const char *section, GError **error);
+extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error);
 extern void cbox_scene_destroy(struct cbox_scene *scene);
 
 #endif

@@ -238,13 +238,26 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
         }
     }
 
-    free(instr_section);
-    
+    int auxes = (module->outputs - module->aux_offset) / 2;
     instr = malloc(sizeof(struct cbox_instrument));
     instr->module = module;
     instr->outputs = outputs;
     instr->refcount = 0;
+    instr->aux_outputs = malloc(sizeof(struct cbox_aux_bus *) * auxes);
+    instr->aux_output_names = malloc(sizeof(char *) * auxes);
+    instr->aux_output_count = auxes;
+    for (int i = 0; i < auxes; i++)
+    {
+        instr->aux_outputs[i] = NULL;
+        
+        gchar *key = g_strdup_printf("aux%d", 1 + i);
+        instr->aux_output_names[i] = cbox_config_get_string(instr_section, key);
+        g_free(key);
+        
+    }
     cbox_command_target_init(&instr->cmd_target, cbox_instrument_process_cmd, instr);
+    
+    free(instr_section);
     
     g_hash_table_insert(instruments.hash, g_strdup(name), instr);
     

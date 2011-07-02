@@ -229,7 +229,8 @@ int main(int argc, char *argv[])
         if (!layer)
             goto fail;
 
-        cbox_scene_add_layer(scene, layer);
+        if (!cbox_scene_add_layer(scene, layer, &error))
+            goto fail;
     }
 
     if (!effect_preset_name)

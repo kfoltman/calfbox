@@ -21,6 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "cmd.h"
 
+#define MAX_AUXBUSES_PER_INSTRUMENT 4
+
 struct cbox_module;
 struct cbox_io;
 
@@ -37,6 +39,9 @@ struct cbox_instrument
     struct cbox_instrument_output *outputs;
     struct cbox_command_target cmd_target;
     int refcount;
+    gchar **aux_output_names;
+    struct cbox_aux_bus **aux_outputs;
+    int aux_output_count;
 };
 
 extern void cbox_instruments_init(struct cbox_io *io);

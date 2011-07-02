@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "app.h"
+#include "auxbus.h"
 #include "config-api.h"
 #include "errors.h"
 #include "instr.h"
@@ -24,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "midi.h"
 #include "module.h"
 #include "scene.h"
+#include <assert.h>
 #include <glib.h>
 
 static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -52,7 +54,12 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         struct cbox_scene *scene = cbox_scene_new();
         if (!scene) // not really expected
             return FALSE;
-        cbox_scene_add_layer(scene, layer);
+        if (!cbox_scene_add_layer(scene, layer, error))
+        {
+            cbox_scene_destroy(scene);
+            cbox_layer_destroy(layer);
+            return FALSE;
+        }
         struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
         cbox_scene_destroy(old_scene);
         return TRUE;
@@ -65,7 +72,12 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         struct cbox_scene *scene = cbox_scene_new();
         if (!scene) // not really expected
             return FALSE;
-        cbox_scene_add_layer(scene, layer);
+        if (!cbox_scene_add_layer(scene, layer, error))
+        {
+            cbox_scene_destroy(scene);
+            cbox_layer_destroy(layer);
+            return FALSE;
+        }
         struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
         cbox_scene_destroy(old_scene);
         return TRUE;
@@ -134,7 +146,11 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
             return NULL;
         }
         
-        cbox_scene_add_layer(s, l);        
+        if (!cbox_scene_add_layer(s, l, error))
+        {
+            cbox_scene_destroy(s);
+            return NULL;
+        }
     }
     
     s->transpose = cbox_config_get_int(section, "transpose", 0);
@@ -157,15 +173,27 @@ struct cbox_scene *cbox_scene_new()
     s->title = g_strdup("");
     s->layer_count = 0;
     s->instrument_count = 0;
+    s->aux_bus_count = 0;
     cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
     s->transpose = 0;
     return s;
 }
 
-void cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer)
+gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error)
 {
     int i;
     
+    struct cbox_instrument *instrument = layer->instrument;
+    for (i = 0; i < instrument->aux_output_count; i++)
+    {
+        assert(!instrument->aux_outputs[i]);
+        if (instrument->aux_output_names[i])
+        {
+            instrument->aux_outputs[i] = cbox_scene_get_aux_bus(scene, instrument->aux_output_names[i], error);
+            if (!instrument->aux_outputs[i])
+                return FALSE;
+        }
+    }
     for (i = 0; i < scene->layer_count; i++)
     {
         if (scene->layers[i]->instrument == layer->instrument)
@@ -174,11 +202,47 @@ void cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer)
     if (i == scene->layer_count)
         scene->instruments[scene->instrument_count++] = layer->instrument;
     scene->layers[scene->layer_count++] = layer;
+    return TRUE;
+}
+
+struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error)
+{
+    for (int i = 0; i < scene->aux_bus_count; i++)
+    {
+        if (!strcmp(scene->aux_buses[i]->name, name))
+        {
+            scene->aux_buses[i]->refcount++;
+            return scene->aux_buses[i];
+        }
+    }
+    if (scene->aux_bus_count == MAX_AUXBUSES_PER_SCENE)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Aux bus limit exceeded for effect '%s'", name);
+        return NULL;
+    }
+    struct cbox_aux_bus *bus = cbox_aux_bus_load(name, error);
+    if (!bus)
+        return NULL;
+    bus->refcount++;
+    scene->aux_buses[scene->aux_bus_count++] = bus;
+    return bus;
 }
 
 void cbox_scene_destroy(struct cbox_scene *scene)
 {
-    for (int i = 0; i < scene->layer_count; i++)
+    int i;
+    for (i = 0; i < scene->layer_count; i++)
         cbox_layer_destroy(scene->layers[i]);
+    for (i = 0; i < scene->instrument_count; i++)
+    {
+        for (int j = 0; j < scene->instruments[i]->aux_output_count; j++)
+        {
+            if (scene->instruments[i]->aux_outputs[j])
+                cbox_aux_bus_unref(scene->instruments[i]->aux_outputs[j]);
+        }
+    }
+            
+    for (int i = 0; i < scene->aux_bus_count; i++)
+        cbox_aux_bus_destroy(scene->aux_buses[i]);
     free(scene);
 }
