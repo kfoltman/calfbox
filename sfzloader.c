@@ -184,6 +184,18 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->send1bus = atoi(value);
     else if (!strcmp(key, "effect2bus"))
         l->send2bus = atoi(value);
+    else if (!strcmp(key, "amplfo_depth"))
+        l->amp_lfo_depth = atof(value);
+    else if (!strcmp(key, "amplfo_freq"))
+        l->amp_lfo_freq = atof(value);
+    else if (!strcmp(key, "fillfo_depth"))
+        l->filter_lfo_depth = atof(value);
+    else if (!strcmp(key, "fillfo_freq"))
+        l->filter_lfo_freq = atof(value);
+    else if (!strcmp(key, "pitchlfo_depth"))
+        l->pitch_lfo_depth = atof(value);
+    else if (!strcmp(key, "pitchlfo_freq"))
+        l->pitch_lfo_freq = atof(value);
     else if (!strncmp(key, "ampeg_", 6))
     {
         if (!parse_envelope_param(&l->amp_env, key + 6, value))

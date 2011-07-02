@@ -34,6 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define MAX_RELEASED_GROUPS 4
 
+static float sine_wave[2049];
+
 GQuark cbox_sampler_error_quark()
 {
     return g_quark_from_string("cbox-sampler-error-quark");
@@ -316,6 +318,14 @@ int skip_inactive_layers(struct sampler_program *prg, int first, int note, int v
     return -1;
 }
 
+static void lfo_init(struct sampler_lfo *lfo, float freq, float depth, int srate)
+{
+    lfo->phase = 0;
+    lfo->delta = (uint32_t)(freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE / srate);
+    lfo->depth = depth;
+}
+
+
 static void sampler_voice_release(struct sampler_voice *v);
 
 void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
@@ -403,6 +413,10 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                     exgroups[exgroupcount++] = l->exclusive_group;
                 }
             }
+            lfo_init(&v->amp_lfo, l->amp_lfo_freq, l->amp_lfo_depth, m->srate);
+            lfo_init(&v->filter_lfo, l->filter_lfo_freq, l->filter_lfo_depth, m->srate);
+            lfo_init(&v->pitch_lfo, l->pitch_lfo_freq, l->pitch_lfo_depth, m->srate);
+            
             cbox_biquadf_reset(&v->filter_left);
             cbox_biquadf_reset(&v->filter_right);
             cbox_envelope_reset(&v->amp_env);
@@ -559,6 +573,27 @@ static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, f
     }
 }
 
+static inline float lfo_run(struct sampler_lfo *lfo)
+{
+    const int FRAC_BITS = 32 - 11;
+    lfo->phase += lfo->delta;
+    if (lfo->depth == 0)
+        return 0;
+    uint32_t iphase = lfo->phase >> FRAC_BITS;
+    float frac = (lfo->phase & ((1 << FRAC_BITS) - 1)) * (1.0 / (1 << FRAC_BITS));
+    float v = sine_wave[iphase] + (sine_wave[iphase + 1] - sine_wave[iphase]) * frac;
+    return v * lfo->depth;
+}
+
+static inline float clip01(float v)
+{
+    if (v < 0.f)
+        return 0;
+    if (v > 1.f)
+        return 1;
+    return v;
+}
+
 void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct sampler_module *m = (struct sampler_module *)module;
@@ -584,6 +619,10 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             vcount++;
             struct sampler_channel *c = v->channel;
             
+            float amp_lfo = lfo_run(&v->amp_lfo);
+            float filter_lfo = lfo_run(&v->filter_lfo);
+            float pitch_lfo = lfo_run(&v->pitch_lfo);
+            
             float amp_env = cbox_envelope_get_next(&v->amp_env, v->released);
             float filter_env = cbox_envelope_get_next(&v->filter_env, v->released);
             float pitch_env = cbox_envelope_get_next(&v->pitch_env, v->released);
@@ -595,12 +634,14 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             
             double maxv = 127 << 7;
             double freq = v->freq * c->pitchbend;
-            if (pitch_env != 0)
-                freq *= pow(2.0, v->pitcheg_depth * pitch_env / 1200.0);
+            if (pitch_env != 0 || pitch_lfo != 0)
+                freq *= pow(2.0, (v->pitcheg_depth * pitch_env + pitch_lfo) / 1200.0);
             uint64_t freq64 = freq * 65536.0 * 65536.0 / m->srate;
             v->delta = freq64 >> 32;
             v->frac_delta = freq64 & 0xFFFFFFFF;
             float gain = amp_env * v->gain * c->volume * c->expression  / (maxv * maxv);
+            if (amp_lfo != 0)
+                gain *= dB2gain(amp_lfo);
             float pan = v->pan + (c->pan * 1.0 / maxv - 0.5) * 2;
             if (pan < -1)
                 pan = -1;
@@ -608,7 +649,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 pan = 1;
             v->lgain = gain * (1 - pan)  / 32768.0;
             v->rgain = gain * pan / 32768.0;
-            float cutoff = v->cutoff*pow(2.0,(filter_env*v->fileg_depth + c->cutoff_ctl*9600/maxv)/1200);
+            float cutoff = v->cutoff*pow(2.0,(filter_env*v->fileg_depth + filter_lfo + c->cutoff_ctl*9600/maxv)/1200);
             if (cutoff < 20)
                 cutoff = 20;
             if (cutoff > m->srate * 0.45)
@@ -899,6 +940,8 @@ void sampler_layer_init(struct sampler_layer *l)
     l->send2bus = 2;
     l->send1gain = 0;
     l->send2gain = 0;
+    l->amp_lfo_depth = l->filter_lfo_depth = l->pitch_lfo_depth = 0;
+    l->amp_lfo_freq = l->filter_lfo_freq = l->pitch_lfo_freq = 0;
 }
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
@@ -992,6 +1035,12 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->send2bus = cbox_config_get_int(cfg_section, "aux2_bus", l->send2bus);
     l->send1gain = cbox_config_get_gain(cfg_section, "aux1_gain", l->send1gain);
     l->send2gain = cbox_config_get_gain(cfg_section, "aux2_gain", l->send2gain);
+    l->amp_lfo_depth = cbox_config_get_float(cfg_section, "amp_lfo_depth", l->amp_lfo_depth);
+    l->amp_lfo_freq = cbox_config_get_float(cfg_section, "amp_lfo_freq", l->amp_lfo_freq);
+    l->filter_lfo_depth = cbox_config_get_float(cfg_section, "filter_lfo_depth", l->filter_lfo_depth);
+    l->filter_lfo_freq = cbox_config_get_float(cfg_section, "filter_lfo_freq", l->filter_lfo_freq);
+    l->pitch_lfo_depth = cbox_config_get_float(cfg_section, "pitch_lfo_depth", l->pitch_lfo_depth);
+    l->pitch_lfo_freq = cbox_config_get_float(cfg_section, "pitch_lfo_freq", l->pitch_lfo_freq);
 }
 
 void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
@@ -1183,6 +1232,8 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     static int inited = 0;
     if (!inited)
     {
+        for (int i = 0; i < 2049; i++)
+            sine_wave[i] = sin(i * M_PI / 1024.0);
         inited = 1;
     }
     

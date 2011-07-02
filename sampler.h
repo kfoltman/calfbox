@@ -82,6 +82,11 @@ struct sampler_layer
     int exclusive_group, off_by;
     int send1bus, send2bus;
     float send1gain, send2gain;
+    
+    float amp_lfo_freq, amp_lfo_depth;
+    float filter_lfo_freq, filter_lfo_depth;
+    float pitch_lfo_freq, pitch_lfo_depth;
+    
     int output_pair_no;
 };
 
@@ -100,6 +105,12 @@ struct sampler_channel
     int sustain, sostenuto;
     int volume, pan, expression, modulation, cutoff_ctl, resonance_ctl;
     struct sampler_program *program;
+};
+
+struct sampler_lfo
+{
+    uint32_t phase, delta;
+    float depth;
 };
 
 struct sampler_voice
@@ -125,6 +136,7 @@ struct sampler_voice
     struct cbox_biquadf_coeffs filter_coeffs;
     struct sampler_channel *channel;
     struct cbox_envelope amp_env, filter_env, pitch_env;
+    struct sampler_lfo amp_lfo, filter_lfo, pitch_lfo;
     enum sample_loop_mode loop_mode;
     int output_pair_no;
     int send1bus, send2bus;
