@@ -176,6 +176,14 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->velcurve_quadratic = atoi(value);
     else if (!strcmp(key, "fil_veltrack"))
         l->fil_veltrack = atof(value);
+    else if (!strcmp(key, "effect1"))
+        l->send1gain = atof(value) / 100.0;
+    else if (!strcmp(key, "effect2"))
+        l->send2gain = atof(value) / 100.0;
+    else if (!strcmp(key, "effect1bus"))
+        l->send1bus = atoi(value);
+    else if (!strcmp(key, "effect2bus"))
+        l->send2bus = atoi(value);
     else if (!strncmp(key, "ampeg_", 6))
     {
         if (!parse_envelope_param(&l->amp_env, key + 6, value))

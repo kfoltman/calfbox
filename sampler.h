@@ -80,6 +80,8 @@ struct sampler_layer
     float velcurve[128];
     int velcurve_quadratic, fil_veltrack;
     int exclusive_group, off_by;
+    int send1bus, send2bus;
+    float send1gain, send2gain;
     int output_pair_no;
 };
 
@@ -125,6 +127,8 @@ struct sampler_voice
     struct cbox_envelope amp_env, filter_env, pitch_env;
     enum sample_loop_mode loop_mode;
     int output_pair_no;
+    int send1bus, send2bus;
+    float send1gain, send2gain;
     int serial_no;
 };
 

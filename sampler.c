@@ -376,6 +376,17 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->fileg_depth = l->fileg_depth;
             v->loop_mode = l->loop_mode;
             v->off_by = l->off_by;
+            int auxes = (m->module.outputs - m->module.aux_offset) / 2;
+            if (l->send1bus >= 1 && l->send1bus < 1 + auxes)
+                v->send1bus = l->send1bus;
+            else
+                v->send1bus = 0;
+            if (l->send2bus >= 1 && l->send2bus < 1 + auxes)
+                v->send2bus = l->send2bus;
+            else
+                v->send2bus = 0;
+            v->send1gain = l->send1gain;
+            v->send2gain = l->send2gain;
             if (l->exclusive_group >= 0 && exgroupcount < MAX_RELEASED_GROUPS)
             {
                 gboolean found = FALSE;
@@ -537,6 +548,17 @@ void sampler_steal_voice(struct sampler_module *m)
     }
 }
 
+static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, float *src_left, float *src_right, float gain)
+{
+    cbox_sample_t *dst_left = outputs[oofs];
+    cbox_sample_t *dst_right = outputs[oofs + 1];
+    for (size_t i = 0; i < CBOX_BLOCK_SIZE; i++)
+    {
+        dst_left[i] += gain * src_left[i];
+        dst_right[i] += gain * src_right[i];
+    }
+}
+
 void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct sampler_module *m = (struct sampler_module *)module;
@@ -598,10 +620,35 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 resonance = 32;
             cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
             
-            if (v->mode == spt_stereo16)
-                process_voice_stereo(v, outputs + v->output_pair_no * 2);
+            if ((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0))
+            {
+                float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
+                for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+                    left[i] = right[i] = 0;
+                float *tmp_outputs[2] = {left, right};
+                if (v->mode == spt_stereo16)
+                    process_voice_stereo(v, tmp_outputs);
+                else
+                    process_voice_mono(v, tmp_outputs);
+                mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.0);
+                if (v->send1bus > 0 && v->send1gain != 0)
+                {
+                    int oofs = m->module.aux_offset + (v->send1bus - 1) * 2;
+                    mix_block_into_with_gain(outputs, oofs, left, right, v->send1gain);
+                }
+                if (v->send2bus > 0 && v->send2gain != 0)
+                {
+                    int oofs = m->module.aux_offset + (v->send2bus - 1) * 2;
+                    mix_block_into_with_gain(outputs, oofs, left, right, v->send2gain);
+                }
+            }
             else
-                process_voice_mono(v, outputs + v->output_pair_no * 2);
+            {
+                if (v->mode == spt_stereo16)
+                    process_voice_stereo(v, outputs + v->output_pair_no * 2);
+                else
+                    process_voice_mono(v, outputs + v->output_pair_no * 2);
+            }
             
             v->last_lgain = v->lgain;
             v->last_rgain = v->rgain;
@@ -848,6 +895,10 @@ void sampler_layer_init(struct sampler_layer *l)
     l->exclusive_group = -1;
     l->off_by = -1;
     l->output_pair_no = 0;
+    l->send1bus = 1;
+    l->send2bus = 2;
+    l->send1gain = 0;
+    l->send2gain = 0;
 }
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
@@ -912,7 +963,7 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->loop_end = cbox_config_get_int(cfg_section, "loop_end", l->loop_end);
     l->loop_evolve = cbox_config_get_int(cfg_section, "loop_evolve", l->loop_evolve);
     l->loop_overlap = cbox_config_get_int(cfg_section, "loop_overlap", l->loop_overlap);
-    l->gain = cbox_config_get_gain_db(cfg_section, "gain", 0.0);
+    l->gain = cbox_config_get_gain(cfg_section, "gain", l->gain);
     l->pan = cbox_config_get_float(cfg_section, "pan", l->pan);
     l->note_scaling = cbox_config_get_float(cfg_section, "note_scaling", l->note_scaling);
     l->root_note = cbox_config_get_int(cfg_section, "root_note", l->root_note);
@@ -937,6 +988,10 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->exclusive_group = cbox_config_get_int(cfg_section, "group", l->exclusive_group);
     l->off_by = cbox_config_get_int(cfg_section, "off_by", l->off_by);
     l->output_pair_no = cbox_config_get_int(cfg_section, "output_pair_no", l->output_pair_no);
+    l->send1bus = cbox_config_get_int(cfg_section, "aux1_bus", l->send1bus);
+    l->send2bus = cbox_config_get_int(cfg_section, "aux2_bus", l->send2bus);
+    l->send1gain = cbox_config_get_gain(cfg_section, "aux1_gain", l->send1gain);
+    l->send2gain = cbox_config_get_gain(cfg_section, "aux2_gain", l->send2gain);
 }
 
 void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
