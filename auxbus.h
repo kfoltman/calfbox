@@ -26,6 +26,9 @@ struct cbox_aux_bus
     gchar *name;
     struct cbox_module *module;
     int refcount;
+    
+    float *input_bufs[2];
+    float *output_bufs[2];
 };
 
 extern struct cbox_aux_bus *cbox_aux_bus_load(const char *name, GError **error);

@@ -30,6 +30,12 @@ struct cbox_aux_bus *cbox_aux_bus_load(const char *name, GError **error)
     p->name = g_strdup(name);
     p->module = module;
     p->refcount = 0;
+    // XXXKF this work up to buffer size of 8192 floats, this should be determined from JACK settings and updated when
+    // JACK buffer size changes
+    p->input_bufs[0] = malloc(8192 * sizeof(float));
+    p->input_bufs[1] = malloc(8192 * sizeof(float));
+    p->output_bufs[0] = malloc(8192 * sizeof(float));
+    p->output_bufs[1] = malloc(8192 * sizeof(float));
     
     return p;
 }
@@ -49,6 +55,8 @@ void cbox_aux_bus_destroy(struct cbox_aux_bus *bus)
     assert(!bus->refcount);
     assert(!bus->module);
     g_free(bus->name);
+    free(bus->input_bufs[0]);
+    free(bus->input_bufs[1]);
     free(bus);
 }
 

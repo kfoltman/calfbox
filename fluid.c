@@ -51,6 +51,7 @@ struct fluidsynth_module
     fluid_synth_t *synth;
     int sfid;
     int output_pairs;
+    int is_multi;
     float **left_outputs, **right_outputs;
 };
 
@@ -98,14 +99,16 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
     }
     
     struct fluidsynth_module *m = malloc(sizeof(struct fluidsynth_module));
-    m->output_pairs = cbox_config_get_int(cfg_section, "output_pairs", 1);
+    int pairs = cbox_config_get_int(cfg_section, "output_pairs", 0);
+    m->output_pairs = pairs ? pairs : 1;
+    m->is_multi = pairs > 0;
     if (m->output_pairs < 1 || m->output_pairs > 16)
     {
         free(m);
         g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Invalid number of output pairs (found %d, supported range 1-16)", m->output_pairs);
         return NULL;
     }
-    if (m->output_pairs == 1)
+    if (pairs == 0)
     {
         cbox_module_init(&m->module, m, 0, 2 * m->output_pairs, fluidsynth_process_cmd);
         m->left_outputs = NULL;
@@ -160,12 +163,11 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
 void fluidsynth_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct fluidsynth_module *m = (struct fluidsynth_module *)module;
-    if (m->output_pairs == 1)
+    if (!m->is_multi)
         fluid_synth_write_float(m->synth, CBOX_BLOCK_SIZE, outputs[0], 0, 1, outputs[1], 0, 1);
     else
     {
-        int i;
-        for (i = 0; i < 2 + m->output_pairs; i++)
+        for (int i = 0; i < 2 + m->output_pairs; i++)
         {
             m->left_outputs[i] = outputs[2 * i];
             m->right_outputs[i] = outputs[2 * i + 1];

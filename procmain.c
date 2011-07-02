@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "auxbus.h"
 #include "instr.h"
 #include "io.h"
 #include "layer.h"
@@ -221,6 +222,17 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     for (n = 0; n < io->output_count; n++)
         for (i = 0; i < nframes; i ++)
             io->output_buffers[n][i] = 0.f;
+    if (scene)
+    {
+        for (n = 0; n < scene->aux_bus_count; n++)
+        {
+            for (i = 0; i < nframes; i ++)
+            {
+                scene->aux_buses[n]->input_bufs[0][i] = 0.f;
+                scene->aux_buses[n]->input_bufs[1][i] = 0.f;
+            }
+        }
+    }
     
     for (n = 0; scene && n < scene->instrument_count; n++)
     {
@@ -261,16 +273,31 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
             for (int o = 0; o < module->outputs / 2; o++)
             {
                 struct cbox_instrument_output *oobj = &instr->outputs[o];
-                int leftch = oobj->output_bus * 2;
-                int rightch = leftch + 1;
                 struct cbox_module *insert = oobj->insert;
                 float gain = oobj->gain;
                 if (insert)
                     (*insert->process_block)(insert, outputs + 2 * o, outputs + 2 * o);
+                float *leftbuf, *rightbuf;
+                if (o < module->aux_offset / 2)
+                {
+                    int leftch = oobj->output_bus * 2;
+                    int rightch = leftch + 1;
+                    leftbuf = io->output_buffers[leftch];
+                    rightbuf = io->output_buffers[rightch];
+                }
+                else
+                {
+                    int bus = o - module->aux_offset / 2;
+                    struct cbox_aux_bus *busobj = instr->aux_outputs[bus];
+                    if (busobj == NULL)
+                        continue;
+                    leftbuf = busobj->input_bufs[0];
+                    rightbuf = busobj->input_bufs[1];
+                }
                 for (j = 0; j < CBOX_BLOCK_SIZE; j++)
                 {
-                    io->output_buffers[leftch][i + j] += gain * channels[2 * o][j];
-                    io->output_buffers[rightch][i + j] += gain * channels[2 * o + 1][j];
+                    leftbuf[i + j] += gain * channels[2 * o][j];
+                    rightbuf[i + j] += gain * channels[2 * o + 1][j];
                 }
             }
         }
@@ -288,6 +315,28 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         }
     }
     
+    if (scene)
+    {
+        for (n = 0; n < scene->aux_bus_count; n++)
+        {
+            struct cbox_aux_bus *bus = scene->aux_buses[n];
+            float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
+            float *outputs[2] = {left, right};
+            for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
+            {
+                float *inputs[2];
+                inputs[0] = &bus->input_bufs[0][i];
+                inputs[1] = &bus->input_bufs[1][i];
+                bus->module->process_block(bus->module, inputs, outputs);
+                for (int j = 0; j < CBOX_BLOCK_SIZE; j++)
+                {
+                    io->output_buffers[0][i + j] += left[j];
+                    io->output_buffers[1][i + j] += right[j];
+                }
+            }
+        }
+    }
+
     // Process "master" effect
     if (effect)
     {
