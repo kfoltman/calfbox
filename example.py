@@ -643,6 +643,7 @@ class MainWindow(gtk.Window):
             outputs_ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
             
         auxbus_ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+        auxbus_ls.append(("", ""))
         for bus in range(len(scene.aux)):
             auxbus_ls.append(("Aux: %s" % scene.aux[bus][1], scene.aux[bus][1]))
             

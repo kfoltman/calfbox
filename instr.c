@@ -124,6 +124,13 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
     else if (!strcmp(subcmd, "/bus") && !strcmp(cmd->arg_types, "s"))
     {
         struct cbox_scene *scene = instr->scene;
+        if (!*(const char *)cmd->arg_values[0])
+        {
+            struct cbox_aux_bus *old_bus = cbox_rt_swap_pointers(app.rt, (void **)&instr->aux_outputs[id], NULL);
+            if (old_bus)
+                cbox_aux_bus_unref(old_bus);
+            return TRUE;            
+        }
         for (int i = 0; i < scene->aux_bus_count; i++)
         {
             if (!scene->aux_buses[i])
@@ -134,7 +141,8 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
                 instr->aux_output_names[id] = g_strdup(scene->aux_buses[i]->name);
                 cbox_aux_bus_ref(scene->aux_buses[i]);
                 struct cbox_aux_bus *old_bus = cbox_rt_swap_pointers(app.rt, (void **)&instr->aux_outputs[id], scene->aux_buses[i]);
-                cbox_aux_bus_unref(old_bus);
+                if (old_bus)
+                    cbox_aux_bus_unref(old_bus);
                 return TRUE;
             }
         }
