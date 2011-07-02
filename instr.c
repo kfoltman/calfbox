@@ -17,11 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "app.h"
+#include "auxbus.h"
 #include "config-api.h"
 #include "instr.h"
 #include "io.h"
 #include "module.h"
 #include "procmain.h"
+#include "scene.h"
 #include <assert.h>
 #include <glib.h>
 
@@ -54,11 +56,7 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
     }
     if (!strcmp(subcmd, "/gain") && !strcmp(cmd->arg_types, "f"))
     {
-        double dB = *(double *)cmd->arg_values[0];
-        if (dB < -96)
-            output->gain = 0;
-        else
-            output->gain = dB2gain(dB);
+        output->gain = dB2gain_simple(*(double *)cmd->arg_values[0]);
         return TRUE;
     }
     if (!strcmp(subcmd, "/output") && !strcmp(cmd->arg_types, "i"))
@@ -68,7 +66,7 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
         output->output_bus = obus - 1;
         return TRUE;
     }
-    if (!strcmp(subcmd, "/load_preset") && !strcmp(cmd->arg_types, "s"))
+    if (!strcmp(subcmd, "/insert_preset") && !strcmp(cmd->arg_types, "s"))
     {
         struct cbox_module *effect = cbox_module_new_from_fx_preset((const char *)cmd->arg_values[0], error);
         if (!effect)
@@ -76,7 +74,7 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
         cbox_rt_swap_pointers(app.rt, (void **)&output->insert, effect);
         return TRUE;
     }
-    if (!strcmp(subcmd, "/new_insert") && !strcmp(cmd->arg_types, "s"))
+    if (!strcmp(subcmd, "/insert_engine") && !strcmp(cmd->arg_types, "s"))
     {
         struct cbox_module *effect = NULL;
         if (*(const char *)cmd->arg_values[0])
@@ -111,6 +109,47 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
     return cbox_set_command_error(error, cmd);            
 }
 
+static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, struct cbox_instrument_output *output, int id, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
+{
+    if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!(cbox_execute_on(fb, NULL, "/gain_linear", "f", error, output->gain) &&
+            cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
+            cbox_execute_on(fb, NULL, "/bus", "s", error, instr->aux_output_names[id] ? instr->aux_output_names[id] : "") &&
+            cbox_execute_on(fb, NULL, "/insert_engine", "s", error, output->insert ? output->insert->engine_name : "") &&
+            cbox_execute_on(fb, NULL, "/insert_preset", "s", error, output->insert ? output->insert->instance_name : "")))
+            return FALSE;
+        return TRUE;
+    }
+    else if (!strcmp(subcmd, "/bus") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_scene *scene = instr->scene;
+        for (int i = 0; i < scene->aux_bus_count; i++)
+        {
+            if (!scene->aux_buses[i])
+                continue;
+            if (!strcmp(scene->aux_buses[i]->name, (const char *)cmd->arg_values[0]))
+            {
+                g_free(instr->aux_output_names[id]);
+                instr->aux_output_names[id] = g_strdup(scene->aux_buses[i]->name);
+                cbox_aux_bus_ref(scene->aux_buses[i]);
+                struct cbox_aux_bus *old_bus = cbox_rt_swap_pointers(app.rt, (void **)&instr->aux_outputs[id], scene->aux_buses[i]);
+                cbox_aux_bus_unref(old_bus);
+                return TRUE;
+            }
+        }
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown aux bus: %s", (const char *)cmd->arg_values[0]);
+        return FALSE;
+    }
+    else if (!strcmp(subcmd, "/output") && !strcmp(cmd->arg_types, "i")) // not supported
+    {
+        cbox_set_command_error(error, cmd);
+        return FALSE;
+    }
+    else // otherwise, treat just like an command on normal (non-aux) output
+        return cbox_instrument_output_process_cmd(instr, output, fb, cmd, subcmd, error);
+}
+
 gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct cbox_instrument *instr = ct->user_data;
@@ -135,7 +174,7 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
         
         gchar *numcopy = g_strndup(num, slash-num);
         int output_num = atoi(numcopy);
-        if (output_num < 1 || output_num > instr->module->outputs / 2)
+        if (output_num < 1 || output_num > instr->module->aux_offset / 2)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid output index %s for command %s", numcopy, cmd->command);
             g_free(numcopy);
@@ -143,6 +182,25 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
         }
         g_free(numcopy);
         return cbox_instrument_output_process_cmd(instr, &instr->outputs[output_num - 1], fb, cmd, slash, error);
+    }
+    else if (!strncmp(cmd->command, "/aux/", 5))
+    {
+        int aux_offset = instr->module->aux_offset / 2;
+        const char *num = cmd->command + 5;
+        const char *slash = strchr(num, '/');
+        if (!slash)
+            return cbox_set_command_error(error, cmd);            
+        
+        gchar *numcopy = g_strndup(num, slash-num);
+        int aux_num = atoi(numcopy);
+        if (aux_num < 1 || aux_num > instr->aux_output_count)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid aux bus index %s for command %s", numcopy, cmd->command);
+            g_free(numcopy);
+            return FALSE;
+        }
+        g_free(numcopy);
+        return cbox_instrument_aux_process_cmd(instr, &instr->outputs[aux_offset + aux_num - 1], aux_num - 1, fb, cmd, slash, error);
     }
     else
     if (!strncmp(cmd->command, "/engine/",8))
@@ -240,6 +298,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
 
     int auxes = (module->outputs - module->aux_offset) / 2;
     instr = malloc(sizeof(struct cbox_instrument));
+    instr->scene = NULL;
     instr->module = module;
     instr->outputs = outputs;
     instr->refcount = 0;
@@ -251,7 +310,8 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
         instr->aux_outputs[i] = NULL;
         
         gchar *key = g_strdup_printf("aux%d", 1 + i);
-        instr->aux_output_names[i] = cbox_config_get_string(instr_section, key);
+        gchar *value = cbox_config_get_string(instr_section, key);
+        instr->aux_output_names[i] = value ? g_strdup(value) : NULL;
         g_free(key);
         
     }
@@ -281,6 +341,10 @@ void cbox_instrument_destroy(struct cbox_instrument *instrument)
     {
         if (instrument->outputs[i].insert)
             cbox_module_destroy(instrument->outputs[i].insert);
+    }
+    for (int i = 0; i < instrument->aux_output_count; i++)
+    {
+        g_free(instrument->aux_output_names[i]);
     }
     cbox_module_destroy(instrument->module);
 }

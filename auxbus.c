@@ -40,20 +40,22 @@ struct cbox_aux_bus *cbox_aux_bus_load(const char *name, GError **error)
     return p;
 }
 
+void cbox_aux_bus_ref(struct cbox_aux_bus *bus)
+{
+    ++bus->refcount;
+}
+
 void cbox_aux_bus_unref(struct cbox_aux_bus *bus)
 {
     assert(bus->refcount > 0);
-    if (!--bus->refcount)
-    {
-        cbox_module_destroy(bus->module);
-        bus->module = NULL;
-    }
+    --bus->refcount;
 }
 
 void cbox_aux_bus_destroy(struct cbox_aux_bus *bus)
 {
+    cbox_module_destroy(bus->module);
+    bus->module = NULL;
     assert(!bus->refcount);
-    assert(!bus->module);
     g_free(bus->name);
     free(bus->input_bufs[0]);
     free(bus->input_bufs[1]);

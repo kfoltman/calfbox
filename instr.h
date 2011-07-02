@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct cbox_module;
 struct cbox_io;
+struct cbox_scene;
 
 struct cbox_instrument_output
 {
@@ -37,6 +38,7 @@ struct cbox_instrument
 {
     struct cbox_module *module;
     struct cbox_instrument_output *outputs;
+    struct cbox_scene *scene;
     struct cbox_command_target cmd_target;
     int refcount;
     gchar **aux_output_names;

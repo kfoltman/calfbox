@@ -102,6 +102,11 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             if (!cbox_execute_on(fb, NULL, "/instrument", "ss", error, s->instruments[i]->module->instance_name, s->instruments[i]->module->engine_name))
                 return FALSE;
         }
+        for (int i = 0; i < s->aux_bus_count; i++)
+        {
+            if (!cbox_execute_on(fb, NULL, "/aux", "is", error, i + 1, s->aux_buses[i]->name))
+                return FALSE;
+        }
         return TRUE;
     }
     else
@@ -200,7 +205,10 @@ gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer
             break;
     }
     if (i == scene->layer_count)
+    {
         scene->instruments[scene->instrument_count++] = layer->instrument;
+        layer->instrument->scene = scene;
+    }
     scene->layers[scene->layer_count++] = layer;
     return TRUE;
 }

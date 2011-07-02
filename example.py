@@ -100,6 +100,10 @@ def combo_value_changed(combo, path, value_offset = 0):
     if combo.get_active() != -1:
         cbox.do_cmd(path, None, [value_offset + combo.get_active()])
 
+def combo_value_changed_use_column(combo, path, column):
+    if combo.get_active() != -1:
+        cbox.do_cmd(path, None, [combo.get_model()[combo.get_active()][column]])
+
 def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustment_changed_float):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
     adj = gtk.Adjustment(getattr(values, item), min, max, 1, 6, 0)
@@ -320,13 +324,13 @@ class MappedSliderRow(TableRowWidget):
         adjustment.set_value(self.mapper.unmap(getattr(values, self.name)))
 
 class EffectWindow(gtk.Window):
-    def __init__(self, instrument, output, plugin_name, main_window):
+    def __init__(self, instrument, output, main_window, path):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_UTILITY)
         self.set_transient_for(main_window)
         self.main_window = main_window
-        self.path = "/instr/%s/output/%s/engine" % (instrument, output)
-        self.set_title("%s - %s" % (plugin_name, instrument))
+        self.path = path
+        self.set_title("%s - %s" % (self.effect_name, instrument))
         if hasattr(self, 'params'):
             values = GetThings(self.path + "/status", [p.name for p in self.params], [])
             self.refreshers = []
@@ -382,10 +386,8 @@ class PhaserWindow(EffectWindow):
         SliderRow("Wet/dry", "wet_dry", 0, 1),
         SliderRow("Stages", "stages", 1, 12, setter = adjustment_changed_int)
     ]
+    effect_name = "Phaser"
     
-    def __init__(self, instrument, output, main_window):
-        EffectWindow.__init__(self, instrument, output, "Phaser", main_window)
-
 class ChorusWindow(EffectWindow):
     params = [
         SliderRow("Min. delay", "min_delay", 1, 20),
@@ -394,8 +396,7 @@ class ChorusWindow(EffectWindow):
         SliderRow("Stereo", "stereo_phase", 0, 360),
         SliderRow("Wet/dry", "wet_dry", 0, 1)
     ]
-    def __init__(self, instrument, output, main_window):
-        EffectWindow.__init__(self, instrument, output, "Chorus", main_window)
+    effect_name = "Chorus"
 
 class DelayWindow(EffectWindow):
     params = [
@@ -403,8 +404,7 @@ class DelayWindow(EffectWindow):
         SliderRow("Feedback", "fb_amt", 0, 1),
         SliderRow("Wet/dry", "wet_dry", 0, 1)
     ]
-    def __init__(self, instrument, output, main_window):
-        EffectWindow.__init__(self, instrument, output, "Delay", main_window)
+    effect_name = "Delay"
 
 class ReverbWindow(EffectWindow):
     params = [
@@ -415,16 +415,14 @@ class ReverbWindow(EffectWindow):
         MappedSliderRow("Highpass", "highpass", LogMapper(30, 2000, freq_format)),
         SliderRow("Diffusion", "diffusion", 0.2, 0.8)
     ]
-    def __init__(self, instrument, output, main_window):
-        EffectWindow.__init__(self, instrument, output, "Reverb", main_window)
+    effect_name = "Reverb"
 
 class ToneControlWindow(EffectWindow):
     params = [
         MappedSliderRow("Lowpass", "lowpass", LogMapper(300, 20000, freq_format)),
         MappedSliderRow("Highpass", "highpass", LogMapper(30, 2000, freq_format))
     ]
-    def __init__(self, instrument, output, main_window):
-        EffectWindow.__init__(self, instrument, output, "Tone Control", main_window)
+    effect_name = "Tone Control"
 
 eq_cols = [
     ("Active", 0, 1, "active", 'checkbox'), 
@@ -434,14 +432,17 @@ eq_cols = [
 ]
 
 class EQWindow(EffectWindow):
-    def __init__(self, instrument, output, main_window):
-        EffectWindow.__init__(self, instrument, output, "Parametric Equalizer", main_window)
+    def __init__(self, instrument, output, main_window, path):
+        EffectWindow.__init__(self, instrument, output, main_window, path)
         values = GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
         self.add(self.create_param_table(eq_cols, 4, values))
+    effect_name = "Equalizer"
         
 class FBRWindow(EffectWindow):
-    def __init__(self, instrument, output, main_window):
-        EffectWindow.__init__(self, instrument, output, "Feedback Reducer", main_window)
+    effect_name = "Feedback Reduction"
+    
+    def __init__(self, instrument, output, main_window, path):
+        EffectWindow.__init__(self, instrument, output, main_window, path)
         values = GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
         t = self.create_param_table(eq_cols, 16, values, 1)        
         self.add(t)
@@ -613,7 +614,7 @@ class MainWindow(gtk.Window):
         
         self.vbox.pack_start(self.menu_bar, False, False)
         rt = GetThings("/rt/status", ['audio_channels'], [])
-        scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title', 'transpose'], [])
+        scene = GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
         
         self.nb = gtk.Notebook()
         self.vbox.add(self.nb)
@@ -637,6 +638,14 @@ class MainWindow(gtk.Window):
                 self.fxpreset_ls[engine] = gtk.ListStore(gobject.TYPE_STRING)
             fx_ls.append((engine,))
             
+        outputs_ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
+        for out in range(0, rt.audio_channels[1]/2):
+            outputs_ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
+            
+        auxbus_ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+        for bus in range(len(scene.aux)):
+            auxbus_ls.append(("Aux: %s" % scene.aux[bus][1], scene.aux[bus][1]))
+            
         for i in scene.instrument:
             ipath = "/instr/%s" % i[0]
             idata = GetThings(ipath + "/status", ['outputs', 'aux_offset'], [])
@@ -653,24 +662,34 @@ class MainWindow(gtk.Window):
             t.attach(bold_label("Gain [dB]", 0.5), 2, 3, 0, 1, 0, gtk.SHRINK)
             t.attach(bold_label("Effect", 0.5), 3, 6, 0, 1, 0, gtk.SHRINK)
             b.pack_start(t, False, False)
+            
             y = 1
             for o in range(1, idata.outputs + 1):
-                opath = "%s/output/%s" % (ipath, o)
-                odata = GetThings(opath + "/status", ['gain', 'output', 'insert_engine', 'insert_preset'], [])
+                if o < idata.aux_offset:
+                    opath = "%s/output/%s" % (ipath, o)
+                else:
+                    opath = "%s/aux/%s" % (ipath, o - idata.aux_offset + 1)
+                odata = GetThings(opath + "/status", ['gain', 'output', 'bus', 'insert_engine', 'insert_preset'], [])
                 engine = odata.insert_engine
                 preset = odata.insert_preset
                 
-                if 2 * (o - 1) < idata.aux_offset:
+                is_aux = 2 * (o - 1) >= idata.aux_offset
+                
+                if not is_aux:
                     output_name = "Out %s" % o
                 else:
                     output_name = "Aux %s" % (o - idata.aux_offset / 2)
                 t.attach(gtk.Label(output_name), 0, 1, y, y + 1, gtk.SHRINK, gtk.SHRINK)
-                ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
-                for out in range(0, rt.audio_channels[1]/2):
-                    ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
-                cb = standard_combo(ls, odata.output - 1)
-                cb.connect('changed', combo_value_changed, opath + '/output', 1)
+                
+                if not is_aux:
+                    cb = standard_combo(outputs_ls, odata.output - 1)
+                    cb.connect('changed', combo_value_changed, opath + '/output', 1)
+                else:
+                    cb = standard_combo(auxbus_ls, ls_index(auxbus_ls, odata.bus, 1))
+                    cb.connect('changed', combo_value_changed_use_column, opath + '/bus', 1)
                 t.attach(cb, 1, 2, y, y + 1, gtk.SHRINK, gtk.SHRINK)
+                    
+                
                 adj = gtk.Adjustment(odata.gain, -96, 24, 1, 6, 0)
                 adj.connect('value_changed', adjustment_changed_float, opath + '/gain')
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
@@ -709,7 +728,7 @@ class MainWindow(gtk.Window):
             return
         engine = GetThings(opath + "/status", ['insert_engine'], []).insert_engine
         wclass = engine_window_map[engine]
-        popup = wclass(instr, output, self)
+        popup = wclass(instr, output, self, "%s/engine" % opath)
         popup.show_all()
         popup.present()
         self.path_popups[opath] = popup
@@ -720,7 +739,7 @@ class MainWindow(gtk.Window):
             del self.path_popups[opath]
             
         engine = combo.get_model()[combo.get_active()][0]
-        cbox.do_cmd(opath + '/new_insert', None, [engine])
+        cbox.do_cmd(opath + '/insert_engine', None, [engine])
         fx_engine, fx_preset, fx_edit = self.path_widgets[opath]
         fx_preset.set_model(self.fxpreset_ls[engine])
         fx_preset.set_active(0)
@@ -728,7 +747,7 @@ class MainWindow(gtk.Window):
         
     def fx_preset_changed(self, combo, opath):
         if combo.get_active() >= 0:
-            cbox.do_cmd(opath + '/load_preset', None, [combo.get_model()[combo.get_active()][0]])
+            cbox.do_cmd(opath + '/insert_preset', None, [combo.get_model()[combo.get_active()][0]])
         if opath in self.path_popups:
             self.path_popups[opath].refresh()
         
