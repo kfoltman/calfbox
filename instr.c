@@ -180,11 +180,12 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
     {
         if (!subcommand)
             return FALSE;
-        int output_num = index;
         return cbox_instrument_output_process_cmd(instr, &instr->outputs[index - 1], fb, cmd, subcommand, error);
     }
     else if (cbox_parse_path_part(cmd, "/aux/", &subcommand, &index, 1, instr->aux_output_count, error))
     {
+        if (!subcommand)
+            return FALSE;
         return cbox_instrument_aux_process_cmd(instr, &instr->outputs[aux_offset + index - 1], index - 1, fb, cmd, subcommand, error);
     }
     else
