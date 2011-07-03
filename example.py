@@ -566,17 +566,14 @@ class MainWindow(gtk.Window):
         self.transpose_adj.connect('value_changed', adjustment_changed_int, '/scene/transpose')
         t.attach(standard_align(gtk.SpinButton(self.transpose_adj), 0, 0, 0, 0), 1, 2, 5, 6, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         
-        self.layers_model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)
-        for l in scene.layer:
-            layer = GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name"], [])
-            self.layers_model.append((layer.instrument_name, layer.enable != 0))
-        
+        self.layers_model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)        
         self.layers_tree = gtk.TreeView(self.layers_model)
         toggle = gtk.CellRendererToggle()
         toggle.connect('toggled', tree_toggle_changed_bool, self.layers_model, "/scene/layer/%d/enable")
         self.layers_tree.insert_column_with_attributes(0, "Enabled", toggle, active=1)
         self.layers_tree.insert_column_with_attributes(1, "Name", gtk.CellRendererText(), text=0)
         t.attach(self.layers_tree, 0, 2, 6, 7, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+        self.refresh_layer_list(scene)        
         return t
 
     def create_menu(self, title, items):
@@ -589,6 +586,13 @@ class MainWindow(gtk.Window):
                 mit.connect('activate', meth)
                 menu.append(mit)
         return menuitem
+
+    def refresh_layer_list(self, scene):
+        self.layers_model.clear()
+        for l in scene.layer:
+            layer = GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name"], [])
+            self.layers_model.append((layer.instrument_name, layer.enable != 0))
+        self.layers_tree.set_model(self.layers_model)
 
     def quit(self, w):
         self.destroy()
@@ -615,7 +619,8 @@ class MainWindow(gtk.Window):
     def refresh_instrument_pages(self):
         self.delete_instrument_pages()
         rt = GetThings("/rt/status", ['audio_channels'], [])
-        scene = GetThings("/scene/status", ['*layer', '*instrument', 'name', 'title', 'transpose'], [])
+        scene = GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
+        self.refresh_layer_list(scene)
         self.create_instrument_pages(scene, rt)
         self.nb.show_all()
         self.title_label.set_text(scene.title)
