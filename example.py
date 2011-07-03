@@ -84,8 +84,8 @@ def standard_filter(patterns, name):
     f.set_name(name)
     return f
 
-def checkbox_changed_bool(adjustment, path, *items):
-    cbox.do_cmd(path, None, list(items) + [1 if adjustment.get_active() else 0])
+def checkbox_changed_bool(checkbox, path, *items):
+    cbox.do_cmd(path, None, list(items) + [1 if checkbox.get_active() else 0])
 
 def adjustment_changed_int(adjustment, path, *items):
     cbox.do_cmd(path, None, list(items) + [int(adjustment.get_value())])
@@ -103,6 +103,10 @@ def combo_value_changed(combo, path, value_offset = 0):
 def combo_value_changed_use_column(combo, path, column):
     if combo.get_active() != -1:
         cbox.do_cmd(path, None, [combo.get_model()[combo.get_active()][column]])
+
+def tree_toggle_changed_bool(renderer, tree_path, model, opath):
+    model[int(tree_path)][1] = not model[int(tree_path)][1]
+    cbox.do_cmd(opath % (1 + int(tree_path)), None, [1 if model[int(tree_path)][1] else 0])
 
 def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustment_changed_float):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
@@ -561,6 +565,18 @@ class MainWindow(gtk.Window):
         self.transpose_adj = gtk.Adjustment(scene.transpose, -24, 24, 1, 5, 0)
         self.transpose_adj.connect('value_changed', adjustment_changed_int, '/scene/transpose')
         t.attach(standard_align(gtk.SpinButton(self.transpose_adj), 0, 0, 0, 0), 1, 2, 5, 6, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+        
+        self.layers_model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)
+        for l in scene.layer:
+            layer = GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name"], [])
+            self.layers_model.append((layer.instrument_name, layer.enable != 0))
+        
+        self.layers_tree = gtk.TreeView(self.layers_model)
+        toggle = gtk.CellRendererToggle()
+        toggle.connect('toggled', tree_toggle_changed_bool, self.layers_model, "/scene/layer/%d/enable")
+        self.layers_tree.insert_column_with_attributes(0, "Enabled", toggle, active=1)
+        self.layers_tree.insert_column_with_attributes(1, "Name", gtk.CellRendererText(), text=0)
+        t.attach(self.layers_tree, 0, 2, 6, 7, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         return t
 
     def create_menu(self, title, items):
@@ -614,8 +630,7 @@ class MainWindow(gtk.Window):
         
         self.vbox.pack_start(self.menu_bar, False, False)
         rt = GetThings("/rt/status", ['audio_channels'], [])
-        scene = GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
-        
+        scene = GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])        
         self.nb = gtk.Notebook()
         self.vbox.add(self.nb)
         self.nb.append_page(self.create_master(scene), gtk.Label("Master"))

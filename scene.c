@@ -28,9 +28,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <glib.h>
 
+static gboolean cbox_layer_process_cmd(struct cbox_layer *layer, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
+{
+    if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        if (!(cbox_execute_on(fb, NULL, "/enable", "i", error, layer->enabled) && 
+            cbox_execute_on(fb, NULL, "/instrument_name", "s", error, layer->instrument->module->instance_name)))
+            return FALSE;
+        return TRUE;
+    }
+    else if (!strcmp(subcmd, "/enable") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->enabled = 0 != *(int *)cmd->arg_values[0];
+        return TRUE;
+    }
+    else // otherwise, treat just like an command on normal (non-aux) output
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+        return FALSE;
+    }
+}
+
 static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct cbox_scene *s = ct->user_data;
+    const char *subcommand = NULL;
+    int index = 0;
     
     if (!strcmp(cmd->command, "/transpose") && !strcmp(cmd->arg_types, "i"))
     {
@@ -81,6 +107,12 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
         cbox_scene_destroy(old_scene);
         return TRUE;
+    }
+    else if (cbox_parse_path_part(cmd, "/layer/", &subcommand, &index, 1, s->layer_count, error))
+    {
+        if (!subcommand)
+            return FALSE;
+        return cbox_layer_process_cmd(s->layers[index - 1], fb, cmd, subcommand, error);
     }
     else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
