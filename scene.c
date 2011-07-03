@@ -161,6 +161,7 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
         goto error;
     }
     
+    s->layers = NULL;
     s->layer_count = 0;
     s->instrument_count = 0;
     s->aux_bus_count = 0;
@@ -209,6 +210,7 @@ struct cbox_scene *cbox_scene_new()
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
     s->name = g_strdup("");
     s->title = g_strdup("");
+    s->layers = NULL;
     s->layer_count = 0;
     s->instrument_count = 0;
     s->aux_bus_count = 0;
@@ -217,7 +219,7 @@ struct cbox_scene *cbox_scene_new()
     return s;
 }
 
-gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error)
+gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *layer, int pos, GError **error)
 {
     int i;
     
@@ -242,8 +244,19 @@ gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer
         scene->instruments[scene->instrument_count++] = layer->instrument;
         layer->instrument->scene = scene;
     }
-    scene->layers[scene->layer_count++] = layer;
+    struct cbox_layer **layers = malloc(sizeof(struct cbox_layer *) * (scene->layer_count + 1));
+    memcpy(layers, scene->layers, sizeof(struct cbox_layer *) * pos);
+    layers[pos] = layer;
+    memcpy(layers + pos + 1, scene->layers + pos, sizeof(struct cbox_layer *) * (scene->layer_count - pos));
+    
+    free(cbox_rt_swap_pointers(app.rt, (void **)&scene->layers, layers));
+    scene->layer_count++;
     return TRUE;
+}
+
+gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error)
+{
+    return cbox_scene_insert_layer(scene, layer, scene->layer_count, error);
 }
 
 struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error)
