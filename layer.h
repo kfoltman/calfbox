@@ -27,6 +27,7 @@ struct cbox_module;
 struct cbox_layer
 {
     struct cbox_instrument *instrument;
+    gboolean enabled;
     int8_t in_channel; // -1 for Omni
     int8_t out_channel; // -1 for Omni
     uint8_t low_note;

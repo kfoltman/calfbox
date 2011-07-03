@@ -121,6 +121,8 @@ int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbo
         for (int l = 0; l < scene->layer_count; l++)
         {
             struct cbox_layer *lp = scene->layers[l];
+            if (!lp->enabled)
+                continue;
             uint8_t data[4] = {0, 0, 0, 0};
             memcpy(data, event->data_inline, event->size);
             if (data[0] < 0xF0) // per-channel messages

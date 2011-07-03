@@ -49,6 +49,7 @@ struct cbox_layer *cbox_layer_load(const char *name, GError **error)
         g_prefix_error(error, "Cannot get instrument %s for layer %s: ", cv, name);
         goto error;
     }
+    l->enabled = cbox_config_get_int(section, "enabled", TRUE);
     l->instrument = instr;
 
     l->low_note = 0;
@@ -66,10 +67,10 @@ struct cbox_layer *cbox_layer_load(const char *name, GError **error)
     l->fixed_note = cbox_config_get_int(section, "fixed_note", -1);
     l->in_channel = cbox_config_get_int(section, "in_channel", 0) - 1;
     l->out_channel = cbox_config_get_int(section, "out_channel", 0) - 1;
-    l->disable_aftertouch = !cbox_config_get_int(section, "aftertouch", 1);
-    l->invert_sustain = cbox_config_get_int(section, "invert_sustain", 0);
-    l->consume = cbox_config_get_int(section, "consume", 0);
-    l->ignore_scene_transpose = cbox_config_get_int(section, "ignore_scene_transpose", 0);
+    l->disable_aftertouch = !cbox_config_get_int(section, "aftertouch", TRUE);
+    l->invert_sustain = cbox_config_get_int(section, "invert_sustain", FALSE);
+    l->consume = cbox_config_get_int(section, "consume", FALSE);
+    l->ignore_scene_transpose = cbox_config_get_int(section, "ignore_scene_transpose", FALSE);
     l->instrument->refcount++;
     
     g_free(section);
@@ -96,6 +97,7 @@ extern struct cbox_layer *cbox_layer_new(const char *module_name, GError **error
         goto error;
     }
 
+    l->enabled = TRUE;
     l->instrument = instr;
     l->low_note = 0;
     l->high_note = 127;
