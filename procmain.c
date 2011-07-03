@@ -174,7 +174,7 @@ int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbo
 static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
 {
     struct cbox_rt *rt = user_data;
-    struct cbox_scene *scene = rt->scene;
+    struct cbox_scene *scene = NULL;
     struct cbox_module *effect = rt->effect;
     struct cbox_rt_cmd_instance cmd;
     int cost;
@@ -190,6 +190,7 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         if (cmd.definition->cleanup || !cmd.is_async)
             jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
     }
+    scene = rt->scene;
         
     for (i = 0; i < io->input_count; i++)
         io->input_buffers[i] = jack_port_get_buffer(io->inputs[i], nframes);

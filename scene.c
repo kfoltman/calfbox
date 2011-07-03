@@ -131,6 +131,7 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
     
     s->layer_count = 0;
     s->instrument_count = 0;
+    s->aux_bus_count = 0;
     
     for (i = 1; ; i++)
     {
