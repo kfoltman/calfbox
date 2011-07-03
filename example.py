@@ -566,12 +566,14 @@ class MainWindow(gtk.Window):
         self.transpose_adj.connect('value_changed', adjustment_changed_int, '/scene/transpose')
         t.attach(standard_align(gtk.SpinButton(self.transpose_adj), 0, 0, 0, 0), 1, 2, 5, 6, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         
-        self.layers_model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)        
+        self.layers_model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_BOOLEAN, gobject.TYPE_INT, gobject.TYPE_INT)
         self.layers_tree = gtk.TreeView(self.layers_model)
         toggle = gtk.CellRendererToggle()
         toggle.connect('toggled', tree_toggle_changed_bool, self.layers_model, "/scene/layer/%d/enable")
         self.layers_tree.insert_column_with_attributes(0, "Enabled", toggle, active=1)
         self.layers_tree.insert_column_with_attributes(1, "Name", gtk.CellRendererText(), text=0)
+        self.layers_tree.insert_column_with_attributes(2, "In Ch#", gtk.CellRendererText(), text=2)
+        self.layers_tree.insert_column_with_attributes(3, "Out Ch#", gtk.CellRendererText(), text=3)
         t.attach(self.layers_tree, 0, 2, 6, 7, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         self.refresh_layer_list(scene)        
         return t
@@ -590,8 +592,8 @@ class MainWindow(gtk.Window):
     def refresh_layer_list(self, scene):
         self.layers_model.clear()
         for l in scene.layer:
-            layer = GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name"], [])
-            self.layers_model.append((layer.instrument_name, layer.enable != 0))
+            layer = GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name", "in_channel", "out_channel"], [])
+            self.layers_model.append((layer.instrument_name, layer.enable != 0, layer.in_channel, layer.out_channel))
         self.layers_tree.set_model(self.layers_model)
 
     def quit(self, w):
@@ -608,7 +610,8 @@ class MainWindow(gtk.Window):
                 elif scene[1] == 'Layer':
                     cbox.do_cmd("/scene/load_layer", None, [scene[2][6:]])
                 elif scene[1] == 'Instrument':
-                    cbox.do_cmd("/scene/load_instrument", None, [scene[2][11:]])
+                    cbox.do_cmd("/scene/new", None, [])
+                    cbox.do_cmd("/scene/add_instrument", None, [0, scene[2][11:]])
                 scene = GetThings("/scene/status", ['name', 'title'], [])
                 self.scene_label.set_text(scene.name)
                 self.title_label.set_text(scene.title)

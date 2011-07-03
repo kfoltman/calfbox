@@ -83,17 +83,17 @@ error:
     return NULL;
 }
 
-extern struct cbox_layer *cbox_layer_new(const char *module_name, GError **error)
+extern struct cbox_layer *cbox_layer_new(const char *instrument_name, GError **error)
 {
     struct cbox_layer *l = malloc(sizeof(struct cbox_layer));
     const char *cv = NULL;
     struct cbox_instrument *instr = NULL;
     
-    instr = cbox_instruments_get_by_name(module_name, TRUE, error);
+    instr = cbox_instruments_get_by_name(instrument_name, TRUE, error);
     if (!instr)
     {
         cbox_force_error(error);
-        g_prefix_error(error, "Cannot get instrument %s for new layer: ", module_name);
+        g_prefix_error(error, "Cannot get instrument %s for new layer: ", instrument_name);
         goto error;
     }
 

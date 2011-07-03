@@ -36,7 +36,9 @@ static gboolean cbox_layer_process_cmd(struct cbox_layer *layer, struct cbox_com
             return FALSE;
 
         if (!(cbox_execute_on(fb, NULL, "/enable", "i", error, layer->enabled) && 
-            cbox_execute_on(fb, NULL, "/instrument_name", "s", error, layer->instrument->module->instance_name)))
+            cbox_execute_on(fb, NULL, "/instrument_name", "s", error, layer->instrument->module->instance_name) && 
+            cbox_execute_on(fb, NULL, "/in_channel", "i", error, layer->in_channel + 1) && 
+            cbox_execute_on(fb, NULL, "/out_channel", "i", error, layer->out_channel + 1)))
             return FALSE;
         return TRUE;
     }
@@ -90,22 +92,35 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         cbox_scene_destroy(old_scene);
         return TRUE;
     }
-    else if (!strcmp(cmd->command, "/load_instrument") && !strcmp(cmd->arg_types, "s"))
+    else if (!strcmp(cmd->command, "/new") && !strcmp(cmd->arg_types, ""))
     {
-        struct cbox_layer *layer = cbox_layer_new((const gchar *)cmd->arg_values[0], error);
-        if (!layer)
-            return FALSE;
         struct cbox_scene *scene = cbox_scene_new();
         if (!scene) // not really expected
             return FALSE;
-        if (!cbox_scene_add_layer(scene, layer, error))
+        struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
+        cbox_scene_destroy(old_scene);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/add_instrument") && !strcmp(cmd->arg_types, "is"))
+    {
+        int pos = *(int *)cmd->arg_values[0];
+        if (pos < 0 || pos > s->layer_count)
         {
-            cbox_scene_destroy(scene);
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", pos, s->layer_count);
+            return FALSE;
+        }
+        if (pos == 0)
+            pos = s->layer_count;
+        else
+            pos--;
+        struct cbox_layer *layer = cbox_layer_new((const gchar *)cmd->arg_values[1], error);
+        if (!layer)
+            return FALSE;
+        if (!cbox_scene_insert_layer(s, layer, pos, error))
+        {
             cbox_layer_destroy(layer);
             return FALSE;
         }
-        struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
-        cbox_scene_destroy(old_scene);
         return TRUE;
     }
     else if (cbox_parse_path_part(cmd, "/layer/", &subcommand, &index, 1, s->layer_count, error))
