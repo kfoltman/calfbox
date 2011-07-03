@@ -56,4 +56,7 @@ extern gboolean cbox_execute_on_v(struct cbox_command_target *ct, struct cbox_co
 
 extern gboolean cbox_osc_command_dump(const struct cbox_osc_command *cmd);
 
+// Note: this sets *subcommand to NULL on parse error; requires "/path/" as path
+extern gboolean cbox_parse_path_part(const struct cbox_osc_command *cmd, const char *path, const char **subcommand, int *index, int min_index, int max_index, GError **error);
+
 #endif

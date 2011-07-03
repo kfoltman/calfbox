@@ -161,6 +161,9 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
 gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct cbox_instrument *instr = ct->user_data;
+    const char *subcommand = NULL;
+    int index = 0;
+    int aux_offset = instr->module->aux_offset / 2;
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
@@ -173,42 +176,16 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
             return FALSE;
         return TRUE;
     }
-    else if (!strncmp(cmd->command, "/output/", 8))
+    else if (cbox_parse_path_part(cmd, "/output/", &subcommand, &index, 1, aux_offset, error))
     {
-        const char *num = cmd->command + 8;
-        const char *slash = strchr(num, '/');
-        if (!slash)
-            return cbox_set_command_error(error, cmd);            
-        
-        gchar *numcopy = g_strndup(num, slash-num);
-        int output_num = atoi(numcopy);
-        if (output_num < 1 || output_num > instr->module->aux_offset / 2)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid output index %s for command %s", numcopy, cmd->command);
-            g_free(numcopy);
+        if (!subcommand)
             return FALSE;
-        }
-        g_free(numcopy);
-        return cbox_instrument_output_process_cmd(instr, &instr->outputs[output_num - 1], fb, cmd, slash, error);
+        int output_num = index;
+        return cbox_instrument_output_process_cmd(instr, &instr->outputs[index - 1], fb, cmd, subcommand, error);
     }
-    else if (!strncmp(cmd->command, "/aux/", 5))
+    else if (cbox_parse_path_part(cmd, "/aux/", &subcommand, &index, 1, instr->aux_output_count, error))
     {
-        int aux_offset = instr->module->aux_offset / 2;
-        const char *num = cmd->command + 5;
-        const char *slash = strchr(num, '/');
-        if (!slash)
-            return cbox_set_command_error(error, cmd);            
-        
-        gchar *numcopy = g_strndup(num, slash-num);
-        int aux_num = atoi(numcopy);
-        if (aux_num < 1 || aux_num > instr->aux_output_count)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid aux bus index %s for command %s", numcopy, cmd->command);
-            g_free(numcopy);
-            return FALSE;
-        }
-        g_free(numcopy);
-        return cbox_instrument_aux_process_cmd(instr, &instr->outputs[aux_offset + aux_num - 1], aux_num - 1, fb, cmd, slash, error);
+        return cbox_instrument_aux_process_cmd(instr, &instr->outputs[aux_offset + index - 1], index - 1, fb, cmd, subcommand, error);
     }
     else
     if (!strncmp(cmd->command, "/engine/",8))

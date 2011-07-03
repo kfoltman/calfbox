@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <glib.h>
 #include <malloc.h>
+#include <stdlib.h>
 #include <string.h>
 
 void cbox_command_target_init(struct cbox_command_target *ct, cbox_process_cmd cmd, void *user_data)
@@ -136,4 +137,38 @@ gboolean cbox_execute_sub(struct cbox_command_target *ct, struct cbox_command_ta
     subcmd.arg_types = cmd->arg_types;
     subcmd.arg_values = cmd->arg_values;
     return ct->process_cmd(ct, fb, &subcmd, error);
+}
+
+gboolean cbox_parse_path_part(const struct cbox_osc_command *cmd, const char *path, const char **subcommand, int *index, int min_index, int max_index, GError **error)
+{
+    int plen = strlen(path);
+    if (!strncmp(cmd->command, path, plen))
+    {
+        const char *num = cmd->command + plen;
+        const char *slash = strchr(num, '/');
+        if (!slash)
+            return cbox_set_command_error(error, cmd);            
+        
+        gchar *numcopy = g_strndup(num, slash-num);
+        char *endptr = NULL;
+        *index = strtol(numcopy, &endptr, 10);
+        if (!*numcopy && *endptr)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid index %s for command %s", numcopy, cmd->command);
+            g_free(numcopy);
+            *subcommand = NULL;
+            return TRUE;
+        }
+        if (*index < min_index || *index > max_index)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Index %s out of range [%d, %d] for command %s", numcopy, min_index, max_index, cmd->command);
+            g_free(numcopy);
+            *subcommand = NULL;
+            return TRUE;
+        }
+        g_free(numcopy);
+        *subcommand = slash;
+        return TRUE;
+    }
+    return FALSE;
 }
