@@ -104,9 +104,14 @@ def combo_value_changed_use_column(combo, path, column):
     if combo.get_active() != -1:
         cbox.do_cmd(path, None, [combo.get_model()[combo.get_active()][column]])
 
-def tree_toggle_changed_bool(renderer, tree_path, model, opath):
-    model[int(tree_path)][1] = not model[int(tree_path)][1]
-    cbox.do_cmd(opath % (1 + int(tree_path)), None, [1 if model[int(tree_path)][1] else 0])
+def tree_toggle_changed_bool(renderer, tree_path, model, opath, column):
+    model[int(tree_path)][column] = not model[int(tree_path)][column]
+    cbox.do_cmd(opath % (1 + int(tree_path)), None, [1 if model[int(tree_path)][column] else 0])
+        
+def standard_toggle_renderer(layers_model, path, column):
+    toggle = gtk.CellRendererToggle()
+    toggle.connect('toggled', tree_toggle_changed_bool, layers_model, path, column)
+    return toggle
 
 def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustment_changed_float):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
@@ -566,14 +571,19 @@ class MainWindow(gtk.Window):
         self.transpose_adj.connect('value_changed', adjustment_changed_int, '/scene/transpose')
         t.attach(standard_align(gtk.SpinButton(self.transpose_adj), 0, 0, 0, 0), 1, 2, 5, 6, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         
-        self.layers_model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_BOOLEAN, gobject.TYPE_INT, gobject.TYPE_INT)
+        self.layers_model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_BOOLEAN, 
+            gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_BOOLEAN,
+            gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_INT)
         self.layers_tree = gtk.TreeView(self.layers_model)
-        toggle = gtk.CellRendererToggle()
-        toggle.connect('toggled', tree_toggle_changed_bool, self.layers_model, "/scene/layer/%d/enable")
-        self.layers_tree.insert_column_with_attributes(0, "Enabled", toggle, active=1)
+        self.layers_tree.insert_column_with_attributes(0, "On?", standard_toggle_renderer(self.layers_model, "/scene/layer/%d/enable", 1), active=1)
         self.layers_tree.insert_column_with_attributes(1, "Name", gtk.CellRendererText(), text=0)
         self.layers_tree.insert_column_with_attributes(2, "In Ch#", gtk.CellRendererText(), text=2)
         self.layers_tree.insert_column_with_attributes(3, "Out Ch#", gtk.CellRendererText(), text=3)
+        self.layers_tree.insert_column_with_attributes(4, "Eat?", standard_toggle_renderer(self.layers_model, "/scene/layer/%d/consume", 4), active=4)
+        self.layers_tree.insert_column_with_attributes(5, "Lo N#", gtk.CellRendererText(), text=5)
+        self.layers_tree.insert_column_with_attributes(6, "Hi N#", gtk.CellRendererText(), text=6)
+        self.layers_tree.insert_column_with_attributes(7, "Fix N#", gtk.CellRendererText(), text=7)
+        self.layers_tree.insert_column_with_attributes(8, "Transpose", gtk.CellRendererText(), text=8)
         t.attach(self.layers_tree, 0, 2, 6, 7, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         self.refresh_layer_list(scene)        
         return t
@@ -592,8 +602,8 @@ class MainWindow(gtk.Window):
     def refresh_layer_list(self, scene):
         self.layers_model.clear()
         for l in scene.layer:
-            layer = GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name", "in_channel", "out_channel"], [])
-            self.layers_model.append((layer.instrument_name, layer.enable != 0, layer.in_channel, layer.out_channel))
+            layer = GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name", "in_channel", "out_channel", "consume", "low_note", "high_note", "fixed_note", "transpose"], [])
+            self.layers_model.append((layer.instrument_name, layer.enable != 0, layer.in_channel, layer.out_channel, layer.consume != 0, layer.low_note, layer.high_note, layer.fixed_note, layer.transpose))
         self.layers_tree.set_model(self.layers_model)
 
     def quit(self, w):

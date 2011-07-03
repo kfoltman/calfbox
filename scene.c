@@ -35,8 +35,15 @@ static gboolean cbox_layer_process_cmd(struct cbox_layer *layer, struct cbox_com
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
 
-        if (!(cbox_execute_on(fb, NULL, "/enable", "i", error, layer->enabled) && 
+        if (!(cbox_execute_on(fb, NULL, "/enable", "i", error, (int)layer->enabled) && 
             cbox_execute_on(fb, NULL, "/instrument_name", "s", error, layer->instrument->module->instance_name) && 
+            cbox_execute_on(fb, NULL, "/consume", "i", error, (int)layer->consume) && 
+            cbox_execute_on(fb, NULL, "/ignore_scene_transpose", "i", error, (int)layer->ignore_scene_transpose) && 
+            cbox_execute_on(fb, NULL, "/disable_aftertouch", "i", error, (int)layer->disable_aftertouch) && 
+            cbox_execute_on(fb, NULL, "/transpose", "i", error, (int)layer->transpose) && 
+            cbox_execute_on(fb, NULL, "/fixed_note", "i", error, (int)layer->fixed_note) && 
+            cbox_execute_on(fb, NULL, "/low_note", "i", error, (int)layer->low_note) && 
+            cbox_execute_on(fb, NULL, "/high_note", "i", error, (int)layer->high_note) && 
             cbox_execute_on(fb, NULL, "/in_channel", "i", error, layer->in_channel + 1) && 
             cbox_execute_on(fb, NULL, "/out_channel", "i", error, layer->out_channel + 1)))
             return FALSE;
@@ -45,6 +52,41 @@ static gboolean cbox_layer_process_cmd(struct cbox_layer *layer, struct cbox_com
     else if (!strcmp(subcmd, "/enable") && !strcmp(cmd->arg_types, "i"))
     {
         layer->enabled = 0 != *(int *)cmd->arg_values[0];
+        return TRUE;
+    }
+    else if (!strcmp(subcmd, "/consume") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->consume = 0 != *(int *)cmd->arg_values[0];
+        return TRUE;
+    }
+    else if (!strcmp(subcmd, "/ignore_scene_transpose") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->ignore_scene_transpose = 0 != *(int *)cmd->arg_values[0];
+        return TRUE;
+    }
+    else if (!strcmp(subcmd, "/disable_aftertouch") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->disable_aftertouch = 0 != *(int *)cmd->arg_values[0];
+        return TRUE;
+    }
+    else if (!strcmp(subcmd, "/transpose") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->transpose = *(int *)cmd->arg_values[0];
+        return TRUE;
+    }
+    else if (!strcmp(subcmd, "/fixed_note") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->fixed_note = *(int *)cmd->arg_values[0];
+        return TRUE;
+    }
+    else if (!strcmp(subcmd, "/low_note") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->low_note = *(int *)cmd->arg_values[0];
+        return TRUE;
+    }
+    else if (!strcmp(subcmd, "/high_note") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->low_note = *(int *)cmd->arg_values[0];
         return TRUE;
     }
     else // otherwise, treat just like an command on normal (non-aux) output
