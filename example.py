@@ -506,21 +506,22 @@ class SceneDialog(gtk.Dialog):
         gtk.Dialog.__init__(self, "Select a scene", parent, gtk.DIALOG_MODAL, 
             (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
         self.set_default_response(gtk.RESPONSE_OK)
-        model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
+        model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         
         for s in cfg_sections("scene:"):
             title = cfg_get(s, "title")
-            model.append((s[6:], "Scene", s))
+            model.append((s[6:], "Scene", s, title))
         for s in cfg_sections("instrument:"):
             title = cfg_get(s, "title")
-            model.append((s[11:], "Instrument", s))
+            model.append((s[11:], "Instrument", s, title))
         for s in cfg_sections("layer:"):
             title = cfg_get(s, "title")
-            model.append((s[6:], "Layer", s))
+            model.append((s[6:], "Layer", s, title))
                 
         scenes = gtk.TreeView(model)
         scenes.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=0)
-        scenes.insert_column_with_attributes(1, "Type", gtk.CellRendererText(), text=1)
+        scenes.insert_column_with_attributes(1, "Title", gtk.CellRendererText(), text=3)
+        scenes.insert_column_with_attributes(2, "Type", gtk.CellRendererText(), text=1)
         self.vbox.pack_start(scenes)
         scenes.show()
         scenes.grab_focus()
