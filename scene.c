@@ -116,24 +116,6 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         cbox_scene_destroy(old_scene);
         return TRUE;
     }
-    else if (!strcmp(cmd->command, "/load_layer") && !strcmp(cmd->arg_types, "s"))
-    {
-        struct cbox_layer *layer = cbox_layer_load((const gchar *)cmd->arg_values[0], error);
-        if (!layer)
-            return FALSE;
-        struct cbox_scene *scene = cbox_scene_new();
-        if (!scene) // not really expected
-            return FALSE;
-        if (!cbox_scene_add_layer(scene, layer, error))
-        {
-            cbox_scene_destroy(scene);
-            cbox_layer_destroy(layer);
-            return FALSE;
-        }
-        struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
-        cbox_scene_destroy(old_scene);
-        return TRUE;
-    }
     else if (!strcmp(cmd->command, "/new") && !strcmp(cmd->arg_types, ""))
     {
         struct cbox_scene *scene = cbox_scene_new();
@@ -141,6 +123,28 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             return FALSE;
         struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
         cbox_scene_destroy(old_scene);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/add_layer") && !strcmp(cmd->arg_types, "is"))
+    {
+        int pos = *(int *)cmd->arg_values[0];
+        if (pos < 0 || pos > s->layer_count)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", pos, s->layer_count);
+            return FALSE;
+        }
+        if (pos == 0)
+            pos = s->layer_count;
+        else
+            pos--;
+        struct cbox_layer *layer = cbox_layer_load((const gchar *)cmd->arg_values[1], error);
+        if (!layer)
+            return FALSE;
+        if (!cbox_scene_insert_layer(s, layer, pos, error))
+        {
+            cbox_layer_destroy(layer);
+            return FALSE;
+        }
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/add_instrument") && !strcmp(cmd->arg_types, "is"))

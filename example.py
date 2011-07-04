@@ -501,22 +501,14 @@ engine_window_map = {
 
 effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq']
 
-class SceneDialog(gtk.Dialog):
+class SelectObjectDialog(gtk.Dialog):
     def __init__(self, parent):
-        gtk.Dialog.__init__(self, "Select a scene", parent, gtk.DIALOG_MODAL, 
+        gtk.Dialog.__init__(self, self.title, parent, gtk.DIALOG_MODAL, 
             (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
         self.set_default_response(gtk.RESPONSE_OK)
         model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         
-        for s in cfg_sections("scene:"):
-            title = cfg_get(s, "title")
-            model.append((s[6:], "Scene", s, title))
-        for s in cfg_sections("instrument:"):
-            title = cfg_get(s, "title")
-            model.append((s[11:], "Instrument", s, title))
-        for s in cfg_sections("layer:"):
-            title = cfg_get(s, "title")
-            model.append((s[6:], "Layer", s, title))
+        self.update_model(model)
                 
         scenes = gtk.TreeView(model)
         scenes.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=0)
@@ -527,8 +519,35 @@ class SceneDialog(gtk.Dialog):
         scenes.grab_focus()
         self.scenes = scenes
         self.scenes.connect('row-activated', lambda w, path, column: self.response(gtk.RESPONSE_OK))
-    def get_selected_scene(self):
+    def get_selected_object(self):
         return self.scenes.get_model()[self.scenes.get_cursor()[0][0]]
+
+class SceneDialog(SelectObjectDialog):
+    title = "Select a scene"
+    def __init__(self, parent):
+        SelectObjectDialog.__init__(self, parent)
+    def update_model(self, model):
+        for s in cfg_sections("scene:"):
+            title = cfg_get(s, "title")
+            model.append((s[6:], "Scene", s, title))
+        for s in cfg_sections("instrument:"):
+            title = cfg_get(s, "title")
+            model.append((s[11:], "Instrument", s, title))
+        for s in cfg_sections("layer:"):
+            title = cfg_get(s, "title")
+            model.append((s[6:], "Layer", s, title))
+
+class AddLayerDialog(SelectObjectDialog):
+    title = "Add a layer"
+    def __init__(self, parent):
+        SelectObjectDialog.__init__(self, parent)
+    def update_model(self, model):
+        for s in cfg_sections("instrument:"):
+            title = cfg_get(s, "title")
+            model.append((s[11:], "Instrument", s, title))
+        for s in cfg_sections("layer:"):
+            title = cfg_get(s, "title")
+            model.append((s[6:], "Layer", s, title))
 
 class MainWindow(gtk.Window):
     def __init__(self):
@@ -615,13 +634,31 @@ class MainWindow(gtk.Window):
         response = d.run()
         try:
             if response == gtk.RESPONSE_OK:
-                scene = d.get_selected_scene()
+                scene = d.get_selected_object()
                 if scene[1] == 'Scene':
                     cbox.do_cmd("/scene/load", None, [scene[2][6:]])
                 elif scene[1] == 'Layer':
-                    cbox.do_cmd("/scene/load_layer", None, [scene[2][6:]])
+                    cbox.do_cmd("/scene/new", None, [])
+                    cbox.do_cmd("/scene/add_layer", None, [0, scene[2][6:]])
                 elif scene[1] == 'Instrument':
                     cbox.do_cmd("/scene/new", None, [])
+                    cbox.do_cmd("/scene/add_instrument", None, [0, scene[2][11:]])
+                scene = GetThings("/scene/status", ['name', 'title'], [])
+                self.scene_label.set_text(scene.name)
+                self.title_label.set_text(scene.title)
+                self.refresh_instrument_pages()
+        finally:
+            d.destroy()
+
+    def add_layer(self, w):
+        d = AddLayerDialog(self)
+        response = d.run()
+        try:
+            if response == gtk.RESPONSE_OK:
+                scene = d.get_selected_object()
+                if scene[1] == 'Layer':
+                    cbox.do_cmd("/scene/add_layer", None, [0, scene[2][6:]])
+                elif scene[1] == 'Instrument':
                     cbox.do_cmd("/scene/add_instrument", None, [0, scene[2][11:]])
                 scene = GetThings("/scene/status", ['name', 'title'], [])
                 self.scene_label.set_text(scene.name)
@@ -644,6 +681,7 @@ class MainWindow(gtk.Window):
         
         self.menu_bar.append(self.create_menu("_Scene", [
             ("_Load", self.load_scene),
+            ("_Add layer", self.add_layer),
             ("_Quit", self.quit),
         ]))
         
