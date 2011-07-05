@@ -121,6 +121,17 @@ void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern)
     free(pattern);
 }
 
+static int cbox_midi_pattern_load_smf_into(struct cbox_midi_pattern_maker *m, const char *smf)
+{
+    int length = 0;
+    if (!cbox_midi_pattern_maker_load_smf(m, smf, &length, NULL))
+    {
+        g_error("Cannot load SMF file %s", smf);
+        return -1;
+    }
+    return length;
+}
+
 static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m, const char *name, int start_pos, int transpose, int transpose_to_note)
 {
     gchar *cfg_section = g_strdup_printf("pattern:%s", name);
@@ -134,15 +145,7 @@ static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m
     
     gchar *smf = cbox_config_get_string(cfg_section, "smf");
     if (smf)
-    {
-        int length = 0;
-        if (!cbox_midi_pattern_maker_load_smf(m, smf, &length, NULL))
-        {
-            g_error("Cannot load SMF file %s", smf);
-            return -1;
-        }
-        return length;
-    }
+        return cbox_midi_pattern_load_smf_into(m, smf);
     
     int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
     int gchannel = cbox_config_get_int(cfg_section, "channel", 1);
@@ -238,6 +241,10 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
         return -1;
     }
     
+    gchar *smf = cbox_config_get_string(cfg_section, "smf");
+    if (smf)
+        return cbox_midi_pattern_load_smf_into(m, smf);
+
     int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
     int channel = cbox_config_get_int(cfg_section, "channel", 10);
     int gswing = cbox_config_get_int(cfg_section, "swing", 0);
