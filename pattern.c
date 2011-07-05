@@ -132,6 +132,18 @@ static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m
         return -1;
     }
     
+    gchar *smf = cbox_config_get_string(cfg_section, "smf");
+    if (smf)
+    {
+        int length = 0;
+        if (!cbox_midi_pattern_maker_load_smf(m, smf, &length, NULL))
+        {
+            g_error("Cannot load SMF file %s", smf);
+            return -1;
+        }
+        return length;
+    }
+    
     int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
     int gchannel = cbox_config_get_int(cfg_section, "channel", 1);
     int gswing = cbox_config_get_int(cfg_section, "swing", 0);
