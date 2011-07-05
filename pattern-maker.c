@@ -16,9 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "errors.h"
 #include "pattern.h"
 #include "pattern-maker.h"
 #include <glib.h>
+#include <smf.h>
 
 struct event_entry
 {
@@ -71,6 +73,20 @@ void cbox_midi_pattern_maker_add(struct cbox_midi_pattern_maker *maker, uint32_t
     g_tree_insert(maker->events, e, NULL);
 }
 
+void cbox_midi_pattern_maker_add_mem(struct cbox_midi_pattern_maker *maker, uint32_t time, const uint8_t *src, uint32_t len)
+{
+    if (len > 3)
+    {
+        g_warning("Event size %d not supported yet, ignoring", (int)len);
+        return;
+    }
+    struct event_entry *e = malloc(sizeof(struct event_entry));
+    e->time = time;
+    memcpy(e->data, src, len);
+    
+    g_tree_insert(maker->events, e, NULL);
+}
+
 struct traverse_state
 {
     struct cbox_midi_event *events;
@@ -99,6 +115,30 @@ struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_mid
     g_tree_foreach(maker->events, traverse_func, &st);
     
     return p;
+}
+
+gboolean cbox_midi_pattern_maker_load_smf(struct cbox_midi_pattern_maker *maker, const char *filename, int *length, GError **error)
+{
+    smf_t *smf = smf_load(filename);
+    if (!smf)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot load SMF file '%s'", filename);
+        return FALSE;
+    }
+    
+    int ppqn = smf->ppqn;
+    smf_event_t *event = NULL;
+    while ((event = smf_get_next_event(smf)) != NULL) {
+        if (smf_event_is_metadata(event))
+                continue;
+
+        cbox_midi_pattern_maker_add_mem(maker, event->time_pulses * 1.0 * PPQN / ppqn, event->midi_buffer, event->midi_buffer_length);
+    }
+    if (length)
+        *length = smf_get_length_pulses(smf) * 1.0 * PPQN / ppqn;
+    smf_delete(smf);
+     
+    return TRUE;
 }
 
 void cbox_midi_pattern_maker_destroy(struct cbox_midi_pattern_maker *maker)
