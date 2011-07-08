@@ -207,18 +207,7 @@ gboolean cbox_config_save(const char *filename, GError **error)
     if (filename == NULL)
         filename = keyfile_name;
 
-    gboolean ok = FALSE;
-    FILE *f = fopen(filename, "w");
-    if (f)
-    {
-        ok = (len == fwrite(data, 1, len, f));
-        if (!ok && ferror(f))
-            g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot write '%s'", filename);
-        if (fclose(f) && ok)
-            g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot close '%s'", filename);
-    }
-    else
-        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot open '%s'", filename);
+    gboolean ok = g_file_set_contents(filename, data, len, error);
     g_free(data);
     return ok;
 }
