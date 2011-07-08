@@ -174,8 +174,14 @@ class GetThings:
 def cfg_sections(prefix = ""):
     return GetThings('/config/sections', ['*section'], [str(prefix)]).section
 
+def cfg_keys(section, prefix = ""):
+    return GetThings('/config/keys', ['*key'], [str(section), str(prefix)]).key
+
 def cfg_get(section, key):
     return GetThings('/config/get', ['value'], [str(section), str(key)]).value
+
+def cfg_set(section, key, value):
+    return cbox.do_cmd('/config/set', None, [str(section), str(key), str(value)])
 
 class StreamWindow(gtk.VBox):
     def __init__(self, instrument, path):

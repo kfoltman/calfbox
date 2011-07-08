@@ -478,6 +478,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
 struct config_foreach_data
 {
     const char *prefix;
+    const char *command;
     struct cbox_command_target *fb;
     GError **error;
     gboolean success;
@@ -491,7 +492,7 @@ void api_config_cb(void *user_data, const char *key)
     if (cfd->prefix && strncmp(cfd->prefix, key, strlen(cfd->prefix)))
         return;
     
-    if (!cbox_execute_on(cfd->fb, NULL, "/section", "s", cfd->error, key))
+    if (!cbox_execute_on(cfd->fb, NULL, cfd->command, "s", cfd->error, key))
     {
         cfd->success = FALSE;
         return;
@@ -505,8 +506,17 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        struct config_foreach_data cfd = {cmd->arg_types[0] == 's' ? (const char *)cmd->arg_values[0] : NULL, fb, error, TRUE};
+        struct config_foreach_data cfd = {cmd->arg_types[0] == 's' ? (const char *)cmd->arg_values[0] : NULL, "/section", fb, error, TRUE};
         cbox_config_foreach_section(api_config_cb, &cfd);
+        return cfd.success;
+    }
+    else if (!strcmp(cmd->command, "/keys") && (!strcmp(cmd->arg_types, "s") || !strcmp(cmd->arg_types, "ss")))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        struct config_foreach_data cfd = {cmd->arg_types[1] == 's' ? (const char *)cmd->arg_values[1] : NULL, "/key", fb, error, TRUE};
+        cbox_config_foreach_key(api_config_cb, cmd->arg_values[0], &cfd);
         return cfd.success;
     }
     else if (!strcmp(cmd->command, "/get") && !strcmp(cmd->arg_types, "ss"))
@@ -518,6 +528,21 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
         if (!value)
             return TRUE;
         return cbox_execute_on(fb, NULL, "/value", "s", error, value);
+    }
+    else if (!strcmp(cmd->command, "/set") && !strcmp(cmd->arg_types, "sss"))
+    {
+        cbox_config_set_string((const char *)cmd->arg_values[0], (const char *)cmd->arg_values[1], (const char *)cmd->arg_values[2]);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/delete") && !strcmp(cmd->arg_types, "ss"))
+    {
+        cbox_config_remove_key((const char *)cmd->arg_values[0], (const char *)cmd->arg_values[1]);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/delete_section") && !strcmp(cmd->arg_types, "s"))
+    {
+        cbox_config_remove_section((const char *)cmd->arg_values[0]);
+        return TRUE;
     }
     else
     {
