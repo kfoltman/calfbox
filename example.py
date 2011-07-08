@@ -181,7 +181,13 @@ def cfg_get(section, key):
     return GetThings('/config/get', ['value'], [str(section), str(key)]).value
 
 def cfg_set(section, key, value):
-    return cbox.do_cmd('/config/set', None, [str(section), str(key), str(value)])
+    cbox.do_cmd('/config/set', None, [str(section), str(key), str(value)])
+
+def cfg_save(section, filename = None):
+    if filename is None:
+        cbox.do_cmd('/config/set', None, [])
+    else:
+        cbox.do_cmd('/config/set', None, [str(filename)])
 
 class StreamWindow(gtk.VBox):
     def __init__(self, instrument, path):

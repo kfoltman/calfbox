@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_CONFIG_API_H
 #define CBOX_CONFIG_API_H
 
+#include <glib.h>
+
 extern void cbox_config_init(const char *override_file);
 extern int cbox_config_has_section(const char *section);
 extern char *cbox_config_get_string(const char *section, const char *key);
@@ -35,6 +37,8 @@ extern void cbox_config_set_int(const char *section, const char *key, int value)
 extern void cbox_config_set_float(const char *section, const char *key, double value);
 extern int cbox_config_remove_section(const char *section);
 extern int cbox_config_remove_key(const char *section, const char *key);
+
+extern gboolean cbox_config_save(const char *filename, GError **error);
 
 extern void cbox_config_close();
 

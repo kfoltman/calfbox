@@ -544,6 +544,14 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
         cbox_config_remove_section((const char *)cmd->arg_values[0]);
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/save") && !strcmp(cmd->arg_types, ""))
+    {
+        return cbox_config_save(NULL, error);
+    }
+    else if (!strcmp(cmd->command, "/save") && !strcmp(cmd->arg_types, "s"))
+    {
+        return cbox_config_save((const char *)cmd->arg_values[0], error);
+    }
     else
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);

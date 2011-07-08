@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config-api.h"
 
-#include <glib.h>
+#include <errno.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 static GKeyFile *config_keyfile;
@@ -194,6 +195,32 @@ int cbox_config_remove_section(const char *section)
 int cbox_config_remove_key(const char *section, const char *key)
 {
     return 0 != g_key_file_remove_key(config_keyfile, section, key, NULL);
+}
+
+gboolean cbox_config_save(const char *filename, GError **error)
+{
+    gsize len = 0;
+    gchar *data = g_key_file_to_data(config_keyfile, &len, error);
+    if (!data)
+        return FALSE;
+    
+    if (filename == NULL)
+        filename = keyfile_name;
+
+    gboolean ok = FALSE;
+    FILE *f = fopen(filename, "w");
+    if (f)
+    {
+        ok = (len == fwrite(data, 1, len, f));
+        if (!ok && ferror(f))
+            g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot write '%s'", filename);
+        if (fclose(f) && ok)
+            g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot close '%s'", filename);
+    }
+    else
+        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot open '%s'", filename);
+    g_free(data);
+    return ok;
 }
 
 void cbox_config_close()
