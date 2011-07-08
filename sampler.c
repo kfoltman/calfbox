@@ -1097,7 +1097,7 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
 static void destroy_layer(struct sampler_module *m, struct sampler_layer *l)
 {
     if (l->waveform)
-        cbox_waveform_release(l->waveform);
+        cbox_waveform_unref(l->waveform);
     free(l);
 }
 

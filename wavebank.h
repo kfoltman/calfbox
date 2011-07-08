@@ -43,6 +43,7 @@ extern int64_t cbox_wavebank_get_bytes();
 extern int64_t cbox_wavebank_get_maxbytes();
 extern void cbox_wavebank_close();
 
-extern void cbox_waveform_release(struct cbox_waveform *waveform);
+extern void cbox_waveform_ref(struct cbox_waveform *waveform);
+extern void cbox_waveform_unref(struct cbox_waveform *waveform);
 
 #endif

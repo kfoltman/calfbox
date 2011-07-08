@@ -93,10 +93,16 @@ void cbox_wavebank_close()
         g_warning("Warning: %lld bytes in unfreed samples", (long long int)wavebank_bytes);
 }
 
-void cbox_waveform_release(struct cbox_waveform *waveform)
+void cbox_waveform_ref(struct cbox_waveform *waveform)
 {
-    waveform->refcount--;
-    assert(waveform->refcount == 0); // XXXKF the current version does not support any caching/reuse of waveforms
+    ++waveform->refcount;
+}
+
+void cbox_waveform_unref(struct cbox_waveform *waveform)
+{
+    if (--waveform->refcount > 0)
+        return;
+    
     wavebank_bytes -= waveform->bytes;
 
     free(waveform->data);

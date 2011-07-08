@@ -44,6 +44,11 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
 static void load_sfz_group(struct sfz_parser_client *client)
 {
     struct sfz_load_state *ls = client->user_data;
+    if (ls->group.waveform)
+    {
+        cbox_waveform_unref(ls->group.waveform);
+        ls->group.waveform = NULL;
+    }
     if (ls->region)
         load_sfz_end_region(client);
     // printf("-- start group\n");
@@ -63,6 +68,8 @@ static void load_sfz_region(struct sfz_parser_client *client)
     if (ls->in_group)
     {
         memcpy(ls->region, &ls->group, sizeof(struct sampler_layer));
+        if (ls->region->waveform)
+            cbox_waveform_ref(ls->region->waveform);
     }
     else
         sampler_layer_init(ls->region);
@@ -104,6 +111,11 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     
     if (!strcmp(key, "sample"))
     {
+        if (l->waveform != NULL)
+        {
+            cbox_waveform_unref(l->waveform);
+            l->waveform = NULL;
+        }
         gchar *filename = g_build_filename(ls->sample_path ? ls->sample_path : "", value, NULL);
         struct cbox_waveform *wf = cbox_wavebank_get_waveform(ls->filename, filename, ls->error);
         g_free(filename);
@@ -248,6 +260,11 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
     }
     if (ls.region)
         load_sfz_end_region(&c);
+    if (ls.group.waveform)
+    {
+        cbox_waveform_unref(ls.group.waveform);
+        ls.group.waveform = NULL;
+    }
     
     prg->layer_count = g_list_length(ls.layers);
     prg->layers = malloc(prg->layer_count * sizeof(struct sampler_layer *));
