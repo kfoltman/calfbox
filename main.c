@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "scene.h"
 #include "scripting.h"
 #include "ui.h"
+#include "wavebank.h"
 
 #include <assert.h>
 #include <glib.h>
@@ -194,6 +195,7 @@ int main(int argc, char *argv[])
     }
     
     cbox_instruments_init(&app.io);
+    cbox_wavebank_init();
     
     if (!scene_name && !instrument_name)
     {
@@ -283,6 +285,9 @@ ok:
     
     cbox_rt_destroy(app.rt);
     
+    if (cbox_wavebank_get_maxbytes() > 0)
+        g_message("Max waveform usage: %f MB", (float)(cbox_wavebank_get_maxbytes() / 1048576.0));
+    cbox_wavebank_close();
     cbox_instruments_close();
     cbox_config_close();
     

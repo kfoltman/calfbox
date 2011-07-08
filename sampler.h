@@ -22,8 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "biquad-float.h"
 #include "envelope.h"
 #include "module.h"
-#include <glib.h>
-#include <sndfile.h>
+#include "wavebank.h"
 #include <stdint.h>
 
 #define MAX_SAMPLER_VOICES 128
@@ -57,7 +56,7 @@ enum sample_loop_mode
 struct sampler_layer
 {
     enum sample_player_type mode;
-    struct sampler_waveform *waveform;
+    struct cbox_waveform *waveform;
     int16_t *sample_data;
     uint32_t sample_offset;
     uint32_t loop_start;
@@ -144,12 +143,6 @@ struct sampler_voice
     int serial_no;
 };
 
-struct sampler_waveform
-{
-    int16_t *data;
-    SF_INFO info;
-};
-
 struct sampler_module
 {
     struct cbox_module module;
@@ -165,10 +158,9 @@ struct sampler_module
 };
 
 extern void sampler_layer_init(struct sampler_layer *l);
-extern void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform);
+extern void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform);
 extern void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section);
 extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
-extern struct sampler_waveform *sampler_waveform_new_from_file(const char *context_name, const char *filename, GError **error);
 extern GQuark cbox_sampler_error_quark();
 
 #endif

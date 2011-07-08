@@ -830,40 +830,6 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->program = m->program_count ? m->programs[0] : NULL;
 }
 
-struct sampler_waveform *sampler_waveform_new_from_file(const char *context_name, const char *filename, GError **error)
-{
-    int i;
-    int nshorts;
-    
-    if (!filename)
-    {
-        g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_INVALID_LAYER, "%s: no filename specified", context_name);
-        return NULL;
-    }
-    struct sampler_waveform *waveform = malloc(sizeof(struct sampler_waveform));
-    memset(&waveform->info, 0, sizeof(waveform->info));
-    SNDFILE *sndfile = sf_open(filename, SFM_READ, &waveform->info);
-    if (!sndfile)
-    {
-        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "%s: cannot open '%s'", context_name, filename);
-        return NULL;
-    }
-    waveform->data = malloc(waveform->info.channels * 2 * (waveform->info.frames + 1));
-    if (waveform->info.channels != 1 && waveform->info.channels != 2)
-    {
-        g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_INVALID_WAVEFORM, 
-            "%s: cannot open file '%s': unsupported channel count %d", context_name, filename, (int)waveform->info.channels);
-        return NULL;
-    }
-    nshorts = waveform->info.channels * (waveform->info.frames + 1);
-    for (i = 0; i < nshorts; i++)
-        waveform->data[i] = 0;
-    sf_readf_short(sndfile, waveform->data, waveform->info.frames);
-    sf_close(sndfile);
-    
-    return waveform;
-}
-
 static void cbox_config_get_dahdsr(const char *cfg_section, const char *prefix, struct cbox_dahdsr *env)
 {
     gchar *v;
@@ -944,7 +910,7 @@ void sampler_layer_init(struct sampler_layer *l)
     l->amp_lfo_freq = l->filter_lfo_freq = l->pitch_lfo_freq = 0;
 }
 
-void sampler_layer_set_waveform(struct sampler_layer *l, struct sampler_waveform *waveform)
+void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform)
 {
     l->waveform = waveform;
     l->sample_data = waveform ? waveform->data : NULL;
@@ -1043,7 +1009,7 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->pitch_lfo_freq = cbox_config_get_float(cfg_section, "pitch_lfo_freq", l->pitch_lfo_freq);
 }
 
-void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct sampler_waveform *waveform)
+void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct cbox_waveform *waveform)
 {
     sampler_layer_init(l);
     sampler_layer_set_waveform(l, waveform);
@@ -1116,7 +1082,7 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
         const char *sample_file = cbox_config_get_string(where ? where : cfg_section, "file");
         
         gchar *sample_pathname = g_build_filename(spath ? spath : "", sample_file, NULL);
-        struct sampler_waveform *waveform = sampler_waveform_new_from_file(where ? where : cfg_section, sample_pathname, error);
+        struct cbox_waveform *waveform = cbox_wavebank_get_waveform(where ? where : cfg_section, sample_pathname, error);
         g_free(sample_pathname);
         
         if (!waveform)
@@ -1131,10 +1097,7 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
 static void destroy_layer(struct sampler_module *m, struct sampler_layer *l)
 {
     if (l->waveform)
-    {
-        free(l->waveform->data);
-        free(l->waveform);
-    }
+        cbox_waveform_release(l->waveform);
     free(l);
 }
 

@@ -105,7 +105,7 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     if (!strcmp(key, "sample"))
     {
         gchar *filename = g_build_filename(ls->sample_path ? ls->sample_path : "", value, NULL);
-        struct sampler_waveform *wf = sampler_waveform_new_from_file(ls->filename, filename, ls->error);
+        struct cbox_waveform *wf = cbox_wavebank_get_waveform(ls->filename, filename, ls->error);
         g_free(filename);
         if (!wf)
             return FALSE;
