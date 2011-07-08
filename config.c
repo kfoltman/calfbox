@@ -77,6 +77,11 @@ char *cbox_config_get_string(const char *section, const char *key)
     return cbox_config_get_string_with_default(section, key, NULL);
 }
 
+void cbox_config_set_string(const char *section, const char *key, const char *value)
+{
+    g_key_file_set_string(config_keyfile, section, key, value);
+}
+
 char *cbox_config_get_string_with_default(const char *section, const char *key, char *def_value)
 {
     if (section && key && g_key_file_has_key(config_keyfile, section, key, NULL))
@@ -108,6 +113,11 @@ int cbox_config_get_int(const char *section, const char *key, int def_value)
     return result;
 }
 
+void cbox_config_set_int(const char *section, const char *key, int value)
+{
+    g_key_file_set_integer(config_keyfile, section, key, value);
+}
+
 float cbox_config_get_float(const char *section, const char *key, float def_value)
 {
     GError *error = NULL;
@@ -123,6 +133,11 @@ float cbox_config_get_float(const char *section, const char *key, float def_valu
     }
     return result;
 }    
+
+void cbox_config_set_float(const char *section, const char *key, double value)
+{
+    g_key_file_set_double(config_keyfile, section, key, value);
+}
 
 float cbox_config_get_gain(const char *section, const char *key, float def_value)
 {
@@ -145,15 +160,40 @@ float cbox_config_get_gain_db(const char *section, const char *key, float def_va
     return cbox_config_get_gain(section, key, pow(2.0, def_value / 6.0));
 }
 
-void cbox_config_foreach_section(void (*process)(void *user_data, const char *key), void *user_data)
+void cbox_config_foreach_section(void (*process)(void *user_data, const char *section), void *user_data)
 {
     gsize i, length = 0;
     gchar **groups = g_key_file_get_groups (config_keyfile, &length);
+    if (!groups)
+        return;
     for (i = 0; i < length; i++)
     {
         process(user_data, groups[i]);
     }
     g_strfreev(groups);
+}
+
+void cbox_config_foreach_key(void (*process)(void *user_data, const char *key), const char *section, void *user_data)
+{
+    gsize i, length = 0;
+    gchar **keys = g_key_file_get_keys (config_keyfile, section, &length, NULL);
+    if (!keys)
+        return;
+    for (i = 0; i < length; i++)
+    {
+        process(user_data, keys[i]);
+    }
+    g_strfreev(keys);
+}
+
+int cbox_config_remove_section(const char *section)
+{
+    return 0 != g_key_file_remove_group(config_keyfile, section, NULL);
+}
+
+int cbox_config_remove_key(const char *section, const char *key)
+{
+    return 0 != g_key_file_remove_key(config_keyfile, section, key, NULL);
 }
 
 void cbox_config_close()
