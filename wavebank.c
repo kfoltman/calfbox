@@ -57,6 +57,11 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     }
     
     char *canonical = realpath(filename, NULL);
+    if (!canonical)
+    {
+        g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, "%s: cannot find a real path for '%s'", context_name, filename);
+        return NULL;
+    }
     gpointer value = g_hash_table_lookup(bank.waveforms_by_name, canonical);
     if (value)
     {
