@@ -35,6 +35,8 @@ struct cbox_waveform
     SF_INFO info;
     int refcount;
     size_t bytes;
+    gchar *canonical_name;
+    gchar *display_name;
 };
 
 extern void cbox_wavebank_init();
