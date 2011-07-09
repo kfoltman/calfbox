@@ -43,6 +43,11 @@ static inline void cbox_biquadf_reset(struct cbox_biquadf_state *state)
     state->x1 = state->y1 = state->x2 = state->y2 = 0.f;
 }
 
+static inline float cbox_biquadf_is_audible(struct cbox_biquadf_state *state, float level)
+{
+    return fabs(state->x1) + fabs(state->x2) + fabs(state->y1) + fabs(state->y2) >= level;
+}
+
 // Based on filter coefficient equations by Robert Bristow-Johnson
 static inline void cbox_biquadf_set_lp_rbj(struct cbox_biquadf_coeffs *coeffs, float fc, float q, float sr)
 {

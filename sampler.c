@@ -617,8 +617,12 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             float pitch_env = cbox_envelope_get_next(&v->pitch_env, v->released);
             if (v->amp_env.cur_stage < 0)
             {
-                v->mode = spt_inactive;
-                continue;
+                if (v->cutoff == -1 || 
+                    (!cbox_biquadf_is_audible(&v->filter_left, 1.0 / 65536.0) && !cbox_biquadf_is_audible(&v->filter_right, 1.0 / 65536.0)))
+                {
+                    v->mode = spt_inactive;
+                    continue;
+                }
             }            
             
             double maxv = 127 << 7;
