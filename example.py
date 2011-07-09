@@ -662,7 +662,7 @@ class MainWindow(gtk.Window):
         finally:
             d.destroy()
 
-    def add_layer(self, w):
+    def layer_add(self, w):
         d = AddLayerDialog(self)
         response = d.run()
         try:
@@ -672,12 +672,15 @@ class MainWindow(gtk.Window):
                     cbox.do_cmd("/scene/add_layer", None, [0, scene[2][6:]])
                 elif scene[1] == 'Instrument':
                     cbox.do_cmd("/scene/add_instrument", None, [0, scene[2][11:]])
-                scene = GetThings("/scene/status", ['name', 'title'], [])
-                self.scene_label.set_text(scene.name)
-                self.title_label.set_text(scene.title)
                 self.refresh_instrument_pages()
         finally:
             d.destroy()
+
+    def layer_remove(self, w):
+        if self.layers_tree.get_cursor()[0] is not None:
+            pos = self.layers_tree.get_cursor()[0][0]
+            cbox.do_cmd("/scene/delete_layer", None, [1 + pos])
+            self.refresh_instrument_pages()
 
     def refresh_instrument_pages(self):
         self.delete_instrument_pages()
@@ -693,8 +696,11 @@ class MainWindow(gtk.Window):
         
         self.menu_bar.append(self.create_menu("_Scene", [
             ("_Load", self.load_scene),
-            ("_Add layer", self.add_layer),
             ("_Quit", self.quit),
+        ]))
+        self.menu_bar.append(self.create_menu("_Layer", [
+            ("_Add", self.layer_add),
+            ("_Remove", self.layer_remove),
         ]))
         
         self.vbox.pack_start(self.menu_bar, False, False)

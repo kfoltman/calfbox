@@ -169,6 +169,21 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         }
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/delete_layer") && !strcmp(cmd->arg_types, "i"))
+    {
+        int pos = *(int *)cmd->arg_values[0];
+        if (pos < 0 || pos > s->layer_count)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for last)", pos, s->layer_count);
+            return FALSE;
+        }
+        if (pos == 0)
+            pos = s->layer_count - 1;
+        else
+            pos--;
+        cbox_layer_destroy(cbox_scene_remove_layer(s, pos));
+        return TRUE;
+    }
     else if (cbox_parse_path_part(cmd, "/layer/", &subcommand, &index, 1, s->layer_count, error))
     {
         if (!subcommand)
@@ -223,6 +238,7 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
     }
     
     s->layers = NULL;
+    s->instruments = NULL;
     s->layer_count = 0;
     s->instrument_count = 0;
     s->aux_bus_count = 0;
@@ -272,6 +288,7 @@ struct cbox_scene *cbox_scene_new()
     s->name = g_strdup("");
     s->title = g_strdup("");
     s->layers = NULL;
+    s->instruments = NULL;
     s->layer_count = 0;
     s->instrument_count = 0;
     s->aux_bus_count = 0;
@@ -302,22 +319,55 @@ gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *la
     }
     if (i == scene->layer_count)
     {
-        scene->instruments[scene->instrument_count++] = layer->instrument;
+        struct cbox_instrument **instruments = malloc(sizeof(struct cbox_instrument *) * (scene->instrument_count + 1));
+        memcpy(instruments, scene->instruments, sizeof(struct cbox_instrument *) * scene->instrument_count);
+        instruments[scene->instrument_count] = layer->instrument;
         layer->instrument->scene = scene;
+        free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->instruments, instruments, &scene->instrument_count, scene->instrument_count + 1));        
     }
     struct cbox_layer **layers = malloc(sizeof(struct cbox_layer *) * (scene->layer_count + 1));
     memcpy(layers, scene->layers, sizeof(struct cbox_layer *) * pos);
     layers[pos] = layer;
     memcpy(layers + pos + 1, scene->layers + pos, sizeof(struct cbox_layer *) * (scene->layer_count - pos));
     
-    free(cbox_rt_swap_pointers(app.rt, (void **)&scene->layers, layers));
-    scene->layer_count++;
+    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->layers, layers, &scene->layer_count, scene->layer_count + 1));
     return TRUE;
 }
 
 gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error)
 {
     return cbox_scene_insert_layer(scene, layer, scene->layer_count, error);
+}
+
+struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos)
+{
+    struct cbox_layer *removed = scene->layers[pos];
+    struct cbox_layer **layers = malloc(sizeof(struct cbox_layer *) * (scene->layer_count - 1));
+    memcpy(layers, scene->layers, sizeof(struct cbox_layer *) * pos);
+    memcpy(layers + pos, scene->layers + pos + 1, sizeof(struct cbox_layer *) * (scene->layer_count - pos - 1));
+    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->layers, layers, &scene->layer_count, scene->layer_count - 1));
+    
+    return removed;
+}
+
+gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument)
+{
+    assert(instrument->scene == scene);
+    int pos;
+    for (pos = 0; pos < scene->instrument_count; pos++)
+    {
+        if (scene->instruments[pos] == instrument)
+        {
+            struct cbox_instrument **instruments = malloc(sizeof(struct cbox_instrument *) * (scene->instrument_count - 1));
+            memcpy(instruments, scene->instruments, sizeof(struct cbox_instrument *) * pos);
+            memcpy(instruments + pos, scene->instruments + pos + 1, sizeof(struct cbox_instrument *) * (scene->instrument_count - pos - 1));
+            free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->instruments, instruments, &scene->instrument_count, scene->instrument_count - 1));
+            
+            instrument->scene = NULL;
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error)

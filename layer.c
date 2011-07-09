@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "instr.h"
 #include "layer.h"
 #include "midi.h"
+#include "scene.h"
 #include <glib.h>
 
 struct cbox_layer *cbox_layer_load(const char *name, GError **error)
@@ -123,6 +124,9 @@ void cbox_layer_destroy(struct cbox_layer *layer)
 {
     if (!--(layer->instrument->refcount))
     {
+        if (layer->instrument->scene)
+            cbox_scene_remove_instrument(layer->instrument->scene, layer->instrument);
+        
         cbox_instrument_destroy(layer->instrument);
     }
     free(layer);
