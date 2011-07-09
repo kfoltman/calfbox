@@ -128,6 +128,7 @@ void cbox_waveform_unref(struct cbox_waveform *waveform)
     if (--waveform->refcount > 0)
         return;
     
+    g_hash_table_remove(bank.waveforms, waveform->canonical_name);
     bank.bytes -= waveform->bytes;
 
     g_free(waveform->display_name);
