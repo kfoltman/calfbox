@@ -53,9 +53,18 @@ enum sample_loop_mode
     slm_loop_sustain, // unsupported
 };
 
+enum sampler_filter_type
+{
+    sft_unknown,
+    sft_lp12,
+    sft_hp12,
+    sft_bp6,
+};
+
 struct sampler_layer
 {
     enum sample_player_type mode;
+    enum sampler_filter_type filter;
     struct cbox_waveform *waveform;
     int16_t *sample_data;
     uint32_t sample_offset;
@@ -115,6 +124,7 @@ struct sampler_lfo
 struct sampler_voice
 {
     enum sample_player_type mode;
+    enum sampler_filter_type filter;
     struct sampler_layer *layer;
     int16_t *sample_data;
     uint32_t pos, delta, loop_start, loop_end, sample_end;
@@ -162,5 +172,7 @@ extern void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_wave
 extern void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section);
 extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
 extern GQuark cbox_sampler_error_quark();
+
+extern enum sampler_filter_type sampler_filter_type_from_string(const char *name);
 
 #endif

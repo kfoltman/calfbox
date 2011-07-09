@@ -58,6 +58,37 @@ static inline void cbox_biquadf_set_lp_rbj(struct cbox_biquadf_coeffs *coeffs, f
     coeffs->b2 =  (float)((1 - alpha)*inv);
 }
 
+// Based on filter coefficient equations by Robert Bristow-Johnson
+static inline void cbox_biquadf_set_hp_rbj(struct cbox_biquadf_coeffs *coeffs, float fc, float q, float sr)
+{
+    float omega=(float)(2*M_PI*fc/sr);
+    float sn=sin(omega);
+    float cs=cos(omega);
+    float alpha=(float)(sn/(2*q));
+    float inv=(float)(1.0/(1.0+alpha));
+
+    coeffs->a2 = coeffs->a0 = (float)(inv*(1 + cs)*0.5f);
+    coeffs->a1 = -2 * coeffs->a0;
+    coeffs->b1 =  (float)(-2*cs*inv);
+    coeffs->b2 =  (float)((1 - alpha)*inv);
+}
+
+// Based on filter coefficient equations by Robert Bristow-Johnson
+static inline void cbox_biquadf_set_bp_rbj(struct cbox_biquadf_coeffs *coeffs, float fc, float q, float sr)
+{
+    float omega=(float)(2*M_PI*fc/sr);
+    float sn=sin(omega);
+    float cs=cos(omega);
+    float alpha=(float)(sn/(2*q));
+    float inv=(float)(1.0/(1.0+alpha));
+
+    coeffs->a0 = (float)(inv*alpha);
+    coeffs->a1 = 0.f;
+    coeffs->a2 = -coeffs->a0;
+    coeffs->b1 =  (float)(-2*cs*inv);
+    coeffs->b2 =  (float)((1 - alpha)*inv);
+}
+
 
 // Based on filter coefficient equations by Robert Bristow-Johnson
 static inline void cbox_biquadf_set_peakeq_rbj(struct cbox_biquadf_coeffs *coeffs, float freq, float q, float peak, float sr)

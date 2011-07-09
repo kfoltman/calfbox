@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "module.h"
 #include "sampler.h"
 #include "sfzloader.h"
+#include <assert.h>
 #include <errno.h>
 #include <glib.h>
 #include <math.h>
@@ -353,6 +354,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->note = note;
             v->vel = vel;
             v->mode = l->mode;
+            v->filter = l->filter;
             v->freq = freq;
             v->released = 0;
             v->released_with_sustain = 0;
@@ -645,7 +647,20 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                     resonance = 0.7;
                 if (resonance > 32)
                     resonance = 32;
-                cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                switch(v->filter)
+                {
+                case sft_lp12:
+                    cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    break;
+                case sft_hp12:
+                    cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    break;
+                case sft_bp6:
+                    cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    break;
+                default:
+                    assert(0);
+                }
             }
             
             float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
@@ -869,6 +884,7 @@ void sampler_layer_init(struct sampler_layer *l)
     l->max_note = 127;
     l->min_vel = 0;
     l->max_vel = 127;
+    l->filter = sft_lp12;
     l->cutoff = 21000;
     l->resonance = 0.707;
     l->fileg_depth = 0;
@@ -992,6 +1008,16 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->filter_lfo_depth = cbox_config_get_float(cfg_section, "filter_lfo_depth", l->filter_lfo_depth);
     l->filter_lfo_freq = cbox_config_get_float(cfg_section, "filter_lfo_freq", l->filter_lfo_freq);
     l->pitch_lfo_depth = cbox_config_get_float(cfg_section, "pitch_lfo_depth", l->pitch_lfo_depth);
+    l->pitch_lfo_freq = cbox_config_get_float(cfg_section, "pitch_lfo_freq", l->pitch_lfo_freq);
+    const char *fil_type = cbox_config_get_string(cfg_section, "fil_type");
+    if (fil_type)
+    {
+        enum sampler_filter_type ft = sampler_filter_type_from_string(fil_type);
+        if (ft != sft_unknown)
+            l->filter = ft;
+        else
+            g_warning("Unknown filter type '%s'", fil_type);
+    }
     l->pitch_lfo_freq = cbox_config_get_float(cfg_section, "pitch_lfo_freq", l->pitch_lfo_freq);
 }
 
@@ -1351,6 +1377,17 @@ void sampler_destroy(struct cbox_module *module)
     
     for (int i = 0; i < m->program_count; i++)
         destroy_program(m, m->programs[i]);
+}
+
+enum sampler_filter_type sampler_filter_type_from_string(const char *name)
+{
+    if (!strcmp(name, "lpf_2p"))
+        return sft_lp12;
+    if (!strcmp(name, "hpf_2p"))
+        return sft_hp12;
+    if (!strcmp(name, "bpf_2p"))
+        return sft_bp6;
+    return sft_unknown;
 }
 
 struct cbox_module_livecontroller_metadata sampler_controllers[] = {

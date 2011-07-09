@@ -208,6 +208,14 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->pitch_lfo_depth = atof(value);
     else if (!strcmp(key, "pitchlfo_freq"))
         l->pitch_lfo_freq = atof(value);
+    else if (!strcmp(key, "fil_type"))
+    {
+        enum sampler_filter_type ft = sampler_filter_type_from_string(value);
+        if (ft == sft_unknown)
+            g_warning("Unhandled filter type: %s", value);
+        else
+            l->filter = ft;
+    }
     else if (!strncmp(key, "ampeg_", 6))
     {
         if (!parse_envelope_param(&l->amp_env, key + 6, value))
