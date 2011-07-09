@@ -116,7 +116,14 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
             cbox_waveform_unref(l->waveform);
             l->waveform = NULL;
         }
-        gchar *filename = g_build_filename(ls->sample_path ? ls->sample_path : "", value, NULL);
+        gchar *value_copy = g_strdup(value);
+        for (int i = 0; value_copy[i]; i++)
+        {
+            if (value_copy[i] == '\\')
+                value_copy[i] = '/';
+        }
+        gchar *filename = g_build_filename(ls->sample_path ? ls->sample_path : "", value_copy, NULL);
+        g_free(value_copy);
         struct cbox_waveform *wf = cbox_wavebank_get_waveform(ls->filename, filename, ls->error);
         g_free(filename);
         if (!wf)
