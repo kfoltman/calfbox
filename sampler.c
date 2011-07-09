@@ -45,14 +45,13 @@ static void sampler_process_block(struct cbox_module *module, cbox_sample_t **in
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void sampler_destroy(struct cbox_module *module);
 
-static void process_voice_mono_lerp(struct sampler_voice *v, float **channels)
+static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
 {
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
     
-    float temp[2][CBOX_BLOCK_SIZE];
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         if (v->pos >= v->loop_end)
@@ -60,9 +59,7 @@ static void process_voice_mono_lerp(struct sampler_voice *v, float **channels)
             if (v->loop_start == (uint32_t)-1)
             {
                 v->mode = spt_inactive;
-                for (; i < CBOX_BLOCK_SIZE; i++)
-                    temp[0][i] = temp[1][i] = 0.f;
-                break;
+                return i;
             }
             v->pos = v->pos - v->loop_end + v->loop_start;
         }
@@ -79,23 +76,21 @@ static void process_voice_mono_lerp(struct sampler_voice *v, float **channels)
         v->frac_pos += v->frac_delta;
         v->pos += v->delta;
         
-        temp[0][i] = sample * lgain;
-        temp[1][i] = sample * rgain;
+        output[0][i] = sample * lgain;
+        output[1][i] = sample * rgain;
         lgain += lgain_delta;
         rgain += rgain_delta;
     }
-    cbox_biquadf_process_adding(&v->filter_left, &v->filter_coeffs, temp[0], channels[0]);
-    cbox_biquadf_process_adding(&v->filter_right, &v->filter_coeffs, temp[1], channels[1]);
+    return CBOX_BLOCK_SIZE;
 }
 
-static void process_voice_mono(struct sampler_voice *v, float **channels)
+static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
 {
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
     
-    float temp[2][CBOX_BLOCK_SIZE];
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         if (v->pos >= v->loop_end)
@@ -103,9 +98,7 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
             if (v->loop_start == (uint32_t)-1)
             {
                 v->mode = spt_inactive;
-                for (; i < CBOX_BLOCK_SIZE; i++)
-                    temp[0][i] = temp[1][i] = 0.f;
-                break;
+                return i;
             }
             v->pos = v->pos - v->loop_end + v->loop_start;
             if (v->loop_end + v->loop_evolve < v->sample_end && ((int32_t) v->loop_start + (int32_t) v->loop_evolve) > 0)
@@ -161,23 +154,21 @@ static void process_voice_mono(struct sampler_voice *v, float **channels)
         v->frac_pos += v->frac_delta;
         v->pos += v->delta;
         
-        temp[0][i] = sample * lgain;
-        temp[1][i] = sample * rgain;
+        output[0][i] = sample * lgain;
+        output[1][i] = sample * rgain;
         lgain += lgain_delta;
         rgain += rgain_delta;
     }
-    cbox_biquadf_process_adding(&v->filter_left, &v->filter_coeffs, temp[0], channels[0]);
-    cbox_biquadf_process_adding(&v->filter_right, &v->filter_coeffs, temp[1], channels[1]);
+    return CBOX_BLOCK_SIZE;
 }
 
-static void process_voice_stereo_lerp(struct sampler_voice *v, float **channels)
+static uint32_t process_voice_stereo_lerp(struct sampler_voice *v, float **output)
 {
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
 
-    float temp[2][CBOX_BLOCK_SIZE];
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         if (v->pos >= v->loop_end)
@@ -185,9 +176,7 @@ static void process_voice_stereo_lerp(struct sampler_voice *v, float **channels)
             if (v->loop_start == (uint32_t)-1)
             {
                 v->mode = spt_inactive;
-                for (; i < CBOX_BLOCK_SIZE; i++)
-                    temp[0][i] = temp[1][i] = 0.f;
-                break;
+                return i;
             }
             v->pos = v->pos - v->loop_end + v->loop_start;
         }
@@ -205,23 +194,21 @@ static void process_voice_stereo_lerp(struct sampler_voice *v, float **channels)
         v->frac_pos += v->frac_delta;
         v->pos += v->delta;
         
-        temp[0][i] = lsample * lgain;
-        temp[1][i] = rsample * rgain;
+        output[0][i] = lsample * lgain;
+        output[1][i] = rsample * rgain;
         lgain += lgain_delta;
         rgain += rgain_delta;
     }
-    cbox_biquadf_process_adding(&v->filter_left, &v->filter_coeffs, temp[0], channels[0]);
-    cbox_biquadf_process_adding(&v->filter_right, &v->filter_coeffs, temp[1], channels[1]);
+    return CBOX_BLOCK_SIZE;
 }
 
-static void process_voice_stereo(struct sampler_voice *v, float **channels)
+static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
 {
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
 
-    float temp[2][CBOX_BLOCK_SIZE];
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         if (v->pos >= v->loop_end)
@@ -229,9 +216,7 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
             if (v->loop_start == (uint32_t)-1)
             {
                 v->mode = spt_inactive;
-                for (; i < CBOX_BLOCK_SIZE; i++)
-                    temp[0][i] = temp[1][i] = 0.f;
-                break;
+                return i;
             }
             v->pos = v->pos - v->loop_end + v->loop_start;
             if (v->loop_end + v->loop_evolve < v->sample_end && ((int32_t) v->loop_start + (int32_t) v->loop_evolve) > 0)
@@ -295,13 +280,12 @@ static void process_voice_stereo(struct sampler_voice *v, float **channels)
         v->frac_pos += v->frac_delta;
         v->pos += v->delta;
         
-        temp[0][i] = ch[0] * lgain;
-        temp[1][i] = ch[1] * rgain;
+        output[0][i] = ch[0] * lgain;
+        output[1][i] = ch[1] * rgain;
         lgain += lgain_delta;
         rgain += rgain_delta;
     }
-    cbox_biquadf_process_adding(&v->filter_left, &v->filter_coeffs, temp[0], channels[0]);
-    cbox_biquadf_process_adding(&v->filter_right, &v->filter_coeffs, temp[1], channels[1]);
+    return CBOX_BLOCK_SIZE;
 }
 
 int skip_inactive_layers(struct sampler_program *prg, int first, int note, int vel)
@@ -649,29 +633,38 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 pan = 1;
             v->lgain = gain * (1 - pan)  / 32768.0;
             v->rgain = gain * pan / 32768.0;
-            float cutoff = v->cutoff*pow(2.0,(filter_env*v->fileg_depth + filter_lfo + c->cutoff_ctl*9600/maxv)/1200);
-            if (cutoff < 20)
-                cutoff = 20;
-            if (cutoff > m->srate * 0.45)
-                cutoff = m->srate * 0.45;
-            float resonance = v->resonance*pow(32.0,c->resonance_ctl/maxv);
-            if (resonance < 0.7)
-                resonance = 0.7;
-            if (resonance > 32)
-                resonance = 32;
-            cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+            if (v->cutoff != -1)
+            {
+                float cutoff = v->cutoff*pow(2.0,(filter_env*v->fileg_depth + filter_lfo + c->cutoff_ctl*9600/maxv)/1200);
+                if (cutoff < 20)
+                    cutoff = 20;
+                if (cutoff > m->srate * 0.45)
+                    cutoff = m->srate * 0.45;
+                float resonance = v->resonance*pow(32.0,c->resonance_ctl/maxv);
+                if (resonance < 0.7)
+                    resonance = 0.7;
+                if (resonance > 32)
+                    resonance = 32;
+                cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+            }
             
+            float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
+            float *tmp_outputs[2] = {left, right};
+            uint32_t samples = 0;
+            if (v->mode == spt_stereo16)
+                samples = process_voice_stereo(v, tmp_outputs);
+            else
+                samples = process_voice_mono(v, tmp_outputs);
+            for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
+                left[i] = right[i] = 0.f;
+            if (v->cutoff != -1)
+            {
+                cbox_biquadf_process(&v->filter_left, &v->filter_coeffs, left);
+                cbox_biquadf_process(&v->filter_right, &v->filter_coeffs, right);
+            }
+            mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.0);
             if ((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0))
             {
-                float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
-                for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
-                    left[i] = right[i] = 0;
-                float *tmp_outputs[2] = {left, right};
-                if (v->mode == spt_stereo16)
-                    process_voice_stereo(v, tmp_outputs);
-                else
-                    process_voice_mono(v, tmp_outputs);
-                mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.0);
                 if (v->send1bus > 0 && v->send1gain != 0)
                 {
                     int oofs = m->module.aux_offset + (v->send1bus - 1) * 2;
@@ -682,13 +675,6 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                     int oofs = m->module.aux_offset + (v->send2bus - 1) * 2;
                     mix_block_into_with_gain(outputs, oofs, left, right, v->send2gain);
                 }
-            }
-            else
-            {
-                if (v->mode == spt_stereo16)
-                    process_voice_stereo(v, outputs + v->output_pair_no * 2);
-                else
-                    process_voice_mono(v, outputs + v->output_pair_no * 2);
             }
             
             v->last_lgain = v->lgain;
