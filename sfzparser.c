@@ -51,7 +51,7 @@ static gboolean handle_2ndslash(struct sfz_parser_state *state, int ch)
 
 static void unexpected_char(struct sfz_parser_state *state, int ch)
 {
-    g_set_error(state->error, CBOX_SFZPARSER_ERROR, CBOX_SFZ_PARSER_ERROR_INVALID_CHAR, "Unexpected character '%c'", ch);
+    g_set_error(state->error, CBOX_SFZPARSER_ERROR, CBOX_SFZ_PARSER_ERROR_INVALID_CHAR, "Unexpected character '%c' (%d)", ch, ch);
 }
 
 static gboolean handle_postslash(struct sfz_parser_state *state, int ch)
@@ -191,7 +191,7 @@ gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
     int len = ftell(f);
     fseek(f, 0, 0);
     
-    char *buf = malloc(len + 1);
+    unsigned char *buf = malloc(len + 1);
     buf[len] = '\0';
     if (fread(buf, 1, len, f) != len)
     {
@@ -209,6 +209,11 @@ gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
     s.token_start = 0;
     s.client = c;
     s.error = error;
+    if (len >= 3 && buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF)
+    {
+        // UTF-8 BOM
+        s.pos += 3;
+    }
     while(s.pos < len && s.handler != NULL)
     {
         if (!(*s.handler)(&s, buf[s.pos++]))
