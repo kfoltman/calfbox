@@ -195,6 +195,10 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->velcurve_quadratic = atoi(value);
     else if (!strcmp(key, "fil_veltrack"))
         l->fil_veltrack = atof(value);
+    else if (!strcmp(key, "fil_keytrack"))
+        l->fil_keytrack = atof(value);
+    else if (!strcmp(key, "fil_keycenter"))
+        l->fil_keycenter = atof(value);
     else if (!strcmp(key, "effect1"))
         l->send1gain = atof(value) / 100.0;
     else if (!strcmp(key, "effect2"))

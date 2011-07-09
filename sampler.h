@@ -86,7 +86,7 @@ struct sampler_layer
     struct cbox_envelope_shape amp_env_shape, filter_env_shape, pitch_env_shape;
     enum sample_loop_mode loop_mode;
     float velcurve[128];
-    int velcurve_quadratic, fil_veltrack;
+    int velcurve_quadratic, fil_veltrack, fil_keytrack, fil_keycenter;
     int exclusive_group, off_by;
     int send1bus, send2bus;
     float send1gain, send2gain;

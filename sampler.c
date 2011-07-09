@@ -366,7 +366,10 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->pitch_env.shape = &l->pitch_env_shape;
             v->last_lgain = 0;
             v->last_rgain = 0;
-            v->cutoff = l->cutoff * pow(2.0, (vel * l->fil_veltrack)/ (1200 * 127.0));
+            if (l->cutoff != -1)
+                v->cutoff = l->cutoff * pow(2.0, (vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack) / 1200.0);
+            else
+                v->cutoff = -1;
             v->resonance = l->resonance;
             v->pitcheg_depth = l->pitcheg_depth;
             v->fileg_depth = l->fileg_depth;
@@ -901,6 +904,8 @@ void sampler_layer_init(struct sampler_layer *l)
         l->velcurve[i] = -1;
     l->velcurve_quadratic = -1; // not known yet
     l->fil_veltrack = 0;
+    l->fil_keytrack = 0;
+    l->fil_keycenter = 60;
     l->exclusive_group = -1;
     l->off_by = -1;
     l->output_pair_no = 0;
@@ -992,6 +997,8 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->fileg_depth = cbox_config_get_float(cfg_section, "fileg_depth", l->fileg_depth);
     l->pitcheg_depth = cbox_config_get_float(cfg_section, "pitcheg_depth", l->pitcheg_depth);
     l->fil_veltrack = cbox_config_get_float(cfg_section, "fil_veltrack", l->fil_veltrack);
+    l->fil_keytrack = cbox_config_get_float(cfg_section, "fil_keytrack", l->fil_keytrack);
+    l->fil_keycenter = cbox_config_get_float(cfg_section, "fil_keycenter", l->fil_keycenter);
     if (cbox_config_get_int(cfg_section, "one_shot", 0))
         l->loop_mode = slm_one_shot;
     if (cbox_config_get_int(cfg_section, "loop_sustain", 0))
