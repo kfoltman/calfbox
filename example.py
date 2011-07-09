@@ -108,10 +108,25 @@ def tree_toggle_changed_bool(renderer, tree_path, model, opath, column):
     model[int(tree_path)][column] = not model[int(tree_path)][column]
     cbox.do_cmd(opath % (1 + int(tree_path)), None, [1 if model[int(tree_path)][column] else 0])
         
-def standard_toggle_renderer(layers_model, path, column):
+def tree_combo_changed(renderer, tree_path, new_value, model, opath, column):
+    new_value = renderer.get_property('model')[new_value][0]
+    model[int(tree_path)][column] = new_value
+    cbox.do_cmd(opath % (1 + int(tree_path)), None, [new_value])
+        
+def standard_toggle_renderer(list_model, path, column):
     toggle = gtk.CellRendererToggle()
-    toggle.connect('toggled', tree_toggle_changed_bool, layers_model, path, column)
+    toggle.connect('toggled', tree_toggle_changed_bool, list_model, path, column)
     return toggle
+
+def standard_combo_renderer(list_model, model, path, column):
+    combo = gtk.CellRendererCombo()
+    combo.set_property('model', model)
+    combo.set_property('editable', True)
+    combo.set_property('has-entry', False)
+    combo.set_property('text-column', 1)
+    combo.set_property('mode', gtk.CELL_RENDERER_MODE_EDITABLE)
+    combo.connect('changed', tree_combo_changed, list_model, path, column)
+    return combo
 
 def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustment_changed_float):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
@@ -327,7 +342,7 @@ class WithPatchTable:
         self.mapping = {}
         for id in patches:
             self.mapping[id] = len(self.mapping)
-            self.patches.append((patches[id], id))
+            self.patches.append(("%s (%s)" % (patches[id], id), id))
         for cb in self.patch_combos:
             cb.set_model(self.patches)
 
@@ -595,6 +610,14 @@ engine_window_map = {
 
 effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq']
 
+in_channels_ls = gtk.ListStore(gobject.TYPE_INT, gobject.TYPE_STRING)
+in_channels_ls.append((0, "All"))
+out_channels_ls = gtk.ListStore(gobject.TYPE_INT, gobject.TYPE_STRING)
+out_channels_ls.append((0, "Same"))
+for i in range(1, 17):
+    in_channels_ls.append((i, str(i)))
+    out_channels_ls.append((i, str(i)))
+
 class MainWindow(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
@@ -643,8 +666,8 @@ class MainWindow(gtk.Window):
         self.layers_tree = gtk.TreeView(self.layers_model)
         self.layers_tree.insert_column_with_attributes(0, "On?", standard_toggle_renderer(self.layers_model, "/scene/layer/%d/enable", 1), active=1)
         self.layers_tree.insert_column_with_attributes(1, "Name", gtk.CellRendererText(), text=0)
-        self.layers_tree.insert_column_with_attributes(2, "In Ch#", gtk.CellRendererText(), text=2)
-        self.layers_tree.insert_column_with_attributes(3, "Out Ch#", gtk.CellRendererText(), text=3)
+        self.layers_tree.insert_column_with_data_func(2, "In Ch#", standard_combo_renderer(self.layers_model, in_channels_ls, "/scene/layer/%d/in_channel", 2), lambda column, cell, model, iter: cell.set_property('text', "%s" % model[iter][2] if model[iter][2] != 0 else 'All'))
+        self.layers_tree.insert_column_with_data_func(3, "Out Ch#", standard_combo_renderer(self.layers_model, out_channels_ls, "/scene/layer/%d/out_channel", 3), lambda column, cell, model, iter: cell.set_property('text', "%s" % model[iter][3] if model[iter][3] != 0 else 'Same'))
         self.layers_tree.insert_column_with_attributes(4, "Eat?", standard_toggle_renderer(self.layers_model, "/scene/layer/%d/consume", 4), active=4)
         self.layers_tree.insert_column_with_attributes(5, "Lo N#", gtk.CellRendererText(), text=5)
         self.layers_tree.insert_column_with_attributes(6, "Hi N#", gtk.CellRendererText(), text=6)

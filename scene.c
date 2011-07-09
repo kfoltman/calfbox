@@ -89,6 +89,16 @@ static gboolean cbox_layer_process_cmd(struct cbox_layer *layer, struct cbox_com
         layer->low_note = *(int *)cmd->arg_values[0];
         return TRUE;
     }
+    else if (!strcmp(subcmd, "/in_channel") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->in_channel = *(int *)cmd->arg_values[0] - 1;
+        return TRUE;
+    }
+    else if (!strcmp(subcmd, "/out_channel") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->out_channel = *(int *)cmd->arg_values[0] - 1;
+        return TRUE;
+    }
     else // otherwise, treat just like an command on normal (non-aux) output
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
