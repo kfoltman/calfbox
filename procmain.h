@@ -67,6 +67,7 @@ extern void cbox_rt_stop(struct cbox_rt *rt);
 extern void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition *cmd, void *user_data);
 extern void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *cmd, void *user_data);
 extern void *cbox_rt_swap_pointers(struct cbox_rt *rt, void **ptr, void *new_value);
+extern void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, void *new_value, int *pcount, int new_count);
 
 // These use an RT command internally
 extern struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scene);
