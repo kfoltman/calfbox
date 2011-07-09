@@ -1094,6 +1094,60 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
     return TRUE;
 }
 
+static int get_first_free_program_no(struct sampler_module *m)
+{
+    int prog_no = -1;
+    gboolean found;
+    
+    // XXXKF this has a N-squared complexity - but I'm not seeing
+    // this being used with more than 10 programs at the same time
+    // in the near future
+    do {
+        prog_no++;
+        found = FALSE;
+        for (int i = 0; i < m->program_count; i++)
+        {
+            if (m->programs[i]->prog_no == prog_no)
+            {
+                found = TRUE;
+                break;
+            }
+        }        
+    } while(found);
+    
+    return prog_no;
+}
+
+static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, GError **error)
+{
+    gboolean replace = FALSE;
+    int index = -1;
+    for (int i = 0; i < m->program_count; i++)
+    {
+        if (m->programs[i]->prog_no == prog_no)
+        {
+            replace = TRUE;
+            index = i;
+            break;
+        }
+    }
+    struct sampler_program *pgm = NULL;
+    if (!load_program(m, &pgm, cfg_section, name, prog_no, error))
+        return FALSE;
+    
+    if (replace)
+    {
+        cbox_rt_swap_pointers(app.rt, (void **)&m->programs[index], pgm);
+        return TRUE;
+    }
+    
+    struct sampler_program **programs = malloc(sizeof(struct sampler_program *) * (m->program_count + 1));
+    memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
+    programs[m->program_count] = pgm;
+    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
+    return TRUE;
+}
+
 static void destroy_layer(struct sampler_module *m, struct sampler_layer *l)
 {
     if (l->waveform)
@@ -1182,6 +1236,16 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         }
         cbox_rt_swap_pointers(app.rt, (void **)&m->channels[channel - 1].program, pgm);
         return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/load_patch") && !strcmp(cmd->arg_types, "iss"))
+    {
+        return load_program_at(m, (const char *)cmd->arg_values[1], (const char *)cmd->arg_values[2], *(int *)cmd->arg_values[0], error);
+    }
+    else if (!strcmp(cmd->command, "/get_unused_program") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        return cbox_execute_on(fb, NULL, "/program_no", "i", error, get_first_free_program_no(m));
     }
     else
         return cbox_set_command_error(error, cmd);

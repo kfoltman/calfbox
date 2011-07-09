@@ -189,6 +189,66 @@ def cfg_save(filename = None):
     else:
         cbox.do_cmd('/config/save', None, [str(filename)])
 
+class SelectObjectDialog(gtk.Dialog):
+    def __init__(self, parent):
+        gtk.Dialog.__init__(self, self.title, parent, gtk.DIALOG_MODAL, 
+            (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
+        self.set_default_response(gtk.RESPONSE_OK)
+        model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
+        
+        self.update_model(model)
+                
+        scenes = gtk.TreeView(model)
+        scenes.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=0)
+        scenes.insert_column_with_attributes(1, "Title", gtk.CellRendererText(), text=3)
+        scenes.insert_column_with_attributes(2, "Type", gtk.CellRendererText(), text=1)
+        self.vbox.pack_start(scenes)
+        scenes.show()
+        scenes.grab_focus()
+        self.scenes = scenes
+        self.scenes.connect('row-activated', lambda w, path, column: self.response(gtk.RESPONSE_OK))
+    def get_selected_object(self):
+        return self.scenes.get_model()[self.scenes.get_cursor()[0][0]]
+
+class SceneDialog(SelectObjectDialog):
+    title = "Select a scene"
+    def __init__(self, parent):
+        SelectObjectDialog.__init__(self, parent)
+    def update_model(self, model):
+        for s in cfg_sections("scene:"):
+            title = cfg_get(s, "title")
+            model.append((s[6:], "Scene", s, title))
+        for s in cfg_sections("instrument:"):
+            title = cfg_get(s, "title")
+            model.append((s[11:], "Instrument", s, title))
+        for s in cfg_sections("layer:"):
+            title = cfg_get(s, "title")
+            model.append((s[6:], "Layer", s, title))
+
+class AddLayerDialog(SelectObjectDialog):
+    title = "Add a layer"
+    def __init__(self, parent):
+        SelectObjectDialog.__init__(self, parent)
+    def update_model(self, model):
+        for s in cfg_sections("instrument:"):
+            title = cfg_get(s, "title")
+            model.append((s[11:], "Instrument", s, title))
+        for s in cfg_sections("layer:"):
+            title = cfg_get(s, "title")
+            model.append((s[6:], "Layer", s, title))
+
+class LoadProgramDialog(SelectObjectDialog):
+    title = "Load a sampler program"
+    def __init__(self, parent):
+        SelectObjectDialog.__init__(self, parent)
+    def update_model(self, model):
+        for s in cfg_sections("spgm:"):
+            title = cfg_get(s, "title")
+            if cfg_get(s, "sfz") == None:
+                model.append((s[5:], "Program", s, title))
+            else:
+                model.append((s[5:], "SFZ", s, title))
+
 class StreamWindow(gtk.VBox):
     def __init__(self, instrument, path):
         gtk.Widget.__init__(self)
@@ -246,14 +306,9 @@ class StreamWindow(gtk.VBox):
 
 class WithPatchTable:
     def __init__(self, attribs):
-        self.patches = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
-        patches = GetThings("%s/patches" % self.path, ["%patch"], []).patch
-        self.mapping = {}
-        for id in patches:
-            self.mapping[id] = len(self.mapping)
-            self.patches.append((patches[id], id))
-        
         self.patch_combos = []
+        self.update_model()
+        
         self.table = gtk.Table(2, 16)
         self.table.set_col_spacings(5)
 
@@ -266,7 +321,19 @@ class WithPatchTable:
 
         self.refresh_id = glib.timeout_add(500, lambda: self.patch_combo_update())
 
+    def update_model(self):
+        self.patches = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
+        patches = GetThings("%s/patches" % self.path, ["%patch"], []).patch
+        self.mapping = {}
+        for id in patches:
+            self.mapping[id] = len(self.mapping)
+            self.patches.append((patches[id], id))
+        for cb in self.patch_combos:
+            cb.set_model(self.patches)
+
     def patch_combo_changed(self, combo, channel):
+        if combo.get_active() is None:
+            return
         cbox.do_cmd(self.path + "/set_patch", None, [int(channel), int(self.patches[combo.get_active()][1])])
 
     def patch_combo_update(self):
@@ -312,7 +379,22 @@ class SamplerWindow(gtk.VBox, WithPatchTable):
         WithPatchTable.__init__(self, attribs)
         panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True)
         self.add(panel)
+        load_button = gtk.Button("_Load")
+        load_button.connect('clicked', self.load)
+        panel.pack_start(load_button, False, True)
         self.refresh_id = glib.timeout_add(200, lambda: self.voices_update())
+        
+    def load(self, event):
+        d = LoadProgramDialog(self.get_toplevel())
+        response = d.run()
+        try:
+            if response == gtk.RESPONSE_OK:
+                scene = d.get_selected_object()
+                pgm_id = GetThings("%s/get_unused_program" % self.path, ['program_no'], []).program_no
+                cbox.do_cmd("%s/load_patch" % self.path, None, [pgm_id, scene[2], scene[2][5:]])
+                self.update_model()
+        finally:
+            d.destroy()        
         
     def voices_update(self):
         attribs = GetThings("%s/status" % self.path, ['active_voices'], [])
@@ -512,54 +594,6 @@ engine_window_map = {
 }
 
 effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq']
-
-class SelectObjectDialog(gtk.Dialog):
-    def __init__(self, parent):
-        gtk.Dialog.__init__(self, self.title, parent, gtk.DIALOG_MODAL, 
-            (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
-        self.set_default_response(gtk.RESPONSE_OK)
-        model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
-        
-        self.update_model(model)
-                
-        scenes = gtk.TreeView(model)
-        scenes.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=0)
-        scenes.insert_column_with_attributes(1, "Title", gtk.CellRendererText(), text=3)
-        scenes.insert_column_with_attributes(2, "Type", gtk.CellRendererText(), text=1)
-        self.vbox.pack_start(scenes)
-        scenes.show()
-        scenes.grab_focus()
-        self.scenes = scenes
-        self.scenes.connect('row-activated', lambda w, path, column: self.response(gtk.RESPONSE_OK))
-    def get_selected_object(self):
-        return self.scenes.get_model()[self.scenes.get_cursor()[0][0]]
-
-class SceneDialog(SelectObjectDialog):
-    title = "Select a scene"
-    def __init__(self, parent):
-        SelectObjectDialog.__init__(self, parent)
-    def update_model(self, model):
-        for s in cfg_sections("scene:"):
-            title = cfg_get(s, "title")
-            model.append((s[6:], "Scene", s, title))
-        for s in cfg_sections("instrument:"):
-            title = cfg_get(s, "title")
-            model.append((s[11:], "Instrument", s, title))
-        for s in cfg_sections("layer:"):
-            title = cfg_get(s, "title")
-            model.append((s[6:], "Layer", s, title))
-
-class AddLayerDialog(SelectObjectDialog):
-    title = "Add a layer"
-    def __init__(self, parent):
-        SelectObjectDialog.__init__(self, parent)
-    def update_model(self, model):
-        for s in cfg_sections("instrument:"):
-            title = cfg_get(s, "title")
-            model.append((s[11:], "Instrument", s, title))
-        for s in cfg_sections("layer:"):
-            title = cfg_get(s, "title")
-            model.append((s[6:], "Layer", s, title))
 
 class MainWindow(gtk.Window):
     def __init__(self):
