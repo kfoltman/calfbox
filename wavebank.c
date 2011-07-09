@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct wave_bank
 {
-    int64_t bytes, maxbytes;
-    GHashTable *waveforms;
+    int64_t bytes, maxbytes, serial_no;
+    GHashTable *waveforms_by_name, *waveforms_by_id;
 };
 
 static struct wave_bank bank;
@@ -40,7 +40,9 @@ void cbox_wavebank_init()
 {
     bank.bytes = 0;
     bank.maxbytes = 0;
-    bank.waveforms = g_hash_table_new(g_str_hash, g_str_equal);
+    bank.serial_no = 0;
+    bank.waveforms_by_name = g_hash_table_new(g_str_hash, g_str_equal);
+    bank.waveforms_by_id = g_hash_table_new(g_int_hash, g_int_equal);
 }
 
 struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *filename, GError **error)
@@ -55,7 +57,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     }
     
     char *canonical = realpath(filename, NULL);
-    gpointer value = g_hash_table_lookup(bank.waveforms, canonical);
+    gpointer value = g_hash_table_lookup(bank.waveforms_by_name, canonical);
     if (value)
     {
         free(canonical);
@@ -82,6 +84,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
         free(canonical);
         return NULL;
     }
+    waveform->id = ++bank.serial_no;
     waveform->bytes = waveform->info.channels * 2 * (waveform->info.frames + 1);
     waveform->data = malloc(waveform->bytes);
     waveform->refcount = 1;
@@ -95,7 +98,8 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     bank.bytes += waveform->bytes;
     if (bank.bytes > bank.maxbytes)
         bank.maxbytes = bank.bytes;
-    g_hash_table_insert(bank.waveforms, waveform->canonical_name, waveform);
+    g_hash_table_insert(bank.waveforms_by_name, waveform->canonical_name, waveform);
+    g_hash_table_insert(bank.waveforms_by_id, &waveform->id, waveform);
     
     return waveform;
 }
@@ -110,13 +114,39 @@ int64_t cbox_wavebank_get_maxbytes()
     return bank.maxbytes;
 }
 
+int cbox_wavebank_get_count()
+{
+    return g_hash_table_size(bank.waveforms_by_id);
+}
+
+struct cbox_waveform *cbox_wavebank_peek_waveform_by_id(int id)
+{
+    return g_hash_table_lookup(bank.waveforms_by_id, &id);
+}
+
+void cbox_wavebank_foreach(void (*cb)(void *, struct cbox_waveform *), void *user_data)
+{
+    GHashTableIter iter;
+    gpointer key, value;
+
+    g_hash_table_iter_init (&iter, bank.waveforms_by_id);
+    while (g_hash_table_iter_next (&iter, &key, &value)) 
+    {
+        (*cb)(user_data, value);
+    }    
+}
+
 void cbox_wavebank_close()
 {
     if (bank.bytes > 0)
         g_warning("Warning: %lld bytes in unfreed samples", (long long int)bank.bytes);
-    g_hash_table_destroy(bank.waveforms);
-    bank.waveforms = NULL;
+    g_hash_table_destroy(bank.waveforms_by_id);
+    g_hash_table_destroy(bank.waveforms_by_name);
+    bank.waveforms_by_id = NULL;
+    bank.waveforms_by_name = NULL;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void cbox_waveform_ref(struct cbox_waveform *waveform)
 {
@@ -128,7 +158,8 @@ void cbox_waveform_unref(struct cbox_waveform *waveform)
     if (--waveform->refcount > 0)
         return;
     
-    g_hash_table_remove(bank.waveforms, waveform->canonical_name);
+    g_hash_table_remove(bank.waveforms_by_name, waveform->canonical_name);
+    g_hash_table_remove(bank.waveforms_by_id, &waveform->id);
     bank.bytes -= waveform->bytes;
 
     g_free(waveform->display_name);

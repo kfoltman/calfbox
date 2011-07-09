@@ -33,6 +33,7 @@ struct cbox_waveform
 {
     int16_t *data;
     SF_INFO info;
+    int id;
     int refcount;
     size_t bytes;
     gchar *canonical_name;
@@ -41,6 +42,9 @@ struct cbox_waveform
 
 extern void cbox_wavebank_init();
 extern struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *filename, GError **error);
+extern struct cbox_waveform *cbox_wavebank_peek_waveform_by_id(int id);
+extern void cbox_wavebank_foreach(void (*cb)(void *user_data, struct cbox_waveform *waveform), void *user_data);
+extern int cbox_wavebank_get_count();
 extern int64_t cbox_wavebank_get_bytes();
 extern int64_t cbox_wavebank_get_maxbytes();
 extern void cbox_wavebank_close();
