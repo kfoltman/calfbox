@@ -666,8 +666,12 @@ class MainWindow(gtk.Window):
         
         self.layers_model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_BOOLEAN, 
             gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_BOOLEAN,
-            gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_INT)
+            gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_INT)    
         self.layers_tree = gtk.TreeView(self.layers_model)
+        self.layers_tree.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, [("text/plain", 0, 1)], gtk.gdk.ACTION_MOVE)
+        self.layers_tree.enable_model_drag_dest([("text/plain", gtk.TARGET_SAME_APP | gtk.TARGET_SAME_WIDGET, 1)], gtk.gdk.ACTION_MOVE)
+        self.layers_tree.connect('drag_data_get', self.drag_data_get)
+        self.layers_tree.connect('drag_data_received', self.drag_data_received)
         self.layers_tree.insert_column_with_attributes(0, "On?", standard_toggle_renderer(self.layers_model, "/scene/layer/%d/enable", 1), active=1)
         self.layers_tree.insert_column_with_attributes(1, "Name", gtk.CellRendererText(), text=0)
         self.layers_tree.insert_column_with_data_func(2, "In Ch#", standard_combo_renderer(self.layers_model, in_channels_ls, "/scene/layer/%d/in_channel", 2), lambda column, cell, model, iter: cell.set_property('text', "%s" % model[iter][2] if model[iter][2] != 0 else 'All'))
@@ -680,6 +684,21 @@ class MainWindow(gtk.Window):
         t.attach(self.layers_tree, 0, 2, 6, 7, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         self.refresh_layer_list(scene)        
         return t
+        
+    def drag_data_get(self, treeview, context, selection, target_id, etime):
+        cursor = treeview.get_cursor()
+        if cursor is not None:
+            selection.set('text/plain', 8, str(cursor[0][0]))
+        
+    def drag_data_received(self, treeview, context, x, y, selection, info, etime):
+        src_row = int(selection.data)
+        dest_row_info = treeview.get_dest_row_at_pos(x, y)
+        if dest_row_info is not None:
+            dest_row = dest_row_info[0][0]
+            #print src_row, dest_row, dest_row_info[1]
+            cbox.do_cmd("/scene/move_layer", None, [src_row + 1, dest_row + 1])
+            scene = GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
+            self.refresh_layer_list(scene)
 
     def create_menu(self, title, items):
         menuitem = gtk.MenuItem(title)
@@ -697,7 +716,6 @@ class MainWindow(gtk.Window):
         for l in scene.layer:
             layer = GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name", "in_channel", "out_channel", "consume", "low_note", "high_note", "fixed_note", "transpose"], [])
             self.layers_model.append((layer.instrument_name, layer.enable != 0, layer.in_channel, layer.out_channel, layer.consume != 0, layer.low_note, layer.high_note, layer.fixed_note, layer.transpose))
-        self.layers_tree.set_model(self.layers_model)
 
     def quit(self, w):
         self.destroy()
