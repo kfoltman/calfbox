@@ -152,6 +152,10 @@ def add_display_row(t, row, label, path, values, item):
     w = left_label(getattr(values, item))
     t.attach(w, 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
     return w
+    
+def set_timer(widget, time, func, *args):
+    refresh_id = glib.timeout_add(time, func, *args)
+    widget.connect('destroy', lambda obj, id: glib.source_remove(id), refresh_id)
 
 class GetThings:
     def __init__(self, cmd, anames, args):
@@ -262,7 +266,7 @@ class LoadProgramDialog(SelectObjectDialog):
             if cfg_get(s, "sfz") == None:
                 model.append((s[5:], "Program", s, title))
             else:
-                model.append((s[5:], "SFZ", s, title))
+                model.append((s[5:], "SFZ", s, title))    
 
 class StreamWindow(gtk.VBox):
     def __init__(self, instrument, path):
@@ -301,7 +305,7 @@ class StreamWindow(gtk.VBox):
         self.play_button.connect('clicked', lambda x: cbox.do_cmd("%s/play" % self.path, None, []))
         self.rewind_button.connect('clicked', lambda x: cbox.do_cmd("%s/seek" % self.path, None, [0]))
         self.stop_button.connect('clicked', lambda x: cbox.do_cmd("%s/stop" % self.path, None, []))
-        self.refresh_id = glib.timeout_add(30, lambda: self.update())
+        set_timer(self, 30, self.update)
 
     def update(self):
         attribs = GetThings("%s/status" % self.path, ['filename', 'pos', 'length', 'playing'], [])
@@ -334,7 +338,7 @@ class WithPatchTable:
             self.table.attach(cb, 1, 2, i, i + 1, gtk.SHRINK, gtk.SHRINK)
             self.patch_combos.append(cb)
 
-        self.refresh_id = glib.timeout_add(500, lambda: self.patch_combo_update())
+        set_timer(self, 500, self.patch_combo_update)
 
     def update_model(self):
         self.patches = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
@@ -363,7 +367,7 @@ class WithPatchTable:
         
 class FluidsynthWindow(gtk.VBox, WithPatchTable):
     def __init__(self, instrument, path):
-        gtk.Widget.__init__(self)
+        gtk.VBox.__init__(self)
         self.path = path
         
         attribs = GetThings("%s/status" % self.path, ['%patch', 'polyphony'], [])
@@ -379,7 +383,7 @@ class FluidsynthWindow(gtk.VBox, WithPatchTable):
 
 class SamplerWindow(gtk.VBox, WithPatchTable):
     def __init__(self, instrument, path):
-        gtk.Widget.__init__(self)
+        gtk.VBox.__init__(self)
         self.path = path
         
         attribs = GetThings("%s/status" % self.path, ['%patch', 'polyphony', 'active_voices'], [])
@@ -397,7 +401,7 @@ class SamplerWindow(gtk.VBox, WithPatchTable):
         load_button = gtk.Button("_Load")
         load_button.connect('clicked', self.load)
         panel.pack_start(load_button, False, True)
-        self.refresh_id = glib.timeout_add(200, lambda: self.voices_update())
+        set_timer(self, 200, self.voices_update)
         
     def load(self, event):
         d = LoadProgramDialog(self.get_toplevel())
@@ -566,7 +570,7 @@ class FBRWindow(EffectWindow):
         self.add(t)
         self.ready_label = gtk.Label("-")
         t.attach(self.ready_label, 0, 2, 17, 18)
-        self.refresh_id = glib.timeout_add(30, lambda: self.update())
+        set_timer(self, 100, self.update)
         sbutton = gtk.Button("_Start")
         sbutton.connect("clicked", lambda button, path: cbox.do_cmd(path + "/start", None, []), self.path)
         t.attach(sbutton, 2, 4, 17, 18)
@@ -624,7 +628,7 @@ class MainWindow(gtk.Window):
         self.vbox = gtk.VBox(spacing = 5)
         self.add(self.vbox)
         self.create()
-        self.refresh_id = glib.timeout_add(30, lambda: self.update())
+        set_timer(self, 30, self.update)
 
     def create_master(self, scene):
         self.scene_list = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
