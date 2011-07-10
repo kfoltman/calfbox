@@ -379,18 +379,22 @@ struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos)
 
 void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newpos)
 {
+    if (oldpos == newpos)
+        return;
     struct cbox_layer **layers = malloc(sizeof(struct cbox_layer *) * scene->layer_count);
-    int d = 0;
     for (int i = 0; i < scene->layer_count; i++)
     {
+        int s;
         if (i == newpos)
-            layers[i] = scene->layers[oldpos];
-        else if ((i < oldpos && i < newpos) || (i >= oldpos && i > newpos))
-            layers[i] = scene->layers[i];
-        else if (i < oldpos && i > newpos)
-            layers[i] = scene->layers[i - 1];
-        else if (i >= oldpos && i < newpos)
-            layers[i] = scene->layers[i + 1];
+            s = oldpos;
+        else
+        {
+            if (oldpos < newpos)
+                s = (i < oldpos || i > newpos) ? i : i + 1;
+            else
+                s = (i < newpos || i > oldpos) ? i : i - 1;
+        }
+        layers[i] = scene->layers[s];
     }
     free(cbox_rt_swap_pointers(app.rt, (void **)&scene->layers, layers));
 }
