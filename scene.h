@@ -45,6 +45,7 @@ extern struct cbox_scene *cbox_scene_new();
 extern gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error);
 extern gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *layer, int pos, GError **error);
 extern struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos);
+extern void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newpos);
 extern struct cbox_scene *cbox_scene_load(const char *section, GError **error);
 extern gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument);
 extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error);

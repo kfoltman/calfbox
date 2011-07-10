@@ -194,6 +194,23 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         cbox_layer_destroy(cbox_scene_remove_layer(s, pos));
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/move_layer") && !strcmp(cmd->arg_types, "ii"))
+    {
+        int oldpos = *(int *)cmd->arg_values[0];
+        if (oldpos < 1 || oldpos > s->layer_count)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d)", oldpos, s->layer_count);
+            return FALSE;
+        }
+        int newpos = *(int *)cmd->arg_values[1];
+        if (newpos < 1 || newpos > s->layer_count)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d)", newpos, s->layer_count);
+            return FALSE;
+        }
+        cbox_scene_move_layer(s, oldpos - 1, newpos - 1);
+        return TRUE;
+    }
     else if (cbox_parse_path_part(cmd, "/layer/", &subcommand, &index, 1, s->layer_count, error))
     {
         if (!subcommand)
@@ -358,6 +375,24 @@ struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos)
     free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->layers, layers, &scene->layer_count, scene->layer_count - 1));
     
     return removed;
+}
+
+void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newpos)
+{
+    struct cbox_layer **layers = malloc(sizeof(struct cbox_layer *) * scene->layer_count);
+    int d = 0;
+    for (int i = 0; i < scene->layer_count; i++)
+    {
+        if (i == newpos)
+            layers[i] = scene->layers[oldpos];
+        else if ((i < oldpos && i < newpos) || (i >= oldpos && i > newpos))
+            layers[i] = scene->layers[i];
+        else if (i < oldpos && i > newpos)
+            layers[i] = scene->layers[i - 1];
+        else if (i >= oldpos && i < newpos)
+            layers[i] = scene->layers[i + 1];
+    }
+    free(cbox_rt_swap_pointers(app.rt, (void **)&scene->layers, layers));
 }
 
 gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument)
