@@ -200,9 +200,15 @@ gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
         return FALSE;
     }
     fclose(f);
+    gboolean result = load_sfz_from_string(buf, len, c, error);
+    free(buf);
+    return result;
+}
     
+gboolean load_sfz_from_string(const char *buf, int len, struct sfz_parser_client *c, GError **error)
+{
     struct sfz_parser_state s;
-    s.filename = name;
+    s.filename = "<inline>";
     s.buf = buf;
     s.handler = handle_char;
     s.pos = 0;
@@ -225,7 +231,6 @@ gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
             return FALSE;
     }
     
-    free(buf);
     return TRUE;
 }
 

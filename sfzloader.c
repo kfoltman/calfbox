@@ -267,16 +267,16 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     return TRUE;
 }
 
-gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, const char *sample_path, GError **error)
+gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, const char *sample_path, int is_from_string, GError **error)
 {
     struct sfz_load_state ls = { .in_group = 0, .m = m, .filename = sfz, .layers = NULL, .region = NULL, .error = error, .sample_path = sample_path };
     struct sfz_parser_client c = { .user_data = &ls, .region = load_sfz_region, .group = load_sfz_group, .key_value = load_sfz_key_value };
     g_clear_error(error);
 
-    if (!load_sfz(sfz, &c, error))
-    {
+    gboolean status = is_from_string ? load_sfz_from_string(sfz, strlen(sfz), &c, error) : load_sfz(sfz, &c, error);
+    if (!status)
         return FALSE;
-    }
+
     if (ls.region)
         load_sfz_end_region(&c);
     if (ls.group.waveform)

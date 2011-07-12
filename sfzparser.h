@@ -39,6 +39,7 @@ struct sfz_parser_client
 };
 
 extern gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error);
+extern gboolean load_sfz_from_string(const char *buf, int len, struct sfz_parser_client *c, GError **error);
 
 extern GQuark cbox_sfz_parser_error_quark();
 

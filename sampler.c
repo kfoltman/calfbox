@@ -1068,12 +1068,12 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
             if (!spath)
                 spath = sfz_path;
             sfz = g_build_filename(sfz_path, sfz, NULL);
-            gboolean result = sampler_module_load_program_sfz(m, prg, sfz, spath, error);
+            gboolean result = sampler_module_load_program_sfz(m, prg, sfz, spath, FALSE, error);
             g_free(sfz);
             return result;
         }
         else
-            return sampler_module_load_program_sfz(m, prg, sfz, spath, error);
+            return sampler_module_load_program_sfz(m, prg, sfz, spath, FALSE, error);
     }
     
     int layer_count = 0;
@@ -1141,24 +1141,47 @@ static int get_first_free_program_no(struct sampler_module *m)
     return prog_no;
 }
 
-static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, GError **error)
+static int find_program(struct sampler_module *m, int prog_no)
 {
-    gboolean replace = FALSE;
-    int index = -1;
     for (int i = 0; i < m->program_count; i++)
     {
         if (m->programs[i]->prog_no == prog_no)
-        {
-            replace = TRUE;
-            index = i;
-            break;
-        }
+            return i;
     }
+    return -1;
+}
+
+static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, GError **error)
+{
     struct sampler_program *pgm = NULL;
+    int index = find_program(m, prog_no);
     if (!load_program(m, &pgm, cfg_section, name, prog_no, error))
         return FALSE;
     
-    if (replace)
+    if (index != -1)
+    {
+        cbox_rt_swap_pointers(app.rt, (void **)&m->programs[index], pgm);
+        return TRUE;
+    }
+    
+    struct sampler_program **programs = malloc(sizeof(struct sampler_program *) * (m->program_count + 1));
+    memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
+    programs[m->program_count] = pgm;
+    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
+    return TRUE;
+}
+
+static gboolean load_from_string(struct sampler_module *m, const char *sample_dir, const char *sfz_data, const char *name, int prog_no, GError **error)
+{
+    int index = find_program(m, prog_no);
+    struct sampler_program *pgm = malloc(sizeof(struct sampler_program));    
+    if (!sampler_module_load_program_sfz(m, pgm, sfz_data, sample_dir, TRUE, error))
+    {
+        free(pgm);
+        return FALSE;
+    }
+
+    if (index != -1)
     {
         cbox_rt_swap_pointers(app.rt, (void **)&m->programs[index], pgm);
         return TRUE;
@@ -1263,6 +1286,10 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     else if (!strcmp(cmd->command, "/load_patch") && !strcmp(cmd->arg_types, "iss"))
     {
         return load_program_at(m, (const char *)cmd->arg_values[1], (const char *)cmd->arg_values[2], *(int *)cmd->arg_values[0], error);
+    }
+    else if (!strcmp(cmd->command, "/load_patch_from_string") && !strcmp(cmd->arg_types, "isss"))
+    {
+        return load_from_string(m, (const char *)cmd->arg_values[1], (const char *)cmd->arg_values[2], (const char *)cmd->arg_values[3], *(int *)cmd->arg_values[0], error);
     }
     else if (!strcmp(cmd->command, "/get_unused_program") && !strcmp(cmd->arg_types, ""))
     {
