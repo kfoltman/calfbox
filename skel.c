@@ -38,7 +38,7 @@ struct {name}_module
 {
     struct cbox_module module;
 
-    struct {name}_params *params;
+    struct {name}_params *params, *old_params;
 };
 
 gboolean {name}_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -66,6 +66,11 @@ void {name}_process_event(struct cbox_module *module, const uint8_t *data, uint3
 void {name}_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct {name}_module *m = module->user_data;
+    
+    if (m->params != m->old_params)
+    {
+        // update calculated values
+    }
 }
 
 struct cbox_module *{name}_create(void *user_data, const char *cfg_section, int srate, GError **error)
@@ -81,6 +86,8 @@ struct cbox_module *{name}_create(void *user_data, const char *cfg_section, int 
     m->module.process_event = {name}_process_event;
     m->module.process_block = {name}_process_block;
     struct {name}_params *p = malloc(sizeof(struct {name}_params));
+    m->params = p;
+    m->old_params = NULL;
     
     return &m->module;
 }
