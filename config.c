@@ -36,6 +36,7 @@ void cbox_config_init(const char *override_file)
     if (config_keyfile)
         return;
     
+    cfg_strings = g_string_chunk_new(100);
     config_keyfile = g_key_file_new();
     keyfiledirs[0] = getenv("HOME");
     keyfiledirs[1] = NULL;
@@ -65,7 +66,6 @@ void cbox_config_init(const char *override_file)
     {
         g_message("Config pathname is %s", keyfile_name);
     }
-    cfg_strings = g_string_chunk_new(100);
 }
 
 int cbox_config_has_section(const char *section)
