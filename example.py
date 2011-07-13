@@ -39,6 +39,7 @@ class LogMapper:
     
 
 freq_format = "%0.1f"
+ms_format = "%0.1f ms"
 lfo_freq_mapper = LogMapper(0.01, 20, "%0.2f")
 
 def standard_mapped_hslider(adj, mapper):
@@ -546,6 +547,16 @@ class ToneControlWindow(EffectWindow):
     ]
     effect_name = "Tone Control"
 
+class CompressorWindow(EffectWindow):
+    params = [
+        SliderRow("Threshold", "threshold", -100, 12),
+        MappedSliderRow("Ratio", "ratio", LogMapper(1, 100, "%0.2f")),
+        MappedSliderRow("Attack", "attack", LogMapper(1, 1000, ms_format)),
+        MappedSliderRow("Release", "release", LogMapper(1, 1000, ms_format)),
+        SliderRow("Make-up gain", "makeup", -48, 48),
+    ]
+    effect_name = "Tone Control"
+
 eq_cols = [
     ("Active", 0, 1, "active", 'checkbox'), 
     ("Center Freq", 10, 20000, "center", 'log_slider'),
@@ -607,12 +618,13 @@ engine_window_map = {
     'feedback_reducer': FBRWindow,
     'parametric_eq': EQWindow,
     'tone_control': ToneControlWindow,
+    'compressor': CompressorWindow,
     'stream_player' : StreamWindow,
     'fluidsynth' : FluidsynthWindow,
     'sampler' : SamplerWindow
 }
 
-effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq']
+effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor']
 
 in_channels_ls = gtk.ListStore(gobject.TYPE_INT, gobject.TYPE_STRING)
 in_channels_ls.append((0, "All"))

@@ -2,7 +2,7 @@ INCLUDES = -I$(srcdir)
 
 bin_PROGRAMS = calfbox
 
-calfbox_SOURCES = app.c auxbus.c chorus.c cmd.c config.c delay.c eq.c errors.c fbr.c fluid.c fxchain.c hwcfg.c instr.c io.c jackinput.c layer.c main.c master.c menu.c menuitem.c midi.c module.c pattern.c pattern-maker.c phaser.c procmain.c reverb.c sampler.c scene.c scripting.c sfzloader.c sfzparser.c song.c streamplay.c tonectl.c tonewheel.c ui.c wavebank.c
+calfbox_SOURCES = app.c auxbus.c chorus.c cmd.c compressor.c config.c delay.c eq.c errors.c fbr.c fluid.c fxchain.c hwcfg.c instr.c io.c jackinput.c layer.c main.c master.c menu.c menuitem.c midi.c module.c pattern.c pattern-maker.c phaser.c procmain.c reverb.c sampler.c scene.c scripting.c sfzloader.c sfzparser.c song.c streamplay.c tonectl.c tonewheel.c ui.c wavebank.c
 calfbox_LDADD = $(JACK_DEPS_LIBS) $(GLIB_DEPS_LIBS) $(FLUIDSYNTH_DEPS_LIBS) $(PYTHON_DEPS_LIBS) $(LIBSMF_DEPS_LIBS) $(LIBSNDFILE_DEPS_LIBS)
 
 AM_CFLAGS = $(JACK_DEPS_CFLAGS) $(GLIB_DEPS_CFLAGS) $(FLUIDSYNTH_DEPS_CFLAGS) $(PYTHON_DEPS_CFLAGS) $(LIBSMF_DEPS_CFLAGS) $(LIBSNDFILE_DEPS_CFLAGS)
