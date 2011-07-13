@@ -46,8 +46,9 @@ struct compressor_module
     struct cbox_module module;
 
     struct compressor_params *params, *old_params;
-    struct cbox_onepolef_coeffs attack_lp, release_lp;
+    struct cbox_onepolef_coeffs attack_lp, release_lp, fast_attack_lp;
     struct cbox_onepolef_state tracker;
+    struct cbox_onepolef_state tracker2;
     int srate;
 };
 
@@ -88,6 +89,7 @@ void compressor_process_block(struct cbox_module *module, cbox_sample_t **inputs
     if (m->params != m->old_params)
     {
         float scale = M_PI * 1000 / m->srate;
+        cbox_onepolef_set_lowpass(&m->fast_attack_lp, 2 * scale / m->params->attack);
         cbox_onepolef_set_lowpass(&m->attack_lp, scale / m->params->attack);
         cbox_onepolef_set_lowpass(&m->release_lp, scale / m->params->release);
         m->old_params = m->params;
@@ -99,7 +101,8 @@ void compressor_process_block(struct cbox_module *module, cbox_sample_t **inputs
         float left = inputs[0][i], right = inputs[1][i];
         float sig = 0.5 * (fabs(left) < fabs(right) ? fabs(left) : fabs(right));
         
-        sig = cbox_onepolef_process_sample(&m->tracker, sig < m->tracker.y1 ? &m->release_lp : &m->attack_lp, sig);
+        sig = cbox_onepolef_process_sample(&m->tracker, sig < m->tracker.y1 ? &m->release_lp : (sig > 4 * m->tracker.y1 ? &m->fast_attack_lp : &m->attack_lp), sig);
+        sig = cbox_onepolef_process_sample(&m->tracker2, sig < m->tracker2.y1 ? &m->release_lp : (sig > 2 * m->tracker2.y1 ? &m->fast_attack_lp : &m->attack_lp), sig);
         float gain = 1.0;
         if (sig > threshold)
             gain = threshold * powf(sig / threshold, invratio) / sig;
@@ -134,6 +137,7 @@ struct cbox_module *compressor_create(void *user_data, const char *cfg_section, 
     m->old_params = NULL;
     
     cbox_onepolef_reset(&m->tracker);
+    cbox_onepolef_reset(&m->tracker2);
 
     return &m->module;
 }
