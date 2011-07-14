@@ -64,7 +64,7 @@ PyCboxCallback_Call(PyObject *_self, PyObject *args, PyObject *kwds)
 
 PyTypeObject CboxCallbackType = {
     PyObject_HEAD_INIT(NULL)
-    .tp_name = "cbox.Callback",
+    .tp_name = "_cbox.Callback",
     .tp_basicsize = sizeof(struct PyCboxCallback),
     .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_doc = "Callback for feedback channel to Cbox C code",
@@ -72,6 +72,22 @@ PyTypeObject CboxCallbackType = {
     .tp_new = PyCboxCallback_New,
     .tp_call = PyCboxCallback_Call
 };
+
+static gboolean set_error_from_python(GError **error)
+{
+    PyObject *ptype = NULL, *pvalue = NULL, *ptraceback = NULL;
+    PyErr_Fetch(&ptype, &pvalue, &ptraceback);
+    PyObject *ptypestr = PyObject_Str(ptype);
+    PyObject *pvaluestr = PyObject_Str(pvalue);
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "%s: %s", PyString_AsString(ptypestr), PyString_AsString(pvaluestr));
+    //g_error("%s:%s", PyString_AsString(ptypestr), PyString_AsString(pvaluestr));
+    Py_DECREF(ptypestr);
+    Py_DECREF(pvaluestr);
+    Py_DECREF(ptype);
+    Py_DECREF(pvalue);
+    Py_DECREF(ptraceback);
+    return FALSE;
+}
 
 static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
@@ -138,19 +154,7 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
         return TRUE;
     }
     
-    PyObject *ptype = NULL, *pvalue = NULL, *ptraceback = NULL;
-    PyErr_Fetch(&ptype, &pvalue, &ptraceback);
-    PyObject *ptypestr = PyObject_Str(ptype);
-    PyObject *pvaluestr = PyObject_Str(pvalue);
-    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "%s: %s", PyString_AsString(ptypestr), PyString_AsString(pvaluestr));
-    //g_error("%s:%s", PyString_AsString(ptypestr), PyString_AsString(pvaluestr));
-    Py_DECREF(ptypestr);
-    Py_DECREF(pvaluestr);
-    Py_DECREF(ptype);
-    Py_DECREF(pvalue);
-    Py_DECREF(ptraceback);
-    
-    return FALSE;
+    return set_error_from_python(error);
 }
 
 static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject *self, PyObject *args)
@@ -260,14 +264,25 @@ void cbox_script_run(const char *name)
         return;
     }
     Py_Initialize();
-    PyObject *m = Py_InitModule("cbox", EmbMethods);
+    PyObject *m = Py_InitModule("_cbox", EmbMethods);
     if (!m)
+    {
+        g_warning("Cannot install the C module");
         return;
+    }
     if (PyType_Ready(&CboxCallbackType) < 0)
+    {
+        g_warning("Cannot install the C callback type");
         return;
+    }
     Py_INCREF(&CboxCallbackType);
     PyModule_AddObject(m, "Callback", (PyObject *)&CboxCallbackType);
     
-    PyRun_SimpleFile(fp, name);
+    if (PyRun_SimpleFile(fp, name) == 1)
+    {
+        GError *error = NULL;
+        set_error_from_python(&error);
+        cbox_print_error(error);
+    }
     Py_Finalize();
 }
