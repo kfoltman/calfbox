@@ -11,6 +11,7 @@ import cbox
 from gui_tools import *
 import fx_gui
 import instr_gui
+import drumkit_editor
 
 class SceneDialog(SelectObjectDialog):
     title = "Select a scene"
@@ -54,6 +55,29 @@ class MainWindow(gtk.Window):
         self.add(self.vbox)
         self.create()
         set_timer(self, 30, self.update)
+
+    def create(self):
+        self.menu_bar = gtk.MenuBar()
+        
+        self.menu_bar.append(self.create_menu("_Scene", [
+            ("_Load", self.load_scene),
+            ("_Quit", self.quit),
+        ]))
+        self.menu_bar.append(self.create_menu("_Layer", [
+            ("_Add", self.layer_add),
+            ("_Remove", self.layer_remove),
+        ]))
+        self.menu_bar.append(self.create_menu("_Tools", [
+            ("_Drum Kit Editor", self.tools_drumkit_editor),
+        ]))
+        
+        self.vbox.pack_start(self.menu_bar, False, False)
+        rt = cbox.GetThings("/rt/status", ['audio_channels'], [])
+        scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])        
+        self.nb = gtk.Notebook()
+        self.vbox.add(self.nb)
+        self.nb.append_page(self.create_master(scene), gtk.Label("Master"))
+        self.create_instrument_pages(scene, rt)
 
     def create_master(self, scene):
         self.scene_list = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
@@ -185,6 +209,11 @@ class MainWindow(gtk.Window):
             pos = self.layers_tree.get_cursor()[0][0]
             cbox.do_cmd("/scene/delete_layer", None, [1 + pos])
             self.refresh_instrument_pages()
+            
+    def tools_drumkit_editor(self, w):
+        dlg = drumkit_editor.EditorDialog(self)
+        dlg.run()
+        dlg.destroy()
 
     def refresh_instrument_pages(self):
         self.delete_instrument_pages()
@@ -194,26 +223,6 @@ class MainWindow(gtk.Window):
         self.create_instrument_pages(scene, rt)
         self.nb.show_all()
         self.title_label.set_text(scene.title)
-
-    def create(self):
-        self.menu_bar = gtk.MenuBar()
-        
-        self.menu_bar.append(self.create_menu("_Scene", [
-            ("_Load", self.load_scene),
-            ("_Quit", self.quit),
-        ]))
-        self.menu_bar.append(self.create_menu("_Layer", [
-            ("_Add", self.layer_add),
-            ("_Remove", self.layer_remove),
-        ]))
-        
-        self.vbox.pack_start(self.menu_bar, False, False)
-        rt = cbox.GetThings("/rt/status", ['audio_channels'], [])
-        scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])        
-        self.nb = gtk.Notebook()
-        self.vbox.add(self.nb)
-        self.nb.append_page(self.create_master(scene), gtk.Label("Master"))
-        self.create_instrument_pages(scene, rt)
 
     def create_instrument_pages(self, scene, rt):
         self.path_widgets = {}
