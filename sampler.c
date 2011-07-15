@@ -1151,6 +1151,19 @@ static int find_program(struct sampler_module *m, int prog_no)
     return -1;
 }
 
+void swap_program(struct sampler_module *m, int index, struct sampler_program *pgm)
+{
+    struct sampler_program *old_program = cbox_rt_swap_pointers(app.rt, (void **)&m->programs[index], pgm);
+
+    for (int i = 0; i < 16; i++)
+    {
+        if (m->channels[i].program == old_program)
+        {
+            cbox_rt_swap_pointers(app.rt, (void **)&m->channels[i].program, pgm);
+        }
+    }
+}
+
 static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, GError **error)
 {
     struct sampler_program *pgm = NULL;
@@ -1160,7 +1173,7 @@ static gboolean load_program_at(struct sampler_module *m, const char *cfg_sectio
     
     if (index != -1)
     {
-        cbox_rt_swap_pointers(app.rt, (void **)&m->programs[index], pgm);
+        swap_program(m, index, pgm);
         return TRUE;
     }
     
@@ -1175,6 +1188,8 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
 {
     int index = find_program(m, prog_no);
     struct sampler_program *pgm = malloc(sizeof(struct sampler_program));    
+    pgm->prog_no = prog_no;
+    pgm->name = g_strdup(name);
     if (!sampler_module_load_program_sfz(m, pgm, sfz_data, sample_dir, TRUE, error))
     {
         free(pgm);
@@ -1183,7 +1198,7 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
 
     if (index != -1)
     {
-        cbox_rt_swap_pointers(app.rt, (void **)&m->programs[index], pgm);
+        swap_program(m, index, pgm);
         return TRUE;
     }
     
