@@ -98,6 +98,7 @@ struct stream_player_module
     struct cbox_module module;
     
     struct stream_state *stream;
+    float fade_increment;
 };
 
 static void init_cue(struct stream_state *ss, struct stream_player_cue_point *pt, uint32_t size, uint64_t pos)
@@ -428,7 +429,7 @@ void stream_player_destroy(struct cbox_module *module)
         stream_state_destroy(m->stream);
 }
 
-static struct stream_state *stream_state_new(const char *context, const gchar *filename, uint64_t loop, GError **error)
+static struct stream_state *stream_state_new(const char *context, const gchar *filename, uint64_t loop, float fade_increment, GError **error)
 {
     struct stream_state *stream = malloc(sizeof(struct stream_state));
     memset(&stream->info, 0, sizeof(stream->info));
@@ -452,7 +453,7 @@ static struct stream_state *stream_state_new(const char *context, const gchar *f
     stream->pcp_next = NULL;
     stream->gain = 1.0;
     stream->fade_gain = 0.0;
-    stream->fade_increment = 1.0;
+    stream->fade_increment = fade_increment;
     stream->thread_started = 0;
     stream->filename = g_strdup(filename);
     
@@ -558,7 +559,7 @@ static int stream_player_load_prepare(void *p)
     
     if (!c->filename)
         return 0;
-    c->stream = stream_state_new(c->context, c->filename, c->loop_start, c->error);
+    c->stream = stream_state_new(c->context, c->filename, c->loop_start, c->module->fade_increment, c->error);
     c->old_stream = NULL;
     if (!c->stream)
     {
@@ -573,8 +574,6 @@ static int stream_player_load_execute(void *p)
     struct load_command_data *c = p;
     
     c->old_stream = c->module->stream;
-    if (c->old_stream && c->stream)
-        c->stream->fade_increment = c->module->stream->fade_increment;
     c->module->stream = c->stream;
     return 1;
 }
@@ -694,22 +693,22 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     
     struct stream_player_module *m = malloc(sizeof(struct stream_player_module));
     gchar *filename = cbox_config_get_string(cfg_section, "file");
-    if (!filename)
-    {
-        g_set_error(error, CBOX_STREAM_PLAYER_ERROR, CBOX_STREAM_PLAYER_ERROR_FAILED, "filename not specified");
-        return NULL;
-    }
     cbox_module_init(&m->module, m, 0, 2, stream_player_process_cmd);
     m->module.process_event = stream_player_process_event;
     m->module.process_block = stream_player_process_block;
     m->module.destroy = stream_player_destroy;
-    m->stream = stream_state_new(cfg_section, filename, (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", -1), error);
-    if (!m->stream)
+    m->fade_increment = 1.0 / (cbox_config_get_float(cfg_section, "fade_time", 0.01) * (srate / CBOX_BLOCK_SIZE));
+    if (filename)
     {
-        cbox_module_destroy(&m->module);
-        return NULL;
+        m->stream = stream_state_new(cfg_section, filename, (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", -1), m->fade_increment, error);
+        if (!m->stream)
+        {
+            cbox_module_destroy(&m->module);
+            return NULL;
+        }
     }
-    m->stream->fade_increment = 1.0 / (cbox_config_get_float(cfg_section, "fade_time", 0.01) * (srate / CBOX_BLOCK_SIZE));
+    else
+        m->stream = NULL;
     
     return &m->module;
 }
