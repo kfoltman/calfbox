@@ -42,11 +42,13 @@ class StreamWindow(gtk.VBox):
 
     def update(self):
         attribs = cbox.GetThings("%s/status" % self.path, ['filename', 'pos', 'length', 'playing'], [])
+        self.progress.set_sensitive(attribs.length is not None)
         self.adjustment.handler_block(self.adjustment_handler)
-        try:
-            self.adjustment.set_all(attribs.pos, 0, attribs.length, 44100, 44100 * 10, 0)
-        finally:
-            self.adjustment.handler_unblock(self.adjustment_handler)
+        if attribs.length is not None:
+            try:
+                self.adjustment.set_all(attribs.pos, 0, attribs.length, 44100, 44100 * 10, 0)
+            finally:
+                self.adjustment.handler_unblock(self.adjustment_handler)
         return True
         
     def pos_slider_moved(self, adjustment):
