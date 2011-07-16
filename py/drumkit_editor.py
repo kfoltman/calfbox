@@ -3,7 +3,8 @@ import glob
 import os
 from gui_tools import *
 
-sample_dir = "/media/resources/samples/dooleydrums/"
+#sample_dir = "/media/resources/samples/dooleydrums/"
+sample_dir = cbox.Config.get("init", "sample_dir")
 
 class SampleFilesModel(gtk.ListStore):
     def __init__(self):
