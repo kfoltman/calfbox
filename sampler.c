@@ -1412,12 +1412,6 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
             break;
         }
     }
-    if (!m->program_count)
-    {
-        g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_NO_PROGRAMS, "%s: no programs defined", cfg_section);
-        cbox_module_destroy(&m->module);
-        return FALSE;
-    }
     m->programs = malloc(sizeof(struct sampler_program *) * m->program_count);
     int success = 1;
     for (i = 0; i < m->program_count; i++)
