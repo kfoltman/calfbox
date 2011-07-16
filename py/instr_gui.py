@@ -68,7 +68,10 @@ class WithPatchTable:
 
         for i in range(16):
             self.table.attach(bold_label("Channel %s" % (1 + i)), 0, 1, i, i + 1, gtk.SHRINK, gtk.SHRINK)
-            cb = standard_combo(self.patches, self.mapping[attribs.patch[i + 1][0]])
+            if attribs.patch[i + 1][0] != -1:
+                cb = standard_combo(self.patches, self.mapping[attribs.patch[i + 1][0]])
+            else:
+                cb = standard_combo(self.patches, None)
             cb.connect('changed', self.patch_combo_changed, i + 1)
             self.table.attach(cb, 1, 2, i, i + 1, gtk.SHRINK, gtk.SHRINK)
             self.patch_combos.append(cb)
