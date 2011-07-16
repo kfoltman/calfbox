@@ -44,6 +44,7 @@ GQuark cbox_sampler_error_quark()
 
 static void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
+static void destroy_program(struct sampler_module *m, struct sampler_program *prg);
 static void sampler_destroy(struct cbox_module *module);
 
 static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
@@ -1151,10 +1152,47 @@ static int find_program(struct sampler_module *m, int prog_no)
     return -1;
 }
 
+struct release_program_voices_data
+{
+    struct sampler_module *module;
+    
+    struct sampler_program *pgm;
+};
+
+static int release_program_voices_execute(void *data)
+{
+    struct release_program_voices_data *rpv = data;
+    struct sampler_module *m = rpv->module;
+    int finished = 1;
+    
+    for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
+    {
+        struct sampler_voice *v = &m->voices[i];
+        
+        if (v->mode != spt_inactive)
+        {
+            if (v->channel->program == rpv->pgm)
+            {
+                finished = 0;
+                v->released = 1;
+                cbox_envelope_go_to(&v->amp_env, 15);        
+            }
+        }
+    }
+    
+    return finished;
+}
+
 void swap_program(struct sampler_module *m, int index, struct sampler_program *pgm)
 {
+    static struct cbox_rt_cmd_definition release_program_voices = { NULL, release_program_voices_execute, NULL };
+    
     struct sampler_program *old_program = cbox_rt_swap_pointers(app.rt, (void **)&m->programs[index], pgm);
 
+    struct release_program_voices_data data = {m, old_program};
+
+    cbox_rt_execute_cmd_sync(app.rt, &release_program_voices, &data);
+    
     for (int i = 0; i < 16; i++)
     {
         if (m->channels[i].program == old_program)
@@ -1162,6 +1200,7 @@ void swap_program(struct sampler_module *m, int index, struct sampler_program *p
             cbox_rt_swap_pointers(app.rt, (void **)&m->channels[i].program, pgm);
         }
     }
+    destroy_program(m, old_program);
 }
 
 static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, GError **error)
