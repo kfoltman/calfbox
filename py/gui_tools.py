@@ -41,6 +41,7 @@ class LogMapper:
 freq_format = "%0.1f"
 ms_format = "%0.1f ms"
 lfo_freq_mapper = LogMapper(0.01, 20, "%0.2f")
+env_mapper = LogMapper(0.002, 20, "%f")
 
 def standard_mapped_hslider(adj, mapper):
     sc = gtk.HScale(adj)
