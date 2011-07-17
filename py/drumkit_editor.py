@@ -218,7 +218,7 @@ class FileView(gtk.TreeView):
 class EditorDialog(gtk.Dialog):
     def __init__(self, parent):
         gtk.Dialog.__init__(self, "Drum kit editor", parent, gtk.DIALOG_MODAL, 
-            (gtk.STOCK_OK, gtk.RESPONSE_OK))
+            (gtk.STOCK_CLOSE, gtk.RESPONSE_CLOSE))
         self.set_default_response(gtk.RESPONSE_OK)
         self.hbox = gtk.HBox()
         
@@ -230,7 +230,12 @@ class EditorDialog(gtk.Dialog):
         
         sw = gtk.ScrolledWindow()
         sw.add_with_viewport(self.tree)
-        self.hbox.pack_start(sw, True, True)
+        left_box = gtk.VBox()
+        left_box.pack_start(sw)
+        save_button = gtk.Button(stock = gtk.STOCK_SAVE_AS)
+        save_button.connect("clicked", self.on_save_as)
+        left_box.pack_start(save_button, False, False)
+        self.hbox.pack_start(left_box, True, True)
         sw.set_size_request(240, -1)
         self.pads = PadTable(self, self.bank_model, 4, 4)
         self.hbox.pack_start(self.pads, True, True)
@@ -266,3 +271,10 @@ class EditorDialog(gtk.Dialog):
         if self.current_pad is None or self.current_pad.key is None:
             return None
         return self.bank_model[self.current_pad.key]
+
+    def on_save_as(self, dialog):
+        dlg = gtk.FileChooserDialog('Save a pad bank', self, gtk.FILE_CHOOSER_ACTION_SAVE, 
+            (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_APPLY))
+        if dlg.run() == gtk.RESPONSE_APPLY:
+            file(dlg.get_filename(), "w").write(self.bank_model.to_sfz())
+        dlg.destroy()
