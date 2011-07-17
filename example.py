@@ -105,7 +105,7 @@ class MainWindow(gtk.Window):
         
         t.attach(bold_label("Tempo"), 0, 1, 4, 5, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         self.tempo_adj = gtk.Adjustment(40, 40, 300, 1, 5, 0)
-        self.tempo_adj.connect('value_changed', adjustment_changed_float, "/master/set_tempo")
+        self.tempo_adj.connect('value_changed', adjustment_changed_float, cbox.VarPath("/master/set_tempo"))
         t.attach(standard_hslider(self.tempo_adj), 1, 2, 4, 5, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
 
         t.attach(bold_label("Transpose"), 0, 1, 5, 6, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
@@ -295,7 +295,7 @@ class MainWindow(gtk.Window):
                     
                 
                 adj = gtk.Adjustment(odata.gain, -96, 24, 1, 6, 0)
-                adj.connect('value_changed', adjustment_changed_float, opath + '/gain')
+                adj.connect('value_changed', adjustment_changed_float, cbox.VarPath(opath + '/gain'))
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
                 
                 fx_engine = standard_combo(fx_ls, ls_index(fx_ls, engine, 0))

@@ -10,6 +10,7 @@ class EffectWindow(gtk.Window):
         self.set_transient_for(main_window)
         self.main_window = main_window
         self.path = path
+        self.vpath = cbox.VarPath(path)
         self.set_title("%s - %s" % (self.effect_name, instrument))
         if hasattr(self, 'params'):
             values = cbox.GetThings(self.path + "/status", [p.name for p in self.params], [])
@@ -18,7 +19,7 @@ class EffectWindow(gtk.Window):
             for i in range(len(self.params)):
                 p = self.params[i]
                 t.attach(p.create_label(), 0, 1, i, i+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-                widget, refresher = p.create_widget(self.path)
+                widget, refresher = p.create_widget(self.vpath)
                 refresher(values)
                 t.attach(widget, 1, 2, i, i+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
                 self.refreshers.append(refresher)
@@ -33,7 +34,7 @@ class EffectWindow(gtk.Window):
             par = self.cols[i]
             t.attach(par.create_label(), i, i + 1, 0, 1, gtk.SHRINK | gtk.FILL)
             for j in range(rows):
-                widget, refresher = par.create_widget(self.path, j)
+                widget, refresher = par.create_widget(self.vpath.plus(None, j))
                 t.attach(widget, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
                 refresher(values)
                 self.table_refreshers.append(refresher)

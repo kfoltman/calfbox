@@ -33,6 +33,15 @@ class GetThings:
     def __str__(self):
         return str(self.seq)
 
+class VarPath:
+    def __init__(self, path, args = []):
+        self.path = path
+        self.args = args
+    def plus(self, subpath, *args):
+        return VarPath(self.path if subpath is None else self.path + "/" + subpath, self.args + list(args))
+    def set(self, *values):
+        do_cmd(self.path, None, self.args + list(values))
+
 class Config:
     @staticmethod
     def sections(prefix = ""):

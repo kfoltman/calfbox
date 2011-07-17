@@ -87,25 +87,25 @@ def standard_filter(patterns, name):
     f.set_name(name)
     return f
 
-def checkbox_changed_bool(checkbox, path, *items):
-    cbox.do_cmd(path, None, list(items) + [1 if checkbox.get_active() else 0])
+def checkbox_changed_bool(checkbox, vpath):
+    vpath.set(1 if checkbox.get_active() else 0)
 
-def adjustment_changed_int(adjustment, path, *items):
-    cbox.do_cmd(path, None, list(items) + [int(adjustment.get_value())])
+def adjustment_changed_int(adjustment, vpath):
+    vpath.set(int(adjustment.get_value()))
 
-def adjustment_changed_float(adjustment, path, *items):
-    cbox.do_cmd(path, None, list(items) + [float(adjustment.get_value())])
+def adjustment_changed_float(adjustment, vpath):
+    vpath.set(float(adjustment.get_value()))
 
-def adjustment_changed_float_mapped(adjustment, path, mapper, *items):
-    cbox.do_cmd(path, None, list(items) + [mapper.map(adjustment.get_value())])
+def adjustment_changed_float_mapped(adjustment, vpath, mapper):
+    vpath.set(mapper.map(adjustment.get_value()))
 
-def combo_value_changed(combo, path, value_offset = 0):
+def combo_value_changed(combo, vpath, value_offset = 0):
     if combo.get_active() != -1:
-        cbox.do_cmd(path, None, [value_offset + combo.get_active()])
+        vpath.set(value_offset + combo.get_active())
 
-def combo_value_changed_use_column(combo, path, column):
+def combo_value_changed_use_column(combo, vpath, column):
     if combo.get_active() != -1:
-        cbox.do_cmd(path, None, [combo.get_model()[combo.get_active()][column]])
+        vpath.set(combo.get_model()[combo.get_active()][column])
 
 def tree_toggle_changed_bool(renderer, tree_path, model, opath, column):
     model[int(tree_path)][column] = not model[int(tree_path)][column]
@@ -152,33 +152,38 @@ class TableRowWidget:
         return self.kwargs[name] if name in self.kwargs else def_value
     def create_label(self):
         return bold_label(self.label)
-    def get_value(self, values, *args):
-        if len(args) == 1:
-            return getattr(values, self.name)[args[0]]
+    def get_value(self, values, vpath):
+        if len(vpath.args) == 1:
+            return getattr(values, self.name)[vpath.args[0]]
         return getattr(values, self.name)
-    def add_row(self, table, row, path, values, *args):
+    def add_row(self, table, row, vpath, values):
         table.attach(self.create_label(), 0, 1, row, row + 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-        widget, refresher = self.create_widget(path, *args)
+        widget, refresher = self.create_widget(vpath)
         table.attach(widget, 1, 2, row, row + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         if values is not None:
             refresher(values)
         return refresher
+    def update_sensitive(self, widget, values):
+        sensitive = (values is not None) and (self.get_with_default('setter', 0) is not None) and hasattr(values, self.name)
+        widget.set_sensitive(sensitive)
+        return sensitive
 
 class SliderRow(TableRowWidget):
     def __init__(self, label, name, minv, maxv, **kwargs):
         TableRowWidget.__init__(self, label, name, **kwargs)
         self.minv = minv
         self.maxv = maxv
-    def create_widget(self, path, *args):
+    def create_widget(self, vpath):
         setter = self.get_with_default('setter', adjustment_changed_float)
         adj = gtk.Adjustment(self.minv, self.minv, self.maxv, 1, 6, 0)
         slider = standard_hslider(adj)
         if setter is not None:
-            adj.connect("value_changed", setter, path + "/" + self.name, *args)
+            adj.connect("value_changed", setter, vpath.plus(self.name))
         else:
             slider.set_sensitive(False)
         def refresher(values):
-            adj.set_value(self.get_value(values, *args))
+            if self.update_sensitive(slider, values):
+                adj.set_value(self.get_value(values, vpath))
         return (slider, refresher)
 
 class IntSliderRow(SliderRow):
@@ -189,24 +194,26 @@ class MappedSliderRow(TableRowWidget):
     def __init__(self, label, name, mapper, **kwargs):
         TableRowWidget.__init__(self, label, name, **kwargs)
         self.mapper = mapper
-    def create_widget(self, path, *args):
+    def create_widget(self, vpath):
         setter = self.get_with_default('setter', adjustment_changed_float_mapped)
         adj = gtk.Adjustment(0, 0, 100, 1, 6, 0)
         slider = standard_mapped_hslider(adj, self.mapper)
         if setter is not None:
-            adj.connect("value_changed", setter, path + "/" + self.name, self.mapper, *args)
+            adj.connect("value_changed", setter, vpath.plus(self.name), self.mapper)
         else:
             slider.set_sensitive(False)
         def refresher(values):
-            adj.set_value(self.mapper.unmap(self.get_value(values, *args)))
+            if self.update_sensitive(slider, values):
+                adj.set_value(self.mapper.unmap(self.get_value(values, vpath)))
         return (slider, refresher)
 
 class CheckBoxRow(TableRowWidget):
-    def create_widget(self, path, *args):
+    def create_widget(self, vpath):
         widget = gtk.CheckButton(self.label)
-        widget.connect("clicked", checkbox_changed_bool, path + "/" + self.name, *args)
+        widget.connect("clicked", checkbox_changed_bool, vpath.plus(self.name))
         def refresher(values):
-            widget.set_active(self.get_value(values, *args) > 0)
+            if self.update_sensitive(widget, values):
+                widget.set_active(self.get_value(values, vpath) > 0)
         return (widget, refresher)
 
 #################################################################################################################################
