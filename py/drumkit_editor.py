@@ -34,7 +34,7 @@ class KeyModelPath(object):
         setattr(model, self.var, value)
         if value != oldval:
             print "%s: set %s to %s" % (self.controller, self.var, value)
-            self.controller.update_kit()
+            self.controller.update_kit_later()
 
 class SFZRegion(object):
     volume = 0
@@ -44,6 +44,8 @@ class SFZRegion(object):
     ampeg_decay = 0.001
     ampeg_sustain = 100
     ampeg_release = 0.1
+    tune = 0
+    transpose = 0
 
 class KeyModel(object):
     def __init__(self, key, sample, filename):
@@ -113,6 +115,8 @@ class PadEditor(gtk.VBox):
     fields = [
         SliderRow("Volume", "volume", -100, 0),
         SliderRow("Pan", "pan", -100, 100),
+        SliderRow("Tune", "tune", -100, 100),
+        IntSliderRow("Tranpose", "transpose", -48, 48),
         MappedSliderRow("Amp Attack", "ampeg_attack", env_mapper),
         MappedSliderRow("Amp Hold", "ampeg_hold", env_mapper),
         MappedSliderRow("Amp Decay", "ampeg_decay", env_mapper),
@@ -202,6 +206,7 @@ class EditorDialog(gtk.Dialog):
         self.set_default_response(gtk.RESPONSE_OK)
         self.hbox = gtk.HBox()
         
+        self.update_source = None
         self.current_pad = None
         self.bank_model = BankModel()
         self.tree = FileView()
@@ -223,10 +228,16 @@ class EditorDialog(gtk.Dialog):
 
     def update_kit(self):
         cbox.do_cmd("/instr/_preview_kit/engine/load_patch_from_string", None, [0, "", self.bank_model.to_sfz(), "Preview"])
+        self.update_source = None
+        return False
+        
+    def update_kit_later(self):
+        if self.update_source is not None:
+            glib.source_remove(self.update_source)
+        self.update_source = glib.idle_add(self.update_kit)
         
     def on_sample_dragged(self, widget):
         self.update_kit()
-        print widget, self.current_pad
         if widget == self.current_pad:
             self.pad_editor.refresh()
         
