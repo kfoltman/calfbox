@@ -373,6 +373,7 @@ struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos)
     memcpy(layers, scene->layers, sizeof(struct cbox_layer *) * pos);
     memcpy(layers + pos, scene->layers + pos + 1, sizeof(struct cbox_layer *) * (scene->layer_count - pos - 1));
     free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->layers, layers, &scene->layer_count, scene->layer_count - 1));
+    cbox_instrument_unref_aux_buses(removed->instrument);
     
     return removed;
 }
@@ -445,16 +446,8 @@ struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char
 void cbox_scene_destroy(struct cbox_scene *scene)
 {
     int i;
-    for (i = 0; i < scene->layer_count; i++)
-        cbox_layer_destroy(scene->layers[i]);
-    for (i = 0; i < scene->instrument_count; i++)
-    {
-        for (int j = 0; j < scene->instruments[i]->aux_output_count; j++)
-        {
-            if (scene->instruments[i]->aux_outputs[j])
-                cbox_aux_bus_unref(scene->instruments[i]->aux_outputs[j]);
-        }
-    }
+    while(scene->layer_count > 0)
+        cbox_layer_destroy(cbox_scene_remove_layer(scene, 0));
             
     for (int i = 0; i < scene->aux_bus_count; i++)
         cbox_aux_bus_destroy(scene->aux_buses[i]);

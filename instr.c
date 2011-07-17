@@ -335,6 +335,15 @@ void cbox_instrument_destroy(struct cbox_instrument *instrument)
     cbox_module_destroy(instrument->module);
 }
 
+void cbox_instrument_unref_aux_buses(struct cbox_instrument *instrument)
+{
+    for (int j = 0; j < instrument->aux_output_count; j++)
+    {
+        if (instrument->aux_outputs[j])
+            cbox_aux_bus_unref(instrument->aux_outputs[j]);
+    }    
+}
+
 void cbox_instruments_close()
 {
     g_hash_table_destroy(instruments.hash);
