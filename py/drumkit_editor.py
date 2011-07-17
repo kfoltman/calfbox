@@ -46,6 +46,14 @@ class SFZRegion(object):
     ampeg_release = 0.1
     tune = 0
     transpose = 0
+    cutoff = 22000
+    resonance = 0.7
+    fileg_depth = 0
+    fileg_attack = 0.001
+    fileg_hold = 0.001
+    fileg_decay = 0.001
+    fileg_sustain = 100
+    fileg_release = 0.1
 
 class KeyModel(object):
     def __init__(self, key, sample, filename):
@@ -122,6 +130,14 @@ class PadEditor(gtk.VBox):
         MappedSliderRow("Amp Decay", "ampeg_decay", env_mapper),
         SliderRow("Amp Sustain", "ampeg_sustain", 0, 100),
         MappedSliderRow("Amp Release", "ampeg_release", env_mapper),
+        MappedSliderRow("Flt Cutoff", "cutoff", filter_freq_mapper),
+        MappedSliderRow("Flt Resonance", "resonance", LogMapper(0.707, 16, "%0.1f x")),
+        SliderRow("Flt Depth", "fileg_depth", -4800, 4800),
+        MappedSliderRow("Flt Attack", "fileg_attack", env_mapper),
+        MappedSliderRow("Flt Hold", "fileg_hold", env_mapper),
+        MappedSliderRow("Flt Decay", "fileg_decay", env_mapper),
+        SliderRow("Flt Sustain", "fileg_sustain", 0, 100),
+        MappedSliderRow("Flt Release", "fileg_release", env_mapper),
     ]
     
 class PadButton(gtk.RadioButton):
