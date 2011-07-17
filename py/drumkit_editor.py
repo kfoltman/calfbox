@@ -6,16 +6,23 @@ from gui_tools import *
 #sample_dir = "/media/resources/samples/dooleydrums/"
 sample_dir = cbox.Config.get("init", "sample_dir")
 
+class SampleDirsModel(gtk.ListStore):
+    def __init__(self):
+        gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_STRING)
+        for entry in cbox.Config.keys("sample_dirs"):
+            path = cbox.Config.get("sample_dirs", entry)
+            self.append((entry, path))
+
 class SampleFilesModel(gtk.ListStore):
     def __init__(self):
         gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_STRING)
         
-    def refresh(self):
+    def refresh(self, sample_dir):
+        print sample_dir
         self.clear()
         self.append(("","<empty>"))
         filelist = glob.glob("%s/*" % sample_dir)
         for f in sorted(filelist):
-            print f
             if not f.lower().endswith(".wav"):
                 continue
             self.append((f,os.path.basename(f)))
@@ -191,7 +198,6 @@ class PadTable(gtk.Table):
 class FileView(gtk.TreeView):
     def __init__(self):
         self.files_model = SampleFilesModel()
-        self.files_model.refresh()
         gtk.TreeView.__init__(self, self.files_model)
         self.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=1)
         self.set_cursor((0,))
@@ -225,13 +231,21 @@ class EditorDialog(gtk.Dialog):
         
         self.update_source = None
         self.current_pad = None
+        self.dirs_model = SampleDirsModel()
         self.bank_model = BankModel()
         self.tree = FileView()
         self.pad_editor = PadEditor(self, self.bank_model)
         
+        combo = gtk.ComboBox(self.dirs_model)
+        cell = gtk.CellRendererText()
+        combo.pack_start(cell, True)
+        combo.add_attribute(cell, 'text', 0)
+        combo.connect('changed', lambda cb: self.tree.files_model.refresh(cb.get_model()[cb.get_active()][1]))
+        combo.set_active(0)
         sw = gtk.ScrolledWindow()
         sw.add(self.tree)
         left_box = gtk.VBox()
+        left_box.pack_start(combo, False, False)
         left_box.pack_start(sw)
         save_button = gtk.Button(stock = gtk.STOCK_SAVE_AS)
         save_button.connect("clicked", self.on_save_as)
