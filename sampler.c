@@ -362,6 +362,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->released_with_sostenuto = 0;
             v->captured_sostenuto = 0;
             v->channel = c;
+            v->layer = l;
+            v->program = c->program;
             v->amp_env.shape = &l->amp_env_shape;
             v->filter_env.shape = &l->filter_env_shape;
             v->pitch_env.shape = &l->pitch_env_shape;
@@ -1156,7 +1158,7 @@ struct release_program_voices_data
 {
     struct sampler_module *module;
     
-    struct sampler_program *pgm;
+    struct sampler_program *old_pgm, *new_pgm;
 };
 
 static int release_program_voices_execute(void *data)
@@ -1165,14 +1167,20 @@ static int release_program_voices_execute(void *data)
     struct sampler_module *m = rpv->module;
     int finished = 1;
     
+    for (int i = 0; i < 16; i++)
+    {
+        if (m->channels[i].program == rpv->old_pgm)
+            m->channels[i].program = rpv->new_pgm;
+    }
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
         
         if (v->mode != spt_inactive)
         {
-            if (v->channel->program == rpv->pgm)
+            if (v->program == rpv->old_pgm)
             {
+                v->program = NULL;
                 finished = 0;
                 v->released = 1;
                 cbox_envelope_go_to(&v->amp_env, 15);        
@@ -1189,17 +1197,10 @@ void swap_program(struct sampler_module *m, int index, struct sampler_program *p
     
     struct sampler_program *old_program = cbox_rt_swap_pointers(app.rt, (void **)&m->programs[index], pgm);
 
-    struct release_program_voices_data data = {m, old_program};
+    struct release_program_voices_data data = {m, old_program, pgm};
 
     cbox_rt_execute_cmd_sync(app.rt, &release_program_voices, &data);
     
-    for (int i = 0; i < 16; i++)
-    {
-        if (m->channels[i].program == old_program)
-        {
-            cbox_rt_swap_pointers(app.rt, (void **)&m->channels[i].program, pgm);
-        }
-    }
     destroy_program(m, old_program);
 }
 

@@ -126,6 +126,7 @@ struct sampler_voice
     enum sample_player_type mode;
     enum sampler_filter_type filter;
     struct sampler_layer *layer;
+    struct sampler_program *program;
     int16_t *sample_data;
     uint32_t pos, delta, loop_start, loop_end, sample_end;
     uint32_t frac_pos, frac_delta;

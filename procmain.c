@@ -186,9 +186,13 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     
     // Process command queue
     cost = 0;
-    while(cost < RT_MAX_COST_PER_CALL && jack_ringbuffer_read(rt->rb_execute, (char *)&cmd, sizeof(cmd)))
+    while(cost < RT_MAX_COST_PER_CALL && jack_ringbuffer_peek(rt->rb_execute, (char *)&cmd, sizeof(cmd)))
     {
-        cost += (cmd.definition->execute)(cmd.user_data);
+        int result = (cmd.definition->execute)(cmd.user_data);
+        if (!result)
+            break;
+        cost += result;
+        jack_ringbuffer_read_advance(rt->rb_execute, sizeof(cmd));
         if (cmd.definition->cleanup || !cmd.is_async)
             jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
     }
