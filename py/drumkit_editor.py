@@ -264,7 +264,6 @@ class EditorDialog(gtk.Dialog):
         
     def on_pad_selected(self, widget):
         self.current_pad = widget
-        print widget.key
         self.pad_editor.refresh()
     
     def get_current_key_model(self):
