@@ -172,7 +172,7 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else if (!strcmp(key, "volume"))
         l->gain = dB2gain(atof(value));
     else if (!strcmp(key, "pan"))
-        l->pan = atof(value) / 100.0;
+        l->pan = (atof(value) + 100) / 200.0;
     else if (!strcmp(key, "cutoff"))
         l->cutoff = atof(value);
     else if (!strcmp(key, "resonance"))
