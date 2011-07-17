@@ -13,7 +13,8 @@ class SampleFilesModel(gtk.ListStore):
     def refresh(self):
         self.clear()
         self.append(("","<empty>"))
-        for f in glob.glob("%s/*" % sample_dir):
+        filelist = glob.glob("%s/*" % sample_dir)
+        for f in sorted(filelist):
             print f
             if not f.lower().endswith(".wav"):
                 continue
@@ -229,7 +230,7 @@ class EditorDialog(gtk.Dialog):
         self.pad_editor = PadEditor(self, self.bank_model)
         
         sw = gtk.ScrolledWindow()
-        sw.add_with_viewport(self.tree)
+        sw.add(self.tree)
         left_box = gtk.VBox()
         left_box.pack_start(sw)
         save_button = gtk.Button(stock = gtk.STOCK_SAVE_AS)
