@@ -42,6 +42,7 @@ freq_format = "%0.1f"
 ms_format = "%0.1f ms"
 lfo_freq_mapper = LogMapper(0.01, 20, "%0.2f")
 env_mapper = LogMapper(0.002, 20, "%f")
+filter_freq_mapper = LogMapper(20, 20000, "%0.1f Hz")
 
 def standard_mapped_hslider(adj, mapper):
     sc = gtk.HScale(adj)
@@ -130,25 +131,6 @@ def standard_combo_renderer(list_model, model, path, column):
     combo.connect('changed', tree_combo_changed, list_model, path, column)
     return combo
 
-def add_slider_row(t, row, label, path, values, item, min, max, setter = adjustment_changed_float):
-    t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-    adj = gtk.Adjustment(getattr(values, item), min, max, 1, 6, 0)
-    if setter is not None:
-        adj.connect("value_changed", setter, path + "/" + item)
-    slider = standard_hslider(adj)
-    t.attach(slider, 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
-    if setter is None:
-        slider.set_sensitive(False)
-    return (slider, adj)
-
-def add_mapped_slider_row(t, row, label, path, values, item, mapper, setter = adjustment_changed_float_mapped):
-    t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-    adj = gtk.Adjustment(mapper.unmap(getattr(values, item)), 0, 100, 1, 6, 0)
-    adj.connect("value_changed", setter, path + "/" + item, mapper)
-    slider = standard_mapped_hslider(adj, mapper)
-    t.attach(slider, 1, 2, row, row+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
-    return (slider, adj)
-
 def add_display_row(t, row, label, path, values, item):
     t.attach(bold_label(label), 0, 1, row, row+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
     w = left_label(getattr(values, item))
@@ -166,25 +148,66 @@ class TableRowWidget:
         self.label = label
         self.name = name
         self.kwargs = kwargs
+    def get_with_default(self, name, def_value):
+        return self.kwargs[name] if name in self.kwargs else def_value
+    def create_label(self):
+        return bold_label(self.label)
+    def get_value(self, values, *args):
+        if len(args) == 1:
+            return getattr(values, self.name)[args[0]]
+        return getattr(values, self.name)
+    def add_row(self, table, row, path, values, *args):
+        table.attach(self.create_label(), 0, 1, row, row + 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+        widget, refresher = self.create_widget(path, *args)
+        table.attach(widget, 1, 2, row, row + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+        if values is not None:
+            refresher(values)
+        return refresher
 
 class SliderRow(TableRowWidget):
     def __init__(self, label, name, minv, maxv, **kwargs):
         TableRowWidget.__init__(self, label, name, **kwargs)
         self.minv = minv
         self.maxv = maxv
-    def add_row(self, table, row_no, path, values):
-        return add_slider_row(table, row_no, self.label, path, values, self.name, self.minv, self.maxv, **self.kwargs)
-    def update(self, values, slider, adjustment):
-        adjustment.set_value(getattr(values, self.name))
+    def create_widget(self, path, *args):
+        setter = self.get_with_default('setter', adjustment_changed_float)
+        adj = gtk.Adjustment(self.minv, self.minv, self.maxv, 1, 6, 0)
+        slider = standard_hslider(adj)
+        if setter is not None:
+            adj.connect("value_changed", setter, path + "/" + self.name, *args)
+        else:
+            slider.set_sensitive(False)
+        def refresher(values):
+            adj.set_value(self.get_value(values, *args))
+        return (slider, refresher)
+
+class IntSliderRow(SliderRow):
+    def __init__(self, label, name, minv, maxv, **kwargs):
+        SliderRow.__init__(self, label, name, minv, maxv, setter = adjustment_changed_int, **kwargs)
 
 class MappedSliderRow(TableRowWidget):
     def __init__(self, label, name, mapper, **kwargs):
         TableRowWidget.__init__(self, label, name, **kwargs)
         self.mapper = mapper
-    def add_row(self, table, row_no, path, values):
-        return add_mapped_slider_row(table, row_no, self.label, path, values, self.name, self.mapper, **self.kwargs)
-    def update(self, values, slider, adjustment):
-        adjustment.set_value(self.mapper.unmap(getattr(values, self.name)))
+    def create_widget(self, path, *args):
+        setter = self.get_with_default('setter', adjustment_changed_float_mapped)
+        adj = gtk.Adjustment(0, 0, 100, 1, 6, 0)
+        slider = standard_mapped_hslider(adj, self.mapper)
+        if setter is not None:
+            adj.connect("value_changed", setter, path + "/" + self.name, self.mapper, *args)
+        else:
+            slider.set_sensitive(False)
+        def refresher(values):
+            adj.set_value(self.mapper.unmap(self.get_value(values, *args)))
+        return (slider, refresher)
+
+class CheckBoxRow(TableRowWidget):
+    def create_widget(self, path, *args):
+        widget = gtk.CheckButton(self.label)
+        widget.connect("clicked", checkbox_changed_bool, path + "/" + self.name, *args)
+        def refresher(values):
+            widget.set_active(self.get_value(values, *args) > 0)
+        return (widget, refresher)
 
 #################################################################################################################################
 

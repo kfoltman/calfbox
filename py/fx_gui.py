@@ -17,41 +17,33 @@ class EffectWindow(gtk.Window):
             t = gtk.Table(2, len(self.params))
             for i in range(len(self.params)):
                 p = self.params[i]
-                self.refreshers.append((p, p.add_row(t, i, self.path, values)))
+                t.attach(p.create_label(), 0, 1, i, i+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+                widget, refresher = p.create_widget(self.path)
+                refresher(values)
+                t.attach(widget, 1, 2, i, i+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+                self.refreshers.append(refresher)
             self.add(t)
         self.connect('delete_event', self.on_close)
         
     def create_param_table(self, cols, rows, values, extra_rows = 0):
         t = gtk.Table(4, rows + 1 + extra_rows)
-        self.cols = eq_cols
-        self.table_widgets = {}
+        self.cols = cols
+        self.table_refreshers = []
         for i in range(len(self.cols)):
             par = self.cols[i]
-            t.attach(bold_label(par[0], halign=0.5), i, i + 1, 0, 1, gtk.SHRINK | gtk.FILL)
+            t.attach(par.create_label(), i, i + 1, 0, 1, gtk.SHRINK | gtk.FILL)
             for j in range(rows):
-                value = getattr(values, par[3])[j]
-                if par[4] == 'slider':
-                    adj = gtk.Adjustment(value, par[1], par[2], 1, 6, 0)
-                    adj.connect("value_changed", adjustment_changed_float, self.path + "/" + par[3], int(j))
-                    widget = standard_hslider(adj)
-                elif par[4] == 'log_slider':
-                    mapper = LogMapper(par[1], par[2], "%f")
-                    adj = gtk.Adjustment(mapper.unmap(value), 0, 100, 1, 6, 0)
-                    adj.connect("value_changed", adjustment_changed_float_mapped, self.path + "/" + par[3], mapper, int(j))
-                    widget = standard_mapped_hslider(adj, mapper)
-                else:
-                    widget = gtk.CheckButton(par[0])
-                    widget.set_active(value > 0)
-                    widget.connect("clicked", checkbox_changed_bool, self.path + "/" + par[3], int(j))
+                widget, refresher = par.create_widget(self.path, j)
                 t.attach(widget, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
-                self.table_widgets[(i, j)] = widget
+                refresher(values)
+                self.table_refreshers.append(refresher)
         return t
         
     def refresh(self):
         if hasattr(self, 'params'):
             values = cbox.GetThings(self.path + "/status", [p.name for p in self.params], [])
-            for param, state in self.refreshers:
-                param.update(values, *state)
+            for refresher in self.refreshers:
+                refresher(values)
                 
     def on_close(self, widget, event):
         self.main_window.on_effect_popup_close(self)
@@ -66,7 +58,7 @@ class PhaserWindow(EffectWindow):
         MappedSliderRow("LFO frequency", "lfo_freq", lfo_freq_mapper),
         SliderRow("Stereo", "stereo_phase", 0, 360),
         SliderRow("Wet/dry", "wet_dry", 0, 1),
-        SliderRow("Stages", "stages", 1, 12, setter = adjustment_changed_int)
+        IntSliderRow("Stages", "stages", 1, 12)
     ]
     effect_name = "Phaser"
     
@@ -117,10 +109,10 @@ class CompressorWindow(EffectWindow):
     effect_name = "Tone Control"
 
 eq_cols = [
-    ("Active", 0, 1, "active", 'checkbox'), 
-    ("Center Freq", 10, 20000, "center", 'log_slider'),
-    ("Filter Q", 0.1, 100, "q", 'log_slider'),
-    ("Gain", -36, 36, "gain", 'slider'),
+    CheckBoxRow("Active", "active"),
+    MappedSliderRow("Center Freq", "center", filter_freq_mapper),
+    MappedSliderRow("Filter Q", "q", LogMapper(0.01, 100, "%f")),
+    SliderRow("Gain", "gain", -36, 36),
 ]
 
 class EQWindow(EffectWindow):
@@ -145,23 +137,15 @@ class FBRWindow(EffectWindow):
         sbutton.connect("clicked", lambda button, path: cbox.do_cmd(path + "/start", None, []), self.path)
         t.attach(sbutton, 2, 4, 17, 18)
         
-    def refresh_values(self):
+    def refresh_table(self):
         values = cbox.GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
-        for i in range(len(self.cols)):
-            par = self.cols[i]
-            for j in range(16):
-                value = getattr(values, par[3])[j]
-                if par[4] == 'slider':
-                    self.table_widgets[(i, j)].get_adjustment().set_value(value)
-                elif par[4] == 'log_slider':
-                    self.table_widgets[(i, j)].get_adjustment().set_value(log_map(value, par[1], par[2]))
-                else:
-                    self.table_widgets[(i, j)].set_active(value > 0)
+        for refresher in self.table_refreshers:
+            refresher(values)
         
     def update(self):
         values = cbox.GetThings(self.path + "/status", ["finished", "refresh"], [])
         if values.refresh:
-            self.refresh_values()
+            self.refresh_table()
         
         if values.finished > 0:
             self.ready_label.set_text("Ready")
