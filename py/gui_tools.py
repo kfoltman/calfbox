@@ -141,6 +141,17 @@ def set_timer(widget, time, func, *args):
     refresh_id = glib.timeout_add(time, func, *args)
     widget.connect('destroy', lambda obj, id: glib.source_remove(id), refresh_id)
 
+def create_menu(title, items):
+    menuitem = gtk.MenuItem(title)
+    if items is not None:
+        menu = gtk.Menu()
+        menuitem.set_submenu(menu)
+        for label, meth in items:
+            mit = gtk.MenuItem(label)
+            mit.connect('activate', meth)
+            menu.append(mit)
+    return menuitem
+
 #################################################################################################################################
 
 class TableRowWidget:

@@ -59,15 +59,15 @@ class MainWindow(gtk.Window):
     def create(self):
         self.menu_bar = gtk.MenuBar()
         
-        self.menu_bar.append(self.create_menu("_Scene", [
+        self.menu_bar.append(create_menu("_Scene", [
             ("_Load", self.load_scene),
             ("_Quit", self.quit),
         ]))
-        self.menu_bar.append(self.create_menu("_Layer", [
+        self.menu_bar.append(create_menu("_Layer", [
             ("_Add", self.layer_add),
             ("_Remove", self.layer_remove),
         ]))
-        self.menu_bar.append(self.create_menu("_Tools", [
+        self.menu_bar.append(create_menu("_Tools", [
             ("_Drum Kit Editor", self.tools_drumkit_editor),
         ]))
         
@@ -148,17 +148,6 @@ class MainWindow(gtk.Window):
             cbox.do_cmd("/scene/move_layer", None, [src_row + 1, dest_row + 1])
             scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
             self.refresh_layer_list(scene)
-
-    def create_menu(self, title, items):
-        menuitem = gtk.MenuItem(title)
-        if items is not None:
-            menu = gtk.Menu()
-            menuitem.set_submenu(menu)
-            for label, meth in items:
-                mit = gtk.MenuItem(label)
-                mit.connect('activate', meth)
-                menu.append(mit)
-        return menuitem
 
     def refresh_layer_list(self, scene):
         self.layers_model.clear()
