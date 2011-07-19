@@ -200,6 +200,15 @@ class SliderRow(TableRowWidget):
 class IntSliderRow(SliderRow):
     def __init__(self, label, name, minv, maxv, **kwargs):
         SliderRow.__init__(self, label, name, minv, maxv, setter = adjustment_changed_int, **kwargs)
+    def create_widget(self, vpath):
+        (slider, refresher) = SliderRow.create_widget(self, vpath)
+        slider.connect('change-value', self.on_change_value)
+        slider.set_digits(0)
+        return slider, refresher
+    def on_change_value(self, range, scroll, value):
+        range.set_value(int(value))
+        return True
+        
 
 class MappedSliderRow(TableRowWidget):
     def __init__(self, label, name, mapper, **kwargs):
