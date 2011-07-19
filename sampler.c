@@ -1180,10 +1180,12 @@ static int release_program_voices_execute(void *data)
         {
             if (v->program == rpv->old_pgm)
             {
-                v->program = NULL;
                 finished = 0;
-                v->released = 1;
-                cbox_envelope_go_to(&v->amp_env, 15);        
+                if (v->amp_env.cur_stage != 15)
+                {
+                    v->released = 1;
+                    cbox_envelope_go_to(&v->amp_env, 15);
+                }
             }
         }
     }
