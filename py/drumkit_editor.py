@@ -132,7 +132,7 @@ class PadEditor(gtk.VBox):
         SliderRow("Volume", "volume", -100, 0),
         SliderRow("Pan", "pan", -100, 100),
         SliderRow("Tune", "tune", -100, 100),
-        IntSliderRow("Tranpose", "transpose", -48, 48),
+        IntSliderRow("Transpose", "transpose", -48, 48),
         MappedSliderRow("Amp Attack", "ampeg_attack", env_mapper),
         MappedSliderRow("Amp Hold", "ampeg_hold", env_mapper),
         MappedSliderRow("Amp Decay", "ampeg_decay", env_mapper),
