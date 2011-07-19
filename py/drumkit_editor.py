@@ -239,6 +239,9 @@ class EditorDialog(gtk.Dialog):
             ("_Save as...", self.on_save_as),
             ("_Close", lambda w: self.response(gtk.RESPONSE_OK)),
         ]))
+        self.menu_bar.append(create_menu("_Layer", [
+            ("_Delete", self.on_layer_delete),
+        ]))
         self.vbox.pack_start(self.menu_bar, False, False)
         
         self.hbox = gtk.HBox(spacing = 5)
@@ -295,7 +298,8 @@ class EditorDialog(gtk.Dialog):
         
     def on_sample_dragged(self, widget):
         self.update_kit()
-        #if widget == self.current_pad:
+        if widget == self.current_pad:
+            self.layer_list.set_cursor(len(self.layer_list.get_model()) - 1)
         #    self.pad_editor.refresh()
         
     def on_pad_selected(self, widget):
@@ -306,6 +310,15 @@ class EditorDialog(gtk.Dialog):
         
     def on_layer_changed(self):
         self.layer_editor.refresh()
+    
+    def on_layer_delete(self, w):
+        if self.layer_list.get_cursor()[0] is None:
+            return None
+        model = self.layer_list.get_model()
+        model.remove(model.get_iter(self.layer_list.get_cursor()[0]))
+        self.layer_editor.refresh()
+        self.current_pad.update_label()
+        self.update_kit()
     
     def get_current_layer_model(self):
         if self.layer_list.get_cursor()[0] is None:
