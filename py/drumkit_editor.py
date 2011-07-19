@@ -235,7 +235,7 @@ class EditorDialog(gtk.Dialog):
         ]))
         self.vbox.pack_start(self.menu_bar)
         
-        self.hbox = gtk.HBox()
+        self.hbox = gtk.HBox(spacing = 5)
         
         self.update_source = None
         self.current_pad = None
@@ -252,7 +252,7 @@ class EditorDialog(gtk.Dialog):
         combo.set_active(0)
         sw = gtk.ScrolledWindow()
         sw.add(self.tree)
-        left_box = gtk.VBox()
+        left_box = gtk.VBox(spacing = 5)
         left_box.pack_start(combo, False, False)
         left_box.pack_start(sw)
         self.hbox.pack_start(left_box, True, True)
