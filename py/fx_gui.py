@@ -4,14 +4,14 @@ from gui_tools import *
 #################################################################################################################################
 
 class EffectWindow(gtk.Window):
-    def __init__(self, instrument, output, main_window, path):
+    def __init__(self, location, main_window, path):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_UTILITY)
         self.set_transient_for(main_window)
         self.main_window = main_window
         self.path = path
         self.vpath = cbox.VarPath(path)
-        self.set_title("%s - %s" % (self.effect_name, instrument))
+        self.set_title("%s - %s" % (self.effect_name, location))
         if hasattr(self, 'params'):
             values = cbox.GetThings(self.path + "/status", [p.name for p in self.params], [])
             self.refreshers = []
@@ -24,7 +24,6 @@ class EffectWindow(gtk.Window):
                 t.attach(widget, 1, 2, i, i+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
                 self.refreshers.append(refresher)
             self.add(t)
-        self.connect('delete_event', self.on_close)
         
     def create_param_table(self, cols, rows, values, extra_rows = 0):
         t = gtk.Table(4, rows + 1 + extra_rows)
@@ -46,9 +45,6 @@ class EffectWindow(gtk.Window):
             for refresher in self.refreshers:
                 refresher(values)
                 
-    def on_close(self, widget, event):
-        self.main_window.on_effect_popup_close(self)
-
 #################################################################################################################################
 
 class PhaserWindow(EffectWindow):
@@ -117,8 +113,8 @@ eq_cols = [
 ]
 
 class EQWindow(EffectWindow):
-    def __init__(self, instrument, output, main_window, path):
-        EffectWindow.__init__(self, instrument, output, main_window, path)
+    def __init__(self, instrument, main_window, path):
+        EffectWindow.__init__(self, instrument, main_window, path)
         values = cbox.GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
         self.add(self.create_param_table(eq_cols, 4, values))
     effect_name = "Equalizer"
@@ -126,8 +122,8 @@ class EQWindow(EffectWindow):
 class FBRWindow(EffectWindow):
     effect_name = "Feedback Reduction"
     
-    def __init__(self, instrument, output, main_window, path):
-        EffectWindow.__init__(self, instrument, output, main_window, path)
+    def __init__(self, instrument, main_window, path):
+        EffectWindow.__init__(self, instrument, main_window, path)
         values = cbox.GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
         t = self.create_param_table(eq_cols, 16, values, 1)        
         self.add(t)
@@ -169,3 +165,78 @@ effect_window_map = {
     'compressor': CompressorWindow,
 }
 
+#################################################################################################################################
+
+class EffectListModel(gtk.ListStore):
+    def __init__(self):
+        self.presets = {}
+        gtk.ListStore.__init__(self, gobject.TYPE_STRING)
+        for engine in effect_engines:
+            self.presets[engine] = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+            self.append((engine,))
+            
+        for preset in cbox.Config.sections("fxpreset:"):
+            engine = preset["engine"]
+            if engine in self.presets:
+                title = preset.title if hasattr(preset, 'title') else preset.name[9:] 
+                self.presets[engine].append((preset.name[9:], title))
+    
+    def get_model_for_engine(self, engine):
+        return self.presets[engine]
+
+effect_list_model = EffectListModel()
+
+#################################################################################################################################
+
+class InsertEffectChooser(object):
+    def __init__(self, opath, location, engine, preset, main_window):
+        self.opath = opath
+        self.location = location
+        self.main_window = main_window
+        self.popup = None
+        
+        self.fx_engine = standard_combo(effect_list_model, ls_index(effect_list_model, engine, 0), width = 120)
+        self.fx_engine.connect('changed', self.fx_engine_changed)
+        
+        if engine in effect_engines:
+            model = effect_list_model.get_model_for_engine(engine)
+            self.fx_preset = standard_combo(model, active_item_lookup = preset, column = 1, lookup_column = 0, width = 120)
+        else:
+            self.fx_preset = standard_combo(None, active_item = 0, column = 1, width = 120)
+        self.fx_preset.connect('changed', self.fx_preset_changed)
+
+        self.fx_edit = gtk.Button("_Edit")
+        self.fx_edit.connect("clicked", self.edit_effect_clicked)
+        self.fx_edit.set_sensitive(engine in effect_window_map)
+        
+    def edit_effect_clicked(self, button):
+        if self.popup is not None:
+            self.popup.present()
+            return
+        engine = cbox.GetThings(self.opath + "/status", ['insert_engine'], []).insert_engine
+        wclass = effect_window_map[engine]
+        popup = wclass(self.location, self.main_window, "%s/engine" % self.opath)
+        popup.show_all()
+        popup.present()
+        popup.connect('delete_event', self.on_close)
+        self.popup = popup
+            
+    def fx_engine_changed(self, combo):
+        if self.popup is not None:
+            self.popup.destroy()
+            self.popup = None
+            
+        engine = combo.get_model()[combo.get_active()][0]
+        cbox.do_cmd(self.opath + '/insert_engine', None, [engine])
+        self.fx_preset.set_model(effect_list_model.get_model_for_engine(engine))
+        self.fx_preset.set_active(0)
+        self.fx_edit.set_sensitive(engine in effect_window_map)
+        
+    def fx_preset_changed(self, combo):
+        if combo.get_active() >= 0:
+            cbox.do_cmd(self.opath + '/insert_preset', None, [combo.get_model()[combo.get_active()][0]])
+        if self.popup is not None:
+            self.popup.refresh()
+
+    def on_close(self, popup, event):
+        self.popup = None

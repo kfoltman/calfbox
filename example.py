@@ -216,20 +216,8 @@ class MainWindow(gtk.Window):
     def create_instrument_pages(self, scene, rt):
         self.path_widgets = {}
         self.path_popups = {}
-        self.fxpreset_ls = {}
+        self.fx_choosers = {}
         
-        for preset in cbox.Config.sections("fxpreset:"):
-            engine = preset["engine"]
-            if engine not in self.fxpreset_ls:
-                self.fxpreset_ls[engine] = gtk.ListStore(gobject.TYPE_STRING)
-            self.fxpreset_ls[engine].append((preset.name[9:],))
-        
-        fx_ls = gtk.ListStore(gobject.TYPE_STRING)
-        for engine in fx_gui.effect_engines:
-            if engine not in self.fxpreset_ls:
-                self.fxpreset_ls[engine] = gtk.ListStore(gobject.TYPE_STRING)
-            fx_ls.append((engine,))
-            
         outputs_ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
         for out in range(0, rt.audio_channels[1]/2):
             outputs_ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
@@ -253,7 +241,8 @@ class MainWindow(gtk.Window):
             t.attach(bold_label("Instr. output", 0.5), 0, 1, 0, 1, gtk.SHRINK, gtk.SHRINK)
             t.attach(bold_label("Send to", 0.5), 1, 2, 0, 1, gtk.SHRINK, gtk.SHRINK)
             t.attach(bold_label("Gain [dB]", 0.5), 2, 3, 0, 1, 0, gtk.SHRINK)
-            t.attach(bold_label("Effect", 0.5), 3, 6, 0, 1, 0, gtk.SHRINK)
+            t.attach(bold_label("Effect", 0.5), 3, 4, 0, 1, 0, gtk.SHRINK)
+            t.attach(bold_label("Preset", 0.5), 4, 6, 0, 1, 0, gtk.SHRINK)
             b.pack_start(t, False, False)
             
             y = 1
@@ -281,29 +270,16 @@ class MainWindow(gtk.Window):
                     cb = standard_combo(auxbus_ls, ls_index(auxbus_ls, odata.bus, 1))
                     cb.connect('changed', combo_value_changed_use_column, opath + '/bus', 1)
                 t.attach(cb, 1, 2, y, y + 1, gtk.SHRINK, gtk.SHRINK)
-                    
-                
+                                    
                 adj = gtk.Adjustment(odata.gain, -96, 24, 1, 6, 0)
                 adj.connect('value_changed', adjustment_changed_float, cbox.VarPath(opath + '/gain'))
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
                 
-                fx_engine = standard_combo(fx_ls, ls_index(fx_ls, engine, 0))
-                fx_engine.connect('changed', self.fx_engine_changed, opath)
-                t.attach(fx_engine, 3, 4, y, y + 1, 0, gtk.SHRINK)
-                
-                if engine in self.fxpreset_ls:
-                    fx_preset = standard_combo(self.fxpreset_ls[engine], ls_index(self.fxpreset_ls[engine], preset, 0))
-                else:
-                    fx_preset = standard_combo(None, 0)
-                fx_preset.connect('changed', self.fx_preset_changed, opath)
-                t.attach(fx_preset, 4, 5, y, y + 1, 0, gtk.SHRINK)
-
-                fx_edit = gtk.Button("_Edit")
-                t.attach(fx_edit, 5, 6, y, y + 1, 0, gtk.SHRINK)
-                fx_edit.connect("clicked", self.edit_effect_clicked, opath, i[0], o)
-                fx_edit.set_sensitive(engine in fx_gui.effect_window_map)
-                
-                self.path_widgets[opath] = (fx_engine, fx_preset, fx_edit)
+                chooser = fx_gui.InsertEffectChooser(opath, "%s: %s" % (i[0], output_name), engine, preset, self)
+                self.fx_choosers[opath] = chooser
+                t.attach(chooser.fx_engine, 3, 4, y, y + 1, 0, gtk.SHRINK)
+                t.attach(chooser.fx_preset, 4, 5, y, y + 1, 0, gtk.SHRINK)
+                t.attach(chooser.fx_edit, 5, 6, y, y + 1, 0, gtk.SHRINK)
                 y += 1
             if i[1] in instr_gui.instrument_window_map:
                 b.pack_start(gtk.HSeparator(), False, False)
@@ -315,35 +291,6 @@ class MainWindow(gtk.Window):
         while self.nb.get_n_pages() > 1:
             self.nb.remove_page(self.nb.get_n_pages() - 1)
             
-    def edit_effect_clicked(self, button, opath, instr, output):
-        if opath in self.path_popups:
-            self.path_popups[opath].present()
-            return
-        engine = cbox.GetThings(opath + "/status", ['insert_engine'], []).insert_engine
-        wclass = fx_gui.effect_window_map[engine]
-        popup = wclass(instr, output, self, "%s/engine" % opath)
-        popup.show_all()
-        popup.present()
-        self.path_popups[opath] = popup
-            
-    def fx_engine_changed(self, combo, opath):
-        if opath in self.path_popups:
-            self.path_popups[opath].destroy()
-            del self.path_popups[opath]
-            
-        engine = combo.get_model()[combo.get_active()][0]
-        cbox.do_cmd(opath + '/insert_engine', None, [engine])
-        fx_engine, fx_preset, fx_edit = self.path_widgets[opath]
-        fx_preset.set_model(self.fxpreset_ls[engine])
-        fx_preset.set_active(0)
-        fx_edit.set_sensitive(engine in fx_gui.effect_window_map)
-        
-    def fx_preset_changed(self, combo, opath):
-        if combo.get_active() >= 0:
-            cbox.do_cmd(opath + '/insert_preset', None, [combo.get_model()[combo.get_active()][0]])
-        if opath in self.path_popups:
-            self.path_popups[opath].refresh()
-        
     def update(self):
         cbox.do_cmd("/on_idle", None, [])
         master = cbox.GetThings("/master/status", ['pos', 'tempo', 'timesig'], [])
@@ -351,9 +298,6 @@ class MainWindow(gtk.Window):
         self.timesig_info.set_markup("%s/%s" % tuple(master.timesig))
         self.tempo_adj.set_value(master.tempo)
         return True
-    
-    def on_effect_popup_close(self, popup):
-        del self.path_popups[popup.path[0:-7]]
 
 def do_quit(window):
     gtk.main_quit()

@@ -65,13 +65,19 @@ def standard_vscroll_window(width, height, content = None):
         scroller.add_with_viewport(content)
     return scroller
 
-def standard_combo(list_store, active_item = None):
-    cb = gtk.ComboBox(list_store)
+def standard_combo(model, active_item = None, column = 0, active_item_lookup = None, lookup_column = None, width = None):
+    cb = gtk.ComboBox(model)
+    if active_item_lookup is not None:
+        if lookup_column is None:
+            lookup_column = column
+        active_item = ls_index(model, active_item_lookup, column)
     if active_item is not None:
         cb.set_active(active_item)
     cell = gtk.CellRendererText()
+    if width is not None:
+        cb.set_size_request(width, -1)
     cb.pack_start(cell, True)
-    cb.add_attribute(cell, 'text', 0)
+    cb.add_attribute(cell, 'text', column)
     return cb
     
 def ls_index(list_store, value, column):
