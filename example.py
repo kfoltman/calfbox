@@ -265,10 +265,10 @@ class MainWindow(gtk.Window):
                 
                 if not is_aux:
                     cb = standard_combo(outputs_ls, odata.output - 1)
-                    cb.connect('changed', combo_value_changed, opath + '/output', 1)
+                    cb.connect('changed', combo_value_changed, cbox.VarPath(opath + '/output'), 1)
                 else:
                     cb = standard_combo(auxbus_ls, ls_index(auxbus_ls, odata.bus, 1))
-                    cb.connect('changed', combo_value_changed_use_column, opath + '/bus', 1)
+                    cb.connect('changed', combo_value_changed_use_column, cbox.VarPath(opath + '/bus'), 1)
                 t.attach(cb, 1, 2, y, y + 1, gtk.SHRINK, gtk.SHRINK)
                                     
                 adj = gtk.Adjustment(odata.gain, -96, 24, 1, 6, 0)
