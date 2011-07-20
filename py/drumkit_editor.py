@@ -261,19 +261,22 @@ class EditorDialog(gtk.Dialog):
         combo.connect('changed', lambda cb: self.tree.files_model.refresh(cb.get_model()[cb.get_active()][1]))
         combo.set_active(0)
         sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
         sw.add(self.tree)
         
         left_box = gtk.VBox(spacing = 5)
         left_box.pack_start(combo, False, False)
         left_box.pack_start(sw)
         self.hbox.pack_start(left_box, True, True)
-        sw.set_size_request(240, -1)
+        sw.set_size_request(200, -1)
         
         self.pads = PadTable(self, self.bank_model, 4, 4)
         self.hbox.pack_start(self.pads, True, True)
         
         right_box = gtk.VBox(spacing = 5)
         sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
+        sw.set_size_request(240, 150)
         sw.add(self.layer_list)
         right_box.pack_start(sw, True, True)
         right_box.pack_start(self.layer_editor, True, True)
