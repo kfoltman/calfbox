@@ -96,7 +96,7 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
     {
         if (!output->insert)
         {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The instrument %s has no insert effect on this outut", instr->module->instance_name);
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The instrument %s has no insert effect on this output", instr->module->instance_name);
             return FALSE;
         }
         if (!output->insert->cmd_target.process_cmd)
