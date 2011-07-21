@@ -62,6 +62,8 @@ class SFZRegion(object):
     fileg_decay = 0.001
     fileg_sustain = 100
     fileg_release = 0.1
+    lovel = 1
+    hivel = 127
 
 class KeySampleModel(object):
     def __init__(self, key, sample, filename):
@@ -143,6 +145,8 @@ class LayerEditor(gtk.VBox):
         SliderRow("Pan", "pan", -100, 100),
         SliderRow("Tune", "tune", -100, 100),
         IntSliderRow("Transpose", "transpose", -48, 48),
+        IntSliderRow("Low velocity", "lovel", 1, 127),
+        IntSliderRow("High velocity", "hivel", 1, 127),
         MappedSliderRow("Amp Attack", "ampeg_attack", env_mapper),
         MappedSliderRow("Amp Hold", "ampeg_hold", env_mapper),
         MappedSliderRow("Amp Decay", "ampeg_decay", env_mapper),
