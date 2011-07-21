@@ -150,9 +150,26 @@ class FBRWindow(EffectWindow):
             self.ready_label.set_text("Not Ready")
         return True
 
+class FXChainWindow(EffectWindow):
+    effect_name = "Effect chain"
+    
+    def __init__(self, instrument, main_window, path):
+        EffectWindow.__init__(self, instrument, main_window, path)
+        values = cbox.GetThings(self.path + "/status", ["*module"], []).module
+        t = gtk.Table(len(values) + 1, 3)
+        self.choosers = []
+        for i in range(1, len(values) + 1):
+            engine, preset = values[i - 1]
+            chooser = InsertEffectChooser("%s/module/%s" % (self.path, i), "%s: slot %s" % (self.get_title(), i), engine, preset, self.main_window)
+            t.attach(chooser.fx_engine, 0, 1, i, i + 1, 0, gtk.SHRINK)
+            t.attach(chooser.fx_preset, 1, 2, i, i + 1, 0, gtk.SHRINK)
+            t.attach(chooser.fx_edit, 2, 3, i, i + 1, 0, gtk.SHRINK)
+            self.choosers.append(chooser)
+        self.add(t)
+
 #################################################################################################################################
 
-effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor']
+effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor', 'fxchain']
 
 effect_window_map = {
     'phaser': PhaserWindow,
@@ -163,6 +180,7 @@ effect_window_map = {
     'parametric_eq': EQWindow,
     'tone_control': ToneControlWindow,
     'compressor': CompressorWindow,
+    'fxchain': FXChainWindow,
 }
 
 #################################################################################################################################

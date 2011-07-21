@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -35,6 +36,91 @@ struct fxchain_module
     struct cbox_module **modules;
     int module_count;
 };
+
+static gboolean fxchain_module_process_cmd(struct fxchain_module *m, int modindex, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
+{
+    struct cbox_module **psm = &m->modules[modindex];
+    struct cbox_module *sm = *psm;
+    if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        if (!(cbox_execute_on(fb, NULL, "/insert_engine", "s", error, sm ? sm->engine_name : "") &&
+            cbox_execute_on(fb, NULL, "/insert_preset", "s", error, sm ? sm->instance_name : "")))
+            return FALSE;
+        return TRUE;
+    }
+    if (!strcmp(subcmd, "/insert_preset") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_module *effect = cbox_module_new_from_fx_preset((const char *)cmd->arg_values[0], error);
+        if (!effect)
+            return FALSE;
+        cbox_rt_swap_pointers(app.rt, (void **)psm, effect);
+        return TRUE;
+    }
+    if (!strcmp(subcmd, "/insert_engine") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_module *effect = NULL;
+        if (*(const char *)cmd->arg_values[0])
+        {
+            struct cbox_module_manifest *manifest = cbox_module_manifest_get_by_name((const char *)cmd->arg_values[0]);
+            if (!manifest)
+            {
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No effect engine '%s'", (const char *)cmd->arg_values[0]);
+                return FALSE;
+            }
+            effect = cbox_module_manifest_create_module(manifest, NULL, cbox_io_get_sample_rate(&app.io), "unnamed", error);
+            if (!effect)
+                return FALSE;
+        }
+        cbox_rt_swap_pointers(app.rt, (void **)psm, effect);
+        return TRUE;
+    }
+    if (!strncmp(subcmd, "/engine/", 8))
+    {
+        if (!sm)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine on module %d in path '%s'", 1 + modindex, cmd->command);
+            return FALSE;
+        }
+        if (!sm->cmd_target.process_cmd)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", sm->engine_name);
+            return FALSE;
+        }
+        return cbox_execute_sub(&sm->cmd_target, fb, cmd, subcmd + 7, error);
+    }
+    return cbox_set_command_error(error, cmd);
+}
+
+gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct fxchain_module *m = (struct fxchain_module *)ct->user_data;
+    const char *subcommand = NULL;
+    int index = 0;
+    
+    //EFFECT_PARAM("/module_count", "i", stages, int, , 1, 12) else
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (int i = 0; i < m->module_count; i++)
+        {
+            if (!cbox_execute_on(fb, NULL, "/module", "ss", error, m->modules[i]->engine_name, m->modules[i]->instance_name))
+                return FALSE;
+        }
+        return TRUE;
+    }
+    else if (cbox_parse_path_part(cmd, "/module/", &subcommand, &index, 1, m->module_count, error))
+    {
+        if (!subcommand)
+            return FALSE;
+        return fxchain_module_process_cmd(m, index - 1, fb, cmd, subcommand, error);
+    }
+    else
+        return cbox_set_command_error(error, cmd);
+    return TRUE;
+}
 
 void fxchain_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
@@ -79,14 +165,14 @@ struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, int
             break;
     }
     fx_count = i;
-    if (!fx_count)
+    if (cfg_section && !fx_count)
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No effects defined");
         return NULL;
     }
     
     struct fxchain_module *m = malloc(sizeof(struct fxchain_module));
-    cbox_module_init(&m->module, m, 2, 2, NULL);
+    cbox_module_init(&m->module, m, 2, 2, fxchain_process_cmd);
     m->module.process_event = fxchain_process_event;
     m->module.process_block = fxchain_process_block;
     m->modules = malloc(sizeof(struct cbox_module *) * fx_count);
