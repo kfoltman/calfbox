@@ -113,6 +113,8 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
 {
     if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
     {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
         if (!(cbox_execute_on(fb, NULL, "/gain_linear", "f", error, output->gain) &&
             cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
             cbox_execute_on(fb, NULL, "/bus", "s", error, instr->aux_output_names[id] ? instr->aux_output_names[id] : "") &&
