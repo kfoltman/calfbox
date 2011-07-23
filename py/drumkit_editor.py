@@ -2,9 +2,12 @@ import cbox
 import glob
 import os
 from gui_tools import *
+import sfzparser
 
 #sample_dir = "/media/resources/samples/dooleydrums/"
 sample_dir = cbox.Config.get("init", "sample_dir")
+
+####################################################################################################################################################
 
 class SampleDirsModel(gtk.ListStore):
     def __init__(self):
@@ -12,6 +15,8 @@ class SampleDirsModel(gtk.ListStore):
         for entry in cbox.Config.keys("sample_dirs"):
             path = cbox.Config.get("sample_dirs", entry)
             self.append((entry, path))
+
+####################################################################################################################################################
 
 class SampleFilesModel(gtk.ListStore):
     def __init__(self):
@@ -27,6 +32,8 @@ class SampleFilesModel(gtk.ListStore):
                 continue
             self.append((f,os.path.basename(f)))
 
+####################################################################################################################################################
+
 class KeyModelPath(object):
     def __init__(self, controller, var = None):
         self.controller = controller
@@ -38,32 +45,37 @@ class KeyModelPath(object):
         return KeyModelPath(self.controller, var)
     def set(self, value):
         model = self.controller.get_current_layer_model()
-        oldval = getattr(model, self.var)
-        setattr(model, self.var, value)
+        oldval = model.attribs[self.var]
+        model.attribs[self.var] = value
         if value != oldval:
             print "%s: set %s to %s" % (self.controller, self.var, value)
             self.controller.update_kit_later()
 
-class SFZRegion(object):
-    volume = 0
-    pan = 0
-    ampeg_attack = 0.001
-    ampeg_hold = 0.001
-    ampeg_decay = 0.001
-    ampeg_sustain = 100
-    ampeg_release = 0.1
-    tune = 0
-    transpose = 0
-    cutoff = 22000
-    resonance = 0.7
-    fileg_depth = 0
-    fileg_attack = 0.001
-    fileg_hold = 0.001
-    fileg_decay = 0.001
-    fileg_sustain = 100
-    fileg_release = 0.1
-    lovel = 1
-    hivel = 127
+####################################################################################################################################################
+
+layer_attribs = {
+    'volume' : 0.0,
+    'pan' : 0.0,
+    'ampeg_attack' : 0.001,
+    'ampeg_hold' : 0.001,
+    'ampeg_decay' : 0.001,
+    'ampeg_sustain' : 100,
+    'ampeg_release' : 0.1,
+    'tune' : 0.0,
+    'transpose' : 0,
+    'cutoff' : 22000.0,
+    'resonance' : 0.7,
+    'fileg_depth' : 0.0,
+    'fileg_attack' : 0.001,
+    'fileg_hold' : 0.001,
+    'fileg_decay' : 0.001,
+    'fileg_sustain' : 100.0,
+    'fileg_release' : 0.1,
+    'lovel' : 1,
+    'hivel' : 127,
+}
+
+####################################################################################################################################################
 
 class KeySampleModel(object):
     def __init__(self, key, sample, filename):
@@ -71,9 +83,7 @@ class KeySampleModel(object):
         self.sample = sample
         self.filename = filename
         self.mode = "one_shot"
-        for key in dir(SFZRegion):
-            if not key.startswith("__"):
-                setattr(self, key, getattr(SFZRegion, key))
+        self.attribs = layer_attribs.copy()
     def set_sample(self, sample, filename):
         self.sample = sample
         self.filename = filename
@@ -81,10 +91,12 @@ class KeySampleModel(object):
         if self.filename == '':
             return ""
         s = "<region> key=%d sample=%s loop_mode=%s" % (self.key, self.filename, self.mode)
-        s += "".join([" %s=%s" % (key, getattr(self, key)) for key in dir(SFZRegion) if not key.startswith("__")])
+        s += "".join([" %s=%s" % item for item in self.attribs.iteritems()])
         return s + "\n"
     def to_markup(self):
         return "<small>%s</small>" % self.sample
+
+####################################################################################################################################################
 
 class KeyModel(gtk.ListStore):
     def __init__(self):
@@ -94,15 +106,44 @@ class KeyModel(gtk.ListStore):
     def to_markup(self):
         return "\n".join([ksm.to_markup() for name, ksm in self])
 
+####################################################################################################################################################
+
 class BankModel(dict):
     def __init__(self):
-        for b in range(36, 36 + 16):
-            self[b] = KeyModel()
+        dict.__init__(self)
+        self.clear()
     def to_sfz(self):
         s = ""
         for key in self:
             s += self[key].to_sfz()
         return s
+    def clear(self):
+        dict.clear(self)
+        for b in range(36, 36 + 16):
+            self[b] = KeyModel()
+    def from_sfz(self, data, path):
+        self.clear()
+        sfz = sfzparser.SFZ()
+        sfz.parse(data)
+        for r in sfz.regions:
+            rdata = r.merged()
+            if ('key' in rdata) and ('sample' in rdata) and (rdata['sample'] != ''):
+                key = int(rdata['key'])
+                sample = rdata['sample']
+                sample_short = os.path.basename(sample)
+                if key in self:
+                    ksm = KeySampleModel(key, sample_short, sfzparser.find_sample_in_path(path, sample))
+                    for k, v in rdata.iteritems():
+                        if k in ksm.attribs:
+                            if type(layer_attribs[k]) is float:
+                                ksm.attribs[k] = float(v)
+                            elif type(layer_attribs[k]) is int:
+                                ksm.attribs[k] = int(v)
+                            else:
+                                ksm.attribs[k] = v
+                    self[key].append((sample_short, ksm))
+
+####################################################################################################################################################
 
 class LayerListView(gtk.TreeView):
     def __init__(self, controller):
@@ -115,6 +156,8 @@ class LayerListView(gtk.TreeView):
         #self.connect('drag-data-get', self.drag_data_get)
     def cursor_changed(self, w):
         self.controller.on_layer_changed()
+
+####################################################################################################################################################
 
 class LayerEditor(gtk.VBox):
     def __init__(self, controller, bank_model):
@@ -137,6 +180,7 @@ class LayerEditor(gtk.VBox):
             self.name_widget.set_text("")
         else:
             self.name_widget.set_text(data.sample)
+            data = data.attribs
         for r in self.refreshers:
             r(data)
 
@@ -162,6 +206,8 @@ class LayerEditor(gtk.VBox):
         MappedSliderRow("Flt Release", "fileg_release", env_mapper),
     ]
     
+####################################################################################################################################################
+
 class PadButton(gtk.RadioButton):
     def __init__(self, controller, bank_model, key):
         gtk.RadioButton.__init__(self, use_underline = False)
@@ -188,6 +234,8 @@ class PadButton(gtk.RadioButton):
             self.get_child().set_markup(data.to_markup())
             self.get_child().set_line_wrap(True)
 
+####################################################################################################################################################
+
 class PadTable(gtk.Table):
     def __init__(self, controller, bank_model, rows, columns):
         gtk.Table.__init__(self, rows, columns, True)
@@ -204,6 +252,11 @@ class PadTable(gtk.Table):
                 group = b
                 self.attach(a, c, c + 1, r, r + 1)
                 self.keys[key] = b
+    def refresh(self):
+        for pad in self.keys.values():
+            pad.update_label()
+
+####################################################################################################################################################
 
 class FileView(gtk.TreeView):
     def __init__(self):
@@ -231,7 +284,9 @@ class FileView(gtk.TreeView):
             c = cursor[0][0]
             fr = self.files_model[c]
             selection.set('text/plain', 8, str(fr[1]+"|"+fr[0]))
-        
+
+####################################################################################################################################################
+
 class EditorDialog(gtk.Dialog):
     def __init__(self, parent):
         gtk.Dialog.__init__(self, "Drum kit editor", parent, gtk.DIALOG_MODAL, 
@@ -240,7 +295,9 @@ class EditorDialog(gtk.Dialog):
 
         self.menu_bar = gtk.MenuBar()
         self.menu_bar.append(create_menu("_Kit", [
-            ("_Save as...", self.on_save_as),
+            ("_New", self.on_kit_new),
+            ("_Open...", self.on_kit_open),
+            ("_Save as...", self.on_kit_save_as),
             ("_Close", lambda w: self.response(gtk.RESPONSE_OK)),
         ]))
         self.menu_bar.append(create_menu("_Layer", [
@@ -309,11 +366,14 @@ class EditorDialog(gtk.Dialog):
             self.layer_list.set_cursor(len(self.layer_list.get_model()) - 1)
         #    self.pad_editor.refresh()
         
-    def on_pad_selected(self, widget):
-        self.current_pad = widget
+    def refresh_layers(self):
         self.layer_list.set_model(self.bank_model[self.current_pad.key])
         self.layer_list.set_cursor(0)
         self.layer_editor.refresh()
+        
+    def on_pad_selected(self, widget):
+        self.current_pad = widget
+        self.refresh_layers()
         
     def on_layer_changed(self):
         self.layer_editor.refresh()
@@ -323,8 +383,8 @@ class EditorDialog(gtk.Dialog):
             return None
         model = self.layer_list.get_model()
         model.remove(model.get_iter(self.layer_list.get_cursor()[0]))
-        self.layer_editor.refresh()
         self.current_pad.update_label()
+        self.layer_editor.refresh()
         self.update_kit()
     
     def get_current_layer_model(self):
@@ -332,9 +392,34 @@ class EditorDialog(gtk.Dialog):
             return None
         return self.layer_list.get_model()[self.layer_list.get_cursor()[0]][1]
 
-    def on_save_as(self, widget):
+    def on_kit_new(self, widget):
+        self.bank_model.from_sfz('', '')
+        self.pads.refresh()
+        self.refresh_layers()
+        self.update_kit()
+
+    def on_kit_open(self, widget):
+        dlg = gtk.FileChooserDialog('Open a pad bank', self, gtk.FILE_CHOOSER_ACTION_OPEN,
+            (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_APPLY))
+        dlg.add_filter(standard_filter(["*.sfz", "*.SFZ"], "SFZ files"))
+        dlg.add_filter(standard_filter(["*"], "All files"))
+        try:
+            if dlg.run() == gtk.RESPONSE_APPLY:
+                sfz_data = file(dlg.get_filename(), "r").read()
+                self.bank_model.from_sfz(sfz_data, dlg.get_current_folder())
+            self.pads.refresh()
+            self.refresh_layers()
+            self.update_kit()
+        finally:
+            dlg.destroy()
+
+    def on_kit_save_as(self, widget):
         dlg = gtk.FileChooserDialog('Save a pad bank', self, gtk.FILE_CHOOSER_ACTION_SAVE, 
             (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_APPLY))
-        if dlg.run() == gtk.RESPONSE_APPLY:
-            file(dlg.get_filename(), "w").write(self.bank_model.to_sfz())
-        dlg.destroy()
+        dlg.add_filter(standard_filter(["*.sfz", "*.SFZ"], "SFZ files"))
+        dlg.add_filter(standard_filter(["*"], "All files"))
+        try:
+            if dlg.run() == gtk.RESPONSE_APPLY:
+                file(dlg.get_filename(), "w").write(self.bank_model.to_sfz())
+        finally:
+            dlg.destroy()

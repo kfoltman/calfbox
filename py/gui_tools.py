@@ -169,10 +169,18 @@ class TableRowWidget:
         return self.kwargs[name] if name in self.kwargs else def_value
     def create_label(self):
         return bold_label(self.label)
+    def has_attr(self, values):
+        if type(values) is dict:
+            return self.name in values
+        return hasattr(values, self.name)
+    def get_attr(self, values):
+        if type(values) is dict:
+            return values[self.name]
+        return getattr(values, self.name)
     def get_value(self, values, vpath):
         if len(vpath.args) == 1:
-            return getattr(values, self.name)[vpath.args[0]]
-        return getattr(values, self.name)
+            return self.get_attr(values)[vpath.args[0]]
+        return self.get_attr(values)
     def add_row(self, table, row, vpath, values):
         table.attach(self.create_label(), 0, 1, row, row + 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         widget, refresher = self.create_widget(vpath)
@@ -181,7 +189,7 @@ class TableRowWidget:
             refresher(values)
         return refresher
     def update_sensitive(self, widget, values):
-        sensitive = (values is not None) and (self.get_with_default('setter', 0) is not None) and hasattr(values, self.name)
+        sensitive = (values is not None) and (self.get_with_default('setter', 0) is not None) and self.has_attr(values)
         widget.set_sensitive(sensitive)
         return sensitive
 
