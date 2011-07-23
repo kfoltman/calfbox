@@ -468,6 +468,24 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return TRUE;
     }
     else
+    if (!strcmp(obj, "play_drum_pattern") && !strcmp(cmd->arg_types, "s"))
+    {
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load((const char *)cmd->arg_values[0], 1));
+        return TRUE;
+    }
+    else
+    if (!strcmp(obj, "play_drum_track") && !strcmp(cmd->arg_types, "s"))
+    {
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track((const char *)cmd->arg_values[0], 1));
+        return TRUE;
+    }
+    else
+    if (!strcmp(obj, "stop_pattern") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_rt_set_pattern_and_destroy(app.rt, NULL);
+        return TRUE;
+    }
+    else
     if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))
     {
         g_message("Print: %s", (const char *)cmd->arg_values[0]);

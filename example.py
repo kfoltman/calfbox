@@ -40,6 +40,19 @@ class AddLayerDialog(SelectObjectDialog):
             title = s["title"]
             model.append((s.name[6:], "Layer", s.name, title))
 
+class PlayPatternDialog(SelectObjectDialog):
+    title = "Play a drum pattern"
+    def __init__(self, parent):
+        SelectObjectDialog.__init__(self, parent)
+    def update_model(self, model):
+        model.append((None, "Stop", "", ""))
+        for s in cbox.Config.sections("drumpattern:"):
+            title = s["title"]
+            model.append((s.name[12:], "Pattern", s.name, title))
+        for s in cbox.Config.sections("drumtrack:"):
+            title = s["title"]
+            model.append((s.name[10:], "Track", s.name, title))
+
 in_channels_ls = gtk.ListStore(gobject.TYPE_INT, gobject.TYPE_STRING)
 in_channels_ls.append((0, "All"))
 out_channels_ls = gtk.ListStore(gobject.TYPE_INT, gobject.TYPE_STRING)
@@ -69,6 +82,7 @@ class MainWindow(gtk.Window):
         ]))
         self.menu_bar.append(create_menu("_Tools", [
             ("_Drum Kit Editor", self.tools_drumkit_editor),
+            ("_Play drum pattern", self.tools_play_drum_pattern),
         ]))
         
         self.vbox.pack_start(self.menu_bar, False, False)
@@ -203,6 +217,21 @@ class MainWindow(gtk.Window):
         dlg = drumkit_editor.EditorDialog(self)
         dlg.run()
         dlg.destroy()
+        
+    def tools_play_drum_pattern(self, w):
+        d = PlayPatternDialog(self)
+        response = d.run()
+        try:
+            if response == gtk.RESPONSE_OK:
+                row = d.get_selected_object()
+                if row[1] == 'Pattern':
+                    cbox.do_cmd("/play_drum_pattern", None, [row[0]])
+                elif row[1] == 'Track':
+                    cbox.do_cmd("/play_drum_track", None, [row[0]])
+                elif row[1] == 'Stop':
+                    cbox.do_cmd("/stop_pattern", None, [])
+        finally:
+            d.destroy()
 
     def refresh_instrument_pages(self):
         self.delete_instrument_pages()
