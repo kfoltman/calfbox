@@ -23,7 +23,6 @@ class SampleFilesModel(gtk.ListStore):
         gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_STRING)
         
     def refresh(self, sample_dir):
-        print sample_dir
         self.clear()
         self.append(("","<empty>"))
         filelist = glob.glob("%s/*" % sample_dir)
