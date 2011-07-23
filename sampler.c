@@ -389,7 +389,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                 v->send2bus = 0;
             v->send1gain = l->send1gain;
             v->send2gain = l->send2gain;
-            if (l->exclusive_group >= 0 && exgroupcount < MAX_RELEASED_GROUPS)
+            if (l->exclusive_group >= 1 && exgroupcount < MAX_RELEASED_GROUPS)
             {
                 gboolean found = FALSE;
                 for (int j = 0; j < exgroupcount; j++)
@@ -913,8 +913,8 @@ void sampler_layer_init(struct sampler_layer *l)
     l->fil_veltrack = 0;
     l->fil_keytrack = 0;
     l->fil_keycenter = 60;
-    l->exclusive_group = -1;
-    l->off_by = -1;
+    l->exclusive_group = 0;
+    l->off_by = 0;
     l->output_pair_no = 0;
     l->send1bus = 1;
     l->send2bus = 2;

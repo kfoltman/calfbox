@@ -73,8 +73,8 @@ layer_attribs = {
     'fileg_release' : 0.1,
     'lovel' : 1,
     'hivel' : 127,
-    'group' : -1,
-    'off_by' : -1,
+    'group' : 0,
+    'off_by' : 0,
 }
 
 ####################################################################################################################################################
@@ -206,8 +206,8 @@ class LayerEditor(gtk.VBox):
         MappedSliderRow("Flt Decay", "fileg_decay", env_mapper),
         SliderRow("Flt Sustain", "fileg_sustain", 0, 100),
         MappedSliderRow("Flt Release", "fileg_release", env_mapper),
-        IntSliderRow("Group", "group", -1, 15),
-        IntSliderRow("Off by group", "off_by", -1, 15),
+        IntSliderRow("Group", "group", 0, 15),
+        IntSliderRow("Off by group", "off_by", 0, 15),
     ]
     
 ####################################################################################################################################################
