@@ -455,6 +455,19 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return TRUE;
     }
     else
+    if (!strcmp(obj, "play_note") && !strcmp(cmd->arg_types, "iii"))
+    {
+        int channel = *(int *)cmd->arg_values[0];
+        int note = *(int *)cmd->arg_values[1];
+        int velocity = *(int *)cmd->arg_values[2];
+        struct cbox_midi_buffer buf;
+        cbox_midi_buffer_init(&buf);
+        cbox_midi_buffer_write_inline(&buf, 0, 0x90 + ((channel - 1) & 15), note & 127, velocity & 127);
+        cbox_midi_buffer_write_inline(&buf, 1, 0x80 + ((channel - 1) & 15), note & 127, velocity & 127);
+        cbox_rt_send_events(app.rt, &buf);
+        return TRUE;
+    }
+    else
     if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))
     {
         g_message("Print: %s", (const char *)cmd->arg_values[0]);

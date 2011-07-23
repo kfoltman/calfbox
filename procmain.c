@@ -500,6 +500,52 @@ struct cbox_midi_pattern *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_mi
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+struct send_events_command
+{
+    struct cbox_rt *rt;
+    
+    struct cbox_midi_buffer *buffer;
+    int pos;
+    int time_delta;
+};
+
+static int send_events_command_execute(void *user_data)
+{
+    struct send_events_command *cmd = user_data;
+    
+    // all done?
+    if (cmd->pos >= cbox_midi_buffer_get_count(cmd->buffer))
+        return 1;
+    
+    int last_time = cbox_midi_buffer_get_last_event_time(&cmd->rt->midibuf_aux);
+    while (cmd->pos < cbox_midi_buffer_get_count(cmd->buffer))
+    {
+        struct cbox_midi_event *event = cbox_midi_buffer_get_event(cmd->buffer, cmd->pos);
+        int time = event->time - cmd->time_delta;
+        if (time < last_time)
+            time = last_time;
+        cbox_midi_buffer_copy_event(&cmd->rt->midibuf_aux, event, time);
+        cmd->pos++;
+    }
+    cmd->time_delta += cmd->rt->io->buffer_size;
+    
+    return (cmd->pos >= cbox_midi_buffer_get_count(cmd->buffer)) ? 1 : 0;
+}
+
+void cbox_rt_send_events(struct cbox_rt *rt, struct cbox_midi_buffer *buffer)
+{
+    if (cbox_midi_buffer_get_count(buffer) == 0)
+        return;
+    
+    static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = send_events_command_execute, .cleanup = NULL };
+    
+    struct send_events_command cmd = { rt, buffer, 0, 0 };
+    
+    cbox_rt_execute_cmd_sync(rt, &def, &cmd);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 struct swap_pointers_command
 {
     void **ptr;

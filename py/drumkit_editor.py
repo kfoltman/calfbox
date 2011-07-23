@@ -224,6 +224,7 @@ class PadButton(gtk.RadioButton):
         self.drag_dest_set(gtk.DEST_DEFAULT_ALL, [("text/plain", 0, 1)], gtk.gdk.ACTION_COPY)
         self.connect('drag_data_received', self.drag_data_received)
         self.connect('toggled', lambda widget: widget.controller.on_pad_selected(widget) if widget.get_active() else None)
+        self.connect('pressed', self.on_clicked)
     def drag_data_received(self, widget, context, x, y, selection, info, etime):
         sample, filename = selection.data.split("|")
         self.bank_model[self.key].append((sample, KeySampleModel(self.key, sample, filename)))
@@ -237,6 +238,8 @@ class PadButton(gtk.RadioButton):
             self.set_label("-")
             self.get_child().set_markup(data.to_markup())
             self.get_child().set_line_wrap(True)
+    def on_clicked(self, w):
+        cbox.do_cmd('/play_note', None, [1, self.key, 127])
 
 ####################################################################################################################################################
 
