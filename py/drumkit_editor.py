@@ -59,7 +59,7 @@ layer_attribs = {
     'ampeg_attack' : 0.001,
     'ampeg_hold' : 0.001,
     'ampeg_decay' : 0.001,
-    'ampeg_sustain' : 100,
+    'ampeg_sustain' : 100.0,
     'ampeg_release' : 0.1,
     'tune' : 0.0,
     'transpose' : 0,
@@ -73,6 +73,8 @@ layer_attribs = {
     'fileg_release' : 0.1,
     'lovel' : 1,
     'hivel' : 127,
+    'group' : -1,
+    'off_by' : -1,
 }
 
 ####################################################################################################################################################
@@ -138,7 +140,7 @@ class BankModel(dict):
                             if type(layer_attribs[k]) is float:
                                 ksm.attribs[k] = float(v)
                             elif type(layer_attribs[k]) is int:
-                                ksm.attribs[k] = int(v)
+                                ksm.attribs[k] = int(float(v))
                             else:
                                 ksm.attribs[k] = v
                     self[key].append((sample_short, ksm))
@@ -204,6 +206,8 @@ class LayerEditor(gtk.VBox):
         MappedSliderRow("Flt Decay", "fileg_decay", env_mapper),
         SliderRow("Flt Sustain", "fileg_sustain", 0, 100),
         MappedSliderRow("Flt Release", "fileg_release", env_mapper),
+        IntSliderRow("Group", "group", -1, 15),
+        IntSliderRow("Off by group", "off_by", -1, 15),
     ]
     
 ####################################################################################################################################################
@@ -337,10 +341,15 @@ class EditorDialog(gtk.Dialog):
         right_box = gtk.VBox(spacing = 5)
         sw = gtk.ScrolledWindow()
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
-        sw.set_size_request(240, 150)
+        sw.set_size_request(320, 100)
+        sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
         sw.add(self.layer_list)
         right_box.pack_start(sw, True, True)
-        right_box.pack_start(self.layer_editor, True, True)
+        sw = gtk.ScrolledWindow()
+        sw.set_size_request(320, 200)
+        sw.set_policy(gtk.POLICY_NEVER, gtk.POLICY_ALWAYS)
+        sw.add_with_viewport(self.layer_editor)
+        right_box.pack_start(sw, True, True)
         self.hbox.pack_start(right_box, True, True)
         
         self.vbox.pack_start(self.hbox)
