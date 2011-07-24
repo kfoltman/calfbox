@@ -199,14 +199,15 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
             arg_values[i] = PyString_AsString(value);
         }
         else
-        if (PyObject_CheckBuffer(value))
+        if (PyObject_CheckReadBuffer(value))
         {
-            Py_buffer view;
-            if (0 == PyObject_GetBuffer(value, &view, PyBUF_SIMPLE))
+            const void *buf;
+            ssize_t len;
+            if (0 == PyObject_AsReadBuffer(value, &buf, &len))
             {
                 struct cbox_blob *blob = malloc(sizeof(struct cbox_blob));
-                blob->data = view.buf;
-                blob->size= view.len;
+                blob->data = (void *)buf;
+                blob->size = len;
                 arg_types[i] = 'b';
                 arg_values[i] = blob;
                 free_blobs = TRUE;
@@ -215,7 +216,10 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
                 arg_types[i] = 'N';
         }
         else
+        {
+            g_error("Cannot serialize Python type '%s'", PyString_AsString(PyObject_Str((PyObject *)value->ob_type)));
             assert(0);
+        }
     }
     arg_types[len] = '\0';
     
