@@ -27,6 +27,11 @@ int ppqn_to_samples(struct cbox_master *master, int time)
     return (int)(master->srate * 60.0 * time / (master->tempo * PPQN));
 }
 
+int samples_to_ppqn(struct cbox_master *master, int time)
+{
+    return (int)(master->tempo * PPQN * time / (master->srate * 60.0));
+}
+
 static inline void accumulate_event(struct cbox_midi_playback_active_notes *notes, const struct cbox_midi_event *event)
 {
     if (event->size != 3)
@@ -58,25 +63,26 @@ void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_b
         {
             if (loop_end == -1)
                 break;
-            if (loop_end >= pb->time + nsamples)
+            if (loop_end >= pb->time_samples + nsamples)
                 break;
             pb->pos = 0;
-            pb->time -= loop_end; // may be negative, but that's OK
+            pb->time_samples -= loop_end; // may be negative, but that's OK
         }
         const struct cbox_midi_event *src = &pb->pattern->events[pb->pos];
         int srctime = ppqn_to_samples(pb->master, src->time);
-        if (srctime >= pb->time + nsamples)
+        if (srctime >= pb->time_samples + nsamples)
             break;
         int32_t time = 0;
-        if (srctime >= pb->time) // convert negative relative time to 0 time
-            time = srctime - pb->time;
+        if (srctime >= pb->time_samples) // convert negative relative time to 0 time
+            time = srctime - pb->time_samples;
         
         cbox_midi_buffer_copy_event(buf, src, time);
         if (pb->active_notes)
             accumulate_event(pb->active_notes, src);
         pb->pos++;
     }
-    pb->time += nsamples;
+    pb->time_samples += nsamples;
+    pb->time_ppqn = samples_to_ppqn(pb->master, pb->time_samples);
 }
 
 struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts)
@@ -105,12 +111,23 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts)
     return p;
 }
 
-void cbox_midi_pattern_playback_seek(struct cbox_midi_pattern_playback *pb, int time_ppqn)
+void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn)
 {
     int pos = 0;
     while (pos < pb->pattern->event_count && time_ppqn > pb->pattern->events[pos].time)
         pos++;
-    pb->time = ppqn_to_samples(pb->master, time_ppqn);
+    pb->time_ppqn = time_ppqn;
+    pb->time_samples = ppqn_to_samples(pb->master, time_ppqn);
+    pb->pos = pos;
+}
+
+void cbox_midi_pattern_playback_seek_samples(struct cbox_midi_pattern_playback *pb, int time_samples)
+{
+    int pos = 0;
+    while (pos < pb->pattern->event_count && time_samples > ppqn_to_samples(pb->master, pb->pattern->events[pos].time))
+        pos++;
+    pb->time_ppqn = samples_to_ppqn(pb->master, time_samples);
+    pb->time_samples = time_samples;
     pb->pos = pos;
 }
 

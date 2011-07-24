@@ -40,7 +40,7 @@ struct cbox_midi_pattern_playback
     struct cbox_midi_pattern *pattern;
     struct cbox_master *master;
     int pos;
-    int time;
+    int time_samples, time_ppqn;
     struct cbox_midi_playback_active_notes *active_notes;
 };
 
@@ -56,7 +56,8 @@ extern void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox
 
 extern void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern);
 
-extern void cbox_midi_pattern_playback_seek(struct cbox_midi_pattern_playback *pb, int time_ppqn);
+extern void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn);
+extern void cbox_midi_pattern_playback_seek_samples(struct cbox_midi_pattern_playback *pb, int time_samples);
 
 extern void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes *notes);
 

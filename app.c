@@ -282,7 +282,7 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
 
 static void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_pattern *pattern)
 {
-    struct cbox_midi_pattern *old = cbox_rt_set_pattern(rt, pattern, 0);
+    struct cbox_midi_pattern *old = cbox_rt_set_pattern(rt, pattern, -1);
     if (old)
         cbox_midi_pattern_destroy(old);
 }

@@ -66,7 +66,8 @@ struct cbox_rt *cbox_rt_new()
     rt->mpb.pattern = NULL;
     rt->mpb.master = rt->master;
     rt->mpb.pos = 0;
-    rt->mpb.time = 0;
+    rt->mpb.time_ppqn = 0;
+    rt->mpb.time_samples = 0;
     rt->mpb.active_notes = &rt->active_notes;
     cbox_midi_playback_active_notes_init(&rt->active_notes);
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
@@ -482,7 +483,12 @@ static int set_pattern_command_execute(void *user_data)
     cmd->old_pattern = cmd->rt->mpb.pattern;
     cmd->rt->mpb.pattern = cmd->new_pattern;
     if (cmd->new_pattern)
-        cbox_midi_pattern_playback_seek(&cmd->rt->mpb, cmd->new_time_ppqn);
+    {
+        if (cmd->new_time_ppqn == -1)
+            cbox_midi_pattern_playback_seek_samples(&cmd->rt->mpb, cmd->rt->mpb.time_samples);
+        else
+            cbox_midi_pattern_playback_seek_ppqn(&cmd->rt->mpb, cmd->new_time_ppqn);
+    }
     
     return 1;
 }
