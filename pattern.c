@@ -426,6 +426,31 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_
     return p;
 }
 
+struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(const struct cbox_blob *blob, int length)
+{
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
+    
+    struct serialized_event {
+        int pos;
+        unsigned char len, cmd, byte1, byte2;
+    };
+    
+    struct serialized_event event;
+    for (size_t i = 0; i < blob->size; i += sizeof(event))
+    {
+        // not sure about alignment guarantees of Python buffers
+        memcpy(&event, ((uint8_t *)blob->data) + i, sizeof(event));
+        cbox_midi_pattern_maker_add(m, event.pos, event.cmd, event.byte1, event.byte2);
+    }
+    
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m);        
+    p->loop_end = length;
+    
+    cbox_midi_pattern_maker_destroy(m);
+    
+    return p;
+}
+
 void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes *notes)
 {
     notes->channels_active = 0;

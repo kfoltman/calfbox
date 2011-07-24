@@ -480,6 +480,12 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return TRUE;
     }
     else
+    if (!strcmp(obj, "play_blob") && !strcmp(cmd->arg_types, "bi"))
+    {
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_from_blob((const struct cbox_blob *)cmd->arg_values[0], *(int *)cmd->arg_values[1]));
+        return TRUE;
+    }
+    else
     if (!strcmp(obj, "stop_pattern") && !strcmp(cmd->arg_types, ""))
     {
         cbox_rt_set_pattern_and_destroy(app.rt, NULL);
