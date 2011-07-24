@@ -3,6 +3,7 @@ import gtk
 import glib
 import gobject
 import math
+import struct
 import sys
 
 sys.path = ["./py"] + sys.path
@@ -12,6 +13,7 @@ from gui_tools import *
 import fx_gui
 import instr_gui
 import drumkit_editor
+import drum_pattern_editor
 
 class SceneDialog(SelectObjectDialog):
     title = "Select a scene"
@@ -68,6 +70,7 @@ class MainWindow(gtk.Window):
         self.add(self.vbox)
         self.create()
         set_timer(self, 30, self.update)
+        self.drum_pattern_editor = None
 
     def create(self):
         self.menu_bar = gtk.MenuBar()
@@ -82,7 +85,8 @@ class MainWindow(gtk.Window):
         ]))
         self.menu_bar.append(create_menu("_Tools", [
             ("_Drum Kit Editor", self.tools_drumkit_editor),
-            ("_Play drum pattern", self.tools_play_drum_pattern),
+            ("_Play Drum Pattern", self.tools_play_drum_pattern),
+            ("_Edit Drum Pattern", self.tools_drum_pattern_editor),
         ]))
         
         self.vbox.pack_start(self.menu_bar, False, False)
@@ -232,6 +236,26 @@ class MainWindow(gtk.Window):
                     cbox.do_cmd("/stop_pattern", None, [])
         finally:
             d.destroy()
+
+    def tools_drum_pattern_editor(self, w):
+        if self.drum_pattern_editor is None:
+            self.drum_pattern_editor = drum_pattern_editor.DrumSeqWindow()
+            self.drum_pattern_editor.set_title("Drum pattern editor")
+            self.drum_pattern_editor.show_all()
+            self.drum_pattern_editor.connect('destroy', self.on_drum_pattern_editor_destroy)
+            self.drum_pattern_editor.pattern.connect('changed', self.on_drum_pattern_changed)
+            self.drum_pattern_editor.pattern.changed()
+        self.drum_pattern_editor.present()
+        
+    def on_drum_pattern_changed(self, pattern):
+        data = ""
+        for i in pattern.items():
+            data += struct.pack("iBBbb", int(i.pos), 3, 0x99, int(36 + i.row), int(i.vel))
+            data += struct.pack("iBBbb", int(i.pos + 1), 3, 0x89, int(36 + i.row), int(i.vel))
+        cbox.do_cmd("/play_blob", None, [buffer(data), pattern.get_length()])
+        
+    def on_drum_pattern_editor_destroy(self, w):
+        self.drum_pattern_editor = None
 
     def refresh_instrument_pages(self):
         self.delete_instrument_pages()
