@@ -100,7 +100,8 @@ class KeySampleModel(object):
 ####################################################################################################################################################
 
 class KeyModel(gtk.ListStore):
-    def __init__(self):
+    def __init__(self, key):
+        self.key = key
         gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
     def to_sfz(self):
         return "".join([ksm.to_sfz() for name, ksm in self])
@@ -121,7 +122,7 @@ class BankModel(dict):
     def clear(self):
         dict.clear(self)
         for b in range(36, 36 + 16):
-            self[b] = KeyModel()
+            self[b] = KeyModel(b)
     def from_sfz(self, data, path):
         self.clear()
         sfz = sfzparser.SFZ()
@@ -155,8 +156,16 @@ class LayerListView(gtk.TreeView):
         #self.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, [("text/plain", 0, 1)], gtk.gdk.ACTION_COPY)
         self.connect('cursor-changed', self.cursor_changed)
         #self.connect('drag-data-get', self.drag_data_get)
+        self.drag_dest_set(gtk.DEST_DEFAULT_ALL, [("text/plain", 0, 1)], gtk.gdk.ACTION_COPY)
+        self.connect('drag_data_received', self.drag_data_received)
     def cursor_changed(self, w):
         self.controller.on_layer_changed()
+    def drag_data_received(self, widget, context, x, y, selection, info, etime):
+        sample, filename = selection.data.split("|")
+        pad_model = self.controller.get_current_pad_model()
+        pad_model.append((sample, KeySampleModel(pad_model.key, sample, filename)))
+        self.controller.current_pad.update_label()
+        self.controller.on_sample_dragged(self)
 
 ####################################################################################################################################################
 
@@ -224,13 +233,16 @@ class PadButton(gtk.RadioButton):
         self.connect('drag_data_received', self.drag_data_received)
         self.connect('toggled', lambda widget: widget.controller.on_pad_selected(widget) if widget.get_active() else None)
         self.connect('pressed', self.on_clicked)
+    def get_key_model(self):
+        return self.bank_model[self.key]
     def drag_data_received(self, widget, context, x, y, selection, info, etime):
         sample, filename = selection.data.split("|")
-        self.bank_model[self.key].append((sample, KeySampleModel(self.key, sample, filename)))
+        self.get_key_model().clear()
+        self.get_key_model().append((sample, KeySampleModel(self.key, sample, filename)))
         self.update_label()
         self.controller.on_sample_dragged(self)
     def update_label(self):
-        data = self.bank_model[self.key]
+        data = self.get_key_model()
         if data == None:
             self.set_label("-")
         else:
@@ -295,9 +307,8 @@ class FileView(gtk.TreeView):
 
 class EditorDialog(gtk.Dialog):
     def __init__(self, parent):
-        gtk.Dialog.__init__(self, "Drum kit editor", parent, gtk.DIALOG_MODAL, 
+        gtk.Dialog.__init__(self, "Drum kit editor", parent, gtk.DIALOG_DESTROY_WITH_PARENT, 
             ())
-        self.set_default_response(gtk.RESPONSE_OK)
 
         self.menu_bar = gtk.MenuBar()
         self.menu_bar.append(create_menu("_Kit", [
@@ -397,7 +408,11 @@ class EditorDialog(gtk.Dialog):
         self.current_pad.update_label()
         self.layer_editor.refresh()
         self.update_kit()
-    
+        self.layer_list.set_cursor(0)
+
+    def get_current_pad_model(self):
+        return self.current_pad.get_key_model()
+
     def get_current_layer_model(self):
         if self.layer_list.get_cursor()[0] is None:
             return None
