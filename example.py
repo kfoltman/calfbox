@@ -71,6 +71,7 @@ class MainWindow(gtk.Window):
         self.create()
         set_timer(self, 30, self.update)
         self.drum_pattern_editor = None
+        self.drumkit_editor = None
 
     def create(self):
         self.menu_bar = gtk.MenuBar()
@@ -218,9 +219,14 @@ class MainWindow(gtk.Window):
             self.refresh_instrument_pages()
             
     def tools_drumkit_editor(self, w):
-        dlg = drumkit_editor.EditorDialog(self)
-        dlg.run()
-        dlg.destroy()
+        if self.drumkit_editor is None:
+            self.drumkit_editor = drumkit_editor.EditorDialog(self)
+            self.drumkit_editor.connect('destroy', self.on_drumkit_editor_destroy)
+            self.drumkit_editor.show_all()
+        self.drumkit_editor.present()
+        
+    def on_drumkit_editor_destroy(self, w):
+        self.drumkit_editor = None
         
     def tools_play_drum_pattern(self, w):
         d = PlayPatternDialog(self)
