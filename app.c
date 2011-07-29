@@ -455,6 +455,23 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return TRUE;
     }
     else
+    if (!strcmp(obj, "send_event") && (!strcmp(cmd->arg_types, "iii") || !strcmp(cmd->arg_types, "ii") || !strcmp(cmd->arg_types, "i")))
+    {
+        int mcmd = *(int *)cmd->arg_values[0];
+        int arg1 = 0, arg2 = 0;
+        if (cmd->arg_types[1] == 'i')
+        {
+            arg1 = *(int *)cmd->arg_values[1];
+            if (cmd->arg_types[2] == 'i')
+                arg2 = *(int *)cmd->arg_values[2];
+        }
+        struct cbox_midi_buffer buf;
+        cbox_midi_buffer_init(&buf);
+        cbox_midi_buffer_write_inline(&buf, 0, mcmd, arg1, arg2);
+        cbox_rt_send_events(app.rt, &buf);
+        return TRUE;
+    }
+    else
     if (!strcmp(obj, "play_note") && !strcmp(cmd->arg_types, "iii"))
     {
         int channel = *(int *)cmd->arg_values[0];
