@@ -116,7 +116,12 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
         if (cmd->arg_types[i] == 'b')
         {
             struct cbox_blob *blob = cmd->arg_values[i];
-            PyList_SetItem(arg_values, i, PyBuffer_FromMemory(blob->data, blob->size));
+            void *data;
+            ssize_t size;
+            PyObject *buf = PyBuffer_New(blob->size);
+            PyObject_AsWriteBuffer(buf, &data, &size);
+            memcpy(data, blob->data, blob->size);
+            PyList_SetItem(arg_values, i, buf);
         }
         else
         {
