@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "blob.h"
 #include "cmd.h"
 #include "errors.h"
 #include <assert.h>

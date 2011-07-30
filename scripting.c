@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "app.h"
+#include "blob.h"
 #include "errors.h"
 #include "scripting.h"
 #include <assert.h>
@@ -205,9 +206,8 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
             ssize_t len;
             if (0 == PyObject_AsReadBuffer(value, &buf, &len))
             {
-                struct cbox_blob *blob = malloc(sizeof(struct cbox_blob));
-                blob->data = (void *)buf;
-                blob->size = len;
+                // note: this is not really acquired, the blob is freed using free and not cbox_blob_destroy
+                struct cbox_blob *blob = cbox_blob_new_acquire_data((void *)buf, len);
                 arg_types[i] = 'b';
                 arg_values[i] = blob;
                 free_blobs = TRUE;

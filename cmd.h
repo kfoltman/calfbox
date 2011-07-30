@@ -23,13 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdarg.h>
 #include <stdint.h>
 
+struct cbox_blob;
 struct cbox_command_target;
-
-struct cbox_blob
-{
-    void *data;
-    size_t size;
-};
 
 struct cbox_osc_command
 {
