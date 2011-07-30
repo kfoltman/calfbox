@@ -82,7 +82,7 @@ class DrumEditorToolbox(gtk.HBox):
         gtk.HBox.__init__(self, spacing = 5)
         self.canvas = canvas
         self.vel_adj = gtk.Adjustment(100, 1, 127, 1, 10, 0)
-        for label, unit in [("1/4", PPQN), ("1/8", PPQN / 2), ("1/8T", PPQN/3), ("1/16", PPQN/4), ("1/16T", PPQN/6)]:
+        for label, unit in [("1/4", PPQN), ("1/8", PPQN / 2), ("1/8T", PPQN/3), ("1/16", PPQN/4), ("1/16T", PPQN/6), ("1/32", PPQN/8)]:
             button = gtk.Button(label)
             button.connect('clicked', lambda w, unit: self.canvas.set_grid_unit(unit), unit)
             self.pack_start(button, True, True)
@@ -139,7 +139,7 @@ class DrumCanvas(gnomecanvas.Canvas):
         self.pattern = pattern
         self.row_height = 24
         self.grid_unit = PPQN / 4 # unit in pulses
-        self.zoom_in = 1
+        self.zoom_in = 2
         self.instr_width = 120
         self.edited_note = None
         self.orig_velocity = None
@@ -294,7 +294,7 @@ class DrumCanvas(gnomecanvas.Canvas):
         return int((y - 1) / self.row_height)
         
     def pulse_to_screen_x(self, pulse):
-        return pulse + self.instr_width
+        return pulse * self.zoom_in + self.instr_width
         
     def column_to_screen_x(self, column):
         unit = self.grid_unit * self.zoom_in
