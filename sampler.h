@@ -127,7 +127,6 @@ struct sampler_voice
     enum sampler_filter_type filter;
     struct sampler_layer *layer;
     struct sampler_program *program;
-    int16_t *sample_data;
     uint32_t pos, delta, loop_start, loop_end, sample_end;
     uint32_t frac_pos, frac_delta;
     uint32_t loop_evolve, loop_overlap;
@@ -138,7 +137,6 @@ struct sampler_voice
     int off_by;
     float freq;
     float gain;
-    float pan;
     float lgain, rgain;
     float last_lgain, last_rgain;
     float cutoff, resonance, fileg_depth, pitcheg_depth;

@@ -71,7 +71,7 @@ static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
         if (nextsample >= v->loop_end && v->loop_start != (uint32_t)-1)
             nextsample -= v->loop_start;
         
-        float sample = fr * v->sample_data[nextsample] + (1 - fr) * v->sample_data[v->pos];
+        float sample = fr * v->layer->sample_data[nextsample] + (1 - fr) * v->layer->sample_data[v->pos];
         
         if (v->frac_pos > ~v->frac_delta)
             v->pos++;
@@ -115,7 +115,7 @@ static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
         float idata[4];
         if (v->pos + 4 < v->loop_end)
         {
-            int16_t *p = &v->sample_data[v->pos];
+            int16_t *p = &v->layer->sample_data[v->pos];
             for (int s = 0; s < 4; s++)
                 idata[s] = p[s];
         }
@@ -131,7 +131,7 @@ static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
                         break;
                     nextsample -= v->loop_end - v->loop_start;
                 }
-                idata[s] = v->sample_data[nextsample];
+                idata[s] = v->layer->sample_data[nextsample];
                 nextsample++;
             }
             while(s < 4)
@@ -144,7 +144,7 @@ static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
             float xfade = (v->pos - (v->loop_end - v->loop_overlap)) * v->loop_overlap_step;
             for (int s = 0; s < 4 && xfade < 1; s++)
             {
-                idata[s] += (v->sample_data[nextsample] - idata[s]) * xfade;
+                idata[s] += (v->layer->sample_data[nextsample] - idata[s]) * xfade;
                 nextsample++;
                 xfade += v->loop_overlap_step;
             }
@@ -188,8 +188,8 @@ static uint32_t process_voice_stereo_lerp(struct sampler_voice *v, float **outpu
         if (nextsample >= v->loop_end && v->loop_start != (uint32_t)-1)
             nextsample -= v->loop_start;
         
-        float lsample = fr * v->sample_data[nextsample << 1] + (1 - fr) * v->sample_data[v->pos << 1];
-        float rsample = fr * v->sample_data[1 + (nextsample << 1)] + (1 - fr) * v->sample_data[1 + (v->pos << 1)];
+        float lsample = fr * v->layer->sample_data[nextsample << 1] + (1 - fr) * v->layer->sample_data[v->pos << 1];
+        float rsample = fr * v->layer->sample_data[1 + (nextsample << 1)] + (1 - fr) * v->layer->sample_data[1 + (v->pos << 1)];
         
         if (v->frac_pos > ~v->frac_delta)
             v->pos++;
@@ -231,7 +231,7 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
         float idata[2][4];
         if (v->pos + 4 < v->loop_end)
         {
-            int16_t *p = &v->sample_data[v->pos << 1];
+            int16_t *p = &v->layer->sample_data[v->pos << 1];
             for (int s = 0; s < 4; s++, p += 2)
             {
                 idata[0][s] = p[0];
@@ -250,8 +250,8 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
                         break;
                     nextsample -= v->loop_end - v->loop_start;
                 }
-                idata[0][s] = v->sample_data[nextsample << 1];
-                idata[1][s] = v->sample_data[1 + (nextsample << 1)];
+                idata[0][s] = v->layer->sample_data[nextsample << 1];
+                idata[1][s] = v->layer->sample_data[1 + (nextsample << 1)];
                 nextsample++;
             }
             for(; s < 4; s++)
@@ -263,8 +263,8 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
             float xfade = (v->pos - (v->loop_end - v->loop_overlap)) * v->loop_overlap_step;
             for (int s = 0; s < 4 && xfade < 1; s++)
             {
-                idata[0][s] += (v->sample_data[nextsample << 1] - idata[0][s]) * xfade;
-                idata[1][s] += (v->sample_data[1 + (nextsample << 1)] - idata[1][s]) * xfade;
+                idata[0][s] += (v->layer->sample_data[nextsample << 1] - idata[0][s]) * xfade;
+                idata[1][s] += (v->layer->sample_data[1 + (nextsample << 1)] - idata[1][s]) * xfade;
                 nextsample++;
                 xfade += v->loop_overlap_step;
             }
@@ -341,7 +341,6 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             
             v->output_pair_no = l->output_pair_no % m->output_pairs;
             v->serial_no = m->serial_no;
-            v->sample_data = l->sample_data;
             v->pos = l->sample_offset;
             v->frac_pos = 0;
             v->loop_start = l->loop_start;
@@ -351,7 +350,6 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->loop_overlap_step = 1.0 / l->loop_overlap;
             v->sample_end = l->sample_end;
             v->gain = l->gain * l->velcurve[vel];
-            v->pan = l->pan;
             v->note = note;
             v->vel = vel;
             v->mode = l->mode;
@@ -638,7 +636,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             float gain = amp_env * v->gain * c->volume * c->expression  / (maxv * maxv);
             if (amp_lfo != 0)
                 gain *= dB2gain(amp_lfo);
-            float pan = v->pan + (c->pan * 1.0 / maxv - 0.5) * 2;
+            float pan = v->layer->pan + (c->pan * 1.0 / maxv - 0.5) * 2;
             if (pan < -1)
                 pan = -1;
             if (pan > 1)
