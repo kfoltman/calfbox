@@ -210,6 +210,8 @@ class DrumCanvas(gnomecanvas.Canvas):
             if column < 0:
                 return
             pulse = column * self.grid_unit
+            if pulse >= self.pattern.get_length():
+                return
             note = self.pattern.get_note(pulse, row)
             if note is not None:
                 if event.button == 3:
@@ -234,6 +236,8 @@ class DrumCanvas(gnomecanvas.Canvas):
             if column < 0:
                 return
             pulse = column * self.grid_unit
+            if pulse >= self.pattern.get_length():
+                return
             if self.pattern.has_note(pulse, row):
                 self.pattern.remove_note(pulse, row)
             self.update_notes()
@@ -249,6 +253,10 @@ class DrumCanvas(gnomecanvas.Canvas):
                 return
             column = self.screen_x_to_column(ex)
             row = self.screen_y_to_row(ey)
+            pulse = column * self.grid_unit
+            if pulse >= self.pattern.get_length():
+                self.cursor.hide()
+                return
             
             x = self.column_to_screen_x(column)
             y = self.row_to_screen_y(row + 0.5)
