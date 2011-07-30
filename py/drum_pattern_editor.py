@@ -159,8 +159,10 @@ class DrumCanvas(gnomecanvas.Canvas):
         self.update_names()
         
         self.connect('event', self.on_grid_event)
-        self.cursor = self.root().add(gnomecanvas.CanvasRect, x1 = -5, y1 = -5, x2 = 5, y2 = 5, outline_color = "red")
+        self.cursor = self.root().add(gnomecanvas.CanvasRect, x1 = -7, y1 = -7, x2 = 6, y2 = 6, outline_color = "gray")
         self.cursor.hide()
+        self.cursor_vel = self.root().add(gnomecanvas.CanvasText, x = 0, y = 0, fill_color = "blue")
+        self.cursor_vel.hide()
 
         self.toolbox = DrumEditorToolbox(self)
         
@@ -169,7 +171,15 @@ class DrumCanvas(gnomecanvas.Canvas):
         
     def set_grid_unit(self, grid_unit):
         self.grid_unit = grid_unit
-        self.update_grid()        
+        self.update_grid()
+        
+    def hide_cursor(self):
+        self.cursor.hide()
+        self.cursor_vel.hide()
+        
+    def show_cursor(self):
+        self.cursor.show()
+        self.cursor_vel.show()
         
     def update_names(self):
         for i in self.names.item_list:
@@ -203,10 +213,11 @@ class DrumCanvas(gnomecanvas.Canvas):
         for item in self.pattern.items():
             x = self.pulse_to_screen_x(item.pos) - self.instr_width
             y = self.row_to_screen_y(item.row + 0.5)
-            item.item = self.notes.add(gnomecanvas.CanvasRect, x1 = x - 5, y1 = y - 5, x2 = x + 5, y2 = y + 5, fill_color_rgba = (item.vel << 25))
+            item.item = self.notes.add(gnomecanvas.CanvasPolygon, points = [-5, 0, 0, -5, 5, 0, 0, 5], fill_color_rgba = (item.vel << 25))
+            item.item.move(x, y)
         
     def on_grid_event(self, item, event):
-        print event
+        #print event
         if event.type in [gtk.gdk.BUTTON_PRESS, gtk.gdk._2BUTTON_PRESS, gtk.gdk.LEAVE_NOTIFY, gtk.gdk.MOTION_NOTIFY, gtk.gdk.BUTTON_RELEASE]:
             ex, ey = self.window_to_world(event.x, event.y)
         unit = self.grid_unit * self.zoom_in
@@ -221,7 +232,9 @@ class DrumCanvas(gnomecanvas.Canvas):
             note = self.pattern.get_note(pulse, row)
             if note is not None:
                 if event.button == 3:
-                    self.pattern.set_note_vel(note, int(self.toolbox.vel_adj.get_value()))
+                    vel = int(self.toolbox.vel_adj.get_value())
+                    self.cursor_vel.set(text = "%s" % vel)
+                    self.pattern.set_note_vel(note, vel)
                     self.update_vel_label(note)
                     self.update_notes()
                     return
@@ -246,32 +259,36 @@ class DrumCanvas(gnomecanvas.Canvas):
                 return
             if self.pattern.has_note(pulse, row):
                 self.pattern.remove_note(pulse, row)
+            self.cursor_vel.set(text = "")
             self.update_notes()
             self.update_vel_label(None)
+            self.edited_note = None
             return
-        if event.type == gtk.gdk.LEAVE_NOTIFY:
-            self.cursor.hide()
+        if event.type == gtk.gdk.LEAVE_NOTIFY and self.edited_note is None:
+            self.hide_cursor()
             self.update_vel_label(None)
             return
         if event.type == gtk.gdk.MOTION_NOTIFY and self.edited_note is None:
             if ex < self.instr_width - unit / 2:
-                self.cursor.hide()
+                self.hide_cursor()
                 return
             column = self.screen_x_to_column(ex)
             row = self.screen_y_to_row(ey)
             pulse = column * self.grid_unit
             if pulse >= self.pattern.get_length():
-                self.cursor.hide()
+                self.hide_cursor()
                 return
             
             x = self.column_to_screen_x(column)
             y = self.row_to_screen_y(row + 0.5)
             if abs(ex - x) > 5:
-                self.cursor.hide()
+                self.hide_cursor()
                 return
-            self.cursor.set(x1 = x - 5, x2 = x + 5, y1 = y - 5, y2 = y + 5)
-            self.cursor.show()
             note = self.pattern.get_note(column * self.grid_unit, row)
+            self.cursor.set(x1 = x - 7, x2 = x + 6, y1 = y - 6, y2 = y + 6)
+            cy = y - self.row_height * 1.5 if row >= self.rows / 2 else y + self.row_height * 1.5
+            self.cursor_vel.set(x = x, y = cy, text = "%s" % note.vel if note is not None else "")
+            self.show_cursor()
             self.update_vel_label(note)
             return
         if event.type == gtk.gdk.MOTION_NOTIFY and self.edited_note is not None:
@@ -280,8 +297,10 @@ class DrumCanvas(gnomecanvas.Canvas):
             if vel > 127: vel = 127
             self.pattern.set_note_vel(self.edited_note, vel)
             self.toolbox.vel_adj.set_value(vel)
+            self.cursor_vel.set(text = "%s" % vel)
             self.update_notes()
             self.update_vel_label(self.edited_note)
+            self.update_now()
         if event.type == gtk.gdk.BUTTON_RELEASE and self.edited_note is not None:
             self.edited_note = None
             self.grab_remove()
