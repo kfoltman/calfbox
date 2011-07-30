@@ -50,7 +50,13 @@ extern struct cbox_midi_pattern *cbox_midi_pattern_load(const char *name, int is
 
 extern struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_drum);
 
+struct cbox_blob_serialized_event {
+    int32_t time;
+    unsigned char len, cmd, byte1, byte2;
+};
+
 extern struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(const struct cbox_blob *blob, int length);
+extern struct cbox_blob *cbox_midi_pattern_to_blob(struct cbox_midi_pattern *pat, int *length);
 
 extern void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int nsamples);
 

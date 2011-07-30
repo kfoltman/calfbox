@@ -30,6 +30,12 @@ class DrumPatternModel(gobject.GObject):
         self.beats = beats
         self.bars = bars
         self.notes = []
+        
+    def import_data(self, data):
+        self.clear()
+        for t in data:
+            if len(t) == 4 and ((t[1] & 0xF0) == 0x90) and (t[3] > 0) and t[2] >= 36 and t[2] < 36 + 16:
+                self.add_note(DrumNoteModel(t[0], t[2] - 36, t[3]))
 
     def clear(self):
         self.notes = []
@@ -313,11 +319,12 @@ class DrumCanvas(gnomecanvas.Canvas):
         assert False
 
 class DrumSeqWindow(gtk.Window):
-    def __init__(self):
+    def __init__(self, length, pat_data):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.vbox = gtk.VBox(spacing = 5)
-        self.pattern = DrumPatternModel(4, 1)
-        ppqn = PPQN
+        self.pattern = DrumPatternModel(4, length / (4 * PPQN))
+        if pat_data is not None:
+            self.pattern.import_data(pat_data)
 
         self.canvas = DrumCanvas(16, self.pattern)
         self.vbox.pack_start(self.canvas, True, True)

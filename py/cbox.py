@@ -1,4 +1,5 @@
 from _cbox import *
+import struct
 
 class GetThings:
     def __init__(self, cmd, anames, args):
@@ -85,3 +86,27 @@ class CfgSection:
         
     def keys(self, prefix = ""):
         return Config.keys(self.name, prefix)
+        
+
+class Pattern:
+    @staticmethod
+    def get_pattern():
+        pat_data = GetThings("/get_pattern", ['pattern'], []).pattern
+        if pat_data is not None:
+            pat_blob, length = pat_data
+            pat_data = []
+            ofs = 0
+            while ofs < len(pat_blob):
+                data = list(struct.unpack_from("iBBbb", pat_blob, ofs))
+                data[1:2] = []
+                pat_data.append(tuple(data))
+                ofs += 8
+            return pat_data, length
+        return None
+        
+    @staticmethod
+    def serialize_event(time, *data):
+        if len(data) >= 1 and len(data) <= 3:
+            return struct.pack("iBBbb"[0:2 + len(data)], int(time), len(data), *[int(v) for v in data])
+        raise ValueError, "Invalid length of an event (%d)" % len(data)
+            

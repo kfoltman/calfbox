@@ -448,17 +448,12 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(const struct cbox_blob
 {
     struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
     
-    struct serialized_event {
-        int pos;
-        unsigned char len, cmd, byte1, byte2;
-    };
-    
-    struct serialized_event event;
+    struct cbox_blob_serialized_event event;
     for (size_t i = 0; i < blob->size; i += sizeof(event))
     {
         // not sure about alignment guarantees of Python buffers
         memcpy(&event, ((uint8_t *)blob->data) + i, sizeof(event));
-        cbox_midi_pattern_maker_add(m, event.pos, event.cmd, event.byte1, event.byte2);
+        cbox_midi_pattern_maker_add(m, event.time, event.cmd, event.byte1, event.byte2);
     }
     
     struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m);        
@@ -467,6 +462,40 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(const struct cbox_blob
     cbox_midi_pattern_maker_destroy(m);
     
     return p;
+}
+
+struct cbox_blob *cbox_midi_pattern_to_blob(struct cbox_midi_pattern *pat, int *length)
+{
+    if (length)
+        *length = pat->loop_end;
+    
+    struct cbox_blob_serialized_event event;
+    int size = 0;
+    for (int i = 0; i < pat->event_count; i++)
+    {
+        // currently sysex events and the like are not supported
+        if (pat->events[i].size < 4)
+            size += sizeof(event);
+    }
+    
+    struct cbox_blob *blob = cbox_blob_new(size);
+    
+    size = 0;
+    uint8_t *data = blob->data;
+    for (int i = 0; i < pat->event_count; i++)
+    {
+        // currently sysex events and the like are not supported
+        const struct cbox_midi_event *src = &pat->events[i];
+        if (src->size < 4)
+        {
+            event.time = src->time;
+            event.len = src->size;
+            memcpy(&event.cmd, &src->data_inline[0], event.len);
+            memcpy(data + size, &event, sizeof(event));
+            size += sizeof(event);
+        }
+    }
+    return blob;
 }
 
 void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes *notes)

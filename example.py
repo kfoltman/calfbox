@@ -3,7 +3,6 @@ import gtk
 import glib
 import gobject
 import math
-import struct
 import sys
 
 sys.path = ["./py"] + sys.path
@@ -245,7 +244,11 @@ class MainWindow(gtk.Window):
 
     def tools_drum_pattern_editor(self, w):
         if self.drum_pattern_editor is None:
-            self.drum_pattern_editor = drum_pattern_editor.DrumSeqWindow()
+            length = drum_pattern_editor.PPQN * 4
+            pat_data = cbox.Pattern.get_pattern()
+            if pat_data is not None:
+                pat_data, length = pat_data
+            self.drum_pattern_editor = drum_pattern_editor.DrumSeqWindow(length, pat_data)
             self.drum_pattern_editor.set_title("Drum pattern editor")
             self.drum_pattern_editor.show_all()
             self.drum_pattern_editor.connect('destroy', self.on_drum_pattern_editor_destroy)
@@ -256,8 +259,8 @@ class MainWindow(gtk.Window):
     def on_drum_pattern_changed(self, pattern):
         data = ""
         for i in pattern.items():
-            data += struct.pack("iBBbb", int(i.pos), 3, 0x99, int(36 + i.row), int(i.vel))
-            data += struct.pack("iBBbb", int(i.pos + 1), 3, 0x89, int(36 + i.row), int(i.vel))
+            data += cbox.Pattern.serialize_event(int(i.pos), 0x99, int(36 + i.row), int(i.vel))
+            data += cbox.Pattern.serialize_event(int(i.pos + 1), 0x89, int(36 + i.row), int(i.vel))
         cbox.do_cmd("/play_blob", None, [buffer(data), pattern.get_length()])
         
     def on_drum_pattern_editor_destroy(self, w):

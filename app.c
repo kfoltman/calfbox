@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "app.h"
+#include "blob.h"
 #include "config-api.h"
 #include "instr.h"
 #include "io.h"
@@ -506,6 +507,22 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     if (!strcmp(obj, "stop_pattern") && !strcmp(cmd->arg_types, ""))
     {
         cbox_rt_set_pattern_and_destroy(app.rt, NULL);
+        return TRUE;
+    }
+    else
+    if (!strcmp(obj, "get_pattern") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        if (app.rt->mpb.pattern)
+        {
+            int length = 0;
+            struct cbox_blob *blob = cbox_midi_pattern_to_blob(app.rt->mpb.pattern, &length);
+            gboolean res = cbox_execute_on(fb, NULL, "/pattern", "bi", error, blob, length);
+            cbox_blob_destroy(blob);
+            return res;
+        }
         return TRUE;
     }
     else
