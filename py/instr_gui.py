@@ -97,9 +97,10 @@ class WithPatchTable:
         attribs = cbox.GetThings("%s/status" % self.path, ['%patch'], [])
         for i in range(16):
             cb = self.patch_combos[i]
-            patch_id = int(self.patches[cb.get_active()][1])
-            if patch_id != attribs.patch[i + 1][1]:
-                cb.set_active(self.mapping[attribs.patch[i + 1][0]])
+            if cb.get_active() >= 0:
+                patch_id = int(self.patches[cb.get_active()][1])
+                if patch_id != attribs.patch[i + 1][1]:
+                    cb.set_active(self.mapping[attribs.patch[i + 1][0]])
         #self.status_label.set_markup(s)
         return True
         
