@@ -1167,7 +1167,7 @@ static int release_program_voices_execute(void *data)
     
     for (int i = 0; i < 16; i++)
     {
-        if (m->channels[i].program == rpv->old_pgm)
+        if (m->channels[i].program == rpv->old_pgm || m->channels[i].program == NULL)
             m->channels[i].program = rpv->new_pgm;
     }
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
