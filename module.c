@@ -169,6 +169,61 @@ fxpreset_error:
     return NULL;
 }
 
+gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, int modindex, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
+{
+    struct cbox_module *sm = *psm;
+    if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        if (!(cbox_execute_on(fb, NULL, "/insert_engine", "s", error, sm ? sm->engine_name : "") &&
+            cbox_execute_on(fb, NULL, "/insert_preset", "s", error, sm ? sm->instance_name : "")))
+            return FALSE;
+        return TRUE;
+    }
+    if (!strcmp(subcmd, "/insert_preset") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_module *effect = cbox_module_new_from_fx_preset((const char *)cmd->arg_values[0], error);
+        if (!effect)
+            return FALSE;
+        cbox_rt_swap_pointers(app.rt, (void **)psm, effect);
+        return TRUE;
+    }
+    if (!strcmp(subcmd, "/insert_engine") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_module *effect = NULL;
+        if (*(const char *)cmd->arg_values[0])
+        {
+            struct cbox_module_manifest *manifest = cbox_module_manifest_get_by_name((const char *)cmd->arg_values[0]);
+            if (!manifest)
+            {
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No effect engine '%s'", (const char *)cmd->arg_values[0]);
+                return FALSE;
+            }
+            effect = cbox_module_manifest_create_module(manifest, NULL, cbox_io_get_sample_rate(&app.io), "unnamed", error);
+            if (!effect)
+                return FALSE;
+        }
+        cbox_rt_swap_pointers(app.rt, (void **)psm, effect);
+        return TRUE;
+    }
+    if (!strncmp(subcmd, "/engine/", 8))
+    {
+        if (!sm)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine on module %d in path '%s'", 1 + modindex, cmd->command);
+            return FALSE;
+        }
+        if (!sm->cmd_target.process_cmd)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", sm->engine_name);
+            return FALSE;
+        }
+        return cbox_execute_sub(&sm->cmd_target, fb, cmd, subcmd + 7, error);
+    }
+    return cbox_set_command_error(error, cmd);
+}
+
 void cbox_module_destroy(struct cbox_module *module)
 {
     g_free(module->instance_name);
