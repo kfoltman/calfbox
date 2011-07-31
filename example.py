@@ -118,9 +118,9 @@ class SceneAuxBusesView(gtk.TreeView):
         self.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=0)
         self.insert_column_with_attributes(1, "Engine", gtk.CellRendererText(), text=1)
     def get_current_row(self):
-        row = self.get_cursor()[0][0]
-        if row is None:
+        if self.get_cursor()[0] is None:
             return None, None
+        row = self.get_cursor()[0][0]
         return row + 1, self.get_model()[row]
 
 class MainWindow(gtk.Window):
