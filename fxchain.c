@@ -93,6 +93,28 @@ static gboolean fxchain_module_process_cmd(struct fxchain_module *m, int modinde
     return cbox_set_command_error(error, cmd);
 }
 
+void fxchain_move(struct fxchain_module *m, int oldpos, int newpos)
+{
+    if (oldpos == newpos)
+        return;
+    struct cbox_module **modules = malloc(sizeof(struct cbox_module *) * m->module_count);
+    for (int i = 0; i < m->module_count; i++)
+    {
+        int s;
+        if (i == newpos)
+            s = oldpos;
+        else
+        {
+            if (oldpos < newpos)
+                s = (i < oldpos || i > newpos) ? i : i + 1;
+            else
+                s = (i < newpos || i > oldpos) ? i : i - 1;
+        }
+        modules[i] = m->modules[s];
+    }
+    free(cbox_rt_swap_pointers(app.rt, (void **)&m->modules, modules));
+}
+
 gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct fxchain_module *m = (struct fxchain_module *)ct->user_data;
@@ -106,7 +128,12 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
             return FALSE;
         for (int i = 0; i < m->module_count; i++)
         {
-            if (!cbox_execute_on(fb, NULL, "/module", "ss", error, m->modules[i]->engine_name, m->modules[i]->instance_name))
+            gboolean res = FALSE;
+            if (m->modules[i])
+                res = cbox_execute_on(fb, NULL, "/module", "ss", error, m->modules[i]->engine_name, m->modules[i]->instance_name);
+            else
+                res = cbox_execute_on(fb, NULL, "/module", "ss", error, "", "");
+            if (!res)
                 return FALSE;
         }
         return TRUE;
@@ -116,6 +143,36 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
         if (!subcommand)
             return FALSE;
         return fxchain_module_process_cmd(m, index - 1, fb, cmd, subcommand, error);
+    }
+    else if (!strcmp(cmd->command, "/insert") && !strcmp(cmd->arg_types, "i"))
+    {
+        int pos = (*(int *)cmd->arg_values[0]) - 1;
+        struct cbox_module **new_modules = malloc((m->module_count + 1) * sizeof(struct cbox_module *));
+        memcpy(new_modules, m->modules, pos * sizeof(struct cbox_module *));
+        new_modules[pos] = NULL;
+        memcpy(new_modules + pos + 1, m->modules + pos, (m->module_count - pos) * sizeof(struct cbox_module *));
+        void *old_modules = cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&m->modules, new_modules, &m->module_count, m->module_count + 1);
+        free(old_modules);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/delete") && !strcmp(cmd->arg_types, "i"))
+    {
+        int pos = (*(int *)cmd->arg_values[0]) - 1;
+        struct cbox_module **new_modules = malloc((m->module_count + 1) * sizeof(struct cbox_module *));
+        memcpy(new_modules, m->modules, pos * sizeof(struct cbox_module *));
+        memcpy(new_modules + pos, m->modules + pos + 1, (m->module_count - pos - 1) * sizeof(struct cbox_module *));
+        struct cbox_module *deleted_module = m->modules[pos];
+        void *old_modules = cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&m->modules, new_modules, &m->module_count, m->module_count - 1);
+        free(old_modules);
+        if (deleted_module)
+            cbox_module_destroy(deleted_module);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/move") && !strcmp(cmd->arg_types, "ii"))
+    {
+        int oldpos = (*(int *)cmd->arg_values[0]) - 1;
+        int newpos = (*(int *)cmd->arg_values[1]) - 1;
+        fxchain_move(m, oldpos, newpos);
     }
     else
         return cbox_set_command_error(error, cmd);
@@ -142,7 +199,15 @@ void fxchain_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             input_bufs[c] = i == 0 ? inputs[c] : bufs[i & 1][c];
             output_bufs[c] = i == m->module_count - 1 ? outputs[c] : bufs[(i + 1) & 1][c];
         }
-        m->modules[i]->process_block(m->modules[i]->user_data, input_bufs, output_bufs);
+        if (m->modules[i])
+            m->modules[i]->process_block(m->modules[i]->user_data, input_bufs, output_bufs);
+        else
+        {
+            // this is not eficient at all, but empty modules aren't likely to be used except
+            // when setting up a chain.
+            for (int c = 0; c < 2; c++)
+                memcpy(output_bufs[c], input_bufs[c], CBOX_BLOCK_SIZE * sizeof(float));
+        }
     }
      
 }

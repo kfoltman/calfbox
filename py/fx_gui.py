@@ -155,17 +155,57 @@ class FXChainWindow(EffectWindow):
     
     def __init__(self, instrument, main_window, path):
         EffectWindow.__init__(self, instrument, main_window, path)
-        values = cbox.GetThings(self.path + "/status", ["*module"], []).module
-        t = gtk.Table(len(values) + 1, 3)
+        self.fx_table = None
         self.choosers = []
-        for i in range(1, len(values) + 1):
+        self.refresh_table()
+        
+    def refresh_table(self):
+        values = cbox.GetThings(self.path + "/status", ["*module"], []).module
+        fx_count = len(values)
+        t = gtk.Table(fx_count + 2, 8)
+        for c in self.choosers:
+            c.close_popup()
+        self.choosers = []
+        for i in range(1, fx_count + 1):
             engine, preset = values[i - 1]
             chooser = InsertEffectChooser("%s/module/%s" % (self.path, i), "%s: slot %s" % (self.get_title(), i), engine, preset, self.main_window)
             t.attach(chooser.fx_engine, 0, 1, i, i + 1, 0, gtk.SHRINK)
             t.attach(chooser.fx_preset, 1, 2, i, i + 1, 0, gtk.SHRINK)
             t.attach(chooser.fx_edit, 2, 3, i, i + 1, 0, gtk.SHRINK)
+            buttons = [
+                ("+", self.on_add_clicked, lambda pos: True),
+                ("-", self.on_delete_clicked, lambda pos: True),
+                ("Up", self.on_up_clicked, lambda pos: pos > 1),
+                ("Down", self.on_down_clicked, lambda pos: pos < fx_count)
+            ]
+            for j in range(len(buttons)):
+                label, method, cond = buttons[j]
+                if not cond(i):
+                    continue
+                button = gtk.Button(label)
+                button.connect('clicked', lambda button, method, pos: method(pos), method, i)
+                t.attach(button, 3 + j, 4 + j, i, i + 1, 0, gtk.SHRINK)
             self.choosers.append(chooser)
+        button = gtk.Button("+")
+        button.connect('clicked', lambda button, method, pos: self.on_add_clicked(pos), method, fx_count + 1)
+        t.attach(button, 3, 4, fx_count + 1, fx_count + 2, 0, gtk.SHRINK)
+        if self.fx_table is not None:
+            self.remove(self.fx_table)
         self.add(t)
+        t.show_all()
+        self.fx_table = t
+    def on_add_clicked(self, pos):
+        cbox.do_cmd(self.path + "/insert", None, [pos])
+        self.refresh_table()
+    def on_delete_clicked(self, pos):
+        cbox.do_cmd(self.path + "/delete", None, [pos])
+        self.refresh_table()
+    def on_up_clicked(self, pos):
+        cbox.do_cmd(self.path + "/move", None, [pos, pos - 1])
+        self.refresh_table()
+    def on_down_clicked(self, pos):
+        cbox.do_cmd(self.path + "/move", None, [pos, pos + 1])
+        self.refresh_table()
 
 #################################################################################################################################
 
@@ -236,7 +276,7 @@ class InsertEffectChooser(object):
         popup = wclass(self.location, self.main_window, "%s/engine" % self.opath)
         popup.show_all()
         popup.present()
-        popup.connect('delete_event', self.on_close)
+        popup.connect('delete_event', self.on_popup_closed)
         self.popup = popup
             
     def fx_engine_changed(self, combo):
@@ -256,5 +296,9 @@ class InsertEffectChooser(object):
         if self.popup is not None:
             self.popup.refresh()
 
-    def on_close(self, popup, event):
+    def on_popup_closed(self, popup, event):
         self.popup = None
+        
+    def close_popup(self):
+        if self.popup is not None:
+            self.popup.destroy();
