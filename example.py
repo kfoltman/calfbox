@@ -62,6 +62,47 @@ for i in range(1, 17):
     in_channels_ls.append((i, str(i)))
     out_channels_ls.append((i, str(i)))
 
+class SceneLayersModel(gtk.ListStore):
+    def __init__(self):
+        gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN, 
+            gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_BOOLEAN,
+            gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_INT)
+    def refresh(self, scene):
+        self.clear()
+        for l in scene.layer:
+            layer = cbox.GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name", "in_channel", "out_channel", "consume", "low_note", "high_note", "fixed_note", "transpose"], [])
+            self.append((layer.instrument_name, layer.enable != 0, layer.in_channel, layer.out_channel, layer.consume != 0, layer.low_note, layer.high_note, layer.fixed_note, layer.transpose))
+
+class SceneLayersView(gtk.TreeView):
+    def __init__(self, model):
+        gtk.TreeView.__init__(self, model)
+        self.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, [("text/plain", 0, 1)], gtk.gdk.ACTION_MOVE)
+        self.enable_model_drag_dest([("text/plain", gtk.TARGET_SAME_APP | gtk.TARGET_SAME_WIDGET, 1)], gtk.gdk.ACTION_MOVE)
+        self.connect('drag_data_get', self.drag_data_get)
+        self.connect('drag_data_received', self.drag_data_received)
+        self.insert_column_with_attributes(0, "On?", standard_toggle_renderer(model, "/scene/layer/%d/enable", 1), active=1)
+        self.insert_column_with_attributes(1, "Name", gtk.CellRendererText(), text=0)
+        self.insert_column_with_data_func(2, "In Ch#", standard_combo_renderer(model, in_channels_ls, "/scene/layer/%d/in_channel", 2), lambda column, cell, model, iter: cell.set_property('text', "%s" % model[iter][2] if model[iter][2] != 0 else 'All'))
+        self.insert_column_with_data_func(3, "Out Ch#", standard_combo_renderer(model, out_channels_ls, "/scene/layer/%d/out_channel", 3), lambda column, cell, model, iter: cell.set_property('text', "%s" % model[iter][3] if model[iter][3] != 0 else 'Same'))
+        self.insert_column_with_attributes(4, "Eat?", standard_toggle_renderer(model, "/scene/layer/%d/consume", 4), active=4)
+        self.insert_column_with_attributes(5, "Lo N#", gtk.CellRendererText(), text=5)
+        self.insert_column_with_attributes(6, "Hi N#", gtk.CellRendererText(), text=6)
+        self.insert_column_with_attributes(7, "Fix N#", gtk.CellRendererText(), text=7)
+        self.insert_column_with_attributes(8, "Transpose", gtk.CellRendererText(), text=8)
+    def drag_data_get(self, treeview, context, selection, target_id, etime):
+        cursor = treeview.get_cursor()
+        if cursor is not None:
+            selection.set('text/plain', 8, str(cursor[0][0]))
+    def drag_data_received(self, treeview, context, x, y, selection, info, etime):
+        src_row = int(selection.data)
+        dest_row_info = treeview.get_dest_row_at_pos(x, y)
+        if dest_row_info is not None:
+            dest_row = dest_row_info[0][0]
+            #print src_row, dest_row, dest_row_info[1]
+            cbox.do_cmd("/scene/move_layer", None, [src_row + 1, dest_row + 1])
+            scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
+            self.get_model().refresh(scene)
+
 class MainWindow(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
@@ -98,8 +139,6 @@ class MainWindow(gtk.Window):
         self.create_instrument_pages(scene, rt)
 
     def create_master(self, scene):
-        self.scene_list = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
-                
         self.master_info = left_label("")
         self.timesig_info = left_label("")
         
@@ -131,48 +170,14 @@ class MainWindow(gtk.Window):
         self.transpose_adj.connect('value_changed', adjustment_changed_int, '/scene/transpose')
         t.attach(standard_align(gtk.SpinButton(self.transpose_adj), 0, 0, 0, 0), 1, 2, 5, 6, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         
-        self.layers_model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_BOOLEAN, 
-            gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_BOOLEAN,
-            gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_INT)    
-        self.layers_tree = gtk.TreeView(self.layers_model)
-        self.layers_tree.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, [("text/plain", 0, 1)], gtk.gdk.ACTION_MOVE)
-        self.layers_tree.enable_model_drag_dest([("text/plain", gtk.TARGET_SAME_APP | gtk.TARGET_SAME_WIDGET, 1)], gtk.gdk.ACTION_MOVE)
-        self.layers_tree.connect('drag_data_get', self.drag_data_get)
-        self.layers_tree.connect('drag_data_received', self.drag_data_received)
-        self.layers_tree.insert_column_with_attributes(0, "On?", standard_toggle_renderer(self.layers_model, "/scene/layer/%d/enable", 1), active=1)
-        self.layers_tree.insert_column_with_attributes(1, "Name", gtk.CellRendererText(), text=0)
-        self.layers_tree.insert_column_with_data_func(2, "In Ch#", standard_combo_renderer(self.layers_model, in_channels_ls, "/scene/layer/%d/in_channel", 2), lambda column, cell, model, iter: cell.set_property('text', "%s" % model[iter][2] if model[iter][2] != 0 else 'All'))
-        self.layers_tree.insert_column_with_data_func(3, "Out Ch#", standard_combo_renderer(self.layers_model, out_channels_ls, "/scene/layer/%d/out_channel", 3), lambda column, cell, model, iter: cell.set_property('text', "%s" % model[iter][3] if model[iter][3] != 0 else 'Same'))
-        self.layers_tree.insert_column_with_attributes(4, "Eat?", standard_toggle_renderer(self.layers_model, "/scene/layer/%d/consume", 4), active=4)
-        self.layers_tree.insert_column_with_attributes(5, "Lo N#", gtk.CellRendererText(), text=5)
-        self.layers_tree.insert_column_with_attributes(6, "Hi N#", gtk.CellRendererText(), text=6)
-        self.layers_tree.insert_column_with_attributes(7, "Fix N#", gtk.CellRendererText(), text=7)
-        self.layers_tree.insert_column_with_attributes(8, "Transpose", gtk.CellRendererText(), text=8)
-        t.attach(self.layers_tree, 0, 2, 6, 7, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
-        self.refresh_layer_list(scene)        
+        self.layers_model = SceneLayersModel()
+        self.layers_tree = SceneLayersView(self.layers_model)
+        t.attach(standard_vscroll_window(-1, 160, self.layers_tree), 0, 2, 6, 7, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+        
+        self.layers_model.refresh(scene)
+        
         return t
         
-    def drag_data_get(self, treeview, context, selection, target_id, etime):
-        cursor = treeview.get_cursor()
-        if cursor is not None:
-            selection.set('text/plain', 8, str(cursor[0][0]))
-        
-    def drag_data_received(self, treeview, context, x, y, selection, info, etime):
-        src_row = int(selection.data)
-        dest_row_info = treeview.get_dest_row_at_pos(x, y)
-        if dest_row_info is not None:
-            dest_row = dest_row_info[0][0]
-            #print src_row, dest_row, dest_row_info[1]
-            cbox.do_cmd("/scene/move_layer", None, [src_row + 1, dest_row + 1])
-            scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
-            self.refresh_layer_list(scene)
-
-    def refresh_layer_list(self, scene):
-        self.layers_model.clear()
-        for l in scene.layer:
-            layer = cbox.GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name", "in_channel", "out_channel", "consume", "low_note", "high_note", "fixed_note", "transpose"], [])
-            self.layers_model.append((layer.instrument_name, layer.enable != 0, layer.in_channel, layer.out_channel, layer.consume != 0, layer.low_note, layer.high_note, layer.fixed_note, layer.transpose))
-
     def quit(self, w):
         self.destroy()
         
@@ -270,7 +275,7 @@ class MainWindow(gtk.Window):
         self.delete_instrument_pages()
         rt = cbox.GetThings("/rt/status", ['audio_channels'], [])
         scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
-        self.refresh_layer_list(scene)
+        self.layers_model.refresh(scene)
         self.create_instrument_pages(scene, rt)
         self.nb.show_all()
         self.title_label.set_text(scene.title)
