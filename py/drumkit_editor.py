@@ -74,6 +74,9 @@ layer_attribs = {
     'hivel' : 127,
     'group' : 0,
     'off_by' : 0,
+    'effect1' : 0,
+    'effect2' : 0,
+    'output' : 0,
 }
 
 ####################################################################################################################################################
@@ -197,6 +200,9 @@ class LayerEditor(gtk.VBox):
     fields = [
         SliderRow("Volume", "volume", -100, 0),
         SliderRow("Pan", "pan", -100, 100),
+        SliderRow("Effect 1", "effect1", 0, 100),
+        SliderRow("Effect 2", "effect2", 0, 100),
+        IntSliderRow("Output", "output", 0, 7),
         SliderRow("Tune", "tune", -100, 100),
         IntSliderRow("Transpose", "transpose", -48, 48),
         IntSliderRow("Low velocity", "lovel", 1, 127),
