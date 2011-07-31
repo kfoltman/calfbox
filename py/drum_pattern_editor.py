@@ -213,7 +213,7 @@ class DrumCanvas(gnomecanvas.Canvas):
         for item in self.pattern.items():
             x = self.pulse_to_screen_x(item.pos) - self.instr_width
             y = self.row_to_screen_y(item.row + 0.5)
-            item.item = self.notes.add(gnomecanvas.CanvasPolygon, points = [-5, 0, 0, -5, 5, 0, 0, 5], fill_color_rgba = (item.vel << 25))
+            item.item = self.notes.add(gnomecanvas.CanvasPolygon, points = [-4, 0, 0, -5, 5, 0, 0, 5], fill_color_rgba = (item.vel << 25))
             item.item.move(x, y)
         
     def on_grid_event(self, item, event):
@@ -262,7 +262,9 @@ class DrumCanvas(gnomecanvas.Canvas):
             self.cursor_vel.set(text = "")
             self.update_notes()
             self.update_vel_label(None)
-            self.edited_note = None
+            if self.edited_note is not None:
+                self.grab_remove()
+                self.edited_note = None
             return
         if event.type == gtk.gdk.LEAVE_NOTIFY and self.edited_note is None:
             self.hide_cursor()
@@ -285,7 +287,7 @@ class DrumCanvas(gnomecanvas.Canvas):
                 self.hide_cursor()
                 return
             note = self.pattern.get_note(column * self.grid_unit, row)
-            self.cursor.set(x1 = x - 7, x2 = x + 6, y1 = y - 6, y2 = y + 6)
+            self.cursor.set(x1 = x - 6, x2 = x + 6, y1 = y - 6, y2 = y + 6)
             cy = y - self.row_height * 1.5 if row >= self.rows / 2 else y + self.row_height * 1.5
             self.cursor_vel.set(x = x, y = cy, text = "%s" % note.vel if note is not None else "")
             self.show_cursor()
