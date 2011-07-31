@@ -48,11 +48,9 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
     {
         if (!(cbox_execute_on(fb, NULL, "/gain_linear", "f", error, output->gain) &&
             cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
-            cbox_execute_on(fb, NULL, "/output", "i", error, output->output_bus + 1) &&
-            cbox_execute_on(fb, NULL, "/insert_engine", "s", error, output->insert ? output->insert->engine_name : "") &&
-            cbox_execute_on(fb, NULL, "/insert_preset", "s", error, output->insert ? output->insert->instance_name : "")))
+            cbox_execute_on(fb, NULL, "/output", "i", error, output->output_bus + 1)))
             return FALSE;
-        return TRUE;
+        return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, error);
     }
     if (!strcmp(subcmd, "/gain") && !strcmp(cmd->arg_types, "f"))
     {
@@ -66,47 +64,7 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
         output->output_bus = obus - 1;
         return TRUE;
     }
-    if (!strcmp(subcmd, "/insert_preset") && !strcmp(cmd->arg_types, "s"))
-    {
-        struct cbox_module *effect = cbox_module_new_from_fx_preset((const char *)cmd->arg_values[0], error);
-        if (!effect)
-            return FALSE;
-        cbox_rt_swap_pointers(app.rt, (void **)&output->insert, effect);
-        return TRUE;
-    }
-    if (!strcmp(subcmd, "/insert_engine") && !strcmp(cmd->arg_types, "s"))
-    {
-        struct cbox_module *effect = NULL;
-        if (*(const char *)cmd->arg_values[0])
-        {
-            struct cbox_module_manifest *manifest = cbox_module_manifest_get_by_name((const char *)cmd->arg_values[0]);
-            if (!manifest)
-            {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No effect engine '%s'", (const char *)cmd->arg_values[0]);
-                return FALSE;
-            }
-            effect = cbox_module_manifest_create_module(manifest, NULL, cbox_io_get_sample_rate(&app.io), "unnamed", error);
-            if (!effect)
-                return FALSE;
-        }
-        cbox_rt_swap_pointers(app.rt, (void **)&output->insert, effect);
-        return TRUE;
-    }
-    if (!strncmp(subcmd, "/engine/", 8))
-    {
-        if (!output->insert)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The instrument %s has no insert effect on this output", instr->module->instance_name);
-            return FALSE;
-        }
-        if (!output->insert->cmd_target.process_cmd)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", output->insert->engine_name);
-            return FALSE;
-        }
-        return cbox_execute_sub(&output->insert->cmd_target, fb, cmd, subcmd + 7, error);
-    }
-    return cbox_set_command_error(error, cmd);            
+    return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, error);
 }
 
 static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, struct cbox_instrument_output *output, int id, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
@@ -117,11 +75,9 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
             return FALSE;
         if (!(cbox_execute_on(fb, NULL, "/gain_linear", "f", error, output->gain) &&
             cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
-            cbox_execute_on(fb, NULL, "/bus", "s", error, instr->aux_output_names[id] ? instr->aux_output_names[id] : "") &&
-            cbox_execute_on(fb, NULL, "/insert_engine", "s", error, output->insert ? output->insert->engine_name : "") &&
-            cbox_execute_on(fb, NULL, "/insert_preset", "s", error, output->insert ? output->insert->instance_name : "")))
+            cbox_execute_on(fb, NULL, "/bus", "s", error, instr->aux_output_names[id] ? instr->aux_output_names[id] : "")))
             return FALSE;
-        return TRUE;
+        return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, error);
     }
     else if (!strcmp(subcmd, "/bus") && !strcmp(cmd->arg_types, "s"))
     {

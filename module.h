@@ -118,7 +118,7 @@ extern struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GErr
 extern void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler);
 extern void cbox_module_destroy(struct cbox_module *module);
 
-extern gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, int modindex, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error);
+extern gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error);
 
 #define EFFECT_PARAM_CLONE(res) \
     struct MODULE_PARAMS *res = malloc(sizeof(struct MODULE_PARAMS)); \

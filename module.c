@@ -169,7 +169,7 @@ fxpreset_error:
     return NULL;
 }
 
-gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, int modindex, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
+gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
 {
     struct cbox_module *sm = *psm;
     if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
@@ -211,7 +211,7 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, int modindex, st
     {
         if (!sm)
         {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine on module %d in path '%s'", 1 + modindex, cmd->command);
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine on module in path '%s'", cmd->command);
             return FALSE;
         }
         if (!sm->cmd_target.process_cmd)

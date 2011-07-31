@@ -86,7 +86,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
     {
         if (!subcommand)
             return FALSE;
-        return cbox_module_slot_process_cmd(&m->modules[index - 1], index - 1, fb, cmd, subcommand, error);
+        return cbox_module_slot_process_cmd(&m->modules[index - 1], fb, cmd, subcommand, error);
     }
     else if (!strcmp(cmd->command, "/insert") && !strcmp(cmd->arg_types, "i"))
     {
