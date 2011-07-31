@@ -369,20 +369,17 @@ class MainWindow(gtk.Window):
             
             y = 1
             for o in range(1, idata.outputs + 1):
-                if o < idata.aux_offset:
+                is_aux = o >= idata.aux_offset
+                if not is_aux:
                     opath = "%s/output/%s" % (ipath, o)
+                    output_name = "Out %s" % o
                 else:
                     opath = "%s/aux/%s" % (ipath, o - idata.aux_offset + 1)
+                    output_name = "Aux %s" % (o - idata.aux_offset + 1)
                 odata = cbox.GetThings(opath + "/status", ['gain', 'output', 'bus', 'insert_engine', 'insert_preset'], [])
                 engine = odata.insert_engine
                 preset = odata.insert_preset
                 
-                is_aux = 2 * (o - 1) >= idata.aux_offset
-                
-                if not is_aux:
-                    output_name = "Out %s" % o
-                else:
-                    output_name = "Aux %s" % (o - idata.aux_offset / 2)
                 t.attach(gtk.Label(output_name), 0, 1, y, y + 1, gtk.SHRINK, gtk.SHRINK)
                 
                 if not is_aux:

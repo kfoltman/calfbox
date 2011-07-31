@@ -128,7 +128,7 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
             return FALSE;
         if (!cbox_execute_on(fb, NULL, "/engine", "s", error, instr->module->engine_name))
             return FALSE;
-        if (!cbox_execute_on(fb, NULL, "/aux_offset", "i", error, instr->module->aux_offset))
+        if (!cbox_execute_on(fb, NULL, "/aux_offset", "i", error, instr->module->aux_offset / 2 + 1))
             return FALSE;
         if (!cbox_execute_on(fb, NULL, "/outputs", "i", error, instr->module->outputs / 2))
             return FALSE;
