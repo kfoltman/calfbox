@@ -21,8 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "cmd.h"
 
-#define MAX_AUXBUSES_PER_SCENE 8
-
 struct cbox_aux_bus;
 struct cbox_instrument;
 
@@ -36,7 +34,7 @@ struct cbox_scene
     int layer_count;
     struct cbox_instrument **instruments;
     int instrument_count;
-    struct cbox_aux_bus *aux_buses[MAX_AUXBUSES_PER_SCENE];
+    struct cbox_aux_bus **aux_buses;
     int aux_bus_count;
     int transpose;
 };
@@ -49,6 +47,7 @@ extern void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newp
 extern struct cbox_scene *cbox_scene_load(const char *section, GError **error);
 extern gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument);
 extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error);
+extern struct cbox_aux_bus *cbox_scene_remove_aux_bus(struct cbox_scene *scene, int pos);
 extern void cbox_scene_destroy(struct cbox_scene *scene);
 
 #endif

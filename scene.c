@@ -106,6 +106,19 @@ static gboolean cbox_layer_process_cmd(struct cbox_layer *layer, struct cbox_com
     }
 }
 
+static gboolean cbox_aux_bus_process_cmd(struct cbox_aux_bus *aux_bus, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
+{
+    if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        return cbox_module_slot_process_cmd(&aux_bus->module, fb, cmd, subcmd, error);
+    }
+    else 
+        return cbox_module_slot_process_cmd(&aux_bus->module, fb, cmd, subcmd, error);
+}
+
 static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct cbox_scene *s = ct->user_data;
@@ -217,6 +230,35 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             return FALSE;
         return cbox_layer_process_cmd(s->layers[index - 1], fb, cmd, subcommand, error);
     }
+    else if (cbox_parse_path_part(cmd, "/aux/", &subcommand, &index, 1, s->aux_bus_count, error))
+    {
+        if (!subcommand)
+            return FALSE;
+        return cbox_aux_bus_process_cmd(s->aux_buses[index - 1], fb, cmd, subcommand, error);
+    }
+    else if (!strcmp(cmd->command, "/load_aux") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_aux_bus *bus = cbox_scene_get_aux_bus(s, (const char *)cmd->arg_values[0], error);
+        if (!bus)
+            return FALSE;
+        cbox_aux_bus_unref(bus);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/delete_aux") && !strcmp(cmd->arg_types, "i"))
+    {
+        int pos = *(int *)cmd->arg_values[0];
+        if (pos < 0 || pos > s->aux_bus_count)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for last)", pos, s->aux_bus_count);
+            return FALSE;
+        }
+        if (pos == 0)
+            pos = s->aux_bus_count - 1;
+        else
+            pos--;
+        cbox_aux_bus_destroy(cbox_scene_remove_aux_bus(s, pos));
+        return TRUE;
+    }
     else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
@@ -266,6 +308,7 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
     
     s->layers = NULL;
     s->instruments = NULL;
+    s->aux_buses = NULL;
     s->layer_count = 0;
     s->instrument_count = 0;
     s->aux_bus_count = 0;
@@ -315,6 +358,7 @@ struct cbox_scene *cbox_scene_new()
     s->name = g_strdup("");
     s->title = g_strdup("");
     s->layers = NULL;
+    s->aux_buses = NULL;
     s->instruments = NULL;
     s->layer_count = 0;
     s->instrument_count = 0;
@@ -420,6 +464,29 @@ gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_inst
     return FALSE;
 }
 
+gboolean cbox_scene_insert_aux_bus(struct cbox_scene *scene, struct cbox_aux_bus *aux_bus)
+{
+    struct cbox_aux_bus **aux_buses = malloc(sizeof(struct cbox_aux_bus *) * (scene->aux_bus_count + 1));
+    memcpy(aux_buses, scene->aux_buses, sizeof(struct cbox_aux_bus *) * (scene->aux_bus_count));
+    aux_buses[scene->aux_bus_count] = aux_bus;
+    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->aux_buses, aux_buses, &scene->aux_bus_count, scene->aux_bus_count + 1));
+    return TRUE;
+}
+
+struct cbox_aux_bus *cbox_scene_remove_aux_bus(struct cbox_scene *scene, int pos)
+{
+    struct cbox_aux_bus *removed = scene->aux_buses[pos];
+    for (int i = 0; i < scene->instrument_count; i++)
+        cbox_instrument_disconnect_aux_bus(scene->instruments[i], removed);
+    
+    struct cbox_aux_bus **aux_buses = malloc(sizeof(struct cbox_aux_bus *) * (scene->aux_bus_count - 1));
+    memcpy(aux_buses, scene->aux_buses, sizeof(struct cbox_aux_bus *) * pos);
+    memcpy(aux_buses + pos, scene->aux_buses + pos + 1, sizeof(struct cbox_aux_bus *) * (scene->aux_bus_count - pos - 1));
+    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->aux_buses, aux_buses, &scene->aux_bus_count, scene->aux_bus_count - 1));
+    
+    return removed;
+}
+
 struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error)
 {
     for (int i = 0; i < scene->aux_bus_count; i++)
@@ -430,16 +497,11 @@ struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char
             return scene->aux_buses[i];
         }
     }
-    if (scene->aux_bus_count == MAX_AUXBUSES_PER_SCENE)
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Aux bus limit exceeded for effect '%s'", name);
-        return NULL;
-    }
     struct cbox_aux_bus *bus = cbox_aux_bus_load(name, error);
     if (!bus)
         return NULL;
+    cbox_scene_insert_aux_bus(scene, bus);
     bus->refcount++;
-    scene->aux_buses[scene->aux_bus_count++] = bus;
     return bus;
 }
 

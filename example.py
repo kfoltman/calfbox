@@ -103,6 +103,26 @@ class SceneLayersView(gtk.TreeView):
             scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
             self.get_model().refresh(scene)
 
+class SceneAuxBusesModel(gtk.ListStore):
+    def __init__(self):
+        gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_STRING)
+    def refresh(self, scene):
+        self.clear()
+        for l in scene.aux:
+            aux = cbox.GetThings("/scene/aux/%d/status" % l[0], ["insert_engine", "insert_preset"], [])
+            self.append((aux.insert_preset, aux.insert_engine))
+
+class SceneAuxBusesView(gtk.TreeView):
+    def __init__(self, model):
+        gtk.TreeView.__init__(self, model)
+        self.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=0)
+        self.insert_column_with_attributes(1, "Engine", gtk.CellRendererText(), text=1)
+    def get_current_row(self):
+        row = self.get_cursor()[0][0]
+        if row is None:
+            return None, None
+        return row + 1, self.get_model()[row]
+
 class MainWindow(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
@@ -124,6 +144,11 @@ class MainWindow(gtk.Window):
             ("_Add", self.layer_add),
             ("_Remove", self.layer_remove),
         ]))
+        self.menu_bar.append(create_menu("_AuxBus", [
+            ("_Add", self.aux_bus_add),
+            ("_Edit", self.aux_bus_edit),
+            ("_Remove", self.aux_bus_remove),
+        ]))
         self.menu_bar.append(create_menu("_Tools", [
             ("_Drum Kit Editor", self.tools_drumkit_editor),
             ("_Play Drum Pattern", self.tools_play_drum_pattern),
@@ -142,7 +167,7 @@ class MainWindow(gtk.Window):
         self.master_info = left_label("")
         self.timesig_info = left_label("")
         
-        t = gtk.Table(2, 6)
+        t = gtk.Table(2, 8)
         t.set_col_spacings(5)
         t.set_row_spacings(5)
         
@@ -171,10 +196,15 @@ class MainWindow(gtk.Window):
         t.attach(standard_align(gtk.SpinButton(self.transpose_adj), 0, 0, 0, 0), 1, 2, 5, 6, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         
         self.layers_model = SceneLayersModel()
-        self.layers_tree = SceneLayersView(self.layers_model)
-        t.attach(standard_vscroll_window(-1, 160, self.layers_tree), 0, 2, 6, 7, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+        self.layers_view = SceneLayersView(self.layers_model)
+        t.attach(standard_vscroll_window(-1, 160, self.layers_view), 0, 2, 6, 7, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+        
+        self.auxes_model = SceneAuxBusesModel()
+        self.auxes_view = SceneAuxBusesView(self.auxes_model)
+        t.attach(standard_vscroll_window(-1, 80, self.auxes_view), 0, 2, 7, 8, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         
         self.layers_model.refresh(scene)
+        self.auxes_model.refresh(scene)
         
         return t
         
@@ -217,11 +247,35 @@ class MainWindow(gtk.Window):
             d.destroy()
 
     def layer_remove(self, w):
-        if self.layers_tree.get_cursor()[0] is not None:
-            pos = self.layers_tree.get_cursor()[0][0]
+        if self.layers_view.get_cursor()[0] is not None:
+            pos = self.layers_view.get_cursor()[0][0]
             cbox.do_cmd("/scene/delete_layer", None, [1 + pos])
             self.refresh_instrument_pages()
             
+    def aux_bus_add(self, w):
+        d = fx_gui.LoadEffectDialog(self)
+        response = d.run()
+        try:
+            cbox.do_cmd("/scene/load_aux", None, [d.get_selected_object()[0]])
+            self.refresh_instrument_pages()
+        finally:
+            d.destroy()
+    def aux_bus_remove(self, w):
+        rowid, row = self.auxes_view.get_current_row()
+        if rowid is None:
+            return
+        cbox.do_cmd("/scene/delete_aux", None, [rowid])
+        self.refresh_instrument_pages()
+        
+    def aux_bus_edit(self, w):
+        rowid, row = self.auxes_view.get_current_row()
+        if rowid is None:
+            return
+        wclass = fx_gui.effect_window_map[row[1]]
+        popup = wclass("Aux: %s" % row[0], self, "/scene/aux/%d/engine" % rowid)
+        popup.show_all()
+        popup.present()
+        
     def tools_drumkit_editor(self, w):
         if self.drumkit_editor is None:
             self.drumkit_editor = drumkit_editor.EditorDialog(self)
@@ -276,6 +330,7 @@ class MainWindow(gtk.Window):
         rt = cbox.GetThings("/rt/status", ['audio_channels'], [])
         scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
         self.layers_model.refresh(scene)
+        self.auxes_model.refresh(scene)
         self.create_instrument_pages(scene, rt)
         self.nb.show_all()
         self.title_label.set_text(scene.title)

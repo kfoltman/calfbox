@@ -302,3 +302,15 @@ class InsertEffectChooser(object):
     def close_popup(self):
         if self.popup is not None:
             self.popup.destroy();
+
+#################################################################################################################################
+
+class LoadEffectDialog(SelectObjectDialog):
+    title = "Load an aux effect"
+    def __init__(self, parent):
+        SelectObjectDialog.__init__(self, parent)
+    def update_model(self, model):
+        for s in cbox.Config.sections("fxpreset:"):
+            title = s["title"]
+            model.append((s.name[9:], s['engine'], s.name, title))
+

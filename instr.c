@@ -302,6 +302,19 @@ void cbox_instrument_unref_aux_buses(struct cbox_instrument *instrument)
     }    
 }
 
+void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrument, struct cbox_aux_bus *bus)
+{
+    for (int j = 0; j < instrument->aux_output_count; j++)
+    {
+        if (instrument->aux_outputs[j] == bus)
+        {
+            cbox_aux_bus_unref(instrument->aux_outputs[j]);
+            instrument->aux_outputs[j] = NULL;
+        }
+    }    
+}
+
+
 void cbox_instruments_close()
 {
     g_hash_table_destroy(instruments.hash);
