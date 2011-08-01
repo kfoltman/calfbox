@@ -70,7 +70,7 @@ def standard_combo(model, active_item = None, column = 0, active_item_lookup = N
     if active_item_lookup is not None:
         if lookup_column is None:
             lookup_column = column
-        active_item = ls_index(model, active_item_lookup, column)
+        active_item = ls_index(model, active_item_lookup, lookup_column)
     if active_item is not None:
         cb.set_active(active_item)
     cell = gtk.CellRendererText()
@@ -157,6 +157,10 @@ def create_menu(title, items):
             mit.connect('activate', meth)
             menu.append(mit)
     return menuitem
+
+def note_to_name(note):
+    n = note % 12
+    return ("C C#D D#E F F#G G#A A#B "[n * 2 : n * 2 + 2]) + str((note / 12) - 2)
 
 #################################################################################################################################
 

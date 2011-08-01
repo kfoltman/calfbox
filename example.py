@@ -318,8 +318,12 @@ class MainWindow(gtk.Window):
     def on_drum_pattern_changed(self, pattern):
         data = ""
         for i in pattern.items():
-            data += cbox.Pattern.serialize_event(int(i.pos), 0x99, int(36 + i.row), int(i.vel))
-            data += cbox.Pattern.serialize_event(int(i.pos + 1), 0x89, int(36 + i.row), int(i.vel))
+            ch = i.channel - 1
+            data += cbox.Pattern.serialize_event(int(i.pos), 0x90 + ch, int(i.row), int(i.vel))
+            if i.len > 1:
+                data += cbox.Pattern.serialize_event(int(i.pos + i.len - 1), 0x80 + ch, int(i.row), int(i.vel))
+            else:
+                data += cbox.Pattern.serialize_event(int(i.pos + 1), 0x80 + ch, int(i.row), int(i.vel))
         cbox.do_cmd("/play_blob", None, [buffer(data), pattern.get_length()])
         
     def on_drum_pattern_editor_destroy(self, w):
