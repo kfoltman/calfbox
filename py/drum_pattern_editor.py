@@ -220,14 +220,12 @@ class DrumCanvas(gnomecanvas.Canvas):
         #print event
         if event.type in [gtk.gdk.BUTTON_PRESS, gtk.gdk._2BUTTON_PRESS, gtk.gdk.LEAVE_NOTIFY, gtk.gdk.MOTION_NOTIFY, gtk.gdk.BUTTON_RELEASE]:
             ex, ey = self.window_to_world(event.x, event.y)
-        unit = self.grid_unit * self.zoom_in
-        if event.type == gtk.gdk.BUTTON_PRESS:
             column = self.screen_x_to_column(ex)
             row = self.screen_y_to_row(ey)
-            if column < 0:
-                return
             pulse = column * self.grid_unit
-            if pulse >= self.pattern.get_length():
+        unit = self.grid_unit * self.zoom_in
+        if event.type == gtk.gdk.BUTTON_PRESS:
+            if pulse < 0 or pulse >= self.pattern.get_length():
                 return
             note = self.pattern.get_note(pulse, row)
             if note is not None:
@@ -250,12 +248,7 @@ class DrumCanvas(gnomecanvas.Canvas):
             self.update_vel_label(note)
             return
         if event.type == gtk.gdk._2BUTTON_PRESS:
-            column = self.screen_x_to_column(ex)
-            row = self.screen_y_to_row(ey)
-            if column < 0:
-                return
-            pulse = column * self.grid_unit
-            if pulse >= self.pattern.get_length():
+            if pulse < 0 or pulse >= self.pattern.get_length():
                 return
             if self.pattern.has_note(pulse, row):
                 self.pattern.remove_note(pulse, row)
@@ -271,13 +264,7 @@ class DrumCanvas(gnomecanvas.Canvas):
             self.update_vel_label(None)
             return
         if event.type == gtk.gdk.MOTION_NOTIFY and self.edited_note is None:
-            if ex < self.instr_width - unit / 2:
-                self.hide_cursor()
-                return
-            column = self.screen_x_to_column(ex)
-            row = self.screen_y_to_row(ey)
-            pulse = column * self.grid_unit
-            if pulse >= self.pattern.get_length():
+            if pulse < 0 or pulse >= self.pattern.get_length():
                 self.hide_cursor()
                 return
             
