@@ -88,9 +88,6 @@ class DrumEditorToolbox(gtk.HBox):
             self.pack_start(button, True, True)
         self.pack_start(gtk.Label("Velocity:"), False, False)
         self.pack_start(gtk.SpinButton(self.vel_adj, 0, 0), False, False)
-        self.cur_vel_label = gtk.Label("")
-        self.cur_vel_label.set_width_chars(3)
-        self.pack_start(self.cur_vel_label, False, False)
         button = gtk.Button("Load")
         button.connect('clicked', self.load_pattern)
         self.pack_start(button, True, True)
@@ -132,6 +129,35 @@ class DrumEditorToolbox(gtk.HBox):
         finally:
             dlg.destroy()
 
+class DrumCanvasCursor(object):
+    def __init__(self, canvas):
+        self.canvas = canvas
+        self.frame = self.canvas.root().add(gnomecanvas.CanvasRect, x1 = -6, y1 = -6, x2 = 6, y2 = 6, outline_color = "gray")
+        self.frame.hide()
+        self.vel = self.canvas.root().add(gnomecanvas.CanvasText, x = 0, y = 0, fill_color = "blue")
+        self.vel.hide()
+
+    def hide(self):
+        self.frame.hide()
+        self.vel.hide()
+        
+    def show(self):
+        self.frame.show()
+        self.vel.show()
+        
+    def set_note(self, note):
+        if note is None:
+            self.vel.set(text = "")
+        else:
+            self.vel.set(text = str(note.vel))
+            
+    def move(self, pulse, row):
+        x = self.canvas.pulse_to_screen_x(pulse)
+        y = self.canvas.row_to_screen_y(row) + self.canvas.row_height / 2
+        self.frame.set(x1 = x - 6, x2 = x + 6, y1 = y - 6, y2 = y + 6)
+        cy = y - self.canvas.row_height * 1.5 if y >= self.canvas.rows * self.canvas.row_height / 2 else y + self.canvas.row_height * 1.5
+        self.vel.set(x = x, y = cy)
+
 class DrumCanvas(gnomecanvas.Canvas):
     def __init__(self, rows, pattern):
         gnomecanvas.Canvas.__init__(self)
@@ -158,11 +184,10 @@ class DrumCanvas(gnomecanvas.Canvas):
         self.names = self.root().add(gnomecanvas.CanvasGroup, x = 0)
         self.update_names()
         
+        self.cursor = DrumCanvasCursor(self)
+        self.cursor.show()
+        
         self.connect('event', self.on_grid_event)
-        self.cursor = self.root().add(gnomecanvas.CanvasRect, x1 = -7, y1 = -7, x2 = 6, y2 = 6, outline_color = "gray")
-        self.cursor.hide()
-        self.cursor_vel = self.root().add(gnomecanvas.CanvasText, x = 0, y = 0, fill_color = "blue")
-        self.cursor_vel.hide()
 
         self.toolbox = DrumEditorToolbox(self)
         
@@ -172,14 +197,6 @@ class DrumCanvas(gnomecanvas.Canvas):
     def set_grid_unit(self, grid_unit):
         self.grid_unit = grid_unit
         self.update_grid()
-        
-    def hide_cursor(self):
-        self.cursor.hide()
-        self.cursor_vel.hide()
-        
-    def show_cursor(self):
-        self.cursor.show()
-        self.cursor_vel.show()
         
     def update_names(self):
         for i in self.names.item_list:
@@ -223,6 +240,7 @@ class DrumCanvas(gnomecanvas.Canvas):
             column = self.screen_x_to_column(ex)
             row = self.screen_y_to_row(ey)
             pulse = column * self.grid_unit
+            epulse = (ex - self.instr_width) / self.zoom_in
         unit = self.grid_unit * self.zoom_in
         if event.type == gtk.gdk.BUTTON_PRESS:
             if pulse < 0 or pulse >= self.pattern.get_length():
@@ -231,9 +249,8 @@ class DrumCanvas(gnomecanvas.Canvas):
             if note is not None:
                 if event.button == 3:
                     vel = int(self.toolbox.vel_adj.get_value())
-                    self.cursor_vel.set(text = "%s" % vel)
                     self.pattern.set_note_vel(note, vel)
-                    self.update_vel_label(note)
+                    self.cursor.set_note(note)
                     self.update_notes()
                     return
                 self.toolbox.vel_adj.set_value(note.vel)
@@ -244,41 +261,35 @@ class DrumCanvas(gnomecanvas.Canvas):
             self.orig_velocity = note.vel
             self.orig_y = ey
             self.grab_add()
+            self.cursor.set_note(note)
             self.update_notes()
-            self.update_vel_label(note)
             return
         if event.type == gtk.gdk._2BUTTON_PRESS:
             if pulse < 0 or pulse >= self.pattern.get_length():
                 return
             if self.pattern.has_note(pulse, row):
                 self.pattern.remove_note(pulse, row)
-            self.cursor_vel.set(text = "")
+            self.cursor.set_note(None)
             self.update_notes()
-            self.update_vel_label(None)
             if self.edited_note is not None:
                 self.grab_remove()
                 self.edited_note = None
             return
         if event.type == gtk.gdk.LEAVE_NOTIFY and self.edited_note is None:
-            self.hide_cursor()
-            self.update_vel_label(None)
+            self.cursor.hide()
             return
         if event.type == gtk.gdk.MOTION_NOTIFY and self.edited_note is None:
             if pulse < 0 or pulse >= self.pattern.get_length():
-                self.hide_cursor()
+                self.cursor.hide()
                 return
             
-            x = self.column_to_screen_x(column)
-            y = self.row_to_screen_y(row + 0.5)
-            if abs(ex - x) > 5:
-                self.hide_cursor()
+            if abs(pulse - epulse) > 5:
+                self.cursor.hide()
                 return
             note = self.pattern.get_note(column * self.grid_unit, row)
-            self.cursor.set(x1 = x - 6, x2 = x + 6, y1 = y - 6, y2 = y + 6)
-            cy = y - self.row_height * 1.5 if row >= self.rows / 2 else y + self.row_height * 1.5
-            self.cursor_vel.set(x = x, y = cy, text = "%s" % note.vel if note is not None else "")
-            self.show_cursor()
-            self.update_vel_label(note)
+            self.cursor.move(pulse, row)
+            self.cursor.set_note(note)
+            self.cursor.show()
             return
         if event.type == gtk.gdk.MOTION_NOTIFY and self.edited_note is not None:
             vel = int(self.orig_velocity - self.snap(ey - self.orig_y) / 2)
@@ -286,9 +297,8 @@ class DrumCanvas(gnomecanvas.Canvas):
             if vel > 127: vel = 127
             self.pattern.set_note_vel(self.edited_note, vel)
             self.toolbox.vel_adj.set_value(vel)
-            self.cursor_vel.set(text = "%s" % vel)
+            self.cursor.set_note(self.edited_note)
             self.update_notes()
-            self.update_vel_label(self.edited_note)
             self.update_now()
         if event.type == gtk.gdk.BUTTON_RELEASE and self.edited_note is not None:
             self.edited_note = None
@@ -311,12 +321,6 @@ class DrumCanvas(gnomecanvas.Canvas):
     def row_to_screen_y(self, row):
         return row * self.row_height + 1
         
-    def update_vel_label(self, note):
-        if note is None:
-            self.toolbox.cur_vel_label.set_text("")
-        else:
-            self.toolbox.cur_vel_label.set_text(str(note.vel))
-            
     def snap(self, val):
         if val > -10 and val < 10:
             return 0
