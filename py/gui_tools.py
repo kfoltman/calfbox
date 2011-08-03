@@ -159,6 +159,8 @@ def create_menu(title, items):
     return menuitem
 
 def note_to_name(note):
+    if note < 0:
+        return "N/A"
     n = note % 12
     return ("C C#D D#E F F#G G#A A#B "[n * 2 : n * 2 + 2]) + str((note / 12) - 2)
 

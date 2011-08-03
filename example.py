@@ -61,6 +61,15 @@ out_channels_ls.append((0, "Same"))
 for i in range(1, 17):
     in_channels_ls.append((i, str(i)))
     out_channels_ls.append((i, str(i)))
+notes_ls = gtk.ListStore(gobject.TYPE_INT, gobject.TYPE_STRING)
+opt_notes_ls = gtk.ListStore(gobject.TYPE_INT, gobject.TYPE_STRING)
+opt_notes_ls.append((-1, "N/A"))
+for i in range(0, 128):
+    notes_ls.append((i, note_to_name(i)))
+    opt_notes_ls.append((i, note_to_name(i)))
+transpose_ls = gtk.ListStore(gobject.TYPE_INT, gobject.TYPE_STRING)
+for i in range(-60, 61):
+    transpose_ls.append((i, str(i)))
 
 class SceneLayersModel(gtk.ListStore):
     def __init__(self):
@@ -85,10 +94,10 @@ class SceneLayersView(gtk.TreeView):
         self.insert_column_with_data_func(2, "In Ch#", standard_combo_renderer(model, in_channels_ls, "/scene/layer/%d/in_channel", 2), lambda column, cell, model, iter: cell.set_property('text', "%s" % model[iter][2] if model[iter][2] != 0 else 'All'))
         self.insert_column_with_data_func(3, "Out Ch#", standard_combo_renderer(model, out_channels_ls, "/scene/layer/%d/out_channel", 3), lambda column, cell, model, iter: cell.set_property('text', "%s" % model[iter][3] if model[iter][3] != 0 else 'Same'))
         self.insert_column_with_attributes(4, "Eat?", standard_toggle_renderer(model, "/scene/layer/%d/consume", 4), active=4)
-        self.insert_column_with_attributes(5, "Lo N#", gtk.CellRendererText(), text=5)
-        self.insert_column_with_attributes(6, "Hi N#", gtk.CellRendererText(), text=6)
-        self.insert_column_with_attributes(7, "Fix N#", gtk.CellRendererText(), text=7)
-        self.insert_column_with_attributes(8, "Transpose", gtk.CellRendererText(), text=8)
+        self.insert_column_with_data_func(5, "Lo N#", standard_combo_renderer(model, notes_ls, "/scene/layer/%d/low_note", 5), lambda column, cell, model, iter: cell.set_property('text', note_to_name(model[iter][5])))
+        self.insert_column_with_data_func(6, "Hi N#", standard_combo_renderer(model, notes_ls, "/scene/layer/%d/high_note", 6), lambda column, cell, model, iter: cell.set_property('text', note_to_name(model[iter][6])))
+        self.insert_column_with_data_func(7, "Fix N#", standard_combo_renderer(model, opt_notes_ls, "/scene/layer/%d/fixed_note", 7), lambda column, cell, model, iter: cell.set_property('text', note_to_name(model[iter][7])))
+        self.insert_column_with_attributes(8, "Transpose", standard_combo_renderer(model, transpose_ls, "/scene/layer/%d/transpose", 8), text=8)
     def drag_data_get(self, treeview, context, selection, target_id, etime):
         cursor = treeview.get_cursor()
         if cursor is not None:
