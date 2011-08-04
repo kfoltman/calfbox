@@ -17,7 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "song.h"
+#include "track.h"
 #include <stdlib.h>
+
+void cbox_master_track_item_destroy(struct cbox_master_track_item *item)
+{
+    free(item);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct cbox_song *cbox_song_new()
 {
@@ -29,34 +37,10 @@ struct cbox_song *cbox_song_new()
     return p;
 }
 
-void cbox_master_track_item_destroy(struct cbox_master_track_item *item)
-{
-    free(item);
-}
-
-void cbox_track_item_destroy(struct cbox_track_item *item)
-{
-    free(item);
-}
-
-struct cbox_track *cbox_track_new()
-{
-    struct cbox_track *p = malloc(sizeof(struct cbox_track));
-    p->output = NULL;
-    p->items = NULL;
-    cbox_midi_playback_active_notes_init(&p->active_notes);
-    return p;
-}
-
-void cbox_track_destroy(struct cbox_track *track)
-{
-    g_list_free_full(track->items, (GDestroyNotify)cbox_track_item_destroy);
-    free(track);
-}
-
 void cbox_song_destroy(struct cbox_song *song)
 {
     g_list_free_full(song->master_track_items, (GDestroyNotify)cbox_master_track_item_destroy);
     g_list_free_full(song->tracks, (GDestroyNotify)cbox_track_destroy);
+    free(song);
 }
 

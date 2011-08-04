@@ -16,31 +16,27 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CBOX_SONG_H
-#define CBOX_SONG_H
+#ifndef CBOX_TRACK_H
+#define CBOX_TRACK_H
 
-#include "pattern.h"
+#include <stdint.h>
+#include <glib.h>
 
-struct cbox_master_track_item
+struct cbox_track_item
 {
     uint32_t time;
-    double tempo;
-    int timesig_nom, timesig_denom;
+    struct cbox_pattern *pattern;
+    uint32_t offset;
+    uint32_t length;
 };
 
-struct cbox_master_track
+struct cbox_track
 {
     GList *items;
 };
 
-struct cbox_song
-{
-    GList *master_track_items;
-    GList *tracks;
-    gchar *lyrics_sheet, *chord_sheet;
-};
-
-extern struct cbox_song *cbox_song_new();
-extern void cbox_song_destroy(struct cbox_song *song);
+extern struct cbox_track *cbox_track_new();
+extern void cbox_track_add_item(struct cbox_track *track, struct cbox_track_item *item);
+extern void cbox_track_destroy(struct cbox_track *track);
 
 #endif
