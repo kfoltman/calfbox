@@ -60,47 +60,45 @@ class StreamWindow(gtk.VBox):
 
 class WithPatchTable:
     def __init__(self, attribs):
+        self.patches = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
         self.patch_combos = []
-        self.update_model()
         
         self.table = gtk.Table(2, 16)
         self.table.set_col_spacings(5)
 
         for i in range(16):
             self.table.attach(bold_label("Channel %s" % (1 + i)), 0, 1, i, i + 1, gtk.SHRINK, gtk.SHRINK)
-            if attribs.patch[i + 1][0] != -1:
-                cb = standard_combo(self.patches, self.mapping[attribs.patch[i + 1][0]])
-            else:
-                cb = standard_combo(self.patches, None)
+            cb = standard_combo(self.patches, None)
             cb.connect('changed', self.patch_combo_changed, i + 1)
             self.table.attach(cb, 1, 2, i, i + 1, gtk.SHRINK, gtk.SHRINK)
             self.patch_combos.append(cb)
 
+        self.update_model()
         set_timer(self, 500, self.patch_combo_update)
 
     def update_model(self):
-        self.patches = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
+        self.patches.clear()
         patches = cbox.GetThings("%s/patches" % self.path, ["%patch"], []).patch
+        ch_patches = cbox.GetThings("%s/status" % self.path, ["%patch"], []).patch
         self.mapping = {}
         for id in patches:
             self.mapping[id] = len(self.mapping)
             self.patches.append(("%s (%s)" % (patches[id], id), id))
-        for cb in self.patch_combos:
-            cb.set_model(self.patches)
+        self.patch_combo_update()
 
     def patch_combo_changed(self, combo, channel):
-        if combo.get_active() is None:
+        if combo.get_active() == -1:
             return
         cbox.do_cmd(self.path + "/set_patch", None, [int(channel), int(self.patches[combo.get_active()][1])])
 
     def patch_combo_update(self):
-        attribs = cbox.GetThings("%s/status" % self.path, ['%patch'], [])
+        patch = cbox.GetThings("%s/status" % self.path, ['%patch'], []).patch
         for i in range(16):
             cb = self.patch_combos[i]
-            if cb.get_active() >= 0:
-                patch_id = int(self.patches[cb.get_active()][1])
-                if patch_id != attribs.patch[i + 1][1]:
-                    cb.set_active(self.mapping[attribs.patch[i + 1][0]])
+            old_patch_index = cb.get_active() if cb.get_active() >= 0 else -1
+            current_patch_index = self.mapping[patch[i + 1][0]] if patch[i + 1][0] >= 0 else -1
+            if old_patch_index != current_patch_index:
+                cb.set_active(current_patch_index)
         #self.status_label.set_markup(s)
         return True
         
