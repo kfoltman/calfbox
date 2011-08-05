@@ -1432,6 +1432,7 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
         }
         else
         {
+            pgm_id = i;
             pgm_section = g_strdup_printf("spgm:%s", pgm_name);
         }
         
