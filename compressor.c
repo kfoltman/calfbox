@@ -99,10 +99,12 @@ void compressor_process_block(struct cbox_module *module, cbox_sample_t **inputs
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         float left = inputs[0][i], right = inputs[1][i];
-        float sig = 0.5 * (fabs(left) < fabs(right) ? fabs(left) : fabs(right));
+        float sig = 0.5 * (fabs(left) > fabs(right) ? fabs(left) : fabs(right));
         
-        sig = cbox_onepolef_process_sample(&m->tracker, sig < m->tracker.y1 ? &m->release_lp : (sig > 4 * m->tracker.y1 ? &m->fast_attack_lp : &m->attack_lp), sig);
-        sig = cbox_onepolef_process_sample(&m->tracker2, sig < m->tracker2.y1 ? &m->release_lp : (sig > 2 * m->tracker2.y1 ? &m->fast_attack_lp : &m->attack_lp), sig);
+        int falling = sig < m->tracker.y1 && sig < m->tracker.x1;
+        int rising_fast = sig > 4 * m->tracker.y1 && sig > 4 * m->tracker.x1;
+        sig = cbox_onepolef_process_sample(&m->tracker, falling ? &m->release_lp : (rising_fast * m->tracker.y1 ? &m->fast_attack_lp : &m->attack_lp), sig);
+        sig = cbox_onepolef_process_sample(&m->tracker2, falling ? &m->release_lp : (rising_fast * m->tracker2.y1 ? &m->fast_attack_lp : &m->attack_lp), sig);
         float gain = 1.0;
         if (sig > threshold)
             gain = threshold * powf(sig / threshold, invratio) / sig;
