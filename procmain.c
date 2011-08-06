@@ -494,23 +494,24 @@ struct cbox_song *cbox_rt_set_song(struct cbox_rt *rt, struct cbox_song *song, i
 struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos_ppqn)
 {
     struct cbox_track *track = cbox_track_new();
-    struct cbox_midi_pattern *metro = cbox_midi_pattern_new_metronome(4);
-    cbox_track_add_item(track, 0, pattern, pattern->loop_end / 4, pattern->loop_end / 2);
-    //cbox_track_add_item(track, 0, pattern, 0, pattern->loop_end / 2);
+    cbox_track_add_item(track, 0, pattern, 0, pattern->loop_end);
     cbox_track_update_playback(track, rt->master);
-    
+
+#if 0    
     struct cbox_track *track2 = cbox_track_new();
-    metro = cbox_midi_pattern_new_metronome(4);
+    struct cbox_midi_pattern *metro = cbox_midi_pattern_new_metronome(4);
     cbox_track_add_item(track2, 0, metro, 0, metro->loop_end);
-    cbox_track_add_item(track2, metro->loop_end, metro, 0, metro->loop_end);
     cbox_track_update_playback(track2, rt->master);
+#endif
     
     struct cbox_song *song = cbox_song_new(rt->master);
     cbox_song_add_track(song, track);
+#if 0
     cbox_song_add_track(song, track2);
+#endif
 
     song->loop_start_ppqn = 0;
-    song->loop_end_ppqn = metro->loop_end * 2;
+    song->loop_end_ppqn = pattern->loop_end;
     
     new_pos_ppqn = 0; // XXXKF
     return cbox_rt_set_song(rt, song, new_pos_ppqn);
