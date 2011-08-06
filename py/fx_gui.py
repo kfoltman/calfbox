@@ -160,18 +160,21 @@ class FXChainWindow(EffectWindow):
         self.refresh_table()
         
     def refresh_table(self):
-        values = cbox.GetThings(self.path + "/status", ["*module"], []).module
+        res = cbox.GetThings(self.path + "/status", ["*module", "%bypass"], [])
+        values = res.module
+        bypass = res.bypass
         fx_count = len(values)
-        t = gtk.Table(fx_count + 2, 8)
+        t = gtk.Table(fx_count + 2, 9)
         for c in self.choosers:
             c.close_popup()
         self.choosers = []
         for i in range(1, fx_count + 1):
             engine, preset = values[i - 1]
-            chooser = InsertEffectChooser("%s/module/%s" % (self.path, i), "%s: slot %s" % (self.get_title(), i), engine, preset, self.main_window)
+            chooser = InsertEffectChooser("%s/module/%s" % (self.path, i), "%s: slot %s" % (self.get_title(), i), engine, preset, bypass[i], self.main_window)
             t.attach(chooser.fx_engine, 0, 1, i, i + 1, 0, gtk.SHRINK)
             t.attach(chooser.fx_preset, 1, 2, i, i + 1, 0, gtk.SHRINK)
             t.attach(chooser.fx_edit, 2, 3, i, i + 1, 0, gtk.SHRINK)
+            t.attach(chooser.fx_bypass, 3, 4, i, i + 1, 0, gtk.SHRINK)
             buttons = [
                 ("+", self.on_add_clicked, lambda pos: True),
                 ("-", self.on_delete_clicked, lambda pos: True),
@@ -184,10 +187,10 @@ class FXChainWindow(EffectWindow):
                     continue
                 button = gtk.Button(label)
                 button.connect('clicked', lambda button, method, pos: method(pos), method, i)
-                t.attach(button, 3 + j, 4 + j, i, i + 1, 0, gtk.SHRINK)
+                t.attach(button, 4 + j, 5 + j, i, i + 1, 0, gtk.SHRINK)
             self.choosers.append(chooser)
         button = gtk.Button("+")
-        button.connect('clicked', lambda button, method, pos: self.on_add_clicked(pos), method, fx_count + 1)
+        button.connect('clicked', lambda button, pos: self.on_add_clicked(pos), fx_count + 1)
         t.attach(button, 3, 4, fx_count + 1, fx_count + 2, 0, gtk.SHRINK)
         if self.fx_table is not None:
             self.remove(self.fx_table)
@@ -247,7 +250,7 @@ effect_list_model = EffectListModel()
 #################################################################################################################################
 
 class InsertEffectChooser(object):
-    def __init__(self, opath, location, engine, preset, main_window):
+    def __init__(self, opath, location, engine, preset, bypass, main_window):
         self.opath = opath
         self.location = location
         self.main_window = main_window
@@ -266,6 +269,10 @@ class InsertEffectChooser(object):
         self.fx_edit = gtk.Button("_Edit")
         self.fx_edit.connect("clicked", self.edit_effect_clicked)
         self.fx_edit.set_sensitive(engine in effect_window_map)
+        
+        self.fx_bypass = gtk.ToggleButton("_Bypass")
+        self.fx_bypass.set_active(bypass > 0)
+        self.fx_bypass.connect("clicked", self.bypass_effect_clicked)
         
     def edit_effect_clicked(self, button):
         if self.popup is not None:
@@ -302,6 +309,9 @@ class InsertEffectChooser(object):
     def close_popup(self):
         if self.popup is not None:
             self.popup.destroy();
+
+    def bypass_effect_clicked(self, button):
+        cbox.do_cmd(self.opath + "/set_bypass", None, [1 if button.get_active() else 0])
 
 #################################################################################################################################
 

@@ -371,13 +371,13 @@ class MainWindow(gtk.Window):
             b.set_border_width(5)
             b.pack_start(gtk.Label("Engine: %s" % i[1]), False, False)
             b.pack_start(gtk.HSeparator(), False, False)
-            t = gtk.Table(1 + idata.outputs, 5)
+            t = gtk.Table(1 + idata.outputs, 7)
             t.set_col_spacings(5)
             t.attach(bold_label("Instr. output", 0.5), 0, 1, 0, 1, gtk.SHRINK, gtk.SHRINK)
             t.attach(bold_label("Send to", 0.5), 1, 2, 0, 1, gtk.SHRINK, gtk.SHRINK)
             t.attach(bold_label("Gain [dB]", 0.5), 2, 3, 0, 1, 0, gtk.SHRINK)
             t.attach(bold_label("Effect", 0.5), 3, 4, 0, 1, 0, gtk.SHRINK)
-            t.attach(bold_label("Preset", 0.5), 4, 6, 0, 1, 0, gtk.SHRINK)
+            t.attach(bold_label("Preset", 0.5), 4, 7, 0, 1, 0, gtk.SHRINK)
             b.pack_start(t, False, False)
             
             y = 1
@@ -389,9 +389,10 @@ class MainWindow(gtk.Window):
                 else:
                     opath = "%s/aux/%s" % (ipath, o - idata.aux_offset + 1)
                     output_name = "Aux %s" % (o - idata.aux_offset + 1)
-                odata = cbox.GetThings(opath + "/status", ['gain', 'output', 'bus', 'insert_engine', 'insert_preset'], [])
+                odata = cbox.GetThings(opath + "/status", ['gain', 'output', 'bus', 'insert_engine', 'insert_preset', 'bypass'], [])
                 engine = odata.insert_engine
                 preset = odata.insert_preset
+                bypass = odata.bypass
                 
                 t.attach(gtk.Label(output_name), 0, 1, y, y + 1, gtk.SHRINK, gtk.SHRINK)
                 
@@ -407,11 +408,12 @@ class MainWindow(gtk.Window):
                 adj.connect('value_changed', adjustment_changed_float, cbox.VarPath(opath + '/gain'))
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
                 
-                chooser = fx_gui.InsertEffectChooser(opath, "%s: %s" % (i[0], output_name), engine, preset, self)
+                chooser = fx_gui.InsertEffectChooser(opath, "%s: %s" % (i[0], output_name), engine, preset, bypass, self)
                 self.fx_choosers[opath] = chooser
                 t.attach(chooser.fx_engine, 3, 4, y, y + 1, 0, gtk.SHRINK)
                 t.attach(chooser.fx_preset, 4, 5, y, y + 1, 0, gtk.SHRINK)
                 t.attach(chooser.fx_edit, 5, 6, y, y + 1, 0, gtk.SHRINK)
+                t.attach(chooser.fx_bypass, 6, 7, y, y + 1, 0, gtk.SHRINK)
                 y += 1
             if i[1] in instr_gui.instrument_window_map:
                 b.pack_start(gtk.HSeparator(), False, False)

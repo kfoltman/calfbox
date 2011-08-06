@@ -79,6 +79,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
                 res = cbox_execute_on(fb, NULL, "/module", "ss", error, "", "");
             if (!res)
                 return FALSE;
+            res = cbox_execute_on(fb, NULL, "/bypass", "ii", error, i + 1, m->modules[i] ? m->modules[i]->bypass : 0);
         }
         return TRUE;
     }
@@ -143,7 +144,7 @@ void fxchain_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             input_bufs[c] = i == 0 ? inputs[c] : bufs[i & 1][c];
             output_bufs[c] = i == m->module_count - 1 ? outputs[c] : bufs[(i + 1) & 1][c];
         }
-        if (m->modules[i])
+        if (m->modules[i] && !m->modules[i]->bypass)
             m->modules[i]->process_block(m->modules[i]->user_data, input_bufs, output_bufs);
         else
         {

@@ -122,6 +122,7 @@ void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, i
     module->inputs = inputs;
     module->outputs = outputs;
     module->aux_offset = outputs;
+    module->bypass = 0;
     
     cbox_command_target_init(&module->cmd_target, cmd_handler, module);
     module->process_event = NULL;
@@ -177,7 +178,8 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         if (!(cbox_execute_on(fb, NULL, "/insert_engine", "s", error, sm ? sm->engine_name : "") &&
-            cbox_execute_on(fb, NULL, "/insert_preset", "s", error, sm ? sm->instance_name : "")))
+            cbox_execute_on(fb, NULL, "/insert_preset", "s", error, sm ? sm->instance_name : "") &&
+            cbox_execute_on(fb, NULL, "/bypass", "i", error, sm ? sm->bypass : 0)))
             return FALSE;
         return TRUE;
     }
@@ -220,6 +222,16 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
             return FALSE;
         }
         return cbox_execute_sub(&sm->cmd_target, fb, cmd, subcmd + 7, error);
+    }
+    if (!strcmp(subcmd, "/set_bypass") && !strcmp(cmd->arg_types, "i"))
+    {
+        if (!sm)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine on module in path '%s'", cmd->command);
+            return FALSE;
+        }
+        sm->bypass = *(int *)cmd->arg_values[0];
+        return TRUE;
     }
     return cbox_set_command_error(error, cmd);
 }

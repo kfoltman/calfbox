@@ -274,7 +274,7 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
                 struct cbox_instrument_output *oobj = &instr->outputs[o];
                 struct cbox_module *insert = oobj->insert;
                 float gain = oobj->gain;
-                if (insert)
+                if (insert && !insert->bypass)
                     (*insert->process_block)(insert, outputs + 2 * o, outputs + 2 * o);
                 float *leftbuf, *rightbuf;
                 if (o < module->aux_offset / 2)
