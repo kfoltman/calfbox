@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct cbox_scene;
 struct cbox_io;
+struct cbox_song;
 
 struct cbox_rt_cmd_instance;
 
@@ -44,12 +45,9 @@ struct cbox_rt
     struct cbox_scene *scene;
     struct cbox_module *effect;
     
-    struct cbox_midi_pattern_playback mpb;
-    
     struct cbox_io *io;
     struct cbox_io_callbacks *cbs;
     struct cbox_master *master;
-    struct cbox_midi_playback_active_notes active_notes;
     struct cbox_midi_buffer midibuf_aux;
     
     jack_ringbuffer_t *rb_execute, *rb_cleanup;
@@ -71,7 +69,8 @@ extern void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **p
 
 // These use an RT command internally
 extern struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scene);
-extern struct cbox_midi_pattern *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos);
+extern struct cbox_song *cbox_rt_set_song(struct cbox_rt *rt, struct cbox_song *song, int new_pos);
+extern struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos);
 extern void cbox_rt_send_events(struct cbox_rt *rt, struct cbox_midi_buffer *buffer);
 
 extern void cbox_rt_destroy(struct cbox_rt *rt);

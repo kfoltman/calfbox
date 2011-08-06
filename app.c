@@ -28,6 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "module.h"
 #include "procmain.h"
 #include "scene.h"
+#include "seq.h"
+#include "song.h"
 #include "ui.h"
 #include "wavebank.h"
 
@@ -117,12 +119,13 @@ gchar *scene_format_value(const struct cbox_menu_item_static *item, void *contex
 
 gchar *transport_format_value(const struct cbox_menu_item_static *item, void *context)
 {
-    struct cbox_bbt bbt;
-    cbox_master_to_bbt(app.rt->master, &bbt);
+    // XXXKF
+    // struct cbox_bbt bbt;
+    // cbox_master_to_bbt(app.rt->master, &bbt);
     if (!strcmp((const char *)item->item.item_context, "pos"))
-        return g_strdup_printf("%d", (int)app.rt->master->song_pos_samples);
+        return g_strdup_printf("%d", (int)app.rt->master->song->song_pos_samples);
     else
-        return g_strdup_printf("%d:%d:%02d", bbt.bar, bbt.beat, bbt.tick);
+        return g_strdup_printf("%d", (int)app.rt->master->song->song_pos_ppqn);
 }
 
 struct cbox_config_section_cb_data
@@ -283,9 +286,9 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
 
 static void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_pattern *pattern)
 {
-    struct cbox_midi_pattern *old = cbox_rt_set_pattern(rt, pattern, -1);
+    struct cbox_song *old = cbox_rt_set_pattern(rt, pattern, -1);
     if (old)
-        cbox_midi_pattern_destroy(old);
+        cbox_song_destroy(old);
 }
 
 int cmd_pattern_none(struct cbox_menu_item_command *item, void *context)
@@ -509,6 +512,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         cbox_rt_set_pattern_and_destroy(app.rt, NULL);
         return TRUE;
     }
+    /*
     else
     if (!strcmp(obj, "get_pattern") && !strcmp(cmd->arg_types, ""))
     {
@@ -525,6 +529,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         }
         return TRUE;
     }
+    */
     else
     if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))
     {

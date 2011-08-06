@@ -425,8 +425,8 @@ class MainWindow(gtk.Window):
             
     def update(self):
         cbox.do_cmd("/on_idle", None, [])
-        master = cbox.GetThings("/master/status", ['pos', 'tempo', 'timesig'], [])
-        self.master_info.set_markup('%s' % master.pos)
+        master = cbox.GetThings("/master/status", ['pos', 'pos_ppqn', 'tempo', 'timesig'], [])
+        self.master_info.set_markup('%s (%s)' % (master.pos, master.pos_ppqn))
         self.timesig_info.set_markup("%s/%s" % tuple(master.timesig))
         self.tempo_adj.set_value(master.tempo)
         return True

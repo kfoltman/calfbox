@@ -21,6 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "pattern.h"
 
+struct cbox_track;
+
 struct cbox_master_track_item
 {
     uint32_t time;
@@ -35,12 +37,16 @@ struct cbox_master_track
 
 struct cbox_song
 {
+    struct cbox_master *master;
     GList *master_track_items;
     GList *tracks;
     gchar *lyrics_sheet, *chord_sheet;
+    uint32_t song_pos_samples, song_pos_ppqn;
+    uint32_t loop_start_ppqn, loop_end_ppqn;
 };
 
-extern struct cbox_song *cbox_song_new();
+extern struct cbox_song *cbox_song_new(struct cbox_master *master);
+extern void cbox_song_add_track(struct cbox_song *song, struct cbox_track *track);
 extern void cbox_song_destroy(struct cbox_song *song);
 
 #endif

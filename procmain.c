@@ -24,6 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "module.h"
 #include "procmain.h"
 #include "scene.h"
+#include "seq.h"
+#include "song.h"
+#include "track.h"
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/midiport.h>
@@ -61,15 +64,8 @@ struct cbox_rt *cbox_rt_new()
     rt->rb_execute = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS);
     rt->rb_cleanup = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS * 2);
     rt->io = NULL;
-    rt->master = malloc(sizeof(struct cbox_master));
-    cbox_master_init(rt->master);
-    rt->mpb.pattern = NULL;
-    rt->mpb.master = rt->master;
-    rt->mpb.pos = 0;
-    rt->mpb.time_ppqn = 0;
-    rt->mpb.time_samples = 0;
-    rt->mpb.active_notes = &rt->active_notes;
-    cbox_midi_playback_active_notes_init(&rt->active_notes);
+    rt->master = cbox_master_new();
+    rt->master->song = cbox_song_new(rt->master);
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
     return rt;
 }
@@ -206,24 +202,19 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
 
     if (scene)
     {
-        struct cbox_midi_buffer midibuf_jack, midibuf_pattern, midibuf_total, *midibufsrcs[2];
+        struct cbox_midi_buffer midibuf_jack, midibuf_pattern, midibuf_total, *midibufsrcs[3];
         cbox_midi_buffer_init(&midibuf_total);
-        if (!rt->mpb.pattern && rt->midibuf_aux.count == 0)
-            convert_midi_from_jack(io->midi, nframes, &midibuf_total);
-        else
-        {
-            struct cbox_midi_buffer midibuf_jack, midibuf_pattern, *midibufsrcs[3];
-            int pos[3] = {0, 0, 0};
-            cbox_midi_buffer_init(&midibuf_jack);
-            cbox_midi_buffer_init(&midibuf_pattern);
-            convert_midi_from_jack(io->midi, nframes, &midibuf_jack);
-            if (rt->mpb.pattern)
-                cbox_read_pattern(&rt->mpb, &midibuf_pattern, nframes);
-            midibufsrcs[0] = &midibuf_jack;
-            midibufsrcs[1] = &midibuf_pattern;
-            midibufsrcs[2] = &rt->midibuf_aux;
-            cbox_midi_buffer_merge(&midibuf_total, midibufsrcs, 3, pos);
-        }
+        
+        int pos[3] = {0, 0, 0};
+        cbox_midi_buffer_init(&midibuf_jack);
+        cbox_midi_buffer_init(&midibuf_pattern);
+        convert_midi_from_jack(io->midi, nframes, &midibuf_jack);
+        cbox_song_render(rt->master->song, &midibuf_pattern, nframes);
+        midibufsrcs[0] = &midibuf_jack;
+        midibufsrcs[1] = &midibuf_pattern;
+        midibufsrcs[2] = &rt->midibuf_aux;
+        cbox_midi_buffer_merge(&midibuf_total, midibufsrcs, 3, pos);
+        
         write_events_to_instrument_ports(&midibuf_total, scene);
     }
     
@@ -361,10 +352,6 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
             }
         }
     }
-    
-    // Update transport
-    if (rt->master->state == CMTS_ROLLING)
-        rt->master->song_pos_samples += nframes;
 }
 
 void cbox_rt_start(struct cbox_rt *rt, struct cbox_io *io)
@@ -381,10 +368,8 @@ void cbox_rt_start(struct cbox_rt *rt, struct cbox_io *io)
 void cbox_rt_stop(struct cbox_rt *rt)
 {
     cbox_io_stop(rt->io);
-    free(rt->master);
     free(rt->cbs);
     rt->cbs = NULL;
-    rt->master = NULL;
     rt->io = NULL;
 }
 
@@ -467,41 +452,68 @@ void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct set_pattern_command
+struct set_song_command
 {
     struct cbox_rt *rt;
-    struct cbox_midi_pattern *new_pattern, *old_pattern;
+    struct cbox_song *new_song, *old_song;
     int new_time_ppqn;
 };
 
-static int set_pattern_command_execute(void *user_data)
+static int set_song_command_execute(void *user_data)
 {
-    struct set_pattern_command *cmd = user_data;
+    struct set_song_command *cmd = user_data;
     
-    if (cbox_midi_playback_active_notes_release(cmd->rt->mpb.active_notes, &cmd->rt->midibuf_aux) < 0)
+    if (cbox_song_active_notes_release(cmd->rt->master->song, &cmd->rt->midibuf_aux) < 0)
         return 0;
-    cmd->old_pattern = cmd->rt->mpb.pattern;
-    cmd->rt->mpb.pattern = cmd->new_pattern;
-    if (cmd->new_pattern)
+    cmd->old_song = cmd->rt->master->song;
+    cmd->rt->master->song = cmd->new_song;
+    if (cmd->new_song)
     {
         if (cmd->new_time_ppqn == -1)
-            cbox_midi_pattern_playback_seek_samples(&cmd->rt->mpb, cmd->rt->mpb.time_samples);
+            cbox_song_seek_samples(cmd->rt->master->song, cmd->rt->master->song->song_pos_samples);
         else
-            cbox_midi_pattern_playback_seek_ppqn(&cmd->rt->mpb, cmd->new_time_ppqn);
+            cbox_song_seek_ppqn(cmd->rt->master->song, cmd->new_time_ppqn);
     }
     
     return 1;
 }
 
-struct cbox_midi_pattern *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos)
+struct cbox_song *cbox_rt_set_song(struct cbox_rt *rt, struct cbox_song *song, int new_pos_ppqn)
 {
-    static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = set_pattern_command_execute, .cleanup = NULL };
+    static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = set_song_command_execute, .cleanup = NULL };
     
-    struct set_pattern_command cmd = { rt, pattern, NULL, new_pos };
+    struct set_song_command cmd = { rt, song, NULL, new_pos_ppqn };
     
     cbox_rt_execute_cmd_sync(rt, &def, &cmd);
     
-    return cmd.old_pattern;
+    return cmd.old_song;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos_ppqn)
+{
+    struct cbox_track *track = cbox_track_new();
+    struct cbox_midi_pattern *metro = cbox_midi_pattern_new_metronome(4);
+    cbox_track_add_item(track, 0, pattern, pattern->loop_end / 4, pattern->loop_end / 2);
+    //cbox_track_add_item(track, 0, pattern, 0, pattern->loop_end / 2);
+    cbox_track_update_playback(track, rt->master);
+    
+    struct cbox_track *track2 = cbox_track_new();
+    metro = cbox_midi_pattern_new_metronome(4);
+    cbox_track_add_item(track2, 0, metro, 0, metro->loop_end);
+    cbox_track_add_item(track2, metro->loop_end, metro, 0, metro->loop_end);
+    cbox_track_update_playback(track2, rt->master);
+    
+    struct cbox_song *song = cbox_song_new(rt->master);
+    cbox_song_add_track(song, track);
+    cbox_song_add_track(song, track2);
+
+    song->loop_start_ppqn = 0;
+    song->loop_end_ppqn = metro->loop_end * 2;
+    
+    new_pos_ppqn = 0; // XXXKF
+    return cbox_rt_set_song(rt, song, new_pos_ppqn);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -606,9 +618,11 @@ struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scen
 
 void cbox_rt_destroy(struct cbox_rt *rt)
 {
-    if (rt->mpb.pattern)
-        cbox_midi_pattern_destroy(rt->mpb.pattern);
+    if (rt->master->song)
+        cbox_song_destroy(rt->master->song);
     jack_ringbuffer_free(rt->rb_execute);
     jack_ringbuffer_free(rt->rb_cleanup);
+    free(rt->master);
+    rt->master = NULL;
     free(rt);
 }

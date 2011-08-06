@@ -23,69 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <glib.h>
 
-int ppqn_to_samples(struct cbox_master *master, int time)
-{
-    return (int)(master->srate * 60.0 * time / (master->tempo * PPQN));
-}
-
-int samples_to_ppqn(struct cbox_master *master, int time)
-{
-    return (int)(master->tempo * PPQN * time / (master->srate * 60.0));
-}
-
-static inline void accumulate_event(struct cbox_midi_playback_active_notes *notes, const struct cbox_midi_event *event)
-{
-    if (event->size != 3)
-        return;
-    // this ignores poly aftertouch - which, I supposed, is OK for now
-    if (event->data_inline[0] < 0x80 || event->data_inline[0] > 0x9F)
-        return;
-    int ch = event->data_inline[0] & 0x0F;
-    if (event->data_inline[0] >= 0x90 && event->data_inline[2] > 0)
-    {
-        int note = event->data_inline[1] & 0x7F;
-        if (!(notes->channels_active & (1 << ch)))
-        {
-            for (int i = 0; i < 4; i++)
-                notes->notes[ch][i] = 0;
-            notes->channels_active |= 1 << ch;
-        }
-        notes->notes[ch][note >> 5] |= 1 << (note & 0x1F);
-    }
-}
-
-void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int nsamples)
-{
-    cbox_midi_buffer_clear(buf);
-    int loop_end = ppqn_to_samples(pb->master, pb->pattern->loop_end);
-    while(1)
-    {
-        if (pb->pos >= pb->pattern->event_count)
-        {
-            if (loop_end == -1)
-                break;
-            if (loop_end >= pb->time_samples + nsamples)
-                break;
-            pb->pos = 0;
-            pb->time_samples -= loop_end; // may be negative, but that's OK
-        }
-        const struct cbox_midi_event *src = &pb->pattern->events[pb->pos];
-        int srctime = ppqn_to_samples(pb->master, src->time);
-        if (srctime >= pb->time_samples + nsamples)
-            break;
-        int32_t time = 0;
-        if (srctime >= pb->time_samples) // convert negative relative time to 0 time
-            time = srctime - pb->time_samples;
-        
-        cbox_midi_buffer_copy_event(buf, src, time);
-        if (pb->active_notes)
-            accumulate_event(pb->active_notes, src);
-        pb->pos++;
-    }
-    pb->time_samples += nsamples;
-    pb->time_ppqn = samples_to_ppqn(pb->master, pb->time_samples);
-}
-
 struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts)
 {
     struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
@@ -110,26 +47,6 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts)
     cbox_midi_pattern_maker_destroy(m);
 
     return p;
-}
-
-void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn)
-{
-    int pos = 0;
-    while (pos < pb->pattern->event_count && time_ppqn > pb->pattern->events[pos].time)
-        pos++;
-    pb->time_ppqn = time_ppqn;
-    pb->time_samples = ppqn_to_samples(pb->master, time_ppqn);
-    pb->pos = pos;
-}
-
-void cbox_midi_pattern_playback_seek_samples(struct cbox_midi_pattern_playback *pb, int time_samples)
-{
-    int pos = 0;
-    while (pos < pb->pattern->event_count && time_samples > ppqn_to_samples(pb->master, pb->pattern->events[pos].time))
-        pos++;
-    pb->time_ppqn = samples_to_ppqn(pb->master, time_samples);
-    pb->time_samples = time_samples;
-    pb->pos = pos;
 }
 
 void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern)
@@ -498,41 +415,3 @@ struct cbox_blob *cbox_midi_pattern_to_blob(struct cbox_midi_pattern *pat, int *
     return blob;
 }
 
-void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes *notes)
-{
-    notes->channels_active = 0;
-}
-
-int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf)
-{
-    if (!notes->channels_active)
-        return 0;
-    int note_offs = 0;
-    for (int c = 0; c < 16; c++)
-    {
-        if (!notes->channels_active & (1 << c))
-            continue;
-        
-        for (int g = 0; g < 4; g++)
-        {
-            uint32_t group = notes->notes[c][g];
-            if (!group)
-                continue;
-            for (int i = 0; i < 32; i++)
-            {
-                int n = i + g * 32;
-                if (!(group & (1 << i)))
-                    continue;
-                if (!cbox_midi_buffer_can_store_msg(buf, 3))
-                    return -1;
-                cbox_midi_buffer_write_inline(buf, cbox_midi_buffer_get_last_event_time(buf), 0x80 + c, n, 0);
-                group &= ~(1 << i);
-                notes->notes[c][g] = group;
-                note_offs++;
-            }
-        }
-        // all Note Offs emitted without buffer overflow - channel is no longer active
-        notes->channels_active &= ~(1 << c);
-    }
-    return note_offs;
-}

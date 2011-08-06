@@ -29,44 +29,19 @@ struct cbox_midi_pattern
     int loop_end;
 };
 
-struct cbox_midi_playback_active_notes
+struct cbox_blob_serialized_event
 {
-    uint16_t channels_active;
-    uint32_t notes[16][4]; // 0..127
-};
-
-struct cbox_midi_pattern_playback
-{
-    struct cbox_midi_pattern *pattern;
-    struct cbox_master *master;
-    int pos;
-    int time_samples, time_ppqn;
-    struct cbox_midi_playback_active_notes *active_notes;
-};
-
-extern struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts);
-
-extern struct cbox_midi_pattern *cbox_midi_pattern_load(const char *name, int is_drum);
-
-extern struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_drum);
-
-struct cbox_blob_serialized_event {
     int32_t time;
     unsigned char len, cmd, byte1, byte2;
 };
 
+extern struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts);
+extern struct cbox_midi_pattern *cbox_midi_pattern_load(const char *name, int is_drum);
+extern struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_drum);
 extern struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(const struct cbox_blob *blob, int length);
+
 extern struct cbox_blob *cbox_midi_pattern_to_blob(struct cbox_midi_pattern *pat, int *length);
 
-extern void cbox_read_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int nsamples);
-
 extern void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern);
-
-extern void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn);
-extern void cbox_midi_pattern_playback_seek_samples(struct cbox_midi_pattern_playback *pb, int time_samples);
-
-extern void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes *notes);
-
-extern int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf);
 
 #endif

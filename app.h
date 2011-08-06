@@ -24,6 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "procmain.h"
 #include <glib.h>
 
+struct cbox_song;
+
 struct cbox_app
 {
     struct cbox_io io;
@@ -35,7 +37,6 @@ struct cbox_app
 };
 
 struct cbox_menu;
-struct cbox_menu_item_menu;
 
 extern struct cbox_app app;
 

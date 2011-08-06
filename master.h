@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define PPQN 48
 
+struct cbox_song;
 
 enum cbox_master_transport_state
 {
@@ -33,12 +34,12 @@ enum cbox_master_transport_state
 
 struct cbox_master
 {
-    uint32_t song_pos_samples;
     int srate;
     float tempo;
     int timesig_nom;
     int timesig_denom; // must be 4 for now
     enum cbox_master_transport_state state;
+    struct cbox_song *song;
     struct cbox_command_target cmd_target;
 };
 
@@ -49,14 +50,23 @@ struct cbox_bbt
     int tick;
 };
 
-extern void cbox_master_init(struct cbox_master *master);
+extern struct cbox_master *cbox_master_new();
 extern void cbox_master_set_sample_rate(struct cbox_master *master, int srate);
 extern void cbox_master_set_tempo(struct cbox_master *master, float tempo);
 extern void cbox_master_set_timesig(struct cbox_master *master, int beats, int unit);
-extern void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt);
-extern uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct cbox_bbt *bbt);
+//extern void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt, int time_samples);
+//extern uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct cbox_bbt *bbt);
 extern void cbox_master_play(struct cbox_master *master);
 extern void cbox_master_stop(struct cbox_master *master);
-extern void cbox_master_seek(struct cbox_master *master, uint32_t song_pos_samples);
+
+static inline int cbox_master_ppqn_to_samples(struct cbox_master *master, int time)
+{
+    return (int)(master->srate * 60.0 * time / (master->tempo * PPQN));
+}
+
+static inline int cbox_master_samples_to_ppqn(struct cbox_master *master, int time)
+{
+    return (int)(master->tempo * PPQN * time / (master->srate * 60.0));
+}
 
 #endif

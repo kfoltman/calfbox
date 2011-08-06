@@ -27,14 +27,20 @@ void cbox_master_track_item_destroy(struct cbox_master_track_item *item)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_song *cbox_song_new()
+struct cbox_song *cbox_song_new(struct cbox_master *master)
 {
-    struct cbox_song *p = malloc(sizeof(struct cbox_song *));
+    struct cbox_song *p = malloc(sizeof(struct cbox_song));
+    p->master = master;
     p->master_track_items = NULL;
     p->tracks = NULL;
     p->lyrics_sheet = NULL;
     p->chord_sheet = NULL;
     return p;
+}
+
+void cbox_song_add_track(struct cbox_song *song, struct cbox_track *track)
+{
+    song->tracks = g_list_append(song->tracks, track);
 }
 
 void cbox_song_destroy(struct cbox_song *song)

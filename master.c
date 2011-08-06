@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "errors.h"
 #include "master.h"
+#include "seq.h"
+#include "song.h"
 #include <string.h>
 
 static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -31,7 +33,8 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
             cbox_execute_on(fb, NULL, "/tempo", "f", error, m->tempo) &&
             cbox_execute_on(fb, NULL, "/timesig", "ii", error, m->timesig_nom, m->timesig_denom) &&
             cbox_execute_on(fb, NULL, "/playing", "i", error, (int)m->state) &&
-            cbox_execute_on(fb, NULL, "/pos", "i", error, m->song_pos_samples);
+            cbox_execute_on(fb, NULL, "/pos", "i", error, m->song->song_pos_samples) &&
+            cbox_execute_on(fb, NULL, "/pos_ppqn", "i", error, m->song->song_pos_ppqn);
     }
     else
     if (!strcmp(cmd->command, "/tell") && !*cmd->arg_types)
@@ -39,7 +42,8 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         return cbox_execute_on(fb, NULL, "/playing", "i", error, (int)m->state) &&
-            cbox_execute_on(fb, NULL, "/pos", "i", error, m->song_pos_samples);
+            cbox_execute_on(fb, NULL, "/pos", "i", error, m->song->song_pos_samples) &&
+            cbox_execute_on(fb, NULL, "/pos_ppqn", "i", error, m->song->song_pos_ppqn);
     }
     else
     if (!strcmp(cmd->command, "/set_tempo") && !strcmp(cmd->arg_types, "f"))
@@ -66,9 +70,15 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
         return TRUE;
     }
     else
-    if (!strcmp(cmd->command, "/seek") && !strcmp(cmd->arg_types, "i"))
+    if (!strcmp(cmd->command, "/seek_samples") && !strcmp(cmd->arg_types, "i"))
     {
-        cbox_master_seek(m, *(int *)cmd->arg_values[0]);
+        cbox_song_seek_samples(m->song, *(int *)cmd->arg_values[0]);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/seek_ppqn") && !strcmp(cmd->arg_types, "i"))
+    {
+        cbox_song_seek_ppqn(m->song, *(int *)cmd->arg_values[0]);
         return TRUE;
     }
     else
@@ -80,14 +90,22 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
 
 void cbox_master_init(struct cbox_master *master)
 {
-    master->song_pos_samples = 0;
     master->srate = 0;
     master->tempo = 120.0;
     master->timesig_nom = 4;
     master->timesig_denom = 4;
     master->state = CMTS_STOP;
+    master->song = NULL;
     cbox_command_target_init(&master->cmd_target, master_process_cmd, master);
 }
+
+struct cbox_master *cbox_master_new()
+{
+    struct cbox_master *master = malloc(sizeof(struct cbox_master));
+    cbox_master_init(master);
+    return master;
+}
+
 
 void cbox_master_set_sample_rate(struct cbox_master *master, int srate)
 {
@@ -105,9 +123,10 @@ void cbox_master_set_timesig(struct cbox_master *master, int beats, int unit)
     master->timesig_denom = unit;
 }
 
-void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt)
+/*
+void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt, int time_samples)
 {
-    double second = ((double)master->song_pos_samples) / master->srate;
+    double second = ((double)time_samples) / master->srate;
     double beat = master->tempo * second / 60;
     int beat_int = (int)beat;
     bbt->bar = beat_int / master->timesig_nom;
@@ -121,6 +140,7 @@ uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct 
     double beat = bbt->bar * master->timesig_nom + bbt->beat + bbt->tick * 1.0 / PPQN;
     return (uint32_t)(master->srate * 60 / master->tempo);
 }
+*/
 
 void cbox_master_play(struct cbox_master *master)
 {
@@ -130,10 +150,5 @@ void cbox_master_play(struct cbox_master *master)
 void cbox_master_stop(struct cbox_master *master)
 {
     master->state = CMTS_STOP;
-}
-
-void cbox_master_seek(struct cbox_master *master, uint32_t song_pos_samples)
-{
-    master->song_pos_samples = song_pos_samples;
 }
 

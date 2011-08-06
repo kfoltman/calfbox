@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
+#include "procmain.h"
+#include "seq.h"
 #include "track.h"
 #include <malloc.h>
 
@@ -28,13 +31,20 @@ struct cbox_track *cbox_track_new()
 {
     struct cbox_track *p = malloc(sizeof(struct cbox_track));
     p->items = NULL;
+    p->pb = NULL;
     return p;
 }
 
 #define CBTI(it) ((struct cbox_track_item *)(it)->data)
 
-void cbox_track_add_item(struct cbox_track *track, struct cbox_track_item *item)
+void cbox_track_add_item(struct cbox_track *track, uint32_t time, struct cbox_midi_pattern *pattern, uint32_t offset, uint32_t length)
 {
+    struct cbox_track_item *item = malloc(sizeof(struct cbox_track_item));
+    item->time = time;
+    item->pattern = pattern;
+    item->offset = offset;
+    item->length = length;
+    
     GList *it = track->items;
     while(it != NULL && CBTI(it)->time < item->time)
         it = g_list_next(it);
@@ -49,8 +59,19 @@ void cbox_track_add_item(struct cbox_track *track, struct cbox_track_item *item)
     track->items = g_list_insert_before(track->items, it, item);
 }
 
+void cbox_track_update_playback(struct cbox_track *track, struct cbox_master *master)
+{
+    struct cbox_track_playback *pb = cbox_track_playback_new_from_track(track, master);
+    struct cbox_track_playback *old_pb = cbox_rt_swap_pointers(app.rt, (void **)&track->pb, pb);
+    if (old_pb)
+        cbox_track_playback_destroy(old_pb);
+}
+
 void cbox_track_destroy(struct cbox_track *track)
 {
+    // XXXKF I'm not sure if I want the lifecycle of track playback objects to be managed by the track itself
+    if (track->pb)
+        cbox_track_playback_destroy(track->pb);
     g_list_free_full(track->items, (GDestroyNotify)cbox_track_item_destroy);
     free(track);
 }
