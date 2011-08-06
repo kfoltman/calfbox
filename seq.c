@@ -111,10 +111,8 @@ void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, int time_s
 
 void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time_samples)
 {
-    printf("start item %d at %d\n", pb->pos, time_samples);
     if (pb->pos >= pb->items_count)
     {
-        printf("end of track\n");
         return;
     }
     struct cbox_track_playback_item *cur = &pb->items[pb->pos];
@@ -124,7 +122,6 @@ void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time_sam
     int end_time_samples = cbox_master_ppqn_to_samples(pb->master, end_time_ppqn);
     cbox_midi_pattern_playback_set_pattern(&pb->playback, cur->pattern, start_time_samples, end_time_samples, cur->offset);
     
-    printf("time_ppqn = %d\n", time_ppqn);
     if (time_ppqn < start_time_ppqn)
         cbox_midi_pattern_playback_seek_ppqn(&pb->playback, 0);
     else
@@ -138,6 +135,16 @@ void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int 
     {
         int rend = nsamples;
         struct cbox_track_playback_item *cur = &pb->items[pb->pos];
+        // a gap before the current item
+        if (pb->master->song->song_pos_samples + rpos < pb->playback.start_time_samples)
+        {
+            int space_samples = pb->playback.start_time_samples - (pb->master->song->song_pos_samples + rpos);
+            if (space_samples >= rend - rpos)
+                return;
+            rpos += space_samples;
+            offset += space_samples;
+        }
+        // check if item finished
         int cur_segment_end_samples = cbox_master_ppqn_to_samples(pb->master, cur->time + cur->length);
         int render_end_samples = pb->master->song->song_pos_samples + rend;
         if (render_end_samples > cur_segment_end_samples)
@@ -217,10 +224,10 @@ void cbox_midi_pattern_playback_render(struct cbox_midi_pattern_playback *pb, st
 void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn)
 {
     int pos = 0;
-    while (pos < pb->pattern->event_count && time_ppqn > (pb->pattern->events[pos].time - pb->offset_ppqn))
+    int patrel_time_ppqn = time_ppqn + pb->offset_ppqn;
+    while (pos < pb->pattern->event_count && patrel_time_ppqn > pb->pattern->events[pos].time)
         pos++;
-    printf("seek ppqn to %d - pos=%d\n", time_ppqn, pos);
-    pb->rel_time_samples = cbox_master_ppqn_to_samples(pb->master, time_ppqn);
+    pb->rel_time_samples = cbox_master_ppqn_to_samples(pb->master, time_ppqn) - pb->start_time_samples;
     pb->pos = pos;
 }
 
