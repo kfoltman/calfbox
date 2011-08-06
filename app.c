@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "scene.h"
 #include "seq.h"
 #include "song.h"
+#include "track.h"
 #include "ui.h"
 #include "wavebank.h"
 
@@ -512,24 +513,27 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         cbox_rt_set_pattern_and_destroy(app.rt, NULL);
         return TRUE;
     }
-    /*
     else
     if (!strcmp(obj, "get_pattern") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        if (app.rt->mpb.pattern)
+        if (app.rt->master->song && app.rt->master->song->tracks)
         {
-            int length = 0;
-            struct cbox_blob *blob = cbox_midi_pattern_to_blob(app.rt->mpb.pattern, &length);
-            gboolean res = cbox_execute_on(fb, NULL, "/pattern", "bi", error, blob, length);
-            cbox_blob_destroy(blob);
-            return res;
+            struct cbox_track *track = app.rt->master->song->tracks->data;
+            if (track)
+            {
+                struct cbox_track_item *item = track->items->data;
+                struct cbox_midi_pattern *pattern = item->pattern;
+                int length = 0;
+                struct cbox_blob *blob = cbox_midi_pattern_to_blob(pattern, &length);
+                gboolean res = cbox_execute_on(fb, NULL, "/pattern", "bi", error, blob, length);
+                cbox_blob_destroy(blob);
+            }
         }
         return TRUE;
     }
-    */
     else
     if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))
     {
