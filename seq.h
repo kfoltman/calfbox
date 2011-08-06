@@ -50,6 +50,7 @@ struct cbox_midi_pattern_playback
     int rel_time_samples;
     // [start, end) of the pattern slice
     int start_time_samples, end_time_samples;
+    int item_start_ppqn;
     int offset_ppqn;
     struct cbox_midi_playback_active_notes *active_notes;
 };
@@ -58,7 +59,7 @@ extern void cbox_midi_pattern_playback_init(struct cbox_midi_pattern_playback *p
 extern void cbox_midi_pattern_playback_render(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int offset, int nsamples);
 extern void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn);
 extern void cbox_midi_pattern_playback_seek_samples(struct cbox_midi_pattern_playback *pb, int time_samples);
-extern void cbox_midi_pattern_playback_set_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_pattern *pattern, int start_time_samples, int end_time_samples, int offset_ppqn);
+extern void cbox_midi_pattern_playback_set_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_pattern *pattern, int start_time_samples, int end_time_samples, int item_start_ppqn, int offset_ppqn);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
