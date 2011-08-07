@@ -470,7 +470,7 @@ static int set_song_command_execute(void *user_data)
     if (cmd->new_song)
     {
         if (cmd->new_time_ppqn == -1)
-            cbox_song_seek_samples(cmd->rt->master->song, cmd->rt->master->song->song_pos_samples);
+            cbox_song_seek_samples(cmd->rt->master->song, cmd->old_song ? cmd->old_song->song_pos_samples : 0);
         else
             cbox_song_seek_ppqn(cmd->rt->master->song, cmd->new_time_ppqn);
     }
@@ -513,7 +513,6 @@ struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_patte
     song->loop_start_ppqn = 0;
     song->loop_end_ppqn = pattern->loop_end;
     
-    new_pos_ppqn = 0; // XXXKF
     return cbox_rt_set_song(rt, song, new_pos_ppqn);
 }
 
