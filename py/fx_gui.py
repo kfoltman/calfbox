@@ -4,6 +4,8 @@ from gui_tools import *
 #################################################################################################################################
 
 class EffectWindow(gtk.Window):
+    engine_name = None
+    
     def __init__(self, location, main_window, path):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_UTILITY)
@@ -12,6 +14,13 @@ class EffectWindow(gtk.Window):
         self.path = path
         self.vpath = cbox.VarPath(path)
         self.set_title("%s - %s" % (self.effect_name, location))
+        self.vbox = gtk.VBox()
+        menu_bar = gtk.MenuBar()
+        menu_bar.append(create_menu("_Effect", [
+            ("_Save as...", self.on_effect_save_as if self.engine_name is not None else None),
+            ("_Close", lambda w: self.destroy()),
+        ]))
+        self.vbox.pack_start(menu_bar, False, False)
         if hasattr(self, 'params'):
             values = cbox.GetThings(self.path + "/status", [p.name for p in self.params], [])
             self.refreshers = []
@@ -23,7 +32,8 @@ class EffectWindow(gtk.Window):
                 refresher(values)
                 t.attach(widget, 1, 2, i, i+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
                 self.refreshers.append(refresher)
-            self.add(t)
+            self.vbox.pack_start(t, True, True)
+        self.add(self.vbox)
         
     def create_param_table(self, cols, rows, values, extra_rows = 0):
         t = gtk.Table(4, rows + 1 + extra_rows)
@@ -39,11 +49,36 @@ class EffectWindow(gtk.Window):
                 self.table_refreshers.append(refresher)
         return t
         
+    def get_save_params(self):
+        if hasattr(self, 'params'):
+            values = cbox.GetThings(self.path + "/status", [p.name for p in self.params], [])
+            result = {'engine' : self.engine_name}
+            for p in self.params:
+                result[p.name] = str(getattr(values, p.name))
+            return result
+        return None
+        
     def refresh(self):
         if hasattr(self, 'params'):
             values = cbox.GetThings(self.path + "/status", [p.name for p in self.params], [])
             for refresher in self.refreshers:
                 refresher(values)
+                
+    def on_effect_save_as(self, w):
+        data = self.get_save_params()
+        if data is None:
+            print "Save not implemented for this effect"
+            return
+            
+        dlg = SaveConfigObjectDialog(self, "Select name for effect preset")
+        try:
+            if dlg.run() == gtk.RESPONSE_OK and dlg.get_name() != "":
+                cs = cbox.CfgSection("fxpreset:" + dlg.get_name())
+                for name, value in data.iteritems():
+                    cs[name] = value
+                cbox.Config.save()
+        finally:
+            dlg.destroy()
                 
 #################################################################################################################################
 
@@ -57,6 +92,7 @@ class PhaserWindow(EffectWindow):
         SliderRow("Wet/dry", "wet_dry", 0, 1),
         IntSliderRow("Stages", "stages", 1, 12)
     ]
+    engine_name = "phaser"
     effect_name = "Phaser"
     
 class ChorusWindow(EffectWindow):
@@ -67,6 +103,7 @@ class ChorusWindow(EffectWindow):
         SliderRow("Stereo", "stereo_phase", 0, 360),
         SliderRow("Wet/dry", "wet_dry", 0, 1)
     ]
+    engine_name = "chorus"
     effect_name = "Chorus"
 
 class DelayWindow(EffectWindow):
@@ -75,6 +112,7 @@ class DelayWindow(EffectWindow):
         SliderRow("Feedback", "fb_amt", 0, 1),
         SliderRow("Wet/dry", "wet_dry", 0, 1)
     ]
+    engine_name = "delay"
     effect_name = "Delay"
 
 class ReverbWindow(EffectWindow):
@@ -86,6 +124,7 @@ class ReverbWindow(EffectWindow):
         MappedSliderRow("Highpass", "highpass", LogMapper(30, 2000, freq_format)),
         SliderRow("Diffusion", "diffusion", 0.2, 0.8)
     ]
+    engine_name = "reverb"
     effect_name = "Reverb"
 
 class ToneControlWindow(EffectWindow):
@@ -93,6 +132,7 @@ class ToneControlWindow(EffectWindow):
         MappedSliderRow("Lowpass", "lowpass", LogMapper(300, 20000, freq_format)),
         MappedSliderRow("Highpass", "highpass", LogMapper(30, 2000, freq_format))
     ]
+    engine_name = "tone_control"
     effect_name = "Tone Control"
 
 class CompressorWindow(EffectWindow):
@@ -103,7 +143,8 @@ class CompressorWindow(EffectWindow):
         MappedSliderRow("Release", "release", LogMapper(1, 1000, ms_format)),
         SliderRow("Make-up gain", "makeup", -48, 48),
     ]
-    effect_name = "Tone Control"
+    engine_name = "compressor"
+    effect_name = "Compressor"
 
 eq_cols = [
     CheckBoxRow("Active", "active"),
@@ -116,7 +157,7 @@ class EQWindow(EffectWindow):
     def __init__(self, instrument, main_window, path):
         EffectWindow.__init__(self, instrument, main_window, path)
         values = cbox.GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
-        self.add(self.create_param_table(eq_cols, 4, values))
+        self.vbox.add(self.create_param_table(eq_cols, 4, values))
     effect_name = "Equalizer"
         
 class FBRWindow(EffectWindow):
@@ -126,7 +167,7 @@ class FBRWindow(EffectWindow):
         EffectWindow.__init__(self, instrument, main_window, path)
         values = cbox.GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
         t = self.create_param_table(eq_cols, 16, values, 1)        
-        self.add(t)
+        self.vbox.add(t)
         self.ready_label = gtk.Label("-")
         t.attach(self.ready_label, 0, 2, 17, 18)
         set_timer(self, 100, self.update)
@@ -193,8 +234,8 @@ class FXChainWindow(EffectWindow):
         button.connect('clicked', lambda button, pos: self.on_add_clicked(pos), fx_count + 1)
         t.attach(button, 3, 4, fx_count + 1, fx_count + 2, 0, gtk.SHRINK)
         if self.fx_table is not None:
-            self.remove(self.fx_table)
-        self.add(t)
+            self.vbox.remove(self.fx_table)
+        self.vbox.pack_start(t, True, True)
         t.show_all()
         self.fx_table = t
     def on_add_clicked(self, pos):

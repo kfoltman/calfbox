@@ -154,7 +154,10 @@ def create_menu(title, items):
         menuitem.set_submenu(menu)
         for label, meth in items:
             mit = gtk.MenuItem(label)
-            mit.connect('activate', meth)
+            if meth is None:
+                mit.set_sensitive(False)
+            else:
+                mit.connect('activate', meth)
             menu.append(mit)
     return menuitem
 
@@ -279,3 +282,28 @@ class SelectObjectDialog(gtk.Dialog):
     def get_selected_object(self):
         return self.scenes.get_model()[self.scenes.get_cursor()[0][0]]
 
+#################################################################################################################################
+
+class SaveConfigObjectDialog(gtk.Dialog):
+    def __init__(self, parent, title):
+        gtk.Dialog.__init__(self, title, parent, gtk.DIALOG_MODAL, 
+            (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
+        self.set_default_response(gtk.RESPONSE_OK)
+        
+        l = gtk.Label()
+        l.set_text_with_mnemonic("_Name")
+        e = gtk.Entry()
+        self.entry = e
+        e.set_activates_default(True)
+        e.connect('changed', self.on_entry_changed)
+        row = gtk.HBox()
+        row.pack_start(l, False, False)
+        row.pack_start(e, True, True)
+        row.show_all()
+        self.vbox.pack_start(row)
+        e.grab_focus()
+        self.on_entry_changed(e)
+    def get_name(self):
+        return self.entry.get_text()
+    def on_entry_changed(self, w):
+        self.set_response_sensitive(gtk.RESPONSE_OK, w.get_text() != '')
