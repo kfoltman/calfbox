@@ -74,8 +74,8 @@ class EffectWindow(gtk.Window):
         try:
             if dlg.run() == gtk.RESPONSE_OK and dlg.get_name() != "":
                 cs = cbox.CfgSection("fxpreset:" + dlg.get_name())
-                for name, value in data.iteritems():
-                    cs[name] = value
+                for name in sorted(data.keys()):
+                    cs[name] = data[name]
                 cbox.Config.save()
         finally:
             dlg.destroy()
@@ -146,27 +146,44 @@ class CompressorWindow(EffectWindow):
     engine_name = "compressor"
     effect_name = "Compressor"
 
-eq_cols = [
-    CheckBoxRow("Active", "active"),
-    MappedSliderRow("Center Freq", "center", filter_freq_mapper),
-    MappedSliderRow("Filter Q", "q", LogMapper(0.01, 100, "%f")),
-    SliderRow("Gain", "gain", -36, 36),
-]
+class EQCommon(object):
+    columns = [
+        CheckBoxRow("Active", "active"),
+        MappedSliderRow("Center Freq", "center", filter_freq_mapper),
+        MappedSliderRow("Filter Q", "q", LogMapper(0.01, 100, "%f")),
+        SliderRow("Gain", "gain", -36, 36),
+    ]
+    def get_save_params(self):
+        values = cbox.GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
+        result = {}
+        for row in range(self.bands):
+            row2 = 1 + row
+            result['band%s_active' % row2] = values.active[row]
+            result['band%s_center' % row2] = values.center[row]
+            result['band%s_q' % row2] = values.q[row]
+            result['band%s_gain' % row2] = values.gain[row]
+        return result
 
-class EQWindow(EffectWindow):
+class EQWindow(EffectWindow, EQCommon):
     def __init__(self, instrument, main_window, path):
         EffectWindow.__init__(self, instrument, main_window, path)
         values = cbox.GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
-        self.vbox.add(self.create_param_table(eq_cols, 4, values))
+        self.vbox.add(self.create_param_table(self.columns, 4, values))
+    def get_save_params(self):
+        return EQCommon.get_save_params(self)
     effect_name = "Equalizer"
+    engine_name = "parametric_eq"
+    bands = 4
         
-class FBRWindow(EffectWindow):
+class FBRWindow(EffectWindow, EQCommon):
     effect_name = "Feedback Reduction"
+    engine_name = "feedback_reducer"
+    bands = 16
     
     def __init__(self, instrument, main_window, path):
         EffectWindow.__init__(self, instrument, main_window, path)
         values = cbox.GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
-        t = self.create_param_table(eq_cols, 16, values, 1)        
+        t = self.create_param_table(self.columns, 16, values, 1)        
         self.vbox.add(t)
         self.ready_label = gtk.Label("-")
         t.attach(self.ready_label, 0, 2, 17, 18)
@@ -190,6 +207,9 @@ class FBRWindow(EffectWindow):
         else:
             self.ready_label.set_text("Not Ready")
         return True
+        
+    def get_save_params(self):
+        return EQCommon.get_save_params(self)
 
 class FXChainWindow(EffectWindow):
     effect_name = "Effect chain"
