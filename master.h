@@ -40,6 +40,7 @@ struct cbox_master
     int timesig_denom; // must be 4 for now
     enum cbox_master_transport_state state;
     struct cbox_song *song;
+    struct cbox_song_playback *spb;
     struct cbox_command_target cmd_target;
 };
 

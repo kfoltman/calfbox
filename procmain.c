@@ -209,7 +209,8 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         cbox_midi_buffer_init(&midibuf_jack);
         cbox_midi_buffer_init(&midibuf_pattern);
         convert_midi_from_jack(io->midi, nframes, &midibuf_jack);
-        cbox_song_render(rt->master->song, &midibuf_pattern, nframes);
+        if (rt->master->spb)
+            cbox_song_playback_render(rt->master->spb, &midibuf_pattern, nframes);
         midibufsrcs[0] = &midibuf_jack;
         midibufsrcs[1] = &midibuf_pattern;
         midibufsrcs[2] = &rt->midibuf_aux;
@@ -455,7 +456,7 @@ void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition
 struct set_song_command
 {
     struct cbox_rt *rt;
-    struct cbox_song *new_song, *old_song;
+    struct cbox_song_playback *new_song, *old_song;
     int new_time_ppqn;
 };
 
@@ -463,30 +464,30 @@ static int set_song_command_execute(void *user_data)
 {
     struct set_song_command *cmd = user_data;
     
-    if (cbox_song_active_notes_release(cmd->rt->master->song, &cmd->rt->midibuf_aux) < 0)
+    if (cmd->rt->master->spb &&
+        cbox_song_playback_active_notes_release(cmd->rt->master->spb, &cmd->rt->midibuf_aux) < 0)
         return 0;
-    cmd->old_song = cmd->rt->master->song;
-    cmd->rt->master->song = cmd->new_song;
+    cmd->old_song = cmd->rt->master->spb;
+    cmd->rt->master->spb = cmd->new_song;
     if (cmd->new_song)
     {
         if (cmd->new_time_ppqn == -1)
-            cbox_song_seek_samples(cmd->rt->master->song, cmd->old_song ? cmd->old_song->song_pos_samples : 0);
+            cbox_song_playback_seek_samples(cmd->rt->master->spb, cmd->old_song ? cmd->old_song->song_pos_samples : 0);
         else
-            cbox_song_seek_ppqn(cmd->rt->master->song, cmd->new_time_ppqn);
+            cbox_song_playback_seek_ppqn(cmd->rt->master->spb, cmd->new_time_ppqn);
     }
     
     return 1;
 }
 
-struct cbox_song *cbox_rt_set_song(struct cbox_rt *rt, struct cbox_song *song, int new_pos_ppqn)
+void cbox_rt_update_song(struct cbox_rt *rt, int new_pos_ppqn)
 {
     static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = set_song_command_execute, .cleanup = NULL };
     
-    struct set_song_command cmd = { rt, song, NULL, new_pos_ppqn };
-    
+    struct set_song_command cmd = { rt, cbox_song_playback_new(rt->master->song), NULL, new_pos_ppqn };
     cbox_rt_execute_cmd_sync(rt, &def, &cmd);
-    
-    return cmd.old_song;
+    if (cmd.old_song)
+        cbox_song_playback_destroy(cmd.old_song);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -513,7 +514,10 @@ struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_patte
     song->loop_start_ppqn = 0;
     song->loop_end_ppqn = pattern->loop_end;
     
-    return cbox_rt_set_song(rt, song, new_pos_ppqn);
+    struct cbox_song *old_song = rt->master->song;
+    rt->master->song = song;
+    cbox_rt_update_song(rt, new_pos_ppqn);
+    return old_song;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

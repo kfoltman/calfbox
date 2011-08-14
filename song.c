@@ -35,8 +35,6 @@ struct cbox_song *cbox_song_new(struct cbox_master *master)
     p->tracks = NULL;
     p->lyrics_sheet = NULL;
     p->chord_sheet = NULL;
-    p->song_pos_samples = 0;
-    p->song_pos_ppqn = 0;
     return p;
 }
 

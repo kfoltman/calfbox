@@ -41,7 +41,6 @@ struct cbox_song
     GList *master_track_items;
     GList *tracks;
     gchar *lyrics_sheet, *chord_sheet;
-    uint32_t song_pos_samples, song_pos_ppqn;
     uint32_t loop_start_ppqn, loop_end_ppqn;
 };
 

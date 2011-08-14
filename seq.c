@@ -130,15 +130,16 @@ void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time_sam
 
 void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int nsamples)
 {
+    struct cbox_song_playback *spb = pb->master->spb;
     int rpos = 0;
     while(rpos < nsamples && pb->pos < pb->items_count)
     {
         int rend = nsamples;
         struct cbox_track_playback_item *cur = &pb->items[pb->pos];
         // a gap before the current item
-        if (pb->master->song->song_pos_samples + rpos < pb->playback.start_time_samples)
+        if (spb->song_pos_samples + rpos < pb->playback.start_time_samples)
         {
-            int space_samples = pb->playback.start_time_samples - (pb->master->song->song_pos_samples + rpos);
+            int space_samples = pb->playback.start_time_samples - (spb->song_pos_samples + rpos);
             if (space_samples >= rend - rpos)
                 return;
             rpos += space_samples;
@@ -146,10 +147,10 @@ void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int 
         }
         // check if item finished
         int cur_segment_end_samples = cbox_master_ppqn_to_samples(pb->master, cur->time + cur->length);
-        int render_end_samples = pb->master->song->song_pos_samples + rend;
+        int render_end_samples = spb->song_pos_samples + rend;
         if (render_end_samples > cur_segment_end_samples)
         {
-            rend = cur_segment_end_samples - pb->master->song->song_pos_samples;
+            rend = cur_segment_end_samples - spb->song_pos_samples;
             cbox_midi_pattern_playback_render(&pb->playback, &pb->output_buffer, offset, rend - rpos);
             pb->pos++;
             cbox_track_playback_start_item(pb, cur_segment_end_samples);
@@ -284,97 +285,121 @@ int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_not
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song)
+{
+    struct cbox_song_playback *spb = malloc(sizeof(struct cbox_song_playback));
+    memset(spb, 0, sizeof(struct cbox_song_playback));
+    spb->master = song->master;
+    spb->track_count = g_list_length(song->tracks);
+    spb->tracks = malloc(spb->track_count * sizeof(struct cbox_track_playback *));
+    spb->song_pos_samples = 0;
+    spb->song_pos_ppqn = 0;
+    spb->loop_start_ppqn = song->loop_start_ppqn;
+    spb->loop_end_ppqn = song->loop_end_ppqn;
+    int pos = 0;
+    for (GList *p = song->tracks; p != NULL; p = g_list_next(p))
+    {
+        struct cbox_track *trk = p->data;
+        spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, song->master);
+    }
+    return spb;
+}
+
 #define MAX_TRACKS 16
 
-void cbox_song_render(struct cbox_song *song, struct cbox_midi_buffer *output, int nsamples)
+void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, int nsamples)
 {
     struct cbox_midi_buffer *midibufsrcs[MAX_TRACKS];
     
     cbox_midi_buffer_clear(output);
     
-    for(GList *p = song->tracks; p; p = g_list_next(p))
+    for(int i = 0; i < spb->track_count; i++)
     {
-        struct cbox_track *trk = p->data;        
-        cbox_midi_buffer_clear(&trk->pb->output_buffer);
+        cbox_midi_buffer_clear(&spb->tracks[i]->output_buffer);
     }
     
-    int end_samples = cbox_master_ppqn_to_samples(song->master, song->loop_end_ppqn);
+    int end_samples = cbox_master_ppqn_to_samples(spb->master, spb->loop_end_ppqn);
     
     int rpos = 0;
     while (rpos < nsamples)
     {
         int rend = nsamples;
-        int end_pos = song->song_pos_samples + (rend - rpos);
+        int end_pos = spb->song_pos_samples + (rend - rpos);
         if (end_pos >= end_samples)
         {
-            rend = end_samples - song->song_pos_samples;
+            rend = end_samples - spb->song_pos_samples;
             end_pos = end_samples;
         }
         
         if (rend > rpos)
         {
-            for(GList *p = song->tracks; p; p = g_list_next(p))
-            {
-                struct cbox_track *trk = p->data;                
-                cbox_track_playback_render(trk->pb, rpos, rend - rpos);
-            }
+            for (int i = 0; i < spb->track_count; i++)
+                cbox_track_playback_render(spb->tracks[i], rpos, rend - rpos);
         }
         
         if (end_pos < end_samples)
         {
-            song->song_pos_samples += rend - rpos;
-            song->song_pos_ppqn = cbox_master_samples_to_ppqn(song->master, song->song_pos_samples);
+            spb->song_pos_samples += rend - rpos;
+            spb->song_pos_ppqn = cbox_master_samples_to_ppqn(spb->master, spb->song_pos_samples);
         }
         else
         {
-            if (song->loop_start_ppqn >= song->loop_end_ppqn)
+            if (spb->loop_start_ppqn >= spb->loop_end_ppqn)
                 return;
                 
-            cbox_song_seek_ppqn(song, song->loop_start_ppqn);
+            cbox_song_playback_seek_ppqn(spb, spb->loop_start_ppqn);
         }
         rpos = rend;
     }
     
-    int nt = 0;
     int bpos[MAX_TRACKS];
-    for(GList *p = song->tracks; p; nt++, p = g_list_next(p))
+    for(int i = 0; i < spb->track_count; i++)
     {
-        struct cbox_track *trk = p->data;        
-        midibufsrcs[nt] = &trk->pb->output_buffer;
-        bpos[nt] = 0;
+        midibufsrcs[i] = &spb->tracks[i]->output_buffer;
+        bpos[i] = 0;
     }
-    cbox_midi_buffer_merge(output, midibufsrcs, nt, bpos);
+    cbox_midi_buffer_merge(output, midibufsrcs, spb->track_count, bpos);
 }
 
-int cbox_song_active_notes_release(struct cbox_song *song, struct cbox_midi_buffer *buf)
+int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf)
 {
-    for(GList *p = song->tracks; p; p = g_list_next(p))
+    for(int i = 0; i < spb->track_count; i++)
     {
-        struct cbox_track *trk = p->data;
-        if (!cbox_midi_playback_active_notes_release(&trk->pb->active_notes, buf))
+        struct cbox_track_playback *trk = spb->tracks[i];
+        if (!cbox_midi_playback_active_notes_release(&trk->active_notes, buf))
             return 0;
     }
     return 1;
 }
 
-void cbox_song_seek_ppqn(struct cbox_song *song, int time_ppqn)
+void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn)
 {
-    for(GList *p = song->tracks; p; p = g_list_next(p))
+    for(int i = 0; i < spb->track_count; i++)
     {
-        struct cbox_track *trk = p->data;
-        cbox_track_playback_seek_ppqn(trk->pb, time_ppqn);
+        struct cbox_track_playback *trk = spb->tracks[i];
+        cbox_track_playback_seek_ppqn(trk, time_ppqn);
     }
-    song->song_pos_samples = cbox_master_ppqn_to_samples(song->master, time_ppqn);
-    song->song_pos_ppqn = time_ppqn;
+    spb->song_pos_samples = cbox_master_ppqn_to_samples(spb->master, time_ppqn);
+    spb->song_pos_ppqn = time_ppqn;
 }
 
-void cbox_song_seek_samples(struct cbox_song *song, int time_samples)
+void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_samples)
 {
-    for(GList *p = song->tracks; p; p = g_list_next(p))
+    for(int i = 0; i < spb->track_count; i++)
     {
-        struct cbox_track *trk = p->data;
-        cbox_track_playback_seek_samples(trk->pb, time_samples);
+        struct cbox_track_playback *trk = spb->tracks[i];
+        cbox_track_playback_seek_samples(trk, time_samples);
     }
-    song->song_pos_samples = time_samples;
-    song->song_pos_ppqn = cbox_master_samples_to_ppqn(song->master, time_samples);
+    spb->song_pos_samples = time_samples;
+    spb->song_pos_ppqn = cbox_master_samples_to_ppqn(spb->master, time_samples);
+}
+
+void cbox_song_playback_destroy(struct cbox_song_playback *spb)
+{
+    for (int i = 0; i < spb->track_count; i++)
+    {
+        cbox_track_playback_destroy(spb->tracks[i]);
+    }
+    free(spb->tracks);
+    free(spb);
 }

@@ -29,21 +29,26 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        return cbox_execute_on(fb, NULL, "/sample_rate", "i", error, m->srate) &&
-            cbox_execute_on(fb, NULL, "/tempo", "f", error, m->tempo) &&
+        if (!cbox_execute_on(fb, NULL, "/sample_rate", "i", error, m->srate))
+            return FALSE;
+        if (!m->spb)
+            return TRUE;
+        return cbox_execute_on(fb, NULL, "/tempo", "f", error, m->tempo) &&
             cbox_execute_on(fb, NULL, "/timesig", "ii", error, m->timesig_nom, m->timesig_denom) &&
             cbox_execute_on(fb, NULL, "/playing", "i", error, (int)m->state) &&
-            cbox_execute_on(fb, NULL, "/pos", "i", error, m->song->song_pos_samples) &&
-            cbox_execute_on(fb, NULL, "/pos_ppqn", "i", error, m->song->song_pos_ppqn);
+            cbox_execute_on(fb, NULL, "/pos", "i", error, m->spb->song_pos_samples) &&
+            cbox_execute_on(fb, NULL, "/pos_ppqn", "i", error, m->spb->song_pos_ppqn);
     }
     else
     if (!strcmp(cmd->command, "/tell") && !*cmd->arg_types)
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
+        if (!m->spb)
+            return TRUE;
         return cbox_execute_on(fb, NULL, "/playing", "i", error, (int)m->state) &&
-            cbox_execute_on(fb, NULL, "/pos", "i", error, m->song->song_pos_samples) &&
-            cbox_execute_on(fb, NULL, "/pos_ppqn", "i", error, m->song->song_pos_ppqn);
+            cbox_execute_on(fb, NULL, "/pos", "i", error, m->spb->song_pos_samples) &&
+            cbox_execute_on(fb, NULL, "/pos_ppqn", "i", error, m->spb->song_pos_ppqn);
     }
     else
     if (!strcmp(cmd->command, "/set_tempo") && !strcmp(cmd->arg_types, "f"))
@@ -72,13 +77,13 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     else
     if (!strcmp(cmd->command, "/seek_samples") && !strcmp(cmd->arg_types, "i"))
     {
-        cbox_song_seek_samples(m->song, *(int *)cmd->arg_values[0]);
+        cbox_song_playback_seek_samples(m->spb, *(int *)cmd->arg_values[0]);
         return TRUE;
     }
     else
     if (!strcmp(cmd->command, "/seek_ppqn") && !strcmp(cmd->arg_types, "i"))
     {
-        cbox_song_seek_ppqn(m->song, *(int *)cmd->arg_values[0]);
+        cbox_song_playback_seek_ppqn(m->spb, *(int *)cmd->arg_values[0]);
         return TRUE;
     }
     else
@@ -96,6 +101,7 @@ void cbox_master_init(struct cbox_master *master)
     master->timesig_denom = 4;
     master->state = CMTS_STOP;
     master->song = NULL;
+    master->spb = NULL;
     cbox_command_target_init(&master->cmd_target, master_process_cmd, master);
 }
 
