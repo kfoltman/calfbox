@@ -93,6 +93,23 @@ class DrumPatternModel(gobject.GObject):
     def delete_selected(self):
         self.notes = [note for note in self.notes if not note.selected]
         self.changed()
+        
+    def group_set(self, **vals):
+        for n in self.notes:
+            if not n.selected:
+                continue
+            for k, v in vals.iteritems():
+                setattr(n, k, v)
+        self.changed()
+
+    def transpose_selected(self, amount):
+        for n in self.notes:
+            if not n.selected:
+                continue
+            if n.row + amount < 0 or n.row + amount > 127:
+                continue
+            n.row += amount
+        self.changed()
 
 gobject.type_register(DrumPatternModel)
 gobject.signal_new("changed", DrumPatternModel, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ())
@@ -367,9 +384,27 @@ class DrumCanvas(gnomecanvas.Canvas):
 
     def on_key_press(self, item, event):
         keyval, state = event.keyval, event.state
-        if gtk.gdk.keyval_name(keyval) == 'Delete':
+        kvname = gtk.gdk.keyval_name(keyval)
+        if kvname == 'Delete':
             self.pattern.delete_selected()
             self.update_notes()
+        elif kvname == 'c':
+            self.pattern.group_set(channel = self.channel)
+            self.update_notes()
+        elif kvname == 'l':
+            self.pattern.group_set(len = self.note_length)
+            self.update_notes()
+        elif kvname == 'v':
+            self.pattern.group_set(vel = int(self.toolbox.vel_adj.get_value()))
+            self.update_notes()
+        elif kvname == 'plus':
+            self.pattern.transpose_selected(1)
+            self.update_notes()
+        elif kvname == 'minus':
+            self.pattern.transpose_selected(-1)
+            self.update_notes()
+        #else:
+        #    print kvname
 
     def on_mouse_event(self, item, event):
         ex, ey = self.window_to_world(event.x, event.y)
@@ -388,6 +423,7 @@ class DrumCanvas(gnomecanvas.Canvas):
                 return
             return
         if event.type == gtk.gdk.BUTTON_PRESS:
+            self.grab_focus()
             if ((event.state & gtk.gdk.MOD1_MASK) != 0) and event.button == 1:
                 self.cursor.start_rubberband(ex, ey)
                 return
