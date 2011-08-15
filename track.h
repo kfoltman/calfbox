@@ -34,6 +34,7 @@ struct cbox_track_item
 
 struct cbox_track
 {
+    gchar *name;
     GList *items;
     struct cbox_track_playback *pb;
 };

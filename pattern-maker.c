@@ -104,9 +104,10 @@ static gboolean traverse_func(gpointer key, gpointer value, gpointer pstate)
     return FALSE;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_midi_pattern_maker *maker)
+struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_midi_pattern_maker *maker, gchar *name)
 {
     struct cbox_midi_pattern *p = malloc(sizeof(struct cbox_midi_pattern));
+    p->name = name;
     p->event_count = g_tree_nnodes(maker->events);
     p->events = malloc(sizeof(struct cbox_midi_event[1]) * p->event_count);
     

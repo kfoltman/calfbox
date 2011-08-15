@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "errors.h"
 #include "song.h"
 #include "track.h"
 #include <stdlib.h>
@@ -27,14 +28,48 @@ void cbox_master_track_item_destroy(struct cbox_master_track_item *item)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct cbox_song *song = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        int nt = 1;
+        for(GList *p = song->tracks; p; p = g_list_next(p))
+        {
+            struct cbox_track *trk = p->data;
+            if (!cbox_execute_on(fb, NULL, "/track", "isi", error, nt++, trk->name, g_list_length(trk->items)))
+                return FALSE;
+        }
+        int np = 1;
+        for(GList *p = song->patterns; p; p = g_list_next(p))
+        {
+            struct cbox_midi_pattern *pat = p->data;
+            if (!cbox_execute_on(fb, NULL, "/pattern", "isi", error, np++, pat->name, pat->loop_end))
+                return FALSE;
+        }
+        return TRUE;
+    }
+    else
+        return cbox_set_command_error(error, cmd);
+    return TRUE;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct cbox_song *cbox_song_new(struct cbox_master *master)
 {
     struct cbox_song *p = malloc(sizeof(struct cbox_song));
     p->master = master;
     p->master_track_items = NULL;
     p->tracks = NULL;
+    p->patterns = NULL;
     p->lyrics_sheet = NULL;
     p->chord_sheet = NULL;
+    cbox_command_target_init(&p->cmd_target, cbox_song_process_cmd, p);
     return p;
 }
 
@@ -43,10 +78,26 @@ void cbox_song_add_track(struct cbox_song *song, struct cbox_track *track)
     song->tracks = g_list_append(song->tracks, track);
 }
 
+void cbox_song_remove_track(struct cbox_song *song, struct cbox_track *track)
+{
+    song->tracks = g_list_remove(song->tracks, track);
+}
+
+void cbox_song_add_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern)
+{
+    song->patterns = g_list_append(song->patterns, pattern);
+}
+
+void cbox_song_remove_patterns(struct cbox_song *song, struct cbox_midi_pattern *pattern)
+{
+    song->patterns = g_list_remove(song->patterns, pattern);
+}
+
 void cbox_song_destroy(struct cbox_song *song)
 {
     g_list_free_full(song->master_track_items, (GDestroyNotify)cbox_master_track_item_destroy);
     g_list_free_full(song->tracks, (GDestroyNotify)cbox_track_destroy);
+    g_list_free_full(song->patterns, (GDestroyNotify)cbox_midi_pattern_destroy);
     free(song);
 }
 

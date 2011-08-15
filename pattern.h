@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct cbox_midi_pattern
 {
+    gchar *name;
     struct cbox_midi_event *events;
     int event_count;
     int loop_end;

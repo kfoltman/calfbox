@@ -39,11 +39,10 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts)
         cbox_midi_pattern_maker_add(m, length * i, 0x90 + channel - 1, accent ? accnote : note, accent ? 127 : 100);
         cbox_midi_pattern_maker_add(m, length * i + 1, 0x80 + channel - 1, accent ? accnote : note, 0);
     }
-    
-    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m);
-    
+
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, g_strdup_printf("click-%d", ts));
     p->loop_end = length * ts;
-    
+
     cbox_midi_pattern_maker_destroy(m);
 
     return p;
@@ -51,6 +50,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts)
 
 void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern)
 {
+    g_free(pattern->name);
     if (pattern->event_count)
         free(pattern->events);
     free(pattern);
@@ -77,11 +77,11 @@ static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m
         g_free(cfg_section);
         return -1;
     }
-    
+
     gchar *smf = cbox_config_get_string(cfg_section, "smf");
     if (smf)
         return cbox_midi_pattern_load_smf_into(m, smf);
-    
+
     int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
     int gchannel = cbox_config_get_int(cfg_section, "channel", 1);
     int gswing = cbox_config_get_int(cfg_section, "swing", 0);
@@ -267,7 +267,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_load(const char *name, int is_drum)
         length = cbox_midi_pattern_load_drum_into(m, name, 0);
     else
         length = cbox_midi_pattern_load_melodic_into(m, name, 0, 0, -1);
-    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m);    
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, g_strdup(name));
     p->loop_end = length;
     
     cbox_midi_pattern_maker_destroy(m);
@@ -353,7 +353,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(const char *name, int is_
     
     g_free(cfg_section);
             
-    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m);        
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, g_strdup(name));
     p->loop_end = length;
     
     cbox_midi_pattern_maker_destroy(m);
@@ -373,7 +373,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(const struct cbox_blob
         cbox_midi_pattern_maker_add(m, event.time, event.cmd, event.byte1, event.byte2);
     }
     
-    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m);        
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, g_strdup("unnamed-blob"));
     p->loop_end = length;
     
     cbox_midi_pattern_maker_destroy(m);

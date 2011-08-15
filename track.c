@@ -30,6 +30,7 @@ void cbox_track_item_destroy(struct cbox_track_item *item)
 struct cbox_track *cbox_track_new()
 {
     struct cbox_track *p = malloc(sizeof(struct cbox_track));
+    p->name = g_strdup("Unnamed");
     p->items = NULL;
     p->pb = NULL;
     return p;
@@ -73,6 +74,7 @@ void cbox_track_destroy(struct cbox_track *track)
     if (track->pb)
         cbox_track_playback_destroy(track->pb);
     g_list_free_full(track->items, (GDestroyNotify)cbox_track_item_destroy);
+    g_free((gchar *)track->name);
     free(track);
 }
 

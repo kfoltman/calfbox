@@ -31,7 +31,7 @@ extern gboolean cbox_midi_pattern_maker_load_smf(struct cbox_midi_pattern_maker 
 extern void cbox_midi_pattern_maker_add(struct cbox_midi_pattern_maker *maker, uint32_t time, uint8_t cmd, uint8_t val1, uint8_t val2);
 extern void cbox_midi_pattern_maker_add_mem(struct cbox_midi_pattern_maker *maker, uint32_t time, const uint8_t *src, uint32_t len);
 
-extern struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_midi_pattern_maker *maker);
+extern struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_midi_pattern_maker *maker, gchar *name);
 
 extern void cbox_midi_pattern_maker_destroy(struct cbox_midi_pattern_maker *maker);
 

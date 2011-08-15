@@ -447,6 +447,9 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         if (!strncmp(obj, "rt/", 3))
             return cbox_execute_sub(&app.rt->cmd_target, fb, cmd, pos, error);
         else
+        if (!strncmp(obj, "song/", 5))
+            return cbox_execute_sub(&app.rt->master->song->cmd_target, fb, cmd, pos, error);
+        else
         if (!strncmp(obj, "waves/", 6))
             return cbox_execute_sub(&app.waves_cmd_target, fb, cmd, pos, error);
         else
