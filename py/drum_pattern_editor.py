@@ -22,6 +22,7 @@ class NoteModel(object):
         self.vel = int(vel)
         self.len = int(len)
         self.item = None
+        self.selected = False
     def __str__(self):
         return "pos=%s row=%s vel=%s len=%s" % (self.pos, self.row, self.vel, self.len)
 
@@ -194,6 +195,9 @@ class DrumCanvasCursor(object):
         self.frame.hide()
         self.vel = self.canvas.root().add(gnomecanvas.CanvasText, x = 0, y = 0, fill_color = "blue")
         self.vel.hide()
+        self.rubberband = False
+        self.rubberband_origin = None
+        self.rubberband_current = None
 
     def hide(self):
         self.frame.hide()
@@ -215,6 +219,34 @@ class DrumCanvasCursor(object):
         self.frame.set(x1 = x - 6, x2 = x + 6, y1 = y - 6, y2 = y + 6)
         cy = y - self.canvas.row_height * 1.5 if y >= self.canvas.rows * self.canvas.row_height / 2 else y + self.canvas.row_height * 1.5
         self.vel.set(x = x, y = cy)
+        
+    def start_rubberband(self, x, y):
+        self.rubberband = True
+        self.rubberband_origin = (x, y)
+        self.rubberband_current = (x, y)
+        self.update_rubberband_frame()
+        self.frame.show()
+        
+    def update_rubberband(self, x, y):
+        self.rubberband_current = (x, y)
+        self.update_rubberband_frame()
+        
+    def end_rubberband(self, x, y):
+        self.rubberband_current = (x, y)
+        self.update_rubberband_frame()
+        self.frame.hide()
+        self.rubberband = False
+        
+    def cancel_rubberband(self):
+        self.rubberband = False
+        
+    def update_rubberband_frame(self):
+        self.frame.set(x1 = self.rubberband_origin[0], y1 = self.rubberband_origin[1], x2 = self.rubberband_current[0], y2 = self.rubberband_current[1])
+        
+    def get_rubberband_box(self):
+        x1, y1 = self.rubberband_origin
+        x2, y2 = self.rubberband_current
+        return (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
 
 class DrumCanvas(gnomecanvas.Canvas):
     def __init__(self, rows, pattern):
@@ -303,6 +335,8 @@ class DrumCanvas(gnomecanvas.Canvas):
             if item.channel == self.channel:
                 fill_color = 0xC0C0C0FF - int(item.vel * 1.5) * 0x00010100
                 outline_color = 0x808080FF
+                if item.selected:
+                    outline_color = 0xFF8080FF
             else:
                 fill_color = 0xE0E0E0FF
                 outline_color = 0xE0E0E0FF
@@ -313,6 +347,16 @@ class DrumCanvas(gnomecanvas.Canvas):
                 item.item = self.notes.add(gnomecanvas.CanvasPolygon, points = [-4, 0, 0, -5, 5, 0, 0, 5], fill_color_rgba = fill_color, outline_color_rgba = outline_color)
             item.item.move(x, y)
         
+    def set_selection_from_rubberband(self):
+        sx, sy, ex, ey = self.cursor.get_rubberband_box()
+        for item in self.pattern.items():
+            x = self.pulse_to_screen_x(item.pos)
+            y = self.row_to_screen_y(item.row + 0.5)
+            item.selected = (x >= sx and x <= ex and y >= sy and y <= ey)
+        self.update_notes()
+            
+                
+        
     def on_grid_event(self, item, event):
         #print event
         if event.type in [gtk.gdk.BUTTON_PRESS, gtk.gdk._2BUTTON_PRESS, gtk.gdk.LEAVE_NOTIFY, gtk.gdk.MOTION_NOTIFY, gtk.gdk.BUTTON_RELEASE]:
@@ -322,7 +366,19 @@ class DrumCanvas(gnomecanvas.Canvas):
             pulse = column * self.grid_unit
             epulse = (ex - self.instr_width) / self.zoom_in
         unit = self.grid_unit * self.zoom_in
+        if self.cursor.rubberband:
+            if event.type == gtk.gdk.MOTION_NOTIFY:
+                self.cursor.update_rubberband(ex, ey)
+                return
+            if event.type == gtk.gdk.BUTTON_RELEASE and event.button == 1:
+                self.cursor.end_rubberband(ex, ey)
+                self.set_selection_from_rubberband()
+                return
+            return
         if event.type == gtk.gdk.BUTTON_PRESS:
+            if ((event.state & gtk.gdk.MOD1_MASK) != 0) and event.button == 1:
+                self.cursor.start_rubberband(ex, ey)
+                return
             if pulse < 0 or pulse >= self.pattern.get_length():
                 return
             note = self.pattern.get_note(pulse, row, self.channel)
