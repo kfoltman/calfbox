@@ -90,6 +90,10 @@ class DrumPatternModel(gobject.GObject):
     def changed(self):
         self.emit('changed')
 
+    def delete_selected(self):
+        self.notes = [note for note in self.notes if not note.selected]
+        self.changed()
+
 gobject.type_register(DrumPatternModel)
 gobject.signal_new("changed", DrumPatternModel, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ())
 
@@ -346,7 +350,7 @@ class DrumCanvas(gnomecanvas.Canvas):
             else:
                 item.item = self.notes.add(gnomecanvas.CanvasPolygon, points = [-4, 0, 0, -5, 5, 0, 0, 5], fill_color_rgba = fill_color, outline_color_rgba = outline_color)
             item.item.move(x, y)
-        
+
     def set_selection_from_rubberband(self):
         sx, sy, ex, ey = self.cursor.get_rubberband_box()
         for item in self.pattern.items():
@@ -354,17 +358,25 @@ class DrumCanvas(gnomecanvas.Canvas):
             y = self.row_to_screen_y(item.row + 0.5)
             item.selected = (x >= sx and x <= ex and y >= sy and y <= ey)
         self.update_notes()
-            
-                
-        
+
     def on_grid_event(self, item, event):
-        #print event
+        if event.type == gtk.gdk.KEY_PRESS:
+            return self.on_key_press(item, event)
         if event.type in [gtk.gdk.BUTTON_PRESS, gtk.gdk._2BUTTON_PRESS, gtk.gdk.LEAVE_NOTIFY, gtk.gdk.MOTION_NOTIFY, gtk.gdk.BUTTON_RELEASE]:
-            ex, ey = self.window_to_world(event.x, event.y)
-            column = self.screen_x_to_column(ex)
-            row = self.screen_y_to_row(ey)
-            pulse = column * self.grid_unit
-            epulse = (ex - self.instr_width) / self.zoom_in
+            return self.on_mouse_event(item, event)
+
+    def on_key_press(self, item, event):
+        keyval, state = event.keyval, event.state
+        if gtk.gdk.keyval_name(keyval) == 'Delete':
+            self.pattern.delete_selected()
+            self.update_notes()
+
+    def on_mouse_event(self, item, event):
+        ex, ey = self.window_to_world(event.x, event.y)
+        column = self.screen_x_to_column(ex)
+        row = self.screen_y_to_row(ey)
+        pulse = column * self.grid_unit
+        epulse = (ex - self.instr_width) / self.zoom_in
         unit = self.grid_unit * self.zoom_in
         if self.cursor.rubberband:
             if event.type == gtk.gdk.MOTION_NOTIFY:
