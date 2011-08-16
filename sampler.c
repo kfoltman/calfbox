@@ -409,6 +409,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             
             cbox_biquadf_reset(&v->filter_left);
             cbox_biquadf_reset(&v->filter_right);
+            cbox_biquadf_reset(&v->filter_left2);
+            cbox_biquadf_reset(&v->filter_right2);
             cbox_envelope_reset(&v->amp_env);
             cbox_envelope_reset(&v->filter_env);
             cbox_envelope_reset(&v->pitch_env);
@@ -584,6 +586,33 @@ static inline float clip01(float v)
     return v;
 }
 
+static gboolean is_4pole(struct sampler_voice *v)
+{
+    if (v->cutoff == -1)
+        return FALSE;
+    return v->filter == sft_lp24 || v->filter == sft_hp24 || v->filter == sft_bp12;
+}
+
+static gboolean is_tail_finished(struct sampler_voice *v)
+{
+    if (v->cutoff == -1)
+        return TRUE;
+    double eps = 1.0 / 65536.0;
+    if (cbox_biquadf_is_audible(&v->filter_left, eps))
+        return FALSE;
+    if (cbox_biquadf_is_audible(&v->filter_right, eps))
+        return FALSE;
+    if (is_4pole(v))
+    {
+        if (cbox_biquadf_is_audible(&v->filter_left2, eps))
+            return FALSE;
+        if (cbox_biquadf_is_audible(&v->filter_right2, eps))
+            return FALSE;
+    }
+    
+    return TRUE;
+}
+
 void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct sampler_module *m = (struct sampler_module *)module;
@@ -655,6 +684,9 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                     resonance = 0.7;
                 if (resonance > 32)
                     resonance = 32;
+                // XXXKF this is derived experimentally and probably far off from correct formula
+                if (is_4pole(v))
+                    resonance = sqrt(resonance / 0.707) * 0.5;
                 switch(v->filter)
                 {
                 case sft_lp12:
@@ -664,6 +696,21 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                     cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
                     break;
                 case sft_bp6:
+                    cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    break;
+                case sft_lp6:
+                    cbox_biquadf_set_1plp(&v->filter_coeffs, cutoff, m->srate);
+                    break;
+                case sft_hp6:
+                    cbox_biquadf_set_1php(&v->filter_coeffs, cutoff, m->srate);
+                    break;
+                case sft_lp24:
+                    cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    break;
+                case sft_hp24:
+                    cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    break;
+                case sft_bp12:
                     cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
                     break;
                 default:
@@ -683,7 +730,11 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             if (v->cutoff != -1)
             {
                 cbox_biquadf_process(&v->filter_left, &v->filter_coeffs, left);
+                if (is_4pole(v))
+                    cbox_biquadf_process(&v->filter_left2, &v->filter_coeffs, left);
                 cbox_biquadf_process(&v->filter_right, &v->filter_coeffs, right);
+                if (is_4pole(v))
+                    cbox_biquadf_process(&v->filter_right2, &v->filter_coeffs, right);
             }
             mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.0);
             if ((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0))
@@ -1475,6 +1526,16 @@ enum sampler_filter_type sampler_filter_type_from_string(const char *name)
         return sft_hp12;
     if (!strcmp(name, "bpf_2p"))
         return sft_bp6;
+    if (!strcmp(name, "lpf_4p"))
+        return sft_lp24;
+    if (!strcmp(name, "hpf_4p"))
+        return sft_hp24;
+    if (!strcmp(name, "bpf_4p"))
+        return sft_bp12;
+    if (!strcmp(name, "lpf_1p"))
+        return sft_lp6;
+    if (!strcmp(name, "hpf_1p"))
+        return sft_hp6;
     return sft_unknown;
 }
 

@@ -59,6 +59,11 @@ enum sampler_filter_type
     sft_lp12,
     sft_hp12,
     sft_bp6,
+    sft_lp24,
+    sft_hp24,
+    sft_bp12,
+    sft_lp6,
+    sft_hp6,
 };
 
 struct sampler_layer
@@ -141,6 +146,7 @@ struct sampler_voice
     float last_lgain, last_rgain;
     float cutoff, resonance, fileg_depth, pitcheg_depth;
     struct cbox_biquadf_state filter_left, filter_right;
+    struct cbox_biquadf_state filter_left2, filter_right2;
     struct cbox_biquadf_coeffs filter_coeffs;
     struct sampler_channel *channel;
     struct cbox_envelope amp_env, filter_env, pitch_env;
