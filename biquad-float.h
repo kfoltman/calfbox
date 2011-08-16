@@ -108,6 +108,38 @@ static inline void cbox_biquadf_set_peakeq_rbj(struct cbox_biquadf_coeffs *coeff
     coeffs->b2 = ib0 * (1 - alpha/A);
 }
 
+static inline void cbox_biquadf_set_1plp(struct cbox_biquadf_coeffs *coeffs, float freq, float sr)
+{
+    float w = hz2w(freq, sr);
+    float x = tan (w * 0.5f);
+    float q = 1 / (1 + x);
+    float a01 = x*q;
+    float b1 = a01 - q;
+    
+    coeffs->a0 = a01;
+    coeffs->a1 = a01;
+    coeffs->b1 = b1;
+    coeffs->a2 = 0;
+    coeffs->b2 = 0;
+}
+
+static inline void cbox_biquadf_set_1php(struct cbox_biquadf_coeffs *coeffs, float freq, float sr)
+{
+    float w = hz2w(freq, sr);
+    float x = tan (w * 0.5f);
+    float q = 1 / (1 + x);
+    float a01 = x*q;
+    float b1 = a01 - q;
+    
+    coeffs->a0 = q;
+    coeffs->a1 = -q;
+    coeffs->b1 = b1;
+    coeffs->a2 = 0;
+    coeffs->b2 = 0;
+}
+
+
+
 static inline void cbox_biquadf_process(struct cbox_biquadf_state *state, struct cbox_biquadf_coeffs *coeffs, float *buffer)
 {
     int i;
