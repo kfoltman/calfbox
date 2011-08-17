@@ -301,6 +301,7 @@ class DrumCanvas(gnomecanvas.Canvas):
         self.connect('event', self.on_grid_event)
 
         self.toolbox = DrumEditorToolbox(self)
+        self.add_events(gtk.gdk.POINTER_MOTION_HINT_MASK)
         
     def calc_size(self):
         return (self.instr_width + self.pattern.get_length() * self.zoom_in + 1, self.rows * self.row_height + 1)
