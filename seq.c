@@ -313,43 +313,50 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
     
     cbox_midi_buffer_clear(output);
     
-    for(int i = 0; i < spb->track_count; i++)
+    if (spb->master->state == CMTS_STOP)
     {
-        cbox_midi_buffer_clear(&spb->tracks[i]->output_buffer);
+        cbox_song_playback_active_notes_release(spb, output);
     }
-    
-    int end_samples = cbox_master_ppqn_to_samples(spb->master, spb->loop_end_ppqn);
-    
-    int rpos = 0;
-    while (rpos < nsamples)
+    else
     {
-        int rend = nsamples;
-        int end_pos = spb->song_pos_samples + (rend - rpos);
-        if (end_pos >= end_samples)
+        for(int i = 0; i < spb->track_count; i++)
         {
-            rend = end_samples - spb->song_pos_samples;
-            end_pos = end_samples;
+            cbox_midi_buffer_clear(&spb->tracks[i]->output_buffer);
         }
         
-        if (rend > rpos)
-        {
-            for (int i = 0; i < spb->track_count; i++)
-                cbox_track_playback_render(spb->tracks[i], rpos, rend - rpos);
-        }
+        int end_samples = cbox_master_ppqn_to_samples(spb->master, spb->loop_end_ppqn);
         
-        if (end_pos < end_samples)
+        int rpos = 0;
+        while (rpos < nsamples)
         {
-            spb->song_pos_samples += rend - rpos;
-            spb->song_pos_ppqn = cbox_master_samples_to_ppqn(spb->master, spb->song_pos_samples);
+            int rend = nsamples;
+            int end_pos = spb->song_pos_samples + (rend - rpos);
+            if (end_pos >= end_samples)
+            {
+                rend = end_samples - spb->song_pos_samples;
+                end_pos = end_samples;
+            }
+            
+            if (rend > rpos)
+            {
+                for (int i = 0; i < spb->track_count; i++)
+                    cbox_track_playback_render(spb->tracks[i], rpos, rend - rpos);
+            }
+            
+            if (end_pos < end_samples)
+            {
+                spb->song_pos_samples += rend - rpos;
+                spb->song_pos_ppqn = cbox_master_samples_to_ppqn(spb->master, spb->song_pos_samples);
+            }
+            else
+            {
+                if (spb->loop_start_ppqn >= spb->loop_end_ppqn)
+                    return;
+                    
+                cbox_song_playback_seek_ppqn(spb, spb->loop_start_ppqn);
+            }
+            rpos = rend;
         }
-        else
-        {
-            if (spb->loop_start_ppqn >= spb->loop_end_ppqn)
-                return;
-                
-            cbox_song_playback_seek_ppqn(spb, spb->loop_start_ppqn);
-        }
-        rpos = rend;
     }
     
     int bpos[MAX_TRACKS];
