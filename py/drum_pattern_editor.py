@@ -185,7 +185,7 @@ class DrumEditorToolbox(gtk.HBox):
             (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_APPLY))
         dlg.add_filter(standard_filter(["*.cbdp"], "Drum patterns"))
         dlg.add_filter(standard_filter(["*"], "All files"))
-        dlg.set_filename("pattern.cbdp")
+        dlg.set_current_name("pattern.cbdp")
         try:
             if dlg.run() == gtk.RESPONSE_APPLY:            
                 pattern = self.canvas.pattern
