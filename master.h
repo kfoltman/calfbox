@@ -35,7 +35,7 @@ enum cbox_master_transport_state
 struct cbox_master
 {
     int srate;
-    float tempo;
+    float tempo, new_tempo;
     int timesig_nom;
     int timesig_denom; // must be 4 for now
     enum cbox_master_transport_state state;

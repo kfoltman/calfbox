@@ -83,7 +83,7 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     else
     if (!strcmp(cmd->command, "/seek_ppqn") && !strcmp(cmd->arg_types, "i"))
     {
-        cbox_song_playback_seek_ppqn(m->spb, *(int *)cmd->arg_values[0]);
+        cbox_song_playback_seek_ppqn(m->spb, *(int *)cmd->arg_values[0], FALSE);
         return TRUE;
     }
     else
@@ -97,6 +97,7 @@ void cbox_master_init(struct cbox_master *master)
 {
     master->srate = 0;
     master->tempo = 120.0;
+    master->new_tempo = 120.0;
     master->timesig_nom = 4;
     master->timesig_denom = 4;
     master->state = CMTS_STOP;
@@ -120,7 +121,7 @@ void cbox_master_set_sample_rate(struct cbox_master *master, int srate)
 
 void cbox_master_set_tempo(struct cbox_master *master, float tempo)
 {
-    master->tempo = tempo;
+    master->new_tempo = tempo;
 }
 
 void cbox_master_set_timesig(struct cbox_master *master, int beats, int unit)

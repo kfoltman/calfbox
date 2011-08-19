@@ -45,19 +45,17 @@ struct cbox_midi_pattern_playback
     struct cbox_midi_pattern *pattern;
     struct cbox_master *master;
     int pos;
-    // XXXKF might use a hard limit on earliest PPQN time (to prevent rounding errors from grabbing events from before PPQN start time)
-    // time within the pattern
     int rel_time_samples;
     // [start, end) of the pattern slice
     int start_time_samples, end_time_samples;
-    int item_start_ppqn;
+    int item_start_ppqn, min_time_ppqn;
     int offset_ppqn;
     struct cbox_midi_playback_active_notes *active_notes;
 };
 
 extern void cbox_midi_pattern_playback_init(struct cbox_midi_pattern_playback *pb, struct cbox_midi_playback_active_notes *active_notes, struct cbox_master *master);
 extern void cbox_midi_pattern_playback_render(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int offset, int nsamples);
-extern void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn);
+extern void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn, int skip_this_pos);
 extern void cbox_midi_pattern_playback_seek_samples(struct cbox_midi_pattern_playback *pb, int time_samples);
 extern void cbox_midi_pattern_playback_set_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_pattern *pattern, int start_time_samples, int end_time_samples, int item_start_ppqn, int offset_ppqn);
 
@@ -86,9 +84,9 @@ struct cbox_track_playback
 
 extern struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master);
 extern void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int nsamples);
-extern void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, int time_ppqn);
+extern void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, int time_ppqn, int skip_this_pos);
 extern void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, int time_samples);
-extern void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time_samples);
+extern void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, int is_ppqn, int skip_this_pos);
 extern void cbox_track_playback_destroy(struct cbox_track_playback *pb);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,7 +103,7 @@ struct cbox_song_playback
 extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song);
 extern void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, int nsamples);
 extern int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf);
-extern void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn);
+extern void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int skip_this_pos);
 extern void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_samples);
 extern void cbox_song_playback_destroy(struct cbox_song_playback *spb);
 

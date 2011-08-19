@@ -474,7 +474,7 @@ static int set_song_command_execute(void *user_data)
         if (cmd->new_time_ppqn == -1)
             cbox_song_playback_seek_samples(cmd->rt->master->spb, cmd->old_song ? cmd->old_song->song_pos_samples : 0);
         else
-            cbox_song_playback_seek_ppqn(cmd->rt->master->spb, cmd->new_time_ppqn);
+            cbox_song_playback_seek_ppqn(cmd->rt->master->spb, cmd->new_time_ppqn, FALSE);
     }
     
     return 1;
