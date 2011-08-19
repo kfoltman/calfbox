@@ -69,6 +69,10 @@ class DrumPatternModel(gobject.GObject):
         note.vel = int(vel)
         self.changed()
             
+    def set_note_len(self, note, len):
+        note.len = int(len)
+        self.changed()
+            
     def has_note(self, pos, row, channel):
         for n in self.notes:
             if n.pos == pos and n.row == row and (channel is None or n.channel == channel):
@@ -120,27 +124,31 @@ for ch in range(1, 17):
 snap_settings_ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
 for row in [("1/4", PPQN), ("1/8", PPQN / 2), ("1/8T", PPQN/3), ("1/16", PPQN/4), ("1/16T", PPQN/6), ("1/32", PPQN/8), ("1/32T", PPQN/12), ("1/64", PPQN/4)]:
     snap_settings_ls.append(row)
-length_settings_ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
-for row in [("1/2", PPQN), ("1/4", PPQN), ("1/4T", PPQN * 2 / 3), ("1/8", PPQN / 2), ("1/8T", PPQN/3), ("1/16", PPQN/4), ("1/16T", PPQN/6), ("1/32", PPQN/8), ("1/32T", PPQN/12), ("1/64", PPQN/4), ("Hit", 1)]:
-    length_settings_ls.append(row)
+edit_mode_ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+for row in [("Drum", "D"), ("Melodic", "M")]:
+    edit_mode_ls.append(row)
 
 class DrumEditorToolbox(gtk.HBox):
     def __init__(self, canvas):
         gtk.HBox.__init__(self, spacing = 5)
         self.canvas = canvas
         self.vel_adj = gtk.Adjustment(100, 1, 127, 1, 10, 0)
+        
         self.pack_start(gtk.Label("Channel:"), False, False)
         self.channel_setting = gui_tools.standard_combo(channel_ls, active_item_lookup = self.canvas.channel, lookup_column = 1)
         self.channel_setting.connect('changed', lambda w: self.canvas.set_channel(w.get_model()[w.get_active()][1]))
         self.pack_start(self.channel_setting, False, True)
+        
+        self.pack_start(gtk.Label("Mode:"), False, False)
+        self.mode_setting = gui_tools.standard_combo(edit_mode_ls, active_item_lookup = self.canvas.edit_mode, lookup_column = 1)
+        self.mode_setting.connect('changed', lambda w: self.canvas.set_edit_mode(w.get_model()[w.get_active()][1]))
+        self.pack_start(self.mode_setting, False, True)
+        
         self.pack_start(gtk.Label("Snap:"), False, False)
         self.snap_setting = gui_tools.standard_combo(snap_settings_ls, active_item_lookup = self.canvas.grid_unit, lookup_column = 1)
         self.snap_setting.connect('changed', lambda w: self.canvas.set_grid_unit(w.get_model()[w.get_active()][1]))
         self.pack_start(self.snap_setting, False, True)
-        self.pack_start(gtk.Label("Length:"), False, False)
-        self.length_setting = gui_tools.standard_combo(length_settings_ls, active_item_lookup = self.canvas.note_length, lookup_column = 1)
-        self.length_setting.connect('changed', lambda w: self.canvas.set_note_length(w.get_model()[w.get_active()][1]))
-        self.pack_start(self.length_setting, False, True)
+        
         self.pack_start(gtk.Label("Velocity:"), False, False)
         self.pack_start(gtk.SpinButton(self.vel_adj, 0, 0), False, False)
         button = gtk.Button("Load")
@@ -153,6 +161,10 @@ class DrumEditorToolbox(gtk.HBox):
         button.connect('clicked', self.double_pattern)
         self.pack_start(button, True, True)
         self.pack_start(gtk.Label("--"), False, False)
+
+    def update_edit_mode(self):
+        self.mode_setting.set_active(gui_tools.ls_index(edit_mode_ls, self.canvas.edit_mode, 1))
+
     def load_pattern(self, w):
         dlg = gtk.FileChooserDialog('Open a drum pattern', self.get_toplevel(), gtk.FILE_CHOOSER_ACTION_OPEN,
             (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_APPLY))
@@ -228,17 +240,21 @@ class DrumCanvasCursor(object):
         self.frame.show()
         self.vel.show()
         
-    def set_note(self, note):
+    def move_to_note(self, note):
+        self.move(note.pos, note.row, note)
+            
+    def move(self, pulse, row, note):
+        x = self.canvas.pulse_to_screen_x(pulse)
+        y = self.canvas.row_to_screen_y(row) + self.canvas.row_height / 2
+        dx = 0
+        if note is not None:
+            dx = self.canvas.pulse_to_screen_x(pulse + note.len) - x
+        self.frame.set(x1 = x - 6, x2 = x + dx + 6, y1 = y - 6, y2 = y + 6)
+        cy = y - self.canvas.row_height * 1.5 if y >= self.canvas.rows * self.canvas.row_height / 2 else y + self.canvas.row_height * 1.5
         if note is None:
             self.vel.set(text = "")
         else:
             self.vel.set(text = "[%s] %s" % (note.channel, note.vel))
-            
-    def move(self, pulse, row):
-        x = self.canvas.pulse_to_screen_x(pulse)
-        y = self.canvas.row_to_screen_y(row) + self.canvas.row_height / 2
-        self.frame.set(x1 = x - 6, x2 = x + 6, y1 = y - 6, y2 = y + 6)
-        cy = y - self.canvas.row_height * 1.5 if y >= self.canvas.rows * self.canvas.row_height / 2 else y + self.canvas.row_height * 1.5
         self.vel.set(x = x, y = cy)
         
     def start_rubberband(self, x, y):
@@ -276,13 +292,13 @@ class DrumCanvas(gnomecanvas.Canvas):
         self.pattern = pattern
         self.row_height = 24
         self.grid_unit = PPQN / 4 # unit in pulses
-        self.note_length = PPQN / 4 # unit in pulses
         self.zoom_in = 2
         self.instr_width = 120
         self.edited_note = None
         self.orig_velocity = None
+        self.orig_length = None
         self.orig_y = None
-        self.channel = 10
+        self.channel_modes = ['D' if ch == 10 else 'M' for ch in range(1, 17)]
         
         self.update_size()
         
@@ -290,18 +306,26 @@ class DrumCanvas(gnomecanvas.Canvas):
         self.update_grid()
 
         self.notes = self.root().add(gnomecanvas.CanvasGroup, x = self.instr_width)
-        self.update_notes()
 
         self.names = self.root().add(gnomecanvas.CanvasGroup, x = 0)
         self.update_names()
         
         self.cursor = DrumCanvasCursor(self)
-        self.cursor.show()
+        self.cursor.hide()
         
         self.connect('event', self.on_grid_event)
 
+        self.channel = 10
+        self.edit_mode = self.channel_modes[self.channel - 1]
         self.toolbox = DrumEditorToolbox(self)
+
         self.add_events(gtk.gdk.POINTER_MOTION_HINT_MASK)
+
+        self.grab_focus()
+
+    def set_edit_mode(self, mode):
+        self.edit_mode = mode
+        self.channel_modes[self.channel - 1] = mode
         
     def calc_size(self):
         return (self.instr_width + self.pattern.get_length() * self.zoom_in + 1, self.rows * self.row_height + 1)
@@ -310,12 +334,11 @@ class DrumCanvas(gnomecanvas.Canvas):
         self.grid_unit = grid_unit
         self.update_grid()
         
-    def set_note_length(self, length):
-        self.note_length = length
-        
     def set_channel(self, channel):
         self.channel = channel
+        self.set_edit_mode(self.channel_modes[self.channel - 1])
         self.update_notes()
+        self.toolbox.update_edit_mode()
         
     def update_size(self):
         sx, sy = self.calc_size()
@@ -364,7 +387,7 @@ class DrumCanvas(gnomecanvas.Canvas):
                 outline_color = 0xE0E0E0FF
             if item.len > 1:
                 x2 = self.pulse_to_screen_x(item.pos + item.len) - self.pulse_to_screen_x(item.pos)
-                item.item = self.notes.add(gnomecanvas.CanvasPolygon, points = [-4, 0, 0, -5, x2 / 2, -5, x2, 0, x2 / 2, 5, 0, 5], fill_color_rgba = fill_color, outline_color_rgba = outline_color)
+                item.item = self.notes.add(gnomecanvas.CanvasPolygon, points = [-2, 0, 0, -5, x2 - 5, -5, x2, 0, x2 - 5, 5, 0, 5], fill_color_rgba = fill_color, outline_color_rgba = outline_color)
             else:
                 item.item = self.notes.add(gnomecanvas.CanvasPolygon, points = [-4, 0, 0, -5, 5, 0, 0, 5], fill_color_rgba = fill_color, outline_color_rgba = outline_color)
             item.item.move(x, y)
@@ -391,9 +414,6 @@ class DrumCanvas(gnomecanvas.Canvas):
             self.update_notes()
         elif kvname == 'c':
             self.pattern.group_set(channel = self.channel)
-            self.update_notes()
-        elif kvname == 'l':
-            self.pattern.group_set(len = self.note_length)
             self.update_notes()
         elif kvname == 'v':
             self.pattern.group_set(vel = int(self.toolbox.vel_adj.get_value()))
@@ -435,18 +455,19 @@ class DrumCanvas(gnomecanvas.Canvas):
                 if event.button == 3:
                     vel = int(self.toolbox.vel_adj.get_value())
                     self.pattern.set_note_vel(note, vel)
-                    self.cursor.set_note(note)
+                    self.cursor.move(pulse, row, note)
                     self.update_notes()
                     return
                 self.toolbox.vel_adj.set_value(note.vel)
             else:
-                note = NoteModel(pulse, self.channel, row, int(self.toolbox.vel_adj.get_value()), self.note_length)
+                note = NoteModel(pulse, self.channel, row, int(self.toolbox.vel_adj.get_value()), self.grid_unit if self.edit_mode == 'M' else 1)
                 self.pattern.add_note(note)
             self.edited_note = note
+            self.orig_length = note.len
             self.orig_velocity = note.vel
             self.orig_y = ey
             self.grab_add()
-            self.cursor.set_note(note)
+            self.cursor.move(self.edited_note.pos, self.edited_note.row, note)
             self.update_notes()
             return
         if event.type == gtk.gdk._2BUTTON_PRESS:
@@ -454,7 +475,7 @@ class DrumCanvas(gnomecanvas.Canvas):
                 return
             if self.pattern.has_note(pulse, row, self.channel):
                 self.pattern.remove_note(pulse, row, self.channel)
-            self.cursor.set_note(None)
+            self.cursor.move(pulse, row, None)
             self.update_notes()
             if self.edited_note is not None:
                 self.grab_remove()
@@ -472,8 +493,7 @@ class DrumCanvas(gnomecanvas.Canvas):
                 self.cursor.hide()
                 return
             note = self.pattern.get_note(column * self.grid_unit, row, self.channel)
-            self.cursor.move(pulse, row)
-            self.cursor.set_note(note)
+            self.cursor.move(pulse, row, note)
             self.cursor.show()
             return
         if event.type == gtk.gdk.MOTION_NOTIFY and self.edited_note is not None:
@@ -481,13 +501,25 @@ class DrumCanvas(gnomecanvas.Canvas):
             if vel < 1: vel = 1
             if vel > 127: vel = 127
             self.pattern.set_note_vel(self.edited_note, vel)
+            len = pulse - self.edited_note.pos
+            if self.edit_mode == 'D':
+                len = 1
+            elif len <= -self.grid_unit:
+                len = self.orig_length
+            elif len <= self.grid_unit:
+                len = self.grid_unit
+            else:
+                len = int((len + 1) /  self.grid_unit) * self.grid_unit - 1
+            self.pattern.set_note_len(self.edited_note, len)
             self.toolbox.vel_adj.set_value(vel)
-            self.cursor.set_note(self.edited_note)
+            self.cursor.move_to_note(self.edited_note)
             self.update_notes()
             self.update_now()
+            return
         if event.type == gtk.gdk.BUTTON_RELEASE and self.edited_note is not None:
             self.edited_note = None
             self.grab_remove()
+            return
             
     def screen_x_to_column(self, x):
         unit = self.grid_unit * self.zoom_in
