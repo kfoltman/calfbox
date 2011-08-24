@@ -15,21 +15,27 @@ class SampleDirsModel(gtk.ListStore):
         for entry in cbox.Config.keys("sample_dirs"):
             path = cbox.Config.get("sample_dirs", entry)
             self.append((entry, path))
+    def has_dir(self, dir):
+        return dir in [path for entry, path in self]
 
 ####################################################################################################################################################
 
 class SampleFilesModel(gtk.ListStore):
-    def __init__(self):
+    def __init__(self, dirs_model):
+        self.dirs_model = dirs_model
         gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_STRING)
         
     def refresh(self, sample_dir):
         self.clear()
-        self.append(("","<empty>"))
-        filelist = glob.glob("%s/*" % sample_dir)
+        if not self.dirs_model.has_dir(sample_dir):
+            self.append((os.path.dirname(sample_dir.rstrip("/")) + "/", "(up)"))
+        filelist = sorted(glob.glob("%s/*" % sample_dir))
         for f in sorted(filelist):
-            if not f.lower().endswith(".wav"):
-                continue
-            self.append((f,os.path.basename(f)))
+            if os.path.isdir(f) and not self.dirs_model.has_dir(f + "/"):
+                self.append((f + "/", os.path.basename(f)+"/"))
+        for f in sorted(filelist):
+            if f.lower().endswith(".wav") and not os.path.isdir(f):
+                self.append((f,os.path.basename(f)))
 
 ####################################################################################################################################################
 
@@ -283,19 +289,23 @@ class PadTable(gtk.Table):
 ####################################################################################################################################################
 
 class FileView(gtk.TreeView):
-    def __init__(self):
-        self.files_model = SampleFilesModel()
+    def __init__(self, dirs_model):
+        self.dirs_model = dirs_model
+        self.files_model = SampleFilesModel(dirs_model)
         gtk.TreeView.__init__(self, self.files_model)
         self.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=1)
         self.set_cursor((0,))
         self.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, [("text/plain", 0, 1)], gtk.gdk.ACTION_COPY)
         self.connect('cursor-changed', self.cursor_changed)
         self.connect('drag-data-get', self.drag_data_get)
-        
+        self.connect('row-activated', self.on_row_activated)
+
     def cursor_changed(self, w):
         c = self.get_cursor()
         if c[0] is not None:
             fn = self.files_model[c[0][0]][0]
+            if fn.endswith("/"):
+                return
             if fn != "":
                 cbox.do_cmd("/instr/_preview_sample/engine/load", None, [fn, -1])
                 cbox.do_cmd("/instr/_preview_sample/engine/play", None, [])
@@ -308,6 +318,15 @@ class FileView(gtk.TreeView):
             c = cursor[0][0]
             fr = self.files_model[c]
             selection.set('text/plain', 8, str(fr[1]+"|"+fr[0]))
+            
+    def on_row_activated(self, treeview, path, column):
+        c = self.get_cursor()
+        fn, label = self.files_model[c[0][0]]
+        if fn.endswith("/"):
+            print "select dir %s" % fn
+            self.get_model().refresh(fn)
+            return
+        
 
 ####################################################################################################################################################
 
@@ -334,7 +353,7 @@ class EditorDialog(gtk.Dialog):
         self.current_pad = None
         self.dirs_model = SampleDirsModel()
         self.bank_model = BankModel()
-        self.tree = FileView()
+        self.tree = FileView(self.dirs_model)
         self.layer_list = LayerListView(self)
         self.layer_editor = LayerEditor(self, self.bank_model)
         
