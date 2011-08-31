@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_INSTR_H
 #define CBOX_INSTR_H
 
-#include "cmd.h"
+#include "recsrc.h"
 
 #define MAX_AUXBUSES_PER_INSTRUMENT 4
 
@@ -32,6 +32,7 @@ struct cbox_instrument_output
     struct cbox_module *insert;
     int output_bus;
     float gain;
+    struct cbox_recording_source rec_dry, rec_wet;
 };
 
 struct cbox_instrument
@@ -54,6 +55,7 @@ extern void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrumen
 extern void cbox_instrument_destroy(struct cbox_instrument *instrument);
 extern void cbox_instruments_close();
 
-extern void cbox_instrument_output_init(struct cbox_instrument_output *output);
+extern void cbox_instrument_output_init(struct cbox_instrument_output *output, uint32_t max_numsamples);
+extern void cbox_instrument_output_uninit(struct cbox_instrument_output *output);
 
 #endif

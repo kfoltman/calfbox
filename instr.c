@@ -214,7 +214,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
     for (int i = 0; i < module->outputs / 2; i ++)
     {
         struct cbox_instrument_output *oobj = outputs + i;
-        cbox_instrument_output_init(oobj);
+        cbox_instrument_output_init(oobj, app.io.buffer_size);
         
         gchar *key = i == 0 ? g_strdup("output_bus") : g_strdup_printf("output%d_bus", 1 + i);
         oobj->output_bus = cbox_config_get_int(instr_section, key, 1) - 1;
@@ -265,6 +265,8 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
     
     g_hash_table_insert(instruments.hash, g_strdup(name), instr);
     
+    // cbox_recording_source_attach(&instr->outputs[0].rec_dry, cbox_recorder_new_stream("output.wav"));
+    
     return instr;
     
 error:
@@ -283,8 +285,7 @@ void cbox_instrument_destroy(struct cbox_instrument *instrument)
     g_hash_table_remove(instruments.hash, instrument->module->instance_name);
     for (int i = 0; i < instrument->module->outputs / 2; i ++)
     {
-        if (instrument->outputs[i].insert)
-            cbox_module_destroy(instrument->outputs[i].insert);
+        cbox_instrument_output_uninit(&instrument->outputs[i]);
     }
     for (int i = 0; i < instrument->aux_output_count; i++)
     {
@@ -314,16 +315,25 @@ void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrument, stru
     }    
 }
 
-
 void cbox_instruments_close()
 {
     g_hash_table_destroy(instruments.hash);
 }
 
-void cbox_instrument_output_init(struct cbox_instrument_output *output)
+void cbox_instrument_output_init(struct cbox_instrument_output *output, uint32_t max_numsamples)
 {
+    cbox_recording_source_init(&output->rec_dry, max_numsamples, 2);
+    cbox_recording_source_init(&output->rec_wet, max_numsamples, 2);
     output->insert = NULL;
     output->output_bus = 0;
     output->gain = 1.0;
 }
 
+
+void cbox_instrument_output_uninit(struct cbox_instrument_output *output)
+{
+    cbox_recording_source_uninit(&output->rec_dry);
+    cbox_recording_source_uninit(&output->rec_wet);
+    if (output->insert)
+        cbox_module_destroy(output->insert);
+}

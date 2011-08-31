@@ -472,7 +472,7 @@ static struct stream_state *stream_state_new(const char *context, const gchar *f
     if (pthread_create(&stream->thr_preload, NULL, sample_preload_thread, stream))
     {
         stream_state_destroy(stream);
-        g_set_error(error, CBOX_STREAM_PLAYER_ERROR, CBOX_STREAM_PLAYER_ERROR_FAILED, "cannot open file '%s': %s", filename, sf_strerror(NULL));
+        g_set_error(error, CBOX_STREAM_PLAYER_ERROR, CBOX_STREAM_PLAYER_ERROR_FAILED, "cannot create streaming thread: %s", strerror(errno));
         return NULL;
     }
     stream->thread_started = 1;

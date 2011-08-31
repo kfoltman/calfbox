@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010 Krzysztof Foltman
+Copyright (C) 2010-2011 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -42,7 +42,8 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
         status = 0;
         io->client = jack_client_open("cbox", 0, &status);
     }
-    
+    // XXXKF would use a callback instead
+    io->buffer_size = jack_get_buffer_size(io->client);
     io->cb = NULL;
     
     if (io->client == NULL)

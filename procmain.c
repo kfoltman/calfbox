@@ -275,8 +275,12 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
                 struct cbox_instrument_output *oobj = &instr->outputs[o];
                 struct cbox_module *insert = oobj->insert;
                 float gain = oobj->gain;
+                if (IS_RECORDING_SOURCE_CONNECTED(oobj->rec_dry))
+                    cbox_recording_source_push(&oobj->rec_dry, (const float **)(outputs + 2 * o), CBOX_BLOCK_SIZE);
                 if (insert && !insert->bypass)
                     (*insert->process_block)(insert, outputs + 2 * o, outputs + 2 * o);
+                if (IS_RECORDING_SOURCE_CONNECTED(oobj->rec_wet))
+                    cbox_recording_source_push(&oobj->rec_wet, (const float **)(outputs + 2 * o), CBOX_BLOCK_SIZE);
                 float *leftbuf, *rightbuf;
                 if (o < module->aux_offset / 2)
                 {
