@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "master.h"
 
 struct cbox_io_callbacks;
+struct cbox_recording_source;
 
 struct cbox_open_params
 {
@@ -40,8 +41,12 @@ struct cbox_io
     float **output_buffers; // only valid inside jack_rt_process
     jack_port_t *midi;
     int buffer_size;
+    struct cbox_recording_source *rec_mono_inputs, *rec_mono_outputs;
+    struct cbox_recording_source *rec_stereo_inputs, *rec_stereo_outputs;
     
     jack_ringbuffer_t *rb_autoconnect;
+    
+    
     
     struct cbox_io_callbacks *cb;
 };
