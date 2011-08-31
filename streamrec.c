@@ -83,6 +83,7 @@ static void *stream_recorder_thread(void *user_data)
             sf_write_float(self->sndfile, self->buffers[buf_idx].data, self->buffers[buf_idx].write_ptr);
             self->buffers[buf_idx].write_ptr = 0;
             jack_ringbuffer_write(self->rb_just_written, &buf_idx, 1);
+            sf_command(self->sndfile, SFC_UPDATE_HEADER_NOW, NULL, 0);
         }
     } while(1);
     
