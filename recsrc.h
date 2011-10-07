@@ -26,6 +26,7 @@ struct cbox_recording_source;
 struct cbox_recorder
 {
     void *user_data;
+    struct cbox_command_target cmd_target;
     
     void (*attach)(struct cbox_recorder *handler, struct cbox_recording_source *src);
     void (*record_block)(struct cbox_recorder *handler, const float **buffers, uint32_t numsamples);
