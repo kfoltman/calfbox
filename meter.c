@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "meter.h"
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void clear_meter(struct cbox_meter *m)
 {
@@ -27,7 +28,9 @@ static void clear_meter(struct cbox_meter *m)
     {
         m->volume[i] = 0.f;
         m->peak[i] = 0.f;
+        m->last_peak[i] = 0.f;
     }
+    m->smpcounter = 0;
 }
 
 void cbox_meter_attach(struct cbox_recorder *handler, struct cbox_recording_source *src)
@@ -54,6 +57,16 @@ void cbox_meter_record_block(struct cbox_recorder *handler, const float **buffer
         m->peak[c] = peak;
         m->volume[c] = volume;
     }
+    m->smpcounter += numsamples;
+    if (m->smpcounter > m->srate)
+    {
+        for (int c = 0; c < m->channels; c++)
+        {
+            m->last_peak[c] = m->peak[c];
+            m->peak[c] = 0;
+        }
+        m->smpcounter = 0;
+    }
 }
 
 void cbox_meter_detach(struct cbox_recorder *handler)
@@ -77,7 +90,16 @@ static gboolean cbox_meter_process_cmd(struct cbox_command_target *ct, struct cb
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        return cbox_execute_on(fb, NULL, "/peak", "ff", error, m->peak[0], m->peak[1]);
+        float peak[2];
+        for (int c = 0; c < 2; c++)
+        {
+            float v = m->peak[c], w = m->last_peak[c];
+            if (v < w)
+                v = w;
+            peak[c] = v;
+        }
+        
+        return cbox_execute_on(fb, NULL, "/peak", "ff", error, peak[0], peak[1]);
     }
     else
     if (!strcmp(cmd->command, "/get_rms") && !strcmp(cmd->arg_types, ""))
@@ -94,7 +116,7 @@ static gboolean cbox_meter_process_cmd(struct cbox_command_target *ct, struct cb
     }
 }
 
-struct cbox_meter *cbox_meter_new()
+struct cbox_meter *cbox_meter_new(int srate)
 {
     struct cbox_meter *m = malloc(sizeof(struct cbox_meter));
     m->recorder.user_data = m;
@@ -103,5 +125,7 @@ struct cbox_meter *cbox_meter_new()
     m->recorder.detach = cbox_meter_detach;
     m->recorder.record_block = cbox_meter_record_block;
     m->recorder.destroy = cbox_meter_destroy;
+    m->srate = srate;
     clear_meter(m);
+    return m;
 }

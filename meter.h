@@ -27,9 +27,12 @@ struct cbox_meter
     
     float volume[2]; // lowpassed squared
     float peak[2];
+    float last_peak[2];
+    int srate;
     int channels;
+    int smpcounter;
 };
 
-extern struct cbox_meter *cbox_meter_new();
+extern struct cbox_meter *cbox_meter_new(int srate);
 
 #endif
