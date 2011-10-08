@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "dspmath.h"
 #include "errors.h"
 #include "meter.h"
 #include <math.h>
@@ -55,7 +56,7 @@ void cbox_meter_record_block(struct cbox_recorder *handler, const float **buffer
             volume += (s * s - volume) * 0.01; // XXXKF this is too simplistic, needs sample rate and proper time constant
         }
         m->peak[c] = peak;
-        m->volume[c] = volume;
+        m->volume[c] = sanef(volume);
     }
     m->smpcounter += numsamples;
     if (m->smpcounter > m->srate)
