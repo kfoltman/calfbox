@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "layer.h"
 #include "menu.h"
 #include "menuitem.h"
+#include "meter.h"
 #include "midi.h"
 #include "module.h"
 #include "procmain.h"
@@ -437,6 +438,9 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         else
         if (!strncmp(obj, "master/", 7))
             return cbox_execute_sub(&app.rt->master->cmd_target, fb, cmd, pos, error);
+        else
+        if (!strncmp(obj, "meter/", 6)) // very hacky
+            return cbox_execute_sub(&app.rt->io->meter_output->recorder.cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "config/", 7))
             return cbox_execute_sub(&app.config_cmd_target, fb, cmd, pos, error);
