@@ -21,6 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <glib.h>
 
+struct cbox_sectref;
+
 extern void cbox_config_init(const char *override_file);
 extern int cbox_config_has_section(const char *section);
 extern char *cbox_config_get_string(const char *section, const char *key);
@@ -39,6 +41,11 @@ extern int cbox_config_remove_section(const char *section);
 extern int cbox_config_remove_key(const char *section, const char *key);
 
 extern gboolean cbox_config_save(const char *filename, GError **error);
+
+extern struct cbox_sectref *cbox_config_sectref(struct cbox_sectref *def_sect, const char *prefix, const char *refname);
+extern struct cbox_sectref *cbox_config_get_sectref(struct cbox_sectref *sect, const char *prefix, const char *key);
+extern struct cbox_sectref *cbox_config_get_sectref_n(struct cbox_sectref *sect, const char *prefix, const char *key, int index);
+extern struct cbox_sectref *cbox_config_get_sectref_suffix(struct cbox_sectref *sect, const char *prefix, const char *key, const char *suffix);
 
 extern void cbox_config_close();
 

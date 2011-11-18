@@ -22,10 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static GKeyFile *config_keyfile;
 static gchar *keyfile_name;
 static GStringChunk *cfg_strings = NULL;
+static GHashTable *config_sections_hash = NULL;
 
 void cbox_config_init(const char *override_file)
 {
@@ -35,7 +37,10 @@ void cbox_config_init(const char *override_file)
     GError *error = NULL;
     if (config_keyfile)
         return;
-    
+
+    // XXXKF use g_hash_table_new_full
+    config_sections_hash = g_hash_table_new(g_str_hash, g_str_equal);
+
     cfg_strings = g_string_chunk_new(100);
     config_keyfile = g_key_file_new();
     keyfiledirs[0] = getenv("HOME");
@@ -212,8 +217,115 @@ gboolean cbox_config_save(const char *filename, GError **error)
     return ok;
 }
 
+struct cbox_cfgfile
+{
+    gchar *libname;
+    gchar *filename;
+    GKeyFile *keyfile;
+};
+
+struct cbox_cfgfile *cbox_cfgfile_get_by_libname(const char *name)
+{
+    // XXXKF implement
+    return NULL;
+}
+
+struct cbox_sectref
+{
+    struct cbox_cfgfile *cfgfile;
+    gchar *section;
+};
+
+static struct cbox_sectref *cbox_sectref_lookup(const char *name)
+{
+    struct cbox_sectref *sr = g_hash_table_lookup(config_sections_hash, name);
+    return sr;
+}
+
+static void cbox_sectref_keep(struct cbox_sectref *sect)
+{
+    gchar *tmp = g_strdup_printf("%s@%s", sect->section, sect->cfgfile->libname);
+    g_hash_table_insert(config_sections_hash, tmp, sect);
+    g_free(tmp);
+}
+
+static void cbox_sectref_set_from_string(struct cbox_sectref *sr, const gchar *refname, struct cbox_cfgfile *default_lib)
+{
+    const gchar *p = strchr(refname, '@');
+    if (p)
+    {
+        sr->section = g_strndup(refname, p - refname);
+        sr->cfgfile = cbox_cfgfile_get_by_libname(p + 1);
+    }
+    else
+    {
+        sr->section = g_strndup(refname, p - refname);
+        sr->cfgfile = default_lib;
+    }
+}
+
+// find the section 'prefix+refname.section' in the config file - either the one referenced by sect, or refname.file
+struct cbox_sectref *cbox_config_sectref(struct cbox_sectref *sect, const char *prefix, const char *refname)
+{
+    if (!prefix)
+        prefix = "";
+    gchar *tmpsect = NULL;
+    const char *p = strchr(refname, '@');
+    if (p)
+        tmpsect = g_strdup_printf("%s%s", prefix, refname);
+    else
+        tmpsect = g_strdup_printf("%s%s@%s", prefix, refname, sect->cfgfile->libname);
+    struct cbox_sectref *sr = cbox_sectref_lookup(tmpsect);
+    if (sr)
+    {
+        g_free(tmpsect);
+        return sr;
+    }
+    sr = malloc(sizeof(struct cbox_sectref));
+    cbox_sectref_set_from_string(sr, tmpsect, sect ? sect->cfgfile : NULL);
+    g_free(tmpsect);
+    cbox_sectref_keep(sr);
+    return sr;
+}
+
+struct cbox_sectref *cbox_config_get_sectref(struct cbox_sectref *sect, const char *prefix, const char *key)
+{
+    if (!key || !sect)
+        return NULL;
+    //const char *sectname = cbox_config_get_string(sect, key);
+    const char *sectname = cbox_config_get_string(sect->section, key);
+    if (!sectname)
+        return NULL;
+    return cbox_config_sectref(sect, prefix, sectname);
+}
+
+struct cbox_sectref *cbox_config_get_sectref_n(struct cbox_sectref *sect, const char *prefix, const char *key, int index)
+{
+    if (!key || !sect)
+        return NULL;
+    gchar *tmp = g_strdup_printf("%s%d", key, index);
+    struct cbox_sectref *sr = cbox_config_get_sectref(sect, prefix, tmp);
+    g_free(tmp);
+    return sr;
+}
+
+struct cbox_sectref *cbox_config_get_sectref_suffix(struct cbox_sectref *sect, const char *prefix, const char *key, const char *suffix)
+{
+    if (!key || !sect)
+        return NULL;
+    gchar *tmp = g_strdup_printf("%s%s", key, suffix ? suffix : "");
+    struct cbox_sectref *sr = cbox_config_get_sectref(sect, prefix, tmp);
+    g_free(tmp);
+    return sr;
+}
+
 void cbox_config_close()
 {
+    if (config_sections_hash)
+    {
+        g_hash_table_destroy(config_sections_hash);
+        config_sections_hash = NULL;
+    }
     if (config_keyfile)
     {
         g_key_file_free(config_keyfile);
