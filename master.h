@@ -60,14 +60,7 @@ extern void cbox_master_set_timesig(struct cbox_master *master, int beats, int u
 extern void cbox_master_play(struct cbox_master *master);
 extern void cbox_master_stop(struct cbox_master *master);
 
-static inline int cbox_master_ppqn_to_samples(struct cbox_master *master, int time)
-{
-    return (int)(master->srate * 60.0 * time / (master->tempo * PPQN));
-}
-
-static inline int cbox_master_samples_to_ppqn(struct cbox_master *master, int time)
-{
-    return (int)(master->tempo * PPQN * time / (master->srate * 60.0));
-}
+int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn);
+int cbox_master_samples_to_ppqn(struct cbox_master *master, int time_samples);
 
 #endif

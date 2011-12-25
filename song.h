@@ -26,7 +26,7 @@ struct cbox_track;
 
 struct cbox_master_track_item
 {
-    uint32_t time;
+    uint32_t duration_ppqn;
     double tempo;
     int timesig_nom, timesig_denom;
 };

@@ -91,11 +91,24 @@ extern void cbox_track_playback_destroy(struct cbox_track_playback *pb);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct cbox_tempo_map_item
+{
+    uint32_t time_ppqn;
+    uint32_t time_samples;
+    double tempo;
+    int timesig_nom, timesig_denom;
+    // should also have a bar/beat position to make things easier
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct cbox_song_playback
 {
     struct cbox_master *master;
     struct cbox_track_playback **tracks;
     int track_count;
+    struct cbox_tempo_map_item *tempo_map_items;
+    int tempo_map_item_count;
     uint32_t song_pos_samples, song_pos_ppqn;
     uint32_t loop_start_ppqn, loop_end_ppqn;
 };
@@ -105,6 +118,8 @@ extern void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbo
 extern int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf);
 extern void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int skip_this_pos);
 extern void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_samples);
+extern struct cbox_tempo_map_item *cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, int time_ppqn);
+extern struct cbox_tempo_map_item *cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, int time_samples);
 extern void cbox_song_playback_destroy(struct cbox_song_playback *spb);
 
 #endif

@@ -159,3 +159,37 @@ void cbox_master_stop(struct cbox_master *master)
     master->state = CMTS_STOP;
 }
 
+int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn)
+{
+    double tempo = master->tempo;
+    int offset = 0;
+    if (master->spb)
+    {
+        struct cbox_tempo_map_item *tmi = cbox_song_playback_tmi_from_ppqn(master->spb, time_ppqn);
+        if (tmi)
+        {
+            tempo = tmi->tempo;
+            time_ppqn -= tmi->time_ppqn;
+            offset = tmi->time_samples;
+        }
+    }
+    return offset + (int)(master->srate * 60.0 * time_ppqn / (tempo * PPQN));
+}
+
+int cbox_master_samples_to_ppqn(struct cbox_master *master, int time_samples)
+{
+    double tempo = master->tempo;
+    int offset = 0;
+    if (master->spb)
+    {
+        struct cbox_tempo_map_item *tmi = cbox_song_playback_tmi_from_samples(master->spb, time_samples);
+        if (tmi)
+        {
+            tempo = tmi->tempo;
+            time_samples -= tmi->time_samples;
+            offset = tmi->time_ppqn;
+        }
+    }
+    return offset + (int)(tempo * PPQN * time_samples / (master->srate * 60.0));
+}
+

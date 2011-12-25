@@ -318,6 +318,26 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song)
         struct cbox_track *trk = p->data;
         spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, song->master);
     }
+    
+    spb->tempo_map_item_count = g_list_length(song->master_track_items);
+    spb->tempo_map_items = malloc(spb->tempo_map_item_count * sizeof(struct cbox_tempo_map_item));
+    pos = 0;
+    int pos_ppqn = 0;
+    int pos_samples = 0;
+    for (GList *p = song->master_track_items; p != NULL; p = g_list_next(p))
+    {
+        struct cbox_master_track_item *mti = p->data;
+        struct cbox_tempo_map_item *tmi = &spb->tempo_map_items[pos];
+        tmi->time_ppqn = pos_ppqn;
+        tmi->time_samples = pos_samples;
+        tmi->tempo = mti->tempo;
+        tmi->timesig_nom = mti->timesig_nom;
+        tmi->timesig_denom = mti->timesig_denom;
+        
+        pos_ppqn += mti->duration_ppqn;
+        pos_samples += song->master->srate * 60.0 * mti->duration_ppqn / (mti->tempo * PPQN);
+        
+    }
     return spb;
 }
 
@@ -422,12 +442,39 @@ void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_sa
     spb->song_pos_ppqn = cbox_master_samples_to_ppqn(spb->master, time_samples);
 }
 
+struct cbox_tempo_map_item *cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, int time_ppqn)
+{
+    if (!spb->tempo_map_item_count)
+        return NULL;
+    // XXXKF should use binary search here really
+    for (int i = 1; i < spb->tempo_map_item_count; i++)
+    {
+        if (time_ppqn < spb->tempo_map_items[i].time_ppqn)
+            return &spb->tempo_map_items[i - 1];
+    }
+    return &spb->tempo_map_items[spb->tempo_map_item_count - 1];
+}
+
+struct cbox_tempo_map_item *cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, int time_samples)
+{
+    if (!spb->tempo_map_item_count)
+        return NULL;
+    // XXXKF should use binary search here really
+    for (int i = 1; i < spb->tempo_map_item_count; i++)
+    {
+        if (time_samples < spb->tempo_map_items[i].time_samples)
+            return &spb->tempo_map_items[i - 1];
+    }
+    return &spb->tempo_map_items[spb->tempo_map_item_count - 1];
+}
+
 void cbox_song_playback_destroy(struct cbox_song_playback *spb)
 {
     for (int i = 0; i < spb->track_count; i++)
     {
         cbox_track_playback_destroy(spb->tracks[i]);
     }
+    free(spb->tempo_map_items);
     free(spb->tracks);
     free(spb);
 }
