@@ -146,6 +146,16 @@ class CompressorWindow(EffectWindow):
     engine_name = "compressor"
     effect_name = "Compressor"
 
+class GateWindow(EffectWindow):
+    params = [
+        SliderRow("Threshold", "threshold", -100, 12),
+        MappedSliderRow("Ratio", "ratio", LogMapper(1, 100, "%0.2f")),
+        MappedSliderRow("Attack", "attack", LogMapper(1, 1000, ms_format)),
+        MappedSliderRow("Release", "release", LogMapper(1, 1000, ms_format)),
+    ]
+    engine_name = "gate"
+    effect_name = "Gate"
+
 class EQCommon(object):
     columns = [
         CheckBoxRow("Active", "active"),
@@ -273,7 +283,7 @@ class FXChainWindow(EffectWindow):
 
 #################################################################################################################################
 
-effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor', 'fxchain']
+effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor', 'gate', 'fxchain']
 
 effect_window_map = {
     'phaser': PhaserWindow,
@@ -284,6 +294,7 @@ effect_window_map = {
     'parametric_eq': EQWindow,
     'tone_control': ToneControlWindow,
     'compressor': CompressorWindow,
+    'gate': GateWindow,
     'fxchain': FXChainWindow,
 }
 
