@@ -151,6 +151,7 @@ class GateWindow(EffectWindow):
         SliderRow("Threshold", "threshold", -100, 12),
         MappedSliderRow("Ratio", "ratio", LogMapper(1, 100, "%0.2f")),
         MappedSliderRow("Attack", "attack", LogMapper(1, 1000, ms_format)),
+        MappedSliderRow("Hold", "hold", LogMapper(1, 1000, ms_format)),
         MappedSliderRow("Release", "release", LogMapper(1, 1000, ms_format)),
     ]
     engine_name = "gate"

@@ -37,6 +37,7 @@ struct gate_params
     float threshold;
     float ratio;
     float attack;
+    float hold;
     float release;
 };
 
@@ -45,9 +46,10 @@ struct gate_module
     struct cbox_module module;
 
     struct gate_params *params, *old_params;
-    struct cbox_onepolef_coeffs attack_lp, release_lp;
+    struct cbox_onepolef_coeffs attack_lp, release_lp, shifter_lp;
+    struct cbox_onepolef_state shifter1, shifter2;
     struct cbox_onepolef_state tracker;
-    struct cbox_onepolef_state tracker2;
+    int hold_time, hold_threshold;
     int srate;
 };
 
@@ -58,6 +60,7 @@ gboolean gate_process_cmd(struct cbox_command_target *ct, struct cbox_command_ta
     EFFECT_PARAM("/threshold", "f", threshold, double, dB2gain_simple, -100, 100) else
     EFFECT_PARAM("/ratio", "f", ratio, double, , 1, 100) else
     EFFECT_PARAM("/attack", "f", attack, double, , 1, 1000) else
+    EFFECT_PARAM("/hold", "f", hold, double, , 1, 1000) else
     EFFECT_PARAM("/release", "f", release, double, , 1, 1000) else
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
@@ -66,6 +69,7 @@ gboolean gate_process_cmd(struct cbox_command_target *ct, struct cbox_command_ta
         return cbox_execute_on(fb, NULL, "/threshold", "f", error, gain2dB_simple(m->params->threshold))
             && cbox_execute_on(fb, NULL, "/ratio", "f", error, m->params->ratio)
             && cbox_execute_on(fb, NULL, "/attack", "f", error, m->params->attack)
+            && cbox_execute_on(fb, NULL, "/hold", "f", error, m->params->hold)
             && cbox_execute_on(fb, NULL, "/release", "f", error, m->params->release)
             ;
     }
@@ -88,22 +92,46 @@ void gate_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox
         float scale = M_PI * 1000 / m->srate;
         cbox_onepolef_set_lowpass(&m->attack_lp, scale / m->params->attack);
         cbox_onepolef_set_lowpass(&m->release_lp, scale / m->params->release);
+        cbox_onepolef_set_allpass(&m->shifter_lp, M_PI * 100 / m->srate);
+        m->hold_threshold = (int)(m->srate * m->params->hold * 0.001);
         m->old_params = m->params;
     }
     
     float threshold = m->params->threshold;
+    float threshold2 = threshold * threshold * 1.73;
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         float left = inputs[0][i], right = inputs[1][i];
-        float sig = 0.5 * (fabs(left) > fabs(right) ? fabs(left) : fabs(right));
+        float sig = fabs(left) > fabs(right) ? fabs(left) : fabs(right);
+
+        // Primitive envelope detector - may not work so well with more interesting stereo signals
+        float shf1 = cbox_onepolef_process_sample(&m->shifter1, &m->shifter_lp, 0.5 * (left + right));
+        float shf2 = cbox_onepolef_process_sample(&m->shifter2, &m->shifter_lp, shf1);
+        sig = sig*sig + shf1*shf1 + shf2 * shf2;
         
-        int falling = sig < m->tracker.y1 && sig < m->tracker.x1;
-        sig = cbox_onepolef_process_sample(&m->tracker, falling ? &m->release_lp : &m->attack_lp, sig);
-        falling = sig < m->tracker.y1 && sig < m->tracker.x1;
-        sig = cbox_onepolef_process_sample(&m->tracker2, falling ? &m->release_lp : &m->attack_lp, sig);
+        // attack - hold - release logic based on signal envelope
+        int release = 1;
         float gain = 1.0;
-        if (sig < threshold)
-            gain = powf(sig / threshold, m->params->ratio - 1);
+        if (sig < threshold2)
+        {
+            // hold vs release
+            if (m->hold_time >= m->hold_threshold)
+            {
+                gain = powf(sig / threshold2, 0.5 * (m->params->ratio - 1));
+                // gain = powf(sqrt(sig) / threshold, (m->params->ratio - 1));
+            }
+            else
+                m->hold_time++;
+        }
+        else
+        {
+            // attack - going to 1 using attack rate
+            m->hold_time = 0;
+            gain = 1.0;
+            release = 0;
+        }
+        
+        gain = cbox_onepolef_process_sample(&m->tracker, release ? &m->release_lp : &m->attack_lp, gain);
                 
         outputs[0][i] = left * gain;
         outputs[1][i] = right * gain;
@@ -123,17 +151,21 @@ struct cbox_module *gate_create(void *user_data, const char *cfg_section, int sr
     m->module.process_event = gate_process_event;
     m->module.process_block = gate_process_block;
     m->srate = srate;
+    m->hold_time = 0;
+    m->hold_threshold = 0;
     
     struct gate_params *p = malloc(sizeof(struct gate_params));
-    p->threshold = cbox_config_get_gain_db(cfg_section, "threshold", -12.0);
-    p->ratio = cbox_config_get_float(cfg_section, "ratio", 2.0);
-    p->attack = cbox_config_get_float(cfg_section, "attack", 5.0);
+    p->threshold = cbox_config_get_gain_db(cfg_section, "threshold", -28.0);
+    p->ratio = cbox_config_get_float(cfg_section, "ratio", 3.0);
+    p->attack = cbox_config_get_float(cfg_section, "attack", 3.0);
+    p->hold = cbox_config_get_float(cfg_section, "hold", 100.0);
     p->release = cbox_config_get_float(cfg_section, "release", 100.0);
     m->params = p;
     m->old_params = NULL;
     
     cbox_onepolef_reset(&m->tracker);
-    cbox_onepolef_reset(&m->tracker2);
+    cbox_onepolef_reset(&m->shifter1);
+    cbox_onepolef_reset(&m->shifter2);
 
     return &m->module;
 }
