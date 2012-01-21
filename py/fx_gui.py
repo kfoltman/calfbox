@@ -157,6 +157,13 @@ class GateWindow(EffectWindow):
     engine_name = "gate"
     effect_name = "Gate"
 
+class DistortionWindow(EffectWindow):
+    params = [
+        SliderRow("Drive", "drive", -36, 36),
+    ]
+    engine_name = "distortion"
+    effect_name = "Distortion"
+
 class EQCommon(object):
     columns = [
         CheckBoxRow("Active", "active"),
@@ -284,7 +291,7 @@ class FXChainWindow(EffectWindow):
 
 #################################################################################################################################
 
-effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor', 'gate', 'fxchain']
+effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor', 'gate', 'distortion', 'fxchain']
 
 effect_window_map = {
     'phaser': PhaserWindow,
@@ -296,6 +303,7 @@ effect_window_map = {
     'tone_control': ToneControlWindow,
     'compressor': CompressorWindow,
     'gate': GateWindow,
+    'distortion': DistortionWindow,
     'fxchain': FXChainWindow,
 }
 
