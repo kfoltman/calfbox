@@ -105,7 +105,7 @@ struct cbox_module *distortion_create(void *user_data, const char *cfg_section, 
     m->module.process_event = distortion_process_event;
     m->module.process_block = distortion_process_block;
     struct distortion_params *p = malloc(sizeof(struct distortion_params));
-    p->drive = 1.0;
+    p->drive = cbox_config_get_gain_db(cfg_section, "drive", 0.f);
     m->params = p;
     m->old_params = NULL;
     
