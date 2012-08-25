@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct distortion_params
 {
     float drive;
+    float shape;
 };
 
 struct distortion_module
@@ -48,11 +49,13 @@ gboolean distortion_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     struct distortion_module *m = (struct distortion_module *)ct->user_data;
     
     EFFECT_PARAM("/drive", "f", drive, double, dB2gain_simple, -36, 36) else
+    EFFECT_PARAM("/shape", "f", shape, double, , -1, 2) else
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        return cbox_execute_on(fb, NULL, "/drive", "f", error, gain2dB_simple(m->params->drive));
+        return cbox_execute_on(fb, NULL, "/drive", "f", error, gain2dB_simple(m->params->drive))
+            && cbox_execute_on(fb, NULL, "/shape", "f", error, m->params->shape);
     }
     else
         return cbox_set_command_error(error, cmd);
@@ -74,6 +77,14 @@ void distortion_process_block(struct cbox_module *module, cbox_sample_t **inputs
     }
     
     float drive = m->params->drive;
+    float shape = m->params->shape;
+    
+    float a0 = shape;
+    float a1 = -2 * shape - 0.5;
+    float a2 = 1.5 + shape;
+    
+    float post = pow(drive, -0.7);
+    
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         for (int c = 0; c < 2; c++)
@@ -85,9 +96,9 @@ void distortion_process_block(struct cbox_module *module, cbox_sample_t **inputs
             if (fabs(val) > 1.0)
                 val = (val > 0) ? 1 : -1;
             else
-                val = val * (3 - val * val) * 0.5;
+                val = a0 * val * val * val * val * val + a1 * val * val * val + a2 * val;
             
-            outputs[c][i] = val;
+            outputs[c][i] = val * post;
         }
     }
 }
@@ -106,6 +117,7 @@ struct cbox_module *distortion_create(void *user_data, const char *cfg_section, 
     m->module.process_block = distortion_process_block;
     struct distortion_params *p = malloc(sizeof(struct distortion_params));
     p->drive = cbox_config_get_gain_db(cfg_section, "drive", 0.f);
+    p->shape = cbox_config_get_gain_db(cfg_section, "shape", 0.f);
     m->params = p;
     m->old_params = NULL;
     
