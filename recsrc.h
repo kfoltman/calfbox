@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "cmd.h"
 
 struct cbox_recording_source;
+struct cbox_rt;
 
 struct cbox_recorder
 {
@@ -53,6 +54,6 @@ extern void cbox_recording_source_change(struct cbox_recording_source *src, uint
 extern void cbox_recording_source_push(struct cbox_recording_source *src, const float **buffers, uint32_t numsamples);
 extern void cbox_recording_source_uninit(struct cbox_recording_source *src);
 
-extern struct cbox_recorder *cbox_recorder_new_stream(const char *filename);
+extern struct cbox_recorder *cbox_recorder_new_stream(struct cbox_rt *rt, const char *filename);
 
 #endif

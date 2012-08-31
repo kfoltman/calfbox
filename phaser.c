@@ -16,13 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
 #include "module.h"
 #include "onepole-float.h"
-#include "procmain.h"
 #include <glib.h>
 #include <malloc.h>
 #include <math.h>
@@ -136,7 +134,7 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     }
 }
 
-struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(phaser_create)
 {
     int b, c;
     
@@ -147,10 +145,10 @@ struct cbox_module *phaser_create(void *user_data, const char *cfg_section, int 
     }
     
     struct phaser_module *m = malloc(sizeof(struct phaser_module));
-    cbox_module_init(&m->module, m, 2, 2, phaser_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, phaser_process_cmd);
     m->module.process_event = phaser_process_event;
     m->module.process_block = phaser_process_block;
-    m->tpdsr = 2.0 * M_PI / srate;
+    m->tpdsr = 2.0 * M_PI / m->module.srate;
     m->phase = 0;
     struct phaser_params *p = malloc(sizeof(struct phaser_params));
     m->params = p;

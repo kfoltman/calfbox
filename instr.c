@@ -30,16 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct cbox_instruments
 {
     GHashTable *hash;
-    struct cbox_io *io;
+    struct cbox_rt *rt;
 };
 
 static struct cbox_instruments instruments;
 
-void cbox_instruments_init(struct cbox_io *io)
+void cbox_instruments_init(struct cbox_rt *rt)
 {
     // XXXKF needs to use 'full' version with g_free for key and value
     instruments.hash = g_hash_table_new(g_str_hash, g_str_equal);
-    instruments.io = io;
+    instruments.rt = rt;
 }
 
 static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr, struct cbox_instrument_output *output, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
@@ -84,7 +84,7 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
         struct cbox_scene *scene = instr->scene;
         if (!*(const char *)cmd->arg_values[0])
         {
-            struct cbox_aux_bus *old_bus = cbox_rt_swap_pointers(app.rt, (void **)&instr->aux_outputs[id], NULL);
+            struct cbox_aux_bus *old_bus = cbox_rt_swap_pointers(instruments.rt, (void **)&instr->aux_outputs[id], NULL);
             if (old_bus)
                 cbox_aux_bus_unref(old_bus);
             return TRUE;            
@@ -202,7 +202,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
     
     // cbox_module_manifest_dump(mptr);
     
-    module = cbox_module_manifest_create_module(mptr, instr_section, cbox_io_get_sample_rate(instruments.io), name, error);
+    module = cbox_module_manifest_create_module(mptr, instr_section, instruments.rt, name, error);
     if (!module)
     {
         cbox_force_error(error);
@@ -214,7 +214,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
     for (int i = 0; i < module->outputs / 2; i ++)
     {
         struct cbox_instrument_output *oobj = outputs + i;
-        cbox_instrument_output_init(oobj, app.io.buffer_size);
+        cbox_instrument_output_init(oobj, cbox_rt_get_buffer_size(instruments.rt));
         
         gchar *key = i == 0 ? g_strdup("output_bus") : g_strdup_printf("output%d_bus", 1 + i);
         oobj->output_bus = cbox_config_get_int(instr_section, key, 1) - 1;
@@ -231,7 +231,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
         
         if (cv)
         {
-            oobj->insert = cbox_module_new_from_fx_preset(cv, error);
+            oobj->insert = cbox_module_new_from_fx_preset(cv, instruments.rt, error);
             if (!oobj->insert)
             {
                 cbox_force_error(error);
@@ -274,9 +274,9 @@ error:
     return NULL;
 }
 
-struct cbox_io *cbox_instruments_get_io()
+struct cbox_rt *cbox_instruments_get_rt()
 {
-    return instruments.io;
+    return instruments.rt;
 }
 
 void cbox_instrument_destroy(struct cbox_instrument *instrument)

@@ -157,7 +157,7 @@ void fxchain_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
      
 }
 
-struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, int srate, GError **error)
+struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, struct cbox_rt *rt, GError **error)
 {
     static int inited = 0;
     if (!inited)
@@ -182,7 +182,7 @@ struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, int
     }
     
     struct fxchain_module *m = malloc(sizeof(struct fxchain_module));
-    cbox_module_init(&m->module, m, 2, 2, fxchain_process_cmd);
+    cbox_module_init(&m->module, rt, m, 2, 2, fxchain_process_cmd);
     m->module.process_event = fxchain_process_event;
     m->module.process_block = fxchain_process_block;
     m->modules = malloc(sizeof(struct cbox_module *) * fx_count);
@@ -196,7 +196,7 @@ struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, int
         gchar *name = g_strdup_printf("effect%d", i + 1);
         const char *fx_preset_name = cbox_config_get_string(cfg_section, name);
         g_free(name);
-        m->modules[i] = cbox_module_new_from_fx_preset(fx_preset_name, error);
+        m->modules[i] = cbox_module_new_from_fx_preset(fx_preset_name, rt, error);
         if (!m->modules[i])
             goto failed;
     }

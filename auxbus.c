@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <glib.h>
 
-struct cbox_aux_bus *cbox_aux_bus_load(const char *name, GError **error)
+struct cbox_aux_bus *cbox_aux_bus_load(const char *name, struct cbox_rt *rt, GError **error)
 {
-    struct cbox_module *module = cbox_module_new_from_fx_preset(name, error);
+    struct cbox_module *module = cbox_module_new_from_fx_preset(name, rt, error);
     if (!module)
         return NULL;
     

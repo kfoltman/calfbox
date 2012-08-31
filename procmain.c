@@ -27,9 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "seq.h"
 #include "song.h"
 #include "track.h"
+#include <assert.h>
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/midiport.h>
+#include <stdio.h>
 #include <unistd.h>
 
 struct cbox_rt_cmd_instance
@@ -66,6 +68,7 @@ struct cbox_rt *cbox_rt_new()
     rt->io = NULL;
     rt->master = cbox_master_new();
     rt->master->song = cbox_song_new(rt->master);
+    rt->started = 0;
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
     return rt;
 }
@@ -191,7 +194,9 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         cost += result;
         jack_ringbuffer_read_advance(rt->rb_execute, sizeof(cmd));
         if (cmd.definition->cleanup || !cmd.is_async)
+        {
             jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
+        }
     }
     scene = rt->scene;
         
@@ -388,15 +393,21 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     }
 }
 
-void cbox_rt_start(struct cbox_rt *rt, struct cbox_io *io)
+void cbox_rt_set_io(struct cbox_rt *rt, struct cbox_io *io)
 {
+    assert(!rt->started);
     rt->io = io;
+    cbox_master_set_sample_rate(rt->master, jack_get_sample_rate(io->client));
+}
+
+void cbox_rt_start(struct cbox_rt *rt)
+{
+    rt->started = 1;
     rt->cbs = malloc(sizeof(struct cbox_io_callbacks));
     rt->cbs->user_data = rt;
     rt->cbs->process = cbox_rt_process;
-    cbox_master_set_sample_rate(rt->master, jack_get_sample_rate(io->client));
 
-    cbox_io_start(io, rt->cbs);        
+    cbox_io_start(rt->io, rt->cbs);        
 }
 
 void cbox_rt_stop(struct cbox_rt *rt)
@@ -404,7 +415,7 @@ void cbox_rt_stop(struct cbox_rt *rt)
     cbox_io_stop(rt->io);
     free(rt->cbs);
     rt->cbs = NULL;
-    rt->io = NULL;
+    rt->started = 0;
 }
 
 void cbox_rt_handle_cmd_queue(struct cbox_rt *rt)
@@ -417,6 +428,22 @@ void cbox_rt_handle_cmd_queue(struct cbox_rt *rt)
     }
 }
 
+static void wait_write_space(jack_ringbuffer_t *rb)
+{
+    int t = 0;
+    while (jack_ringbuffer_write_space(rb) < sizeof(struct cbox_rt_cmd_instance))
+    {
+        // wait until some space frees up in the execute queue
+        usleep(1000);
+        t++;
+        if (t >= 1000)
+        {
+            fprintf(stderr, "Execute queue full, waiting...\n");
+            t = 0;
+        }
+    }
+}
+
 void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
 {
     struct cbox_rt_cmd_instance cmd;
@@ -426,7 +453,7 @@ void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
             return;
         
     // No realtime thread - do it all in the main thread
-    if (!rt->io)
+    if (!rt->started)
     {
         def->execute(user_data);
         if (def->cleanup)
@@ -438,17 +465,19 @@ void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
     cmd.user_data = user_data;
     cmd.is_async = 0;
     
+    wait_write_space(rt->rb_execute);
     jack_ringbuffer_write(rt->rb_execute, (const char *)&cmd, sizeof(cmd));
     do
     {
         struct cbox_rt_cmd_instance cmd2;
-    
-        if (!jack_ringbuffer_read(rt->rb_cleanup, (char *)&cmd2, sizeof(cmd2)))
+        
+        if (jack_ringbuffer_read_space(rt->rb_cleanup) < sizeof(cmd2))
         {
             // still no result in cleanup queue - wait
             usleep(10000);
             continue;
         }
+        jack_ringbuffer_read(rt->rb_cleanup, (char *)&cmd2, sizeof(cmd2));
         if (!memcmp(&cmd, &cmd2, sizeof(cmd)))
         {
             if (def->cleanup)
@@ -471,7 +500,7 @@ void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition
             return;
     }
     // No realtime thread - do it all in the main thread
-    if (!rt->io)
+    if (!rt->started)
     {
         def->execute(user_data);
         if (def->cleanup)
@@ -479,6 +508,7 @@ void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition
         return;
     }
     
+    wait_write_space(rt->rb_execute);
     jack_ringbuffer_write(rt->rb_execute, (const char *)&cmd, sizeof(cmd));
     
     // will be cleaned up by next sync call or by cbox_rt_cmd_handle_queue
@@ -649,6 +679,18 @@ void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, voi
 struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scene)
 {
     return cbox_rt_swap_pointers(rt, (void **)&rt->scene, scene);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+int cbox_rt_get_sample_rate(struct cbox_rt *rt)
+{
+    return cbox_io_get_sample_rate(rt->io);
+}
+
+int cbox_rt_get_buffer_size(struct cbox_rt *rt)
+{
+    return rt->io->buffer_size;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

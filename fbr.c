@@ -16,13 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "biquad-float.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
 #include "eq.h"
 #include "module.h"
+#include "procmain.h"
 #include <complex.h>
 #include <glib.h>
 #include <malloc.h>
@@ -67,8 +67,6 @@ struct feedback_reducer_module
     int analysed;
 
     complex float fft_buffers[2][ANALYSIS_BUFFER_SIZE];
-
-    int srate;
 };
 
 // Do a butterfly operation:
@@ -219,7 +217,7 @@ static void redo_filters(struct feedback_reducer_module *m)
         struct eq_band *band = &m->params->bands[i];
         if (band->active)
         {
-            cbox_biquadf_set_peakeq_rbj(&m->coeffs[i], band->center, band->q, band->gain, m->srate);
+            cbox_biquadf_set_peakeq_rbj(&m->coeffs[i], band->center, band->q, band->gain, m->module.srate);
         }
     }
     m->old_params = m->params;
@@ -236,7 +234,7 @@ gboolean feedback_reducer_process_cmd(struct cbox_command_target *ct, struct cbo
     if (!strcmp(cmd->command, "/start") && !strcmp(cmd->arg_types, ""))
     {
         m->analysed = 0;
-        cbox_rt_swap_pointers(app.rt, (void **)&m->wrptr, m->analysis_buffer);
+        cbox_rt_swap_pointers(m->module.rt, (void **)&m->wrptr, m->analysis_buffer);
     }
     else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
@@ -246,7 +244,7 @@ gboolean feedback_reducer_process_cmd(struct cbox_command_target *ct, struct cbo
         if (m->wrptr == m->analysis_buffer + ANALYSIS_BUFFER_SIZE && m->analysed == 0)
         {
             float freqs[16];
-            int count = find_peaks(m->fft_buffers[do_fft(m)], m->srate, freqs);
+            int count = find_peaks(m->fft_buffers[do_fft(m)], m->module.srate, freqs);
             struct feedback_reducer_params *p = malloc(sizeof(struct feedback_reducer_params));
             memcpy(p->bands + count, &m->params->bands[0], sizeof(struct eq_band) * (MAX_FBR_BANDS - count));
             for (int i = 0; i < count; i++)
@@ -256,7 +254,7 @@ gboolean feedback_reducer_process_cmd(struct cbox_command_target *ct, struct cbo
                 p->bands[i].q = freqs[i] / 50; // each band ~100 Hz (not really sure about filter Q vs bandwidth)
                 p->bands[i].gain = 0.125;
             }
-            free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, p)); \
+            free(cbox_rt_swap_pointers(m->module.rt, (void **)&m->params, p)); \
             m->analysed = 1;
             if (!cbox_execute_on(fb, NULL, "/refresh", "i", error, 1))
                 return FALSE;
@@ -325,7 +323,7 @@ void feedback_reducer_process_block(struct cbox_module *module, cbox_sample_t **
     }
 }
 
-struct cbox_module *feedback_reducer_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(feedback_reducer_create)
 {
     static int inited = 0;
     if (!inited)
@@ -347,10 +345,9 @@ struct cbox_module *feedback_reducer_create(void *user_data, const char *cfg_sec
     }
     
     struct feedback_reducer_module *m = malloc(sizeof(struct feedback_reducer_module));
-    cbox_module_init(&m->module, m, 2, 2, feedback_reducer_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, feedback_reducer_process_cmd);
     m->module.process_event = feedback_reducer_process_event;
     m->module.process_block = feedback_reducer_process_block;
-    m->srate = srate;
     struct feedback_reducer_params *p = malloc(sizeof(struct feedback_reducer_params));
     m->params = p;
     m->old_params = NULL;

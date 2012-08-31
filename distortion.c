@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -103,7 +102,7 @@ void distortion_process_block(struct cbox_module *module, cbox_sample_t **inputs
     }
 }
 
-struct cbox_module *distortion_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(distortion_create)
 {
     static int inited = 0;
     if (!inited)
@@ -112,7 +111,7 @@ struct cbox_module *distortion_create(void *user_data, const char *cfg_section, 
     }
     
     struct distortion_module *m = malloc(sizeof(struct distortion_module));
-    cbox_module_init(&m->module, m, 2, 2, distortion_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, distortion_process_cmd);
     m->module.process_event = distortion_process_event;
     m->module.process_block = distortion_process_block;
     struct distortion_params *p = malloc(sizeof(struct distortion_params));

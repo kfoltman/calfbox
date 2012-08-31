@@ -132,16 +132,16 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "s"))
     {
-        struct cbox_scene *scene = cbox_scene_load((const gchar *)cmd->arg_values[0], error);
+        struct cbox_scene *scene = cbox_scene_load((const gchar *)cmd->arg_values[0], s->rt, error);
         if (!scene)
             return FALSE;
-        struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
+        struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
         cbox_scene_destroy(old_scene);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/new") && !strcmp(cmd->arg_types, ""))
     {
-        struct cbox_scene *scene = cbox_scene_new();
+        struct cbox_scene *scene = cbox_scene_new(s->rt);
         if (!scene) // not really expected
             return FALSE;
         struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
@@ -293,7 +293,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
 }
 
-struct cbox_scene *cbox_scene_load(const char *name, GError **error)
+struct cbox_scene *cbox_scene_load(const char *name, struct cbox_rt *rt, GError **error)
 {
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
     const char *cv = NULL;
@@ -306,6 +306,7 @@ struct cbox_scene *cbox_scene_load(const char *name, GError **error)
         goto error;
     }
     
+    s->rt = rt;
     s->layers = NULL;
     s->instruments = NULL;
     s->aux_buses = NULL;
@@ -352,9 +353,10 @@ error:
     return NULL;
 }
 
-struct cbox_scene *cbox_scene_new()
+struct cbox_scene *cbox_scene_new(struct cbox_rt *rt)
 {
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
+    s->rt = rt;
     s->name = g_strdup("");
     s->title = g_strdup("");
     s->layers = NULL;
@@ -497,7 +499,7 @@ struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char
             return scene->aux_buses[i];
         }
     }
-    struct cbox_aux_bus *bus = cbox_aux_bus_load(name, error);
+    struct cbox_aux_bus *bus = cbox_aux_bus_load(name, scene->rt, error);
     if (!bus)
         return NULL;
     cbox_scene_insert_aux_bus(scene, bus);

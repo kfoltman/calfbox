@@ -82,7 +82,7 @@ static gboolean select_patch_by_name(struct fluidsynth_module *m, int channel, c
     return FALSE;
 }
 
-struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(fluidsynth_create)
 {
     int result = 0;
     int i;
@@ -110,14 +110,14 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
     }
     if (pairs == 0)
     {
-        cbox_module_init(&m->module, m, 0, 2 * m->output_pairs, fluidsynth_process_cmd);
+        CALL_MODULE_INIT(m, 0, 2 * m->output_pairs, fluidsynth_process_cmd);
         m->left_outputs = NULL;
         m->right_outputs = NULL;
     }
     else
     {
         g_message("Multichannel mode enabled, %d output pairs, 2 effects", m->output_pairs);
-        cbox_module_init(&m->module, m, 0, 2 * m->output_pairs + 4, fluidsynth_process_cmd); // direct + fx outputs
+        CALL_MODULE_INIT(m, 0, 2 * m->output_pairs + 4, fluidsynth_process_cmd);
         m->left_outputs = malloc(sizeof(float *) * (m->output_pairs + 2));
         m->right_outputs = malloc(sizeof(float *) * (m->output_pairs + 2));
     }
@@ -126,7 +126,7 @@ struct cbox_module *fluidsynth_create(void *user_data, const char *cfg_section, 
     m->module.destroy = fluidsynth_destroy;
     m->module.aux_offset = 2 * m->output_pairs;
     m->settings = new_fluid_settings();
-    fluid_settings_setnum(m->settings, "synth.sample-rate", srate);
+    fluid_settings_setnum(m->settings, "synth.sample-rate", m->module.srate);
     fluid_settings_setint(m->settings, "synth.audio-channels", m->output_pairs);
     fluid_settings_setint(m->settings, "synth.audio-groups", m->output_pairs);
     m->synth = new_fluid_synth(m->settings);

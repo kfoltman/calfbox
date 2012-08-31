@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -50,7 +49,6 @@ struct gate_module
     struct cbox_onepolef_state shifter1, shifter2;
     struct cbox_onepolef_state tracker;
     int hold_time, hold_threshold;
-    int srate;
 };
 
 gboolean gate_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -89,11 +87,11 @@ void gate_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox
     
     if (m->params != m->old_params)
     {
-        float scale = M_PI * 1000 / m->srate;
+        float scale = M_PI * 1000 / m->module.srate;
         cbox_onepolef_set_lowpass(&m->attack_lp, scale / m->params->attack);
         cbox_onepolef_set_lowpass(&m->release_lp, scale / m->params->release);
-        cbox_onepolef_set_allpass(&m->shifter_lp, M_PI * 100 / m->srate);
-        m->hold_threshold = (int)(m->srate * m->params->hold * 0.001);
+        cbox_onepolef_set_allpass(&m->shifter_lp, M_PI * 100 / m->module.srate);
+        m->hold_threshold = (int)(m->module.srate * m->params->hold * 0.001);
         m->old_params = m->params;
     }
     
@@ -138,7 +136,7 @@ void gate_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox
     }
 }
 
-struct cbox_module *gate_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(gate_create)
 {
     static int inited = 0;
     if (!inited)
@@ -147,10 +145,9 @@ struct cbox_module *gate_create(void *user_data, const char *cfg_section, int sr
     }
     
     struct gate_module *m = malloc(sizeof(struct gate_module));
-    cbox_module_init(&m->module, m, 2, 2, gate_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, gate_process_cmd);
     m->module.process_event = gate_process_event;
     m->module.process_block = gate_process_block;
-    m->srate = srate;
     m->hold_time = 0;
     m->hold_threshold = 0;
     

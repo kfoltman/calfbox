@@ -28,6 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define CBOX_MAX_AUDIO_PORTS 32
 
+struct cbox_rt;
+
 struct cbox_module_keyrange_metadata
 {
     uint8_t channel; // 0 = omni
@@ -61,6 +63,7 @@ struct cbox_module_voicingparam_metadata
 struct cbox_module
 {
     void *user_data;
+    struct cbox_rt *rt;
     const char *engine_name;
     gchar *instance_name;
     cbox_sample_t *input_samples;
@@ -68,6 +71,7 @@ struct cbox_module
     struct cbox_midi_buffer midi_input;
     int inputs, outputs, aux_offset;
     int bypass;
+    int srate;
     
     struct cbox_command_target cmd_target;
         
@@ -92,7 +96,7 @@ struct cbox_module_manifest
     struct cbox_module_voicingparam_metadata *voicing_params;
     int num_voicing_params;
     
-    struct cbox_module *(*create)(void *user_data, const char *cfg_section, int srate, GError **error);
+    struct cbox_module *(*create)(void *user_data, const char *cfg_section, struct cbox_rt *rt, GError **error);
 };
 
 #define DEFINE_MODULE(modname, ninputs, noutputs) \
@@ -112,12 +116,13 @@ extern struct cbox_module_manifest *cbox_module_list[];
 
 extern void cbox_module_manifest_dump(struct cbox_module_manifest *manifest);
 extern struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char *name);
-extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate, const char *instance_name, GError **error);
+extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, struct cbox_rt *rt, const char *instance_name, GError **error);
 
-extern struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **error);
+extern struct cbox_module *cbox_module_new_from_fx_preset(const char *name, struct cbox_rt *rt, GError **error);
 
-extern void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler);
+extern void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler);
 extern void cbox_module_destroy(struct cbox_module *module);
+extern void cbox_module_swap_pointers_and_free(struct cbox_module *sm, void **pptr, void *value);
 
 extern gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error);
 
@@ -133,7 +138,7 @@ extern gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cb
             return cbox_set_range_error(error, path, minv, maxv);\
         EFFECT_PARAM_CLONE(pp); \
         pp->field = expr(value); \
-        free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, pp)); \
+        cbox_module_swap_pointers_and_free(&m->module, (void **)&m->params, pp); \
     } \
 
 #define EFFECT_PARAM_ARRAY(path, type, array, field, ctype, expr, minv, maxv) \
@@ -145,10 +150,14 @@ extern gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cb
             return cbox_set_range_error(error, path, minv, maxv);\
         EFFECT_PARAM_CLONE(pp); \
         pp->array[pos].field = expr(value); \
-        free(cbox_rt_swap_pointers(app.rt, (void **)&m->params, pp)); \
+        cbox_module_swap_pointers_and_free(&m->module, (void **)&m->params, pp); \
     } \
 
+#define MODULE_CREATE_FUNCTION(funcname) \
+    struct cbox_module *funcname(void *user_data, const char *cfg_section, struct cbox_rt *rt, GError **error)
 
+#define CALL_MODULE_INIT(m, inputs, outputs, func) \
+    cbox_module_init(&(m)->module, rt, (m), inputs, outputs, func);
 
 
 #endif

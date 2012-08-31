@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "biquad-float.h"
 #include "config.h"
 #include "config-api.h"
@@ -47,7 +46,6 @@ struct parametric_eq_module
 
     struct cbox_biquadf_state state[MAX_EQ_BANDS][2];
     struct cbox_biquadf_coeffs coeffs[MAX_EQ_BANDS];
-    int srate;
 };
 
 static void redo_filters(struct parametric_eq_module *m)
@@ -57,7 +55,7 @@ static void redo_filters(struct parametric_eq_module *m)
         struct eq_band *band = &m->params->bands[i];
         if (band->active)
         {
-            cbox_biquadf_set_peakeq_rbj(&m->coeffs[i], band->center, band->q, band->gain, m->srate);
+            cbox_biquadf_set_peakeq_rbj(&m->coeffs[i], band->center, band->q, band->gain, m->module.srate);
         }
     }
     m->old_params = m->params;
@@ -155,7 +153,7 @@ void cbox_eq_reset_bands(struct cbox_biquadf_state state[1][2], int bands)
             cbox_biquadf_reset(&state[b][c]);
 }
 
-struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(parametric_eq_create)
 {
     static int inited = 0;
     if (!inited)
@@ -164,13 +162,12 @@ struct cbox_module *parametric_eq_create(void *user_data, const char *cfg_sectio
     }
     
     struct parametric_eq_module *m = malloc(sizeof(struct parametric_eq_module));
-    cbox_module_init(&m->module, m, 2, 2, parametric_eq_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, parametric_eq_process_cmd);
     m->module.process_event = parametric_eq_process_event;
     m->module.process_block = parametric_eq_process_block;
     struct parametric_eq_params *p = malloc(sizeof(struct parametric_eq_params));
     m->params = p;
     m->old_params = NULL;
-    m->srate = srate;
     
     for (int b = 0; b < MAX_EQ_BANDS; b++)
     {

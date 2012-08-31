@@ -103,10 +103,10 @@ struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char *name)
     return NULL;
 }
 
-struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, int srate, const char *instance_name, GError **error)
+struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, struct cbox_rt *rt, const char *instance_name, GError **error)
 {
     g_clear_error(error);
-    struct cbox_module *module = manifest->create(manifest->user_data, cfg_section, srate, error);
+    struct cbox_module *module = manifest->create(manifest->user_data, cfg_section, rt, error);
     if (!module)
         return NULL;
 
@@ -119,9 +119,10 @@ struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manife
     return module;
 }
 
-void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler)
+void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler)
 {
     module->user_data = user_data;
+    module->rt = rt;
     module->instance_name = NULL;
     module->input_samples = NULL;
     module->output_samples = NULL;
@@ -129,6 +130,7 @@ void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, i
     module->outputs = outputs;
     module->aux_offset = outputs;
     module->bypass = 0;
+    module->srate = cbox_rt_get_sample_rate(rt);
     
     cbox_command_target_init(&module->cmd_target, cmd_handler, module);
     module->process_event = NULL;
@@ -136,7 +138,7 @@ void cbox_module_init(struct cbox_module *module, void *user_data, int inputs, i
     module->destroy = NULL;
 }
 
-struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **error)
+struct cbox_module *cbox_module_new_from_fx_preset(const char *name, struct cbox_rt *rt, GError **error)
 {
     gchar *section = g_strdup_printf("fxpreset:%s", name);
     const char *engine;
@@ -160,7 +162,7 @@ struct cbox_module *cbox_module_new_from_fx_preset(const char *name, GError **er
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "FX preset '%s' refers to non-existing engine '%s'", name, engine);
         goto fxpreset_error;
     }
-    effect = cbox_module_manifest_create_module(mptr, section, cbox_io_get_sample_rate(&app.io), section, error);
+    effect = cbox_module_manifest_create_module(mptr, section, rt, section, error);
     if (!effect)
     {
         cbox_force_error(error);
@@ -191,7 +193,7 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
     }
     if (!strcmp(subcmd, "/insert_preset") && !strcmp(cmd->arg_types, "s"))
     {
-        struct cbox_module *effect = cbox_module_new_from_fx_preset((const char *)cmd->arg_values[0], error);
+        struct cbox_module *effect = cbox_module_new_from_fx_preset((const char *)cmd->arg_values[0], sm->rt, error);
         if (!effect)
             return FALSE;
         cbox_rt_swap_pointers(app.rt, (void **)psm, effect);
@@ -208,7 +210,7 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No effect engine '%s'", (const char *)cmd->arg_values[0]);
                 return FALSE;
             }
-            effect = cbox_module_manifest_create_module(manifest, NULL, cbox_io_get_sample_rate(&app.io), "unnamed", error);
+            effect = cbox_module_manifest_create_module(manifest, NULL, sm->rt, "unnamed", error);
             if (!effect)
                 return FALSE;
         }
@@ -240,6 +242,11 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
         return TRUE;
     }
     return cbox_set_command_error(error, cmd);
+}
+
+void cbox_module_swap_pointers_and_free(struct cbox_module *sm, void **pptr, void *value)
+{
+    free(cbox_rt_swap_pointers(sm->rt, pptr, value));
 }
 
 void cbox_module_destroy(struct cbox_module *module)

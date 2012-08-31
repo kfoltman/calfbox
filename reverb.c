@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -64,7 +63,6 @@ struct reverb_module
     struct cbox_onepolef_coeffs filter_coeffs[2];
     struct reverb_params *params, *old_params;
     int pos;
-    int srate;
 };
 
 gboolean reverb_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -103,13 +101,13 @@ void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     struct reverb_module *m = (struct reverb_module *)module;
     struct reverb_params *p = m->params;
     
-    float rv = p->decay_time * m->srate / 1000;
+    float rv = p->decay_time * m->module.srate / 1000;
     float dryamt = p->dryamt;
     float wetamt = p->wetamt;
 
     if (p != m->old_params)
     {
-        float tpdsr = 2 * M_PI / m->srate;
+        float tpdsr = 2 * M_PI / m->module.srate;
         cbox_onepolef_set_lowpass(&m->filter_coeffs[0], p->lowpass * tpdsr);
         cbox_onepolef_set_highpass(&m->filter_coeffs[1], p->highpass * tpdsr);
         m->old_params = p;
@@ -190,7 +188,7 @@ void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     m->pos += CBOX_BLOCK_SIZE;
 }
 
-struct cbox_module *reverb_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(reverb_create)
 {
     static int inited = 0;
     int i;
@@ -200,11 +198,10 @@ struct cbox_module *reverb_create(void *user_data, const char *cfg_section, int 
     }
     
     struct reverb_module *m = malloc(sizeof(struct reverb_module));
-    cbox_module_init(&m->module, m, 2, 2, reverb_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, reverb_process_cmd);
     m->module.process_event = reverb_process_event;
     m->module.process_block = reverb_process_block;
     m->pos = 0;
-    m->srate = srate;
     m->old_params = NULL;
     m->params = malloc(sizeof(struct reverb_params));
     m->params->decay_time = cbox_config_get_float(cfg_section, "reverb_time", 1000);
@@ -221,7 +218,7 @@ struct cbox_module *reverb_create(void *user_data, const char *cfg_section, int 
             b->delay_storage[i] = 0.f;
     }
     
-    float tpdsr = 2 * M_PI / srate;
+    float tpdsr = 2 * M_PI / m->module.srate;
     
     m->params->diffusion = cbox_config_get_float(cfg_section, "diffusion", 0.45);
     m->params->lowpass = cbox_config_get_float(cfg_section, "lowpass", 8000.f);

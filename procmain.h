@@ -22,15 +22,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <jack/ringbuffer.h>
 
-#include "pattern.h"
+#include "cmd.h"
+#include "midi.h"
 
 #define RT_CMD_QUEUE_ITEMS 1024
 #define RT_MAX_COST_PER_CALL 100
 
 struct cbox_scene;
 struct cbox_io;
+struct cbox_midi_pattern;
 struct cbox_song;
-
 struct cbox_rt_cmd_instance;
 
 struct cbox_rt_cmd_definition
@@ -53,11 +54,13 @@ struct cbox_rt
     jack_ringbuffer_t *rb_execute, *rb_cleanup;
     
     struct cbox_command_target cmd_target;
+    int started;
 };
 
 extern struct cbox_rt *cbox_rt_new();
 
-extern void cbox_rt_start(struct cbox_rt *rt, struct cbox_io *io);
+extern void cbox_rt_set_io(struct cbox_rt *rt, struct cbox_io *io);
+extern void cbox_rt_start(struct cbox_rt *rt);
 extern void cbox_rt_handle_cmd_queue(struct cbox_rt *rt);
 extern void cbox_rt_stop(struct cbox_rt *rt);
 
@@ -72,6 +75,9 @@ extern struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scen
 extern struct cbox_song *cbox_rt_set_song(struct cbox_rt *rt, struct cbox_song *song, int new_pos);
 extern struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos);
 extern void cbox_rt_send_events(struct cbox_rt *rt, struct cbox_midi_buffer *buffer);
+
+extern int cbox_rt_get_sample_rate(struct cbox_rt *rt);
+extern int cbox_rt_get_buffer_size(struct cbox_rt *rt);
 
 extern void cbox_rt_destroy(struct cbox_rt *rt);
 

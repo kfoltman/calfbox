@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -90,7 +89,7 @@ void tone_control_process_block(struct cbox_module *module, cbox_sample_t **inpu
     cbox_onepolef_process(&m->highpass_state[1], &m->highpass_coeffs, outputs[1]);
 }
 
-struct cbox_module *tone_control_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(tone_control_create)
 {
     static int inited = 0;
     if (!inited)
@@ -99,11 +98,11 @@ struct cbox_module *tone_control_create(void *user_data, const char *cfg_section
     }
     
     struct tone_control_module *m = malloc(sizeof(struct tone_control_module));
-    cbox_module_init(&m->module, m, 2, 2, tone_control_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, tone_control_process_cmd);
     m->module.process_event = tone_control_process_event;
     m->module.process_block = tone_control_process_block;
     
-    m->tpdsr = 2 * M_PI / srate;
+    m->tpdsr = 2 * M_PI / m->module.srate;
     
     m->old_params = NULL;
     m->params = malloc(sizeof(struct tone_control_params));

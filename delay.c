@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -44,7 +43,6 @@ struct delay_module
     float storage[MAX_DELAY_LENGTH][2];
     struct delay_params *params;
     int pos;
-    int srate;
 };
 
 #define MODULE_PARAMS delay_params
@@ -79,7 +77,7 @@ void delay_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbo
     struct delay_module *m = (struct delay_module *)module;
     
     int pos = m->pos;
-    int dv = m->params->time * m->srate / 1000.0;
+    int dv = m->params->time * m->module.srate / 1000.0;
     float dryamt = 1 - m->params->wet_dry;
     float wetamt = m->params->wet_dry;
     float fbamt = m->params->fb_amt;
@@ -102,7 +100,7 @@ void delay_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbo
     m->pos = pos;
 }
 
-struct cbox_module *delay_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(delay_create)
 {
     static int inited = 0;
     int i;
@@ -112,9 +110,8 @@ struct cbox_module *delay_create(void *user_data, const char *cfg_section, int s
     }
     
     struct delay_module *m = malloc(sizeof(struct delay_module));
-    cbox_module_init(&m->module, m, 2, 2, delay_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, delay_process_cmd);
     struct delay_params *p = malloc(sizeof(struct delay_params));
-    m->srate = srate;
     m->params = p;
     m->module.process_event = delay_process_event;
     m->module.process_block = delay_process_block;

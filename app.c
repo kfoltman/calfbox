@@ -64,7 +64,7 @@ void switch_scene(struct cbox_menu_item_command *item, struct cbox_scene *new_sc
 int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = cbox_scene_load(item->item.item_context, &error);
+    struct cbox_scene *scene = cbox_scene_load(item->item.item_context, app.rt, &error);
     if (scene)
         switch_scene(item, scene, "scene");
     else
@@ -75,7 +75,7 @@ int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = cbox_scene_new();
+    struct cbox_scene *scene = cbox_scene_new(app.rt);
     struct cbox_layer *layer = cbox_layer_new((char *)item->item.item_context, &error);
     
     if (layer)
@@ -96,7 +96,7 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = cbox_scene_new();
+    struct cbox_scene *scene = cbox_scene_new(app.rt);
     struct cbox_layer *layer = cbox_layer_load((char *)item->item.item_context, &error);
     
     if (layer)

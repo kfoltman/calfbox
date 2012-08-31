@@ -48,7 +48,7 @@ void jack_input_process_block(struct cbox_module *module, cbox_sample_t **inputs
     
     for (int i = 0; i < 2; i++)
     {
-        float *src = app.io.input_buffers[m->inputs[i]] + m->offset;
+        float *src = module->rt->io->input_buffers[m->inputs[i]] + m->offset;
         for (int j = 0; j < CBOX_BLOCK_SIZE; j++)
             outputs[i][j] = src[j];
     }
@@ -65,7 +65,7 @@ static gboolean validate_input_index(int input, const char *cfg_section, const c
     return TRUE;
 }
 
-struct cbox_module *jack_input_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(jack_input_create)
 {
     static int inited = 0;
     if (!inited)
@@ -81,7 +81,7 @@ struct cbox_module *jack_input_create(void *user_data, const char *cfg_section, 
         return NULL;
     
     struct jack_input_module *m = malloc(sizeof(struct jack_input_module));
-    cbox_module_init(&m->module, m, 0, 2, NULL);
+    CALL_MODULE_INIT(m, 0, 2, NULL);
     m->module.process_event = jack_input_process_event;
     m->module.process_block = jack_input_process_block;
     

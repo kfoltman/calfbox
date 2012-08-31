@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -49,7 +48,6 @@ struct compressor_module
     struct cbox_onepolef_coeffs attack_lp, release_lp, fast_attack_lp;
     struct cbox_onepolef_state tracker;
     struct cbox_onepolef_state tracker2;
-    int srate;
 };
 
 gboolean compressor_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -88,7 +86,7 @@ void compressor_process_block(struct cbox_module *module, cbox_sample_t **inputs
     
     if (m->params != m->old_params)
     {
-        float scale = M_PI * 1000 / m->srate;
+        float scale = M_PI * 1000 / m->module.srate;
         cbox_onepolef_set_lowpass(&m->fast_attack_lp, 2 * scale / m->params->attack);
         cbox_onepolef_set_lowpass(&m->attack_lp, scale / m->params->attack);
         cbox_onepolef_set_lowpass(&m->release_lp, scale / m->params->release);
@@ -115,7 +113,7 @@ void compressor_process_block(struct cbox_module *module, cbox_sample_t **inputs
     }
 }
 
-struct cbox_module *compressor_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(compressor_create)
 {
     static int inited = 0;
     if (!inited)
@@ -124,10 +122,9 @@ struct cbox_module *compressor_create(void *user_data, const char *cfg_section, 
     }
     
     struct compressor_module *m = malloc(sizeof(struct compressor_module));
-    cbox_module_init(&m->module, m, 2, 2, compressor_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, compressor_process_cmd);
     m->module.process_event = compressor_process_event;
     m->module.process_block = compressor_process_block;
-    m->srate = srate;
     
     struct compressor_params *p = malloc(sizeof(struct compressor_params));
     p->threshold = cbox_config_get_gain_db(cfg_section, "threshold", -12.0);

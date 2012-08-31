@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
@@ -131,7 +130,7 @@ void chorus_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     m->pos += CBOX_BLOCK_SIZE;
 }
 
-struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(chorus_create)
 {
     static int inited = 0;
     int i;
@@ -143,12 +142,12 @@ struct cbox_module *chorus_create(void *user_data, const char *cfg_section, int 
     }
     
     struct chorus_module *m = malloc(sizeof(struct chorus_module));
-    cbox_module_init(&m->module, m, 2, 2, chorus_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, chorus_process_cmd);
     m->module.process_event = chorus_process_event;
     m->module.process_block = chorus_process_block;
     m->pos = 0;
     m->phase = 0;
-    m->tp32dsr = 65536.0 * 65536.0 / srate;
+    m->tp32dsr = 65536.0 * 65536.0 / m->module.srate;
     struct chorus_params *p = malloc(sizeof(struct chorus_params));
     m->params = p;
     p->sphase = cbox_config_get_float(cfg_section, "stereo_phase", 90.f);

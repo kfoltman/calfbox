@@ -31,7 +31,7 @@ struct cbox_aux_bus
     float *output_bufs[2];
 };
 
-extern struct cbox_aux_bus *cbox_aux_bus_load(const char *name, GError **error);
+extern struct cbox_aux_bus *cbox_aux_bus_load(const char *name, struct cbox_rt *rt, GError **error);
 extern void cbox_aux_bus_ref(struct cbox_aux_bus *bus);
 extern void cbox_aux_bus_unref(struct cbox_aux_bus *bus);
 extern void cbox_aux_bus_destroy(struct cbox_aux_bus *bus);

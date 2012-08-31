@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "menuitem.h"
 #include "midi.h"
 #include "module.h"
+#include "pattern.h"
 #include "procmain.h"
 #include "scene.h"
 #include "scripting.h"
@@ -193,8 +194,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Cannot initialise sound I/O\n");
         return 1;
     }
-    
-    cbox_instruments_init(&app.io);
+    cbox_rt_set_io(app.rt, &app.io);
+    cbox_instruments_init(app.rt);
     cbox_wavebank_init();
     
     if (!scene_name && !instrument_name)
@@ -219,14 +220,14 @@ int main(int argc, char *argv[])
     if (scene_name)
     {
         app.current_scene_name = g_strdup_printf("scene:%s", scene_name);
-        scene = cbox_scene_load(scene_name, &error);
+        scene = cbox_scene_load(scene_name, app.rt, &error);
         if (!scene)
             goto fail;
     }
     else
     {
         app.current_scene_name = g_strdup_printf("instrument:%s", instrument_name);
-        scene = cbox_scene_new();
+        scene = cbox_scene_new(app.rt);
         layer = cbox_layer_new(instrument_name, &error);
         if (!layer)
             goto fail;
@@ -240,14 +241,14 @@ int main(int argc, char *argv[])
     
     if (effect_preset_name && *effect_preset_name)
     {
-        app.rt->effect = cbox_module_new_from_fx_preset(effect_preset_name, &error);
+        app.rt->effect = cbox_module_new_from_fx_preset(effect_preset_name, app.rt, &error);
         if (!app.rt->effect)
             goto fail;
     }
     cbox_master_set_tempo(app.rt->master, tempo);
     cbox_master_set_timesig(app.rt->master, bpb, 4);
 
-    cbox_rt_start(app.rt, &app.io);
+    cbox_rt_start(app.rt);
     if (drum_pattern_name)
         cbox_rt_set_pattern(app.rt, cbox_midi_pattern_load(drum_pattern_name, 1), 0);
     else if (drum_track_name)

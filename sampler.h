@@ -162,7 +162,6 @@ struct sampler_module
 {
     struct cbox_module module;
 
-    int srate;
     struct sampler_voice voices[MAX_SAMPLER_VOICES];
     struct sampler_channel channels[16];
     struct sampler_program **programs;

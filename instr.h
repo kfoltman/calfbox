@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MAX_AUXBUSES_PER_INSTRUMENT 4
 
 struct cbox_module;
-struct cbox_io;
+struct cbox_rt;
 struct cbox_scene;
 
 struct cbox_instrument_output
@@ -47,9 +47,9 @@ struct cbox_instrument
     int aux_output_count;
 };
 
-extern void cbox_instruments_init(struct cbox_io *io);
+extern void cbox_instruments_init(struct cbox_rt *rt);
 extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gboolean load, GError **error);
-extern struct cbox_io *cbox_instruments_get_io();
+extern struct cbox_rt *cbox_instruments_get_rt();
 extern void cbox_instrument_unref_aux_buses(struct cbox_instrument *instrument);
 extern void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrument, struct cbox_aux_bus *bus);
 extern void cbox_instrument_destroy(struct cbox_instrument *instrument);

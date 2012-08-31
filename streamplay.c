@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "assert.h"
 #include "config.h"
 #include "config-api.h"
@@ -614,19 +613,19 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
         if (!require_stream(m, error))
             return FALSE;
         m->stream->readptr_new = *(int *)cmd->arg_values[0];
-        cbox_rt_execute_cmd_async(app.rt, &stream_seek_command, m);
+        cbox_rt_execute_cmd_async(m->module.rt, &stream_seek_command, m);
     }
     else if (!strcmp(cmd->command, "/play") && !strcmp(cmd->arg_types, ""))
     {
         if (!require_stream(m, error))
             return FALSE;
-        cbox_rt_execute_cmd_async(app.rt, &stream_play_command, m);
+        cbox_rt_execute_cmd_async(m->module.rt, &stream_play_command, m);
     }
     else if (!strcmp(cmd->command, "/stop") && !strcmp(cmd->arg_types, ""))
     {
         if (!require_stream(m, error))
             return FALSE;
-        cbox_rt_execute_cmd_async(app.rt, &stream_stop_command, m);
+        cbox_rt_execute_cmd_async(m->module.rt, &stream_stop_command, m);
     }
     else if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
@@ -653,7 +652,7 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
         c->filename = g_strdup((gchar *)cmd->arg_values[0]);
         c->loop_start = *(int *)cmd->arg_values[1];
         c->error = error;
-        cbox_rt_execute_cmd_sync(app.rt, &stream_load_command, c);
+        cbox_rt_execute_cmd_sync(m->module.rt, &stream_load_command, c);
         gboolean success = c->stream != NULL;
         free(c);
         return success;
@@ -668,7 +667,7 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
         c->filename = NULL;
         c->loop_start = 0;
         c->error = error;
-        cbox_rt_execute_cmd_sync(app.rt, &stream_load_command, c);
+        cbox_rt_execute_cmd_sync(m->module.rt, &stream_load_command, c);
         gboolean success = c->stream == NULL;
         free(c);
         return success;        
@@ -681,7 +680,7 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
     return TRUE;
 }
 
-struct cbox_module *stream_player_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(stream_player_create)
 {
     int rest;
     static int inited = 0;
@@ -693,11 +692,11 @@ struct cbox_module *stream_player_create(void *user_data, const char *cfg_sectio
     
     struct stream_player_module *m = malloc(sizeof(struct stream_player_module));
     gchar *filename = cbox_config_get_string(cfg_section, "file");
-    cbox_module_init(&m->module, m, 0, 2, stream_player_process_cmd);
+    CALL_MODULE_INIT(m, 0, 2, stream_player_process_cmd);
     m->module.process_event = stream_player_process_event;
     m->module.process_block = stream_player_process_block;
     m->module.destroy = stream_player_destroy;
-    m->fade_increment = 1.0 / (cbox_config_get_float(cfg_section, "fade_time", 0.01) * (srate / CBOX_BLOCK_SIZE));
+    m->fade_increment = 1.0 / (cbox_config_get_float(cfg_section, "fade_time", 0.01) * (m->module.srate / CBOX_BLOCK_SIZE));
     if (filename)
     {
         m->stream = stream_state_new(cfg_section, filename, (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", -1), m->fade_increment, error);

@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "biquad-float.h"
 #include "config.h"
 #include "config-api.h"
@@ -47,7 +46,6 @@ struct fuzz_module
 {
     struct cbox_module module;
 
-    int srate;
     struct fuzz_params *params, *old_params;
     
     struct cbox_biquadf_coeffs split_coeffs;
@@ -98,8 +96,8 @@ void fuzz_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox
         // update calculated values
     }
     
-    cbox_biquadf_set_bp_rbj(&m->split_coeffs, m->params->band, 0.7 / m->params->bandwidth, m->srate);
-    cbox_biquadf_set_bp_rbj(&m->post_coeffs, m->params->band2, 0.7 / m->params->bandwidth2, m->srate);
+    cbox_biquadf_set_bp_rbj(&m->split_coeffs, m->params->band, 0.7 / m->params->bandwidth, m->module.srate);
+    cbox_biquadf_set_bp_rbj(&m->post_coeffs, m->params->band2, 0.7 / m->params->bandwidth2, m->module.srate);
     
     float splitbuf[2][CBOX_BLOCK_SIZE];
     float drive = m->params->drive;
@@ -132,7 +130,7 @@ void fuzz_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox
     }
 }
 
-struct cbox_module *fuzz_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(fuzz_create)
 {
     static int inited = 0;
     if (!inited)
@@ -141,7 +139,7 @@ struct cbox_module *fuzz_create(void *user_data, const char *cfg_section, int sr
     }
     
     struct fuzz_module *m = malloc(sizeof(struct fuzz_module));
-    cbox_module_init(&m->module, m, 2, 2, fuzz_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, fuzz_process_cmd);
     m->module.process_event = fuzz_process_event;
     m->module.process_block = fuzz_process_block;
     struct fuzz_params *p = malloc(sizeof(struct fuzz_params));
@@ -154,7 +152,6 @@ struct cbox_module *fuzz_create(void *user_data, const char *cfg_section, int sr
     p->bandwidth2 = cbox_config_get_float(cfg_section, "bandwidth2", 1);
     m->params = p;
     m->old_params = NULL;
-    m->srate = srate;
     cbox_biquadf_reset(&m->split_state[0]);
     cbox_biquadf_reset(&m->split_state[1]);
     cbox_biquadf_reset(&m->post_state[0]);

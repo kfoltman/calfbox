@@ -16,12 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config-api.h"
 #include "dspmath.h"
 #include "errors.h"
 #include "midi.h"
 #include "module.h"
+#include "procmain.h"
 #include "sampler.h"
 #include "sfzloader.h"
 #include <assert.h>
@@ -403,9 +403,9 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                     exgroups[exgroupcount++] = l->exclusive_group;
                 }
             }
-            lfo_init(&v->amp_lfo, l->amp_lfo_freq, l->amp_lfo_depth, m->srate);
-            lfo_init(&v->filter_lfo, l->filter_lfo_freq, l->filter_lfo_depth, m->srate);
-            lfo_init(&v->pitch_lfo, l->pitch_lfo_freq, l->pitch_lfo_depth, m->srate);
+            lfo_init(&v->amp_lfo, l->amp_lfo_freq, l->amp_lfo_depth, m->module.srate);
+            lfo_init(&v->filter_lfo, l->filter_lfo_freq, l->filter_lfo_depth, m->module.srate);
+            lfo_init(&v->pitch_lfo, l->pitch_lfo_freq, l->pitch_lfo_depth, m->module.srate);
             
             cbox_biquadf_reset(&v->filter_left);
             cbox_biquadf_reset(&v->filter_right);
@@ -659,7 +659,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             double freq = v->freq * c->pitchbend;
             if (pitch_env != 0 || pitch_lfo != 0)
                 freq *= pow(2.0, (v->pitcheg_depth * pitch_env + pitch_lfo) / 1200.0);
-            uint64_t freq64 = freq * 65536.0 * 65536.0 / m->srate;
+            uint64_t freq64 = freq * 65536.0 * 65536.0 / m->module.srate;
             v->delta = freq64 >> 32;
             v->frac_delta = freq64 & 0xFFFFFFFF;
             float gain = amp_env * v->gain * c->volume * c->expression  / (maxv * maxv);
@@ -677,8 +677,8 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 float cutoff = v->cutoff*pow(2.0,(filter_env*v->fileg_depth + filter_lfo + c->cutoff_ctl*9600/maxv)/1200);
                 if (cutoff < 20)
                     cutoff = 20;
-                if (cutoff > m->srate * 0.45)
-                    cutoff = m->srate * 0.45;
+                if (cutoff > m->module.srate * 0.45)
+                    cutoff = m->module.srate * 0.45;
                 float resonance = v->resonance*pow(32.0,c->resonance_ctl/maxv);
                 if (resonance < 0.7)
                     resonance = 0.7;
@@ -690,28 +690,28 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 switch(v->filter)
                 {
                 case sft_lp12:
-                    cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
                     break;
                 case sft_hp12:
-                    cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
                     break;
                 case sft_bp6:
-                    cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
                     break;
                 case sft_lp6:
-                    cbox_biquadf_set_1plp(&v->filter_coeffs, cutoff, m->srate);
+                    cbox_biquadf_set_1plp(&v->filter_coeffs, cutoff, m->module.srate);
                     break;
                 case sft_hp6:
-                    cbox_biquadf_set_1php(&v->filter_coeffs, cutoff, m->srate);
+                    cbox_biquadf_set_1php(&v->filter_coeffs, cutoff, m->module.srate);
                     break;
                 case sft_lp24:
-                    cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
                     break;
                 case sft_hp24:
-                    cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
                     break;
                 case sft_bp12:
-                    cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->srate);
+                    cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
                     break;
                 default:
                     assert(0);
@@ -985,9 +985,9 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *w
 
 void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
 {
-    cbox_envelope_init_dahdsr(&l->amp_env_shape, &l->amp_env, m->srate / CBOX_BLOCK_SIZE);
-    cbox_envelope_init_dahdsr(&l->filter_env_shape, &l->filter_env,  m->srate / CBOX_BLOCK_SIZE);
-    cbox_envelope_init_dahdsr(&l->pitch_env_shape, &l->pitch_env,  m->srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_dahdsr(&l->amp_env_shape, &l->amp_env, m->module.srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_dahdsr(&l->filter_env_shape, &l->filter_env,  m->module.srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_dahdsr(&l->pitch_env_shape, &l->pitch_env,  m->module.srate / CBOX_BLOCK_SIZE);
 
     if (l->loop_mode == slm_unknown)
         l->loop_mode = l->loop_start == -1 ? slm_no_loop : slm_loop_continuous;
@@ -1246,11 +1246,11 @@ void swap_program(struct sampler_module *m, int index, struct sampler_program *p
 {
     static struct cbox_rt_cmd_definition release_program_voices = { NULL, release_program_voices_execute, NULL };
     
-    struct sampler_program *old_program = cbox_rt_swap_pointers(app.rt, (void **)&m->programs[index], pgm);
+    struct sampler_program *old_program = cbox_rt_swap_pointers(m->module.rt, (void **)&m->programs[index], pgm);
 
     struct release_program_voices_data data = {m, old_program, pgm};
 
-    cbox_rt_execute_cmd_sync(app.rt, &release_program_voices, &data);
+    cbox_rt_execute_cmd_sync(m->module.rt, &release_program_voices, &data);
     
     destroy_program(m, old_program);
 }
@@ -1271,7 +1271,7 @@ static gboolean load_program_at(struct sampler_module *m, const char *cfg_sectio
     struct sampler_program **programs = malloc(sizeof(struct sampler_program *) * (m->program_count + 1));
     memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
     programs[m->program_count] = pgm;
-    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
+    free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
     return TRUE;
 }
 
@@ -1296,7 +1296,7 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
     struct sampler_program **programs = malloc(sizeof(struct sampler_program *) * (m->program_count + 1));
     memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
     programs[m->program_count] = pgm;
-    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
+    free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
     return TRUE;
 }
 
@@ -1386,7 +1386,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
                 break;
             }
         }
-        cbox_rt_swap_pointers(app.rt, (void **)&m->channels[channel - 1].program, pgm);
+        cbox_rt_swap_pointers(m->module.rt, (void **)&m->channels[channel - 1].program, pgm);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/load_patch") && !strcmp(cmd->arg_types, "iss"))
@@ -1408,7 +1408,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     return TRUE;
 }
 
-struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_CREATE_FUNCTION(sampler_create)
 {
     int result = 0;
     int i;
@@ -1440,14 +1440,13 @@ struct cbox_module *sampler_create(void *user_data, const char *cfg_section, int
     }
     
     struct sampler_module *m = malloc(sizeof(struct sampler_module));
-    cbox_module_init(&m->module, m, 0, (output_pairs + aux_pairs) * 2, sampler_process_cmd);
+    CALL_MODULE_INIT(m, 0, (output_pairs + aux_pairs) * 2, sampler_process_cmd);
     m->output_pairs = output_pairs;
     m->aux_pairs = aux_pairs;
     m->module.aux_offset = m->output_pairs * 2;
     m->module.process_event = sampler_process_event;
     m->module.process_block = sampler_process_block;
     m->module.destroy = sampler_destroy;
-    m->srate = srate;
     m->programs = NULL;
     m->max_voices = max_voices;
     m->serial_no = 0;

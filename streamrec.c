@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
+#include "procmain.h"
 #include "recsrc.h"
 #include <assert.h>
 #include <glib.h>
@@ -45,7 +45,8 @@ struct stream_recorder
 {
     struct cbox_recorder iface;
     struct recording_buffer buffers[STREAM_BUFFER_COUNT];
-    
+
+    struct cbox_rt *rt;
     gchar *filename;
     SNDFILE *sndfile;
     SF_INFO info;
@@ -97,7 +98,7 @@ static void stream_recorder_attach(struct cbox_recorder *handler, struct cbox_re
     {
         memset(&self->info, 0, sizeof(self->info));
         self->info.frames = 0;
-        self->info.samplerate = cbox_io_get_sample_rate(&app.io);
+        self->info.samplerate = cbox_rt_get_sample_rate(self->rt);
         self->info.channels = src->channels;
         self->info.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT; // XXXKF 
         self->info.sections = 0;
@@ -170,9 +171,10 @@ void stream_recorder_destroy(struct cbox_recorder *handler)
 }
 
 
-struct cbox_recorder *cbox_recorder_new_stream(const char *filename)
+struct cbox_recorder *cbox_recorder_new_stream(struct cbox_rt *rt, const char *filename)
 {
     struct stream_recorder *self = malloc(sizeof(struct stream_recorder));
+    self->rt = rt;
     self->iface.user_data = self;
     self->iface.attach = stream_recorder_attach;
     self->iface.record_block = stream_recorder_record_block;

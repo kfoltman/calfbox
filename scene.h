@@ -30,6 +30,7 @@ struct cbox_scene
     gchar *name;
     gchar *title;
     
+    struct cbox_rt *rt;
     struct cbox_layer **layers;
     int layer_count;
     struct cbox_instrument **instruments;
@@ -39,12 +40,12 @@ struct cbox_scene
     int transpose;
 };
 
-extern struct cbox_scene *cbox_scene_new();
+extern struct cbox_scene *cbox_scene_new(struct cbox_rt *rt);
 extern gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error);
 extern gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *layer, int pos, GError **error);
 extern struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos);
 extern void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newpos);
-extern struct cbox_scene *cbox_scene_load(const char *section, GError **error);
+extern struct cbox_scene *cbox_scene_load(const char *section, struct cbox_rt *rt, GError **error);
 extern gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument);
 extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error);
 extern struct cbox_aux_bus *cbox_scene_remove_aux_bus(struct cbox_scene *scene, int pos);
