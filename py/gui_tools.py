@@ -209,8 +209,11 @@ class SliderRow(TableRowWidget):
         self.maxv = maxv
     def create_widget(self, vpath):
         setter = self.get_with_default('setter', adjustment_changed_float)
-        adj = gtk.Adjustment(self.minv, self.minv, self.maxv, 1, 6, 0)
+        step = self.kwargs['step'] if 'step' in self.kwargs else 1
+        adj = gtk.Adjustment(self.minv, self.minv, self.maxv, step, 6, 0)
         slider = standard_hslider(adj)
+        if 'digits' in self.kwargs:
+            slider.set_digits(self.kwargs['digits'])
         if setter is not None:
             adj.connect("value_changed", setter, vpath.plus(self.name))
         else:
