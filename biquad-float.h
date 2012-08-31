@@ -166,6 +166,18 @@ static inline void cbox_biquadf_process(struct cbox_biquadf_state *state, struct
     state->y1 = sanef(y1);
 }
 
+static inline double cbox_biquadf_process_sample(struct cbox_biquadf_state *state, struct cbox_biquadf_coeffs *coeffs, double in)
+{    
+    double out = sanef(coeffs->a0 * sanef(in) + coeffs->a1 * state->x1 + coeffs->a2 * state->x2 - coeffs->b1 * state->y1 - coeffs->b2 * state->y2);
+        
+    state->x2 = state->x1;
+    state->x1 = in;
+    state->y2 = state->y1;
+    state->y1 = out;
+    
+    return out;
+}
+
 static inline void cbox_biquadf_process_to(struct cbox_biquadf_state *state, struct cbox_biquadf_coeffs *coeffs, float *buffer_in, float *buffer_out)
 {
     int i;
