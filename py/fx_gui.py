@@ -122,7 +122,7 @@ class ReverbWindow(EffectWindow):
         SliderRow("Wet amount", "wet_amt", -100, 12),
         MappedSliderRow("Lowpass", "lowpass", LogMapper(300, 20000, freq_format)),
         MappedSliderRow("Highpass", "highpass", LogMapper(30, 2000, freq_format)),
-        SliderRow("Diffusion", "diffusion", 0.2, 0.8)
+        SliderRow("Diffusion", "diffusion", 0.2, 0.8, step = 0.025, digits = 2)
     ]
     engine_name = "reverb"
     effect_name = "Reverb"
@@ -160,9 +160,23 @@ class GateWindow(EffectWindow):
 class DistortionWindow(EffectWindow):
     params = [
         SliderRow("Drive", "drive", -36, 36),
+        SliderRow("Shape", "shape", -1, 2),
     ]
     engine_name = "distortion"
     effect_name = "Distortion"
+
+class FuzzWindow(EffectWindow):
+    params = [
+        SliderRow("Drive", "drive", -36, 36),
+        SliderRow("Wet/dry", "wet_dry", 0, 1),
+        SliderRow("Rectify", "rectify", 0, 1),
+        MappedSliderRow("Pre freq", "band", LogMapper(100, 5000, freq_format)),
+        SliderRow("Pre width", "bandwidth", 0.25, 4),
+        MappedSliderRow("Post freq", "band2", LogMapper(100, 5000, freq_format)),
+        SliderRow("Post width", "bandwidth2", 0.25, 4),
+    ]
+    engine_name = "fuzz"
+    effect_name = "Fuzz"
 
 class EQCommon(object):
     columns = [
@@ -291,7 +305,7 @@ class FXChainWindow(EffectWindow):
 
 #################################################################################################################################
 
-effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor', 'gate', 'distortion', 'fxchain']
+effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor', 'gate', 'distortion', 'fuzz', 'fxchain']
 
 effect_window_map = {
     'phaser': PhaserWindow,
@@ -304,6 +318,7 @@ effect_window_map = {
     'compressor': CompressorWindow,
     'gate': GateWindow,
     'distortion': DistortionWindow,
+    'fuzz': FuzzWindow,
     'fxchain': FXChainWindow,
 }
 
