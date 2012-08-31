@@ -93,7 +93,7 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     }
 }
 
-void cbox_master_init(struct cbox_master *master)
+static void cbox_master_init(struct cbox_master *master, struct cbox_rt *rt)
 {
     master->srate = 0;
     master->tempo = 120.0;
@@ -101,15 +101,16 @@ void cbox_master_init(struct cbox_master *master)
     master->timesig_nom = 4;
     master->timesig_denom = 4;
     master->state = CMTS_STOP;
+    master->rt = rt;
     master->song = NULL;
     master->spb = NULL;
     cbox_command_target_init(&master->cmd_target, master_process_cmd, master);
 }
 
-struct cbox_master *cbox_master_new()
+struct cbox_master *cbox_master_new(struct cbox_rt *rt)
 {
     struct cbox_master *master = malloc(sizeof(struct cbox_master));
-    cbox_master_init(master);
+    cbox_master_init(master, rt);
     return master;
 }
 

@@ -66,7 +66,7 @@ struct cbox_rt *cbox_rt_new()
     rt->rb_execute = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS);
     rt->rb_cleanup = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS * 2);
     rt->io = NULL;
-    rt->master = cbox_master_new();
+    rt->master = cbox_master_new(rt);
     rt->master->song = cbox_song_new(rt->master);
     rt->started = 0;
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);

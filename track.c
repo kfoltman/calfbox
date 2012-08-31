@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
+#include "master.h"
 #include "procmain.h"
 #include "seq.h"
 #include "track.h"
@@ -63,7 +63,7 @@ void cbox_track_add_item(struct cbox_track *track, uint32_t time, struct cbox_mi
 void cbox_track_update_playback(struct cbox_track *track, struct cbox_master *master)
 {
     struct cbox_track_playback *pb = cbox_track_playback_new_from_track(track, master);
-    struct cbox_track_playback *old_pb = cbox_rt_swap_pointers(app.rt, (void **)&track->pb, pb);
+    struct cbox_track_playback *old_pb = cbox_rt_swap_pointers(master->rt, (void **)&track->pb, pb);
     if (old_pb)
         cbox_track_playback_destroy(old_pb);
 }

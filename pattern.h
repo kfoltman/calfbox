@@ -22,6 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "master.h"
 #include "midi.h"
 
+struct cbox_blob;
+
 struct cbox_midi_pattern
 {
     gchar *name;
