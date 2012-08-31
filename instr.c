@@ -16,11 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "auxbus.h"
 #include "config-api.h"
 #include "instr.h"
-#include "io.h"
 #include "module.h"
 #include "procmain.h"
 #include "scene.h"
@@ -84,7 +82,7 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
         struct cbox_scene *scene = instr->scene;
         if (!*(const char *)cmd->arg_values[0])
         {
-            struct cbox_aux_bus *old_bus = cbox_rt_swap_pointers(instruments.rt, (void **)&instr->aux_outputs[id], NULL);
+            struct cbox_aux_bus *old_bus = cbox_rt_swap_pointers(instr->module->rt, (void **)&instr->aux_outputs[id], NULL);
             if (old_bus)
                 cbox_aux_bus_unref(old_bus);
             return TRUE;            
@@ -98,7 +96,7 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
                 g_free(instr->aux_output_names[id]);
                 instr->aux_output_names[id] = g_strdup(scene->aux_buses[i]->name);
                 cbox_aux_bus_ref(scene->aux_buses[i]);
-                struct cbox_aux_bus *old_bus = cbox_rt_swap_pointers(app.rt, (void **)&instr->aux_outputs[id], scene->aux_buses[i]);
+                struct cbox_aux_bus *old_bus = cbox_rt_swap_pointers(instr->module->rt, (void **)&instr->aux_outputs[id], scene->aux_buses[i]);
                 if (old_bus)
                     cbox_aux_bus_unref(old_bus);
                 return TRUE;
@@ -214,7 +212,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
     for (int i = 0; i < module->outputs / 2; i ++)
     {
         struct cbox_instrument_output *oobj = outputs + i;
-        cbox_instrument_output_init(oobj, cbox_rt_get_buffer_size(instruments.rt));
+        cbox_instrument_output_init(oobj, cbox_rt_get_buffer_size(module->rt));
         
         gchar *key = i == 0 ? g_strdup("output_bus") : g_strdup_printf("output%d_bus", 1 + i);
         oobj->output_bus = cbox_config_get_int(instr_section, key, 1) - 1;
@@ -231,7 +229,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
         
         if (cv)
         {
-            oobj->insert = cbox_module_new_from_fx_preset(cv, instruments.rt, error);
+            oobj->insert = cbox_module_new_from_fx_preset(cv, module->rt, error);
             if (!oobj->insert)
             {
                 cbox_force_error(error);

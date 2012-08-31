@@ -16,11 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
 #include "module.h"
+#include "procmain.h"
 #include <glib.h>
 #include <malloc.h>
 #include <math.h>
@@ -56,7 +56,7 @@ void fxchain_move(struct fxchain_module *m, int oldpos, int newpos)
         }
         modules[i] = m->modules[s];
     }
-    free(cbox_rt_swap_pointers(app.rt, (void **)&m->modules, modules));
+    free(cbox_rt_swap_pointers(m->module.rt, (void **)&m->modules, modules));
 }
 
 gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -96,7 +96,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
         memcpy(new_modules, m->modules, pos * sizeof(struct cbox_module *));
         new_modules[pos] = NULL;
         memcpy(new_modules + pos + 1, m->modules + pos, (m->module_count - pos) * sizeof(struct cbox_module *));
-        void *old_modules = cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&m->modules, new_modules, &m->module_count, m->module_count + 1);
+        void *old_modules = cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->modules, new_modules, &m->module_count, m->module_count + 1);
         free(old_modules);
         return TRUE;
     }
@@ -107,7 +107,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
         memcpy(new_modules, m->modules, pos * sizeof(struct cbox_module *));
         memcpy(new_modules + pos, m->modules + pos + 1, (m->module_count - pos - 1) * sizeof(struct cbox_module *));
         struct cbox_module *deleted_module = m->modules[pos];
-        void *old_modules = cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&m->modules, new_modules, &m->module_count, m->module_count - 1);
+        void *old_modules = cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->modules, new_modules, &m->module_count, m->module_count - 1);
         free(old_modules);
         if (deleted_module)
             cbox_module_destroy(deleted_module);

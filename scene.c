@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "auxbus.h"
 #include "config-api.h"
 #include "errors.h"
@@ -24,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "layer.h"
 #include "midi.h"
 #include "module.h"
+#include "procmain.h"
 #include "scene.h"
 #include <assert.h>
 #include <glib.h>
@@ -144,7 +144,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         struct cbox_scene *scene = cbox_scene_new(s->rt);
         if (!scene) // not really expected
             return FALSE;
-        struct cbox_scene *old_scene = cbox_rt_set_scene(app.rt, scene);
+        struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
         cbox_scene_destroy(old_scene);
         return TRUE;
     }
@@ -396,14 +396,14 @@ gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *la
         memcpy(instruments, scene->instruments, sizeof(struct cbox_instrument *) * scene->instrument_count);
         instruments[scene->instrument_count] = layer->instrument;
         layer->instrument->scene = scene;
-        free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->instruments, instruments, &scene->instrument_count, scene->instrument_count + 1));        
+        free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->instruments, instruments, &scene->instrument_count, scene->instrument_count + 1));        
     }
     struct cbox_layer **layers = malloc(sizeof(struct cbox_layer *) * (scene->layer_count + 1));
     memcpy(layers, scene->layers, sizeof(struct cbox_layer *) * pos);
     layers[pos] = layer;
     memcpy(layers + pos + 1, scene->layers + pos, sizeof(struct cbox_layer *) * (scene->layer_count - pos));
     
-    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->layers, layers, &scene->layer_count, scene->layer_count + 1));
+    free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->layers, layers, &scene->layer_count, scene->layer_count + 1));
     return TRUE;
 }
 
@@ -418,7 +418,7 @@ struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos)
     struct cbox_layer **layers = malloc(sizeof(struct cbox_layer *) * (scene->layer_count - 1));
     memcpy(layers, scene->layers, sizeof(struct cbox_layer *) * pos);
     memcpy(layers + pos, scene->layers + pos + 1, sizeof(struct cbox_layer *) * (scene->layer_count - pos - 1));
-    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->layers, layers, &scene->layer_count, scene->layer_count - 1));
+    free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->layers, layers, &scene->layer_count, scene->layer_count - 1));
     cbox_instrument_unref_aux_buses(removed->instrument);
     
     return removed;
@@ -443,7 +443,7 @@ void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newpos)
         }
         layers[i] = scene->layers[s];
     }
-    free(cbox_rt_swap_pointers(app.rt, (void **)&scene->layers, layers));
+    free(cbox_rt_swap_pointers(scene->rt, (void **)&scene->layers, layers));
 }
 
 gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument)
@@ -457,7 +457,7 @@ gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_inst
             struct cbox_instrument **instruments = malloc(sizeof(struct cbox_instrument *) * (scene->instrument_count - 1));
             memcpy(instruments, scene->instruments, sizeof(struct cbox_instrument *) * pos);
             memcpy(instruments + pos, scene->instruments + pos + 1, sizeof(struct cbox_instrument *) * (scene->instrument_count - pos - 1));
-            free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->instruments, instruments, &scene->instrument_count, scene->instrument_count - 1));
+            free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->instruments, instruments, &scene->instrument_count, scene->instrument_count - 1));
             
             instrument->scene = NULL;
             return TRUE;
@@ -471,7 +471,7 @@ gboolean cbox_scene_insert_aux_bus(struct cbox_scene *scene, struct cbox_aux_bus
     struct cbox_aux_bus **aux_buses = malloc(sizeof(struct cbox_aux_bus *) * (scene->aux_bus_count + 1));
     memcpy(aux_buses, scene->aux_buses, sizeof(struct cbox_aux_bus *) * (scene->aux_bus_count));
     aux_buses[scene->aux_bus_count] = aux_bus;
-    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->aux_buses, aux_buses, &scene->aux_bus_count, scene->aux_bus_count + 1));
+    free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->aux_buses, aux_buses, &scene->aux_bus_count, scene->aux_bus_count + 1));
     return TRUE;
 }
 
@@ -484,7 +484,7 @@ struct cbox_aux_bus *cbox_scene_remove_aux_bus(struct cbox_scene *scene, int pos
     struct cbox_aux_bus **aux_buses = malloc(sizeof(struct cbox_aux_bus *) * (scene->aux_bus_count - 1));
     memcpy(aux_buses, scene->aux_buses, sizeof(struct cbox_aux_bus *) * pos);
     memcpy(aux_buses + pos, scene->aux_buses + pos + 1, sizeof(struct cbox_aux_bus *) * (scene->aux_bus_count - pos - 1));
-    free(cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&scene->aux_buses, aux_buses, &scene->aux_bus_count, scene->aux_bus_count - 1));
+    free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->aux_buses, aux_buses, &scene->aux_bus_count, scene->aux_bus_count - 1));
     
     return removed;
 }
