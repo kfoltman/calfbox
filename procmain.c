@@ -83,6 +83,10 @@ struct cbox_objhdr *cbox_rt_newfunc(struct cbox_class *class_ptr, struct cbox_do
     return NULL;
 }
 
+void cbox_rt_destroyfunc(struct cbox_objhdr *obj_ptr)
+{
+}
+
 int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_midi_buffer *destination)
 {
     void *midi = jack_port_get_buffer(port, nframes);

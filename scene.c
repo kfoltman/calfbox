@@ -140,7 +140,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         if (!cbox_scene_load(scene, (const gchar *)cmd->arg_values[0], error))
             return FALSE;
         struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
-        cbox_scene_destroy(old_scene);
+        CBOX_DELETE(old_scene);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/new") && !strcmp(cmd->arg_types, ""))
@@ -149,7 +149,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         if (!scene) // not really expected
             return FALSE;
         struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
-        cbox_scene_destroy(old_scene);
+        CBOX_DELETE(old_scene);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/add_layer") && !strcmp(cmd->arg_types, "is"))
@@ -515,8 +515,8 @@ struct cbox_objhdr *cbox_scene_newfunc(struct cbox_class *class_ptr, struct cbox
     CBOX_RETURN_OBJECT(s);
 }
 
-void cbox_scene_destroy(struct cbox_scene *scene)
+static void cbox_scene_destroyfunc(struct cbox_objhdr *scene)
 {
-    cbox_scene_clear(scene);
+    cbox_scene_clear((struct cbox_scene *)scene);
     free(scene);
 }

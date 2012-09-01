@@ -53,6 +53,5 @@ extern gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cb
 extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error);
 extern struct cbox_aux_bus *cbox_scene_remove_aux_bus(struct cbox_scene *scene, int pos);
 extern void cbox_scene_clear(struct cbox_scene *scene);
-extern void cbox_scene_destroy(struct cbox_scene *scene);
 
 #endif

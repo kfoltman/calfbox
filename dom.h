@@ -83,6 +83,9 @@ extern void cbox_dom_close();
 #define CBOX_CREATE_OTHER_CLASS(obj, class) \
     (struct class *)cbox_object_new_by_class((obj)->_obj_hdr.owner, &CBOX_CLASS_##class)
 
+#define CBOX_DELETE(obj) \
+    cbox_object_destroy(&(obj)->_obj_hdr)
+
 #define CBOX_OBJECT_HEADER_INIT(self, class, document) \
     do { \
         (self)->_obj_hdr.class_ptr = &CBOX_CLASS_##class; \
@@ -94,10 +97,8 @@ extern void cbox_dom_close();
     cbox_object_set_as_singleton(&(self)->_obj_hdr)
     
 #define CBOX_CLASS_DEFINITION_ROOT(class) \
-    struct cbox_objhdr *class##_newfunc(struct cbox_class *class_ptr, struct cbox_document *owner); \
-    void class##_destroyfunc(struct cbox_objhdr *hdr_ptr) { \
-        class##_destroy((struct class *)hdr_ptr); \
-    } \
+    static struct cbox_objhdr *class##_newfunc(struct cbox_class *class_ptr, struct cbox_document *owner); \
+    static void class##_destroyfunc(struct cbox_objhdr *hdr_ptr); \
     static struct cbox_command_target *class##_getcmdtarget(struct cbox_objhdr *hdr) { \
         return &(((struct class *)hdr)->cmd_target);\
     }; \

@@ -55,7 +55,7 @@ void switch_scene(struct cbox_menu_item_command *item, struct cbox_scene *new_sc
     struct cbox_scene *old = cbox_rt_set_scene(app.rt, new_scene);
     if (old)
     {
-        cbox_scene_destroy(old);
+        CBOX_DELETE(old);
         g_free(app.current_scene_name);
     }
     app.current_scene_name = g_strdup_printf("%s:%s", prefix, (char *)item->item.item_context);
@@ -69,7 +69,7 @@ int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
         switch_scene(item, scene, "scene");
     else {
         if (scene)
-            cbox_scene_destroy(scene);
+            CBOX_DELETE(scene);
         cbox_print_error(error);
     }
     return 0;
@@ -91,7 +91,7 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
     else
     {
         cbox_print_error(error);
-        cbox_scene_destroy(scene);
+        CBOX_DELETE(scene);
     }
     return 0;
 }
@@ -112,7 +112,7 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
     else
     {
         cbox_print_error(error);
-        cbox_scene_destroy(scene);
+        CBOX_DELETE(scene);
     }
     return 0;
 }

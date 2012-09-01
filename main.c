@@ -289,7 +289,8 @@ ok:
     if (app.rt->effect)
         cbox_module_destroy(app.rt->effect);
     if (scene)
-        cbox_scene_destroy(scene);
+        CBOX_DELETE(scene);
+    cbox_document_dump(app.document);
     
     cbox_rt_destroy(app.rt);
     
