@@ -185,7 +185,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    app.rt = cbox_rt_new();
+    app.document = cbox_document_new();
+    app.rt = cbox_rt_new(app.document);
+    
     cbox_config_init(config_name);
     if (tempo < 1)
         tempo = cbox_config_get_float("master", "tempo", 120);
@@ -222,14 +224,16 @@ int main(int argc, char *argv[])
     if (scene_name)
     {
         app.current_scene_name = g_strdup_printf("scene:%s", scene_name);
-        scene = cbox_scene_load(scene_name, app.rt, &error);
+        scene = CBOX_NEW(app.document, cbox_scene);
         if (!scene)
+            goto fail;
+        if (!cbox_scene_load(scene, scene_name, &error))
             goto fail;
     }
     else
     {
         app.current_scene_name = g_strdup_printf("instrument:%s", instrument_name);
-        scene = cbox_scene_new(app.rt);
+        scene = CBOX_NEW(app.document, cbox_scene);
         layer = cbox_layer_new(app.rt, instrument_name, &error);
         if (!layer)
             goto fail;

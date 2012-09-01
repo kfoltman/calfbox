@@ -27,6 +27,7 @@ static GHashTable *class_name_hash = NULL;
 struct cbox_class_per_document
 {
     GList *instances;
+    struct cbox_objhdr *singleton;
 };
 
 struct cbox_document
@@ -34,15 +35,30 @@ struct cbox_document
     GHashTable *classes_per_document;
 };
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 void cbox_dom_init()
 {
     class_name_hash = g_hash_table_new(g_str_hash, g_str_equal);
 }
 
+void cbox_dom_close()
+{
+    g_hash_table_destroy(class_name_hash);    
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 struct cbox_class *cbox_class_find_by_name(const char *name)
 {
     assert(class_name_hash != NULL);
     return g_hash_table_lookup(class_name_hash, name);
+}
+
+void cbox_class_register(struct cbox_class *class_ptr)
+{
+    assert(class_name_hash != NULL);
+    g_hash_table_insert(class_name_hash, (gpointer)class_ptr->name, class_ptr);
 }
 
 static struct cbox_class_per_document *get_cpd_for_class(struct cbox_document *doc, struct cbox_class *class_ptr)
@@ -52,9 +68,12 @@ static struct cbox_class_per_document *get_cpd_for_class(struct cbox_document *d
         return p;
     p = malloc(sizeof(struct cbox_class_per_document));
     p->instances = NULL;
+    p->singleton = NULL;
     g_hash_table_insert(doc->classes_per_document, class_ptr, p);
     return p;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 struct cbox_objhdr *cbox_object_new_by_class(struct cbox_document *doc, struct cbox_class *class_ptr)
 {
@@ -81,6 +100,19 @@ struct cbox_objhdr *cbox_object_new_by_class_name(struct cbox_document *doc, con
     return cbox_object_new_by_class(doc, (struct cbox_class *)class_ptr);
 }
 
+struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_ptr)
+{
+    if (!hdr_ptr->class_ptr->getcmdtargetfunc)
+        return NULL;
+    return hdr_ptr->class_ptr->getcmdtargetfunc(hdr_ptr);
+}
+
+void cbox_object_set_as_singleton(struct cbox_objhdr *hdr_ptr)
+{
+    struct cbox_class_per_document *cpd = get_cpd_for_class(hdr_ptr->owner, hdr_ptr->class_ptr);
+    cpd->singleton = hdr_ptr;
+}
+
 void cbox_object_destroy(struct cbox_objhdr *hdr_ptr)
 {
     struct cbox_class_per_document *cpd = get_cpd_for_class(hdr_ptr->owner, hdr_ptr->class_ptr);
@@ -90,12 +122,7 @@ void cbox_object_destroy(struct cbox_objhdr *hdr_ptr)
     hdr_ptr->class_ptr->destroyfunc(hdr_ptr);
 }
 
-void cbox_class_register(struct cbox_class *class_ptr)
-{
-    assert(class_name_hash != NULL);
-    g_hash_table_insert(class_name_hash, (gpointer)class_ptr->name, class_ptr);
-}
-
+////////////////////////////////////////////////////////////////////////////////////////
 
 
 struct cbox_document *cbox_document_new()
@@ -105,13 +132,16 @@ struct cbox_document *cbox_document_new()
     return res;
 }
 
+struct cbox_objhdr *cbox_document_get_singleton(struct cbox_document *document, struct cbox_class *class_ptr)
+{
+    struct cbox_class_per_document *cpd = get_cpd_for_class(document, class_ptr);
+    return cpd->singleton;
+}
+
+
 void cbox_document_destroy(struct cbox_document *document)
 {
     free(document);
 }
 
 
-void cbox_dom_close()
-{
-    g_hash_table_destroy(class_name_hash);    
-}

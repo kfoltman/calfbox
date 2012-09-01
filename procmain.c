@@ -34,6 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <unistd.h>
 
+CBOX_CLASS_DEFINITION_ROOT(cbox_rt)
+
 struct cbox_rt_cmd_instance
 {
     struct cbox_rt_cmd_definition *definition;
@@ -57,10 +59,10 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
     }    
 }
 
-struct cbox_rt *cbox_rt_new()
+struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
 {
     struct cbox_rt *rt = malloc(sizeof(struct cbox_rt));
-    
+    CBOX_OBJECT_HEADER_INIT(rt, cbox_rt, doc);
     rt->scene = NULL;
     rt->effect = NULL;
     rt->rb_execute = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS);
@@ -71,8 +73,14 @@ struct cbox_rt *cbox_rt_new()
     rt->started = 0;
     rt->instruments = cbox_instruments_new(rt);
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
+    CBOX_SET_AS_SINGLETON(rt);
     
     return rt;
+}
+
+struct cbox_objhdr *cbox_rt_newfunc(struct cbox_class *class_ptr, struct cbox_document *doc)
+{
+    return NULL;
 }
 
 int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_midi_buffer *destination)

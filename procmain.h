@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <jack/ringbuffer.h>
 
 #include "cmd.h"
+#include "dom.h"
 #include "midi.h"
 
 #define RT_CMD_QUEUE_ITEMS 1024
@@ -42,8 +43,12 @@ struct cbox_rt_cmd_definition
     void (*cleanup)(void *user_data);
 };
 
+CBOX_EXTERN_CLASS(cbox_rt)
+
 struct cbox_rt
 {
+    CBOX_OBJECT_HEADER()
+    
     struct cbox_scene *scene;
     struct cbox_instruments *instruments;
     struct cbox_module *effect;
@@ -59,7 +64,7 @@ struct cbox_rt
     int started;
 };
 
-extern struct cbox_rt *cbox_rt_new();
+extern struct cbox_rt *cbox_rt_new(struct cbox_document *doc);
 
 extern void cbox_rt_set_io(struct cbox_rt *rt, struct cbox_io *io);
 extern void cbox_rt_start(struct cbox_rt *rt);

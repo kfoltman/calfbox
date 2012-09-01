@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_APP_H
 
 #include "cmd.h"
+#include "dom.h"
 #include "io.h"
 #include "procmain.h"
 #include <glib.h>
@@ -29,6 +30,7 @@ struct cbox_song;
 struct cbox_app
 {
     struct cbox_io io;
+    struct cbox_document *document;
     struct cbox_rt *rt;
     struct cbox_command_target cmd_target;
     struct cbox_command_target config_cmd_target;

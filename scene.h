@@ -20,12 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_SCENE_H
 
 #include "cmd.h"
+#include "dom.h"
+
+CBOX_EXTERN_CLASS(cbox_scene)
 
 struct cbox_aux_bus;
 struct cbox_instrument;
 
 struct cbox_scene
 {
+    CBOX_OBJECT_HEADER()
     struct cbox_command_target cmd_target;
     gchar *name;
     gchar *title;
@@ -40,15 +44,15 @@ struct cbox_scene
     int transpose;
 };
 
-extern struct cbox_scene *cbox_scene_new(struct cbox_rt *rt);
 extern gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error);
 extern gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *layer, int pos, GError **error);
 extern struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos);
 extern void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newpos);
-extern struct cbox_scene *cbox_scene_load(const char *section, struct cbox_rt *rt, GError **error);
+extern gboolean cbox_scene_load(struct cbox_scene *scene, const char *section, GError **error);
 extern gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument);
 extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error);
 extern struct cbox_aux_bus *cbox_scene_remove_aux_bus(struct cbox_scene *scene, int pos);
+extern void cbox_scene_clear(struct cbox_scene *scene);
 extern void cbox_scene_destroy(struct cbox_scene *scene);
 
 #endif

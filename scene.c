@@ -28,6 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <glib.h>
 
+CBOX_CLASS_DEFINITION_ROOT(cbox_scene)
+
 static gboolean cbox_layer_process_cmd(struct cbox_layer *layer, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
 {
     if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
@@ -132,8 +134,10 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "s"))
     {
-        struct cbox_scene *scene = cbox_scene_load((const gchar *)cmd->arg_values[0], s->rt, error);
+        struct cbox_scene *scene = CBOX_CREATE_OTHER_CLASS(s, cbox_scene);
         if (!scene)
+            return FALSE;
+        if (!cbox_scene_load(scene, (const gchar *)cmd->arg_values[0], error))
             return FALSE;
         struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
         cbox_scene_destroy(old_scene);
@@ -141,7 +145,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/new") && !strcmp(cmd->arg_types, ""))
     {
-        struct cbox_scene *scene = cbox_scene_new(s->rt);
+        struct cbox_scene *scene = CBOX_CREATE_OTHER_CLASS(s, cbox_scene);
         if (!scene) // not really expected
             return FALSE;
         struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
@@ -293,9 +297,8 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
 }
 
-struct cbox_scene *cbox_scene_load(const char *name, struct cbox_rt *rt, GError **error)
+gboolean cbox_scene_load(struct cbox_scene *s, const char *name, GError **error)
 {
-    struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
     const char *cv = NULL;
     int i;
     gchar *section = g_strdup_printf("scene:%s", name);
@@ -306,13 +309,14 @@ struct cbox_scene *cbox_scene_load(const char *name, struct cbox_rt *rt, GError 
         goto error;
     }
     
-    s->rt = rt;
-    s->layers = NULL;
-    s->instruments = NULL;
-    s->aux_buses = NULL;
-    s->layer_count = 0;
-    s->instrument_count = 0;
-    s->aux_bus_count = 0;
+    cbox_scene_clear(s);
+    
+    assert(s->layers == NULL);
+    assert(s->instruments == NULL);
+    assert(s->aux_buses == NULL);
+    assert(s->layer_count == 0);
+    assert(s->instrument_count == 0);
+    assert(s->aux_bus_count == 0);
     
     for (i = 1; ; i++)
     {
@@ -328,16 +332,10 @@ struct cbox_scene *cbox_scene_load(const char *name, struct cbox_rt *rt, GError 
         
         l = cbox_layer_load(s->rt, cv, error);
         if (!l)
-        {
-            cbox_scene_destroy(s);
-            return NULL;
-        }
+            goto error;
         
         if (!cbox_scene_add_layer(s, l, error))
-        {
-            cbox_scene_destroy(s);
-            return NULL;
-        }
+            goto error;
     }
     
     s->transpose = cbox_config_get_int(section, "transpose", 0);
@@ -345,29 +343,11 @@ struct cbox_scene *cbox_scene_load(const char *name, struct cbox_rt *rt, GError 
     g_free(section);
     cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
     s->name = g_strdup(name);
-    return s;
+    return TRUE;
 
 error:
     g_free(section);
-    free(s);
-    return NULL;
-}
-
-struct cbox_scene *cbox_scene_new(struct cbox_rt *rt)
-{
-    struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
-    s->rt = rt;
-    s->name = g_strdup("");
-    s->title = g_strdup("");
-    s->layers = NULL;
-    s->aux_buses = NULL;
-    s->instruments = NULL;
-    s->layer_count = 0;
-    s->instrument_count = 0;
-    s->aux_bus_count = 0;
-    cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
-    s->transpose = 0;
-    return s;
+    return FALSE;
 }
 
 gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *layer, int pos, GError **error)
@@ -507,13 +487,36 @@ struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char
     return bus;
 }
 
-void cbox_scene_destroy(struct cbox_scene *scene)
+void cbox_scene_clear(struct cbox_scene *scene)
 {
     int i;
     while(scene->layer_count > 0)
         cbox_layer_destroy(cbox_scene_remove_layer(scene, 0));
             
-    for (int i = 0; i < scene->aux_bus_count; i++)
-        cbox_aux_bus_destroy(scene->aux_buses[i]);
+    while(scene->aux_bus_count > 0)
+        cbox_aux_bus_destroy(scene->aux_buses[--scene->aux_bus_count]);
+}
+
+struct cbox_objhdr *cbox_scene_newfunc(struct cbox_class *class_ptr, struct cbox_document *document)
+{
+    struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
+    CBOX_OBJECT_HEADER_INIT(s, cbox_scene, document);
+    s->rt = CBOX_GET_SINGLETON(document, cbox_rt);
+    s->name = g_strdup("");
+    s->title = g_strdup("");
+    s->layers = NULL;
+    s->aux_buses = NULL;
+    s->instruments = NULL;
+    s->layer_count = 0;
+    s->instrument_count = 0;
+    s->aux_bus_count = 0;
+    cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
+    s->transpose = 0;
+    CBOX_RETURN_OBJECT(s);
+}
+
+void cbox_scene_destroy(struct cbox_scene *scene)
+{
+    cbox_scene_clear(scene);
     free(scene);
 }
