@@ -275,6 +275,7 @@ int main(int argc, char *argv[])
                 break;
         } while(1);
     }
+    cbox_document_dump(app.document);
     scene = cbox_rt_set_scene(app.rt, NULL);
     cbox_rt_stop(app.rt);
     cbox_io_close(&app.io);

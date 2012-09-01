@@ -138,6 +138,32 @@ struct cbox_objhdr *cbox_document_get_singleton(struct cbox_document *document, 
     return cpd->singleton;
 }
 
+static void iter_func(gpointer key, gpointer value, gpointer document)
+{
+    struct cbox_class *class_ptr = key;
+    struct cbox_class_per_document *cpd = value;
+    int first = 1;
+    printf("Class %s: ", class_ptr->name);
+    if (cpd->singleton)
+    {
+        printf("Singleton %p", cpd->singleton);
+        first = 0;
+    }
+    GList *l = cpd->instances;
+    while(l) {
+        if (!first)
+            printf(", ");
+        printf("%p", l->data);
+        l = l->next;
+        first = 0;
+    }
+    printf("\n");
+}
+
+void cbox_document_dump(struct cbox_document *document)
+{
+     g_hash_table_foreach(document->classes_per_document, iter_func, document);
+}
 
 void cbox_document_destroy(struct cbox_document *document)
 {
