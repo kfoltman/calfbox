@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "app.h"
 #include "config-api.h"
+#include "dom.h"
 #include "instr.h"
 #include "io.h"
 #include "layer.h"
@@ -133,6 +134,8 @@ int main(int argc, char *argv[])
     float tempo = 0;
     GError *error = NULL;
     gboolean no_ui = FALSE;
+    
+    cbox_dom_init();
     
     while(1)
     {
@@ -291,6 +294,8 @@ ok:
     cbox_config_close();
     
     g_free(instr_section);
+
+    cbox_dom_close();
     
     return 0;
 }
