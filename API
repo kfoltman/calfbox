@@ -1,0 +1,120 @@
+@module >> @chorus, @phaser, ...
+
+@moduleslot/status() ->
+    /insert_engine(string engine),
+    /insert_preset(string preset),
+    /bypass(int bypassed)
+@moduleslot/insert_engine(string engine)
+@moduleslot/insert_preset(string engine)
+@moduleslot/engine/{add: @module}
+@moduleslot/set_bypass(int bypassed)
+
+/master/
+/master/status() -> /sample_rate, /tempo, /timesig, /playing, /pos, /pos_ppqn
+/master/tell() -> /playing, /pos, /pos_ppqn
+/master/set_tempo(float tempo)
+/master/set_timesig(int num, int denom)
+/master/play()
+/master/stop()
+/master/seek_samples(int samples)
+/master/seek_ppqn(int ppqn)
+
+/meter/
+/meter/get_peak() -> /peak(float left, float right)
+/meter/get_rms() -> /rms(float left, float right)
+
+/config/
+/config/sections([string prefix]) -> [/section(string name)]
+/config/keys(string section, string ?prefix) -> [/section(string name)]
+/config/get(string section, string key) -> /value(string value)
+/config/set(string section, string key, string value)
+/config/delete(string section, string key)
+/config/delete_section(string section)
+/config/save(string ?filename)
+
+/instr/
+/instr/<name>/status() ->
+    /engine(string name),
+    /aux_offset(int first_aux_output_no),
+    /outputs(int stereo_output_count)
+/instr/<name>/output/<index>/status() ->
+    /gain_linear(float gain),
+    /gain(float gain_dB),
+    /output(int output_bus),
+    {add: @moduleslot/status()}
+/instr/<name>/output/<index>/gain(float gain_dB),
+/instr/<name>/output/<index>/output(int output_bus)
+/instr/<name>/output/<index>/{add: @moduleslot}
+/instr/<name>/aux/<index>/status() ->
+    /gain_linear(float gain),
+    /gain(float gain_dB),
+    /bus(string output_bus),
+    {add: @moduleslot/status()}
+/instr/<name>/aux/<index>/gain(float gain_dB)
+/instr/<name>/aux/<index>/bus(string bus)
+/instr/<name>/aux/<index>/{add: @moduleslot}
+
+/scene/
+/scene/transpose(int semitones)
+/scene/new()
+/scene/load(string scene_name)
+/scene/add_layer(int layer_pos, string layer_name)
+/scene/add_instrument(int layer_pos, string instrument_name)
+/scene/delete_layer(int pos)
+/scene/move_layer(int oldpos, int newpos)
+/scene/layer/<index>/
+/scene/layer/<index>/status() ->
+    /enable(int),
+    /instrument_name(string iname),
+    /consume(int consume),
+    /ignore_scene_transpose(int ignore),
+    /disable_aftertouch(int disable),
+    /transpose(int semitones),
+    /fixed_note(int note),
+    /low_note(int note),
+    /high_note(int note),
+    /in_channel(int channel),
+    /out_channel(int channel)
+/scene/layer/<index>/enable(int)
+/scene/layer/<index>/instrument_name(string iname)
+/scene/layer/<index>/consume(int consume)
+/scene/layer/<index>/ignore_scene_transpose(int ignore)
+/scene/layer/<index>/disable_aftertouch(int disable)
+/scene/layer/<index>/transpose(int semitones)
+/scene/layer/<index>/fixed_note(int note)
+/scene/layer/<index>/low_note(int note)
+/scene/layer/<index>/high_note(int note)
+/scene/layer/<index>/in_channel(int channel)
+/scene/layer/<index>/out_channel(int channel)
+/scene/aux/<index>/
+/scene/aux/<index>/{add: @module}
+/scene/load_aux(string name)
+/scene/delete_aux(int aux_index)
+/scene/status() ->
+    /name(string),
+    /title(string),
+    /transpose(int semitones),
+    [/layer(int index)],
+    [/instrument(string instance, string engine)],
+    [/aux(int index, string name)]
+
+/rt/
+/rt/status() -> /audio_channels(int inputs, int outputs)
+/song/
+/song/status() -> [/track(int index, string name, int items)], [/pattern(int index, string name, int length)]
+/waves/
+/waves/status() -> /bytes(int bytes), /max_bytes(int max_bytes), /count(int count)
+/waves/list() -> [/waveform(int id)]
+/waves/info(int id) -> /filename(string), /name(string), /bytes(int)
+/on_idle() -> {any}
+/send_event(int)
+/send_event(int, int)
+/send_event(int, int, int)
+/play_note(int ch, int note, int velocity) (plays a note with duration=1 on the next buffer)
+/play_drum_pattern(string pattern)
+/play_drum_track(string track)
+/play_blob(blob midi_pattern, int length_ticks)
+/stop_pattern()
+/print_s(string)
+/print_i(int)
+/print_f(float)
