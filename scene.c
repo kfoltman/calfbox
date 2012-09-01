@@ -160,7 +160,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             pos = s->layer_count;
         else
             pos--;
-        struct cbox_layer *layer = cbox_layer_load((const gchar *)cmd->arg_values[1], error);
+        struct cbox_layer *layer = cbox_layer_load(s->rt, (const gchar *)cmd->arg_values[1], error);
         if (!layer)
             return FALSE;
         if (!cbox_scene_insert_layer(s, layer, pos, error))
@@ -182,7 +182,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             pos = s->layer_count;
         else
             pos--;
-        struct cbox_layer *layer = cbox_layer_new((const gchar *)cmd->arg_values[1], error);
+        struct cbox_layer *layer = cbox_layer_new(s->rt, (const gchar *)cmd->arg_values[1], error);
         if (!layer)
             return FALSE;
         if (!cbox_scene_insert_layer(s, layer, pos, error))
@@ -326,7 +326,7 @@ struct cbox_scene *cbox_scene_load(const char *name, struct cbox_rt *rt, GError 
         if (!cv)
             break;
         
-        l = cbox_layer_load(cv, error);
+        l = cbox_layer_load(s->rt, cv, error);
         if (!l)
         {
             cbox_scene_destroy(s);

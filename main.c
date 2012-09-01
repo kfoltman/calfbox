@@ -195,7 +195,6 @@ int main(int argc, char *argv[])
         return 1;
     }
     cbox_rt_set_io(app.rt, &app.io);
-    cbox_instruments_init(app.rt);
     cbox_wavebank_init();
     
     if (!scene_name && !instrument_name)
@@ -228,7 +227,7 @@ int main(int argc, char *argv[])
     {
         app.current_scene_name = g_strdup_printf("instrument:%s", instrument_name);
         scene = cbox_scene_new(app.rt);
-        layer = cbox_layer_new(instrument_name, &error);
+        layer = cbox_layer_new(app.rt, instrument_name, &error);
         if (!layer)
             goto fail;
 
@@ -289,7 +288,6 @@ ok:
     if (cbox_wavebank_get_maxbytes() > 0)
         g_message("Max waveform usage: %f MB", (float)(cbox_wavebank_get_maxbytes() / 1048576.0));
     cbox_wavebank_close();
-    cbox_instruments_close();
     cbox_config_close();
     
     g_free(instr_section);

@@ -76,7 +76,7 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
     struct cbox_scene *scene = cbox_scene_new(app.rt);
-    struct cbox_layer *layer = cbox_layer_new((char *)item->item.item_context, &error);
+    struct cbox_layer *layer = cbox_layer_new(app.rt, (char *)item->item.item_context, &error);
     
     if (layer)
     {
@@ -97,7 +97,7 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
     struct cbox_scene *scene = cbox_scene_new(app.rt);
-    struct cbox_layer *layer = cbox_layer_load((char *)item->item.item_context, &error);
+    struct cbox_layer *layer = cbox_layer_load(app.rt, (char *)item->item.item_context, &error);
     
     if (layer)
     {
@@ -419,7 +419,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             len = pos - obj;
             
             gchar *name = g_strndup(obj, len);
-            struct cbox_instrument *instr = cbox_instruments_get_by_name(name, FALSE, error);
+            struct cbox_instrument *instr = cbox_instruments_get_by_name(app.rt->instruments, name, FALSE, error);
             if (instr)
             {
                 g_free(name);
@@ -440,7 +440,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             return cbox_execute_sub(&app.rt->master->cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "meter/", 6)) // very hacky
-            return cbox_execute_sub(&app.rt->io->meter_output->recorder.cmd_target, fb, cmd, pos, error);
+            return cbox_execute_sub(&app.io.meter_output->recorder.cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "config/", 7))
             return cbox_execute_sub(&app.config_cmd_target, fb, cmd, pos, error);

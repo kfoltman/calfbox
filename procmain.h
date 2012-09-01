@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define RT_CMD_QUEUE_ITEMS 1024
 #define RT_MAX_COST_PER_CALL 100
 
+struct cbox_instruments;
 struct cbox_scene;
 struct cbox_io;
 struct cbox_midi_pattern;
@@ -44,6 +45,7 @@ struct cbox_rt_cmd_definition
 struct cbox_rt
 {
     struct cbox_scene *scene;
+    struct cbox_instruments *instruments;
     struct cbox_module *effect;
     
     struct cbox_io *io;

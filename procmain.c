@@ -69,7 +69,9 @@ struct cbox_rt *cbox_rt_new()
     rt->master = cbox_master_new(rt);
     rt->master->song = cbox_song_new(rt->master);
     rt->started = 0;
+    rt->instruments = cbox_instruments_new(rt);
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
+    
     return rt;
 }
 
@@ -701,7 +703,12 @@ void cbox_rt_destroy(struct cbox_rt *rt)
         cbox_song_destroy(rt->master->song);
     jack_ringbuffer_free(rt->rb_execute);
     jack_ringbuffer_free(rt->rb_cleanup);
+
     free(rt->master);
     rt->master = NULL;
+
+    cbox_instruments_destroy(rt->instruments);
+    rt->instruments = NULL;
+
     free(rt);
 }

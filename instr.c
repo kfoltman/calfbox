@@ -31,13 +31,13 @@ struct cbox_instruments
     struct cbox_rt *rt;
 };
 
-static struct cbox_instruments instruments;
-
-void cbox_instruments_init(struct cbox_rt *rt)
+struct cbox_instruments *cbox_instruments_new(struct cbox_rt *rt)
 {
     // XXXKF needs to use 'full' version with g_free for key and value
-    instruments.hash = g_hash_table_new(g_str_hash, g_str_equal);
-    instruments.rt = rt;
+    struct cbox_instruments *res = malloc(sizeof(struct cbox_instruments *));
+    res->hash = g_hash_table_new(g_str_hash, g_str_equal);
+    res->rt = rt;
+    return res;
 }
 
 static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr, struct cbox_instrument_output *output, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
@@ -162,13 +162,13 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
 }
 
 
-extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gboolean load, GError **error)
+extern struct cbox_instrument *cbox_instruments_get_by_name(struct cbox_instruments *instruments, const char *name, gboolean load, GError **error)
 {
     struct cbox_module_manifest *mptr = NULL;
     struct cbox_instrument *instr = NULL;
     struct cbox_module *module = NULL;
     gchar *instr_section = NULL;
-    gpointer value = g_hash_table_lookup(instruments.hash, name);
+    gpointer value = g_hash_table_lookup(instruments->hash, name);
     const char *cv, *instr_engine;
     
     if (value)
@@ -200,7 +200,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
     
     // cbox_module_manifest_dump(mptr);
     
-    module = cbox_module_manifest_create_module(mptr, instr_section, instruments.rt, name, error);
+    module = cbox_module_manifest_create_module(mptr, instr_section, instruments->rt, name, error);
     if (!module)
     {
         cbox_force_error(error);
@@ -240,6 +240,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
 
     int auxes = (module->outputs - module->aux_offset) / 2;
     instr = malloc(sizeof(struct cbox_instrument));
+    instr->owner = instruments;
     instr->scene = NULL;
     instr->module = module;
     instr->outputs = outputs;
@@ -261,7 +262,7 @@ extern struct cbox_instrument *cbox_instruments_get_by_name(const char *name, gb
     
     free(instr_section);
     
-    g_hash_table_insert(instruments.hash, g_strdup(name), instr);
+    g_hash_table_insert(instruments->hash, g_strdup(name), instr);
     
     // cbox_recording_source_attach(&instr->outputs[0].rec_dry, cbox_recorder_new_stream("output.wav"));
     
@@ -272,15 +273,15 @@ error:
     return NULL;
 }
 
-struct cbox_rt *cbox_instruments_get_rt()
+struct cbox_rt *cbox_instruments_get_rt(struct cbox_instruments *instruments)
 {
-    return instruments.rt;
+    return instruments->rt;
 }
 
 void cbox_instrument_destroy(struct cbox_instrument *instrument)
 {
     assert(instrument->refcount == 0);
-    g_hash_table_remove(instruments.hash, instrument->module->instance_name);
+    g_hash_table_remove(instrument->owner->hash, instrument->module->instance_name);
     for (int i = 0; i < instrument->module->outputs / 2; i ++)
     {
         cbox_instrument_output_uninit(&instrument->outputs[i]);
@@ -313,9 +314,10 @@ void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrument, stru
     }    
 }
 
-void cbox_instruments_close()
+void cbox_instruments_destroy(struct cbox_instruments *instruments)
 {
-    g_hash_table_destroy(instruments.hash);
+    g_hash_table_destroy(instruments->hash);
+    free(instruments);
 }
 
 void cbox_instrument_output_init(struct cbox_instrument_output *output, uint32_t max_numsamples)

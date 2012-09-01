@@ -21,10 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "instr.h"
 #include "layer.h"
 #include "midi.h"
+#include "procmain.h"
 #include "scene.h"
 #include <glib.h>
 
-struct cbox_layer *cbox_layer_load(const char *name, GError **error)
+struct cbox_layer *cbox_layer_load(struct cbox_rt *rt, const char *name, GError **error)
 {
     struct cbox_layer *l = malloc(sizeof(struct cbox_layer));
     const char *cv = NULL;
@@ -43,7 +44,7 @@ struct cbox_layer *cbox_layer_load(const char *name, GError **error)
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Instrument not specified for layer %s", name);
         goto error;
     }
-    instr = cbox_instruments_get_by_name(cv, TRUE, error);
+    instr = cbox_instruments_get_by_name(rt->instruments, cv, TRUE, error);
     if (!instr)
     {
         cbox_force_error(error);
@@ -84,13 +85,13 @@ error:
     return NULL;
 }
 
-extern struct cbox_layer *cbox_layer_new(const char *instrument_name, GError **error)
+extern struct cbox_layer *cbox_layer_new(struct cbox_rt *rt, const char *instrument_name, GError **error)
 {
     struct cbox_layer *l = malloc(sizeof(struct cbox_layer));
     const char *cv = NULL;
     struct cbox_instrument *instr = NULL;
     
-    instr = cbox_instruments_get_by_name(instrument_name, TRUE, error);
+    instr = cbox_instruments_get_by_name(rt->instruments, instrument_name, TRUE, error);
     if (!instr)
     {
         cbox_force_error(error);
