@@ -157,6 +157,8 @@ static void iter_func(gpointer key, gpointer value, gpointer document)
         l = l->next;
         first = 0;
     }
+    if (first)
+        printf("<no instances>");
     printf("\n");
 }
 
