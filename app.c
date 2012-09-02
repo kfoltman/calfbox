@@ -460,6 +460,9 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         if (!strncmp(obj, "waves/", 6))
             return cbox_execute_sub(&app.waves_cmd_target, fb, cmd, pos, error);
         else
+        if (!strncmp(obj, "doc/", 4))
+            return cbox_execute_sub(cbox_document_get_cmd_target(app.document), fb, cmd, pos, error);
+        else
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
             return FALSE;

@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "cmd.h"
+#include "errors.h"
 #include "dom.h"
 
 #include <assert.h>
@@ -33,6 +35,8 @@ struct cbox_class_per_document
 struct cbox_document
 {
     GHashTable *classes_per_document;
+    struct cbox_command_target cmd_target;
+    int item_ctr;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -124,12 +128,32 @@ void cbox_object_destroy(struct cbox_objhdr *hdr_ptr)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+static gboolean document_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    if (!strcmp(cmd->command, "/dump") && !strcmp(cmd->arg_types, ""))
+    {
+        struct cbox_document *doc = ct->user_data;
+        cbox_document_dump(doc);
+        return TRUE;
+    }
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+    return FALSE;    
+}
 
 struct cbox_document *cbox_document_new()
 {
     struct cbox_document *res = malloc(sizeof(struct cbox_document));
     res->classes_per_document = g_hash_table_new(NULL, NULL);
+    res->cmd_target.process_cmd = document_process_cmd;
+    res->cmd_target.user_data = res;
+    res->item_ctr = 0;
+
     return res;
+}
+
+struct cbox_command_target *cbox_document_get_cmd_target(struct cbox_document *doc)
+{
+    return &doc->cmd_target;
 }
 
 struct cbox_objhdr *cbox_document_get_singleton(struct cbox_document *document, struct cbox_class *class_ptr)

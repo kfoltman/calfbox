@@ -109,4 +109,8 @@ class Pattern:
         if len(data) >= 1 and len(data) <= 3:
             return struct.pack("iBBbb"[0:2 + len(data)], int(time), len(data), *[int(v) for v in data])
         raise ValueError, "Invalid length of an event (%d)" % len(data)
-            
+
+class Document:
+    @staticmethod
+    def dump():
+        do_cmd("/doc/dump", None, [])

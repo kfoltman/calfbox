@@ -59,6 +59,7 @@ extern void cbox_object_destroy(struct cbox_objhdr *hdr_ptr);
 extern struct cbox_document *cbox_document_new();
 extern struct cbox_objhdr *cbox_document_get_singleton(struct cbox_document *document, struct cbox_class *class_ptr);
 extern void cbox_document_dump(struct cbox_document *);
+extern struct cbox_command_target *cbox_document_get_cmd_target(struct cbox_document *);
 extern void cbox_document_destroy(struct cbox_document *);
 
 extern void cbox_dom_init();

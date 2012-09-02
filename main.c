@@ -275,7 +275,6 @@ int main(int argc, char *argv[])
                 break;
         } while(1);
     }
-    cbox_document_dump(app.document);
     scene = cbox_rt_set_scene(app.rt, NULL);
     cbox_rt_stop(app.rt);
     cbox_io_close(&app.io);
@@ -290,7 +289,6 @@ ok:
         cbox_module_destroy(app.rt->effect);
     if (scene)
         CBOX_DELETE(scene);
-    cbox_document_dump(app.document);
     
     cbox_rt_destroy(app.rt);
     
