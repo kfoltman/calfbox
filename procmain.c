@@ -668,24 +668,41 @@ static int swap_pointers_command_execute(void *user_data)
 
 void *cbox_rt_swap_pointers(struct cbox_rt *rt, void **ptr, void *new_value)
 {
-    static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = swap_pointers_command_execute, .cleanup = NULL };
-    
-    struct swap_pointers_command sc = { ptr, NULL, new_value, NULL, 0 };
-    
-    cbox_rt_execute_cmd_sync(rt, &scdef, &sc);
-    
-    return sc.old_value;
+    if (rt)
+    {
+        static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = swap_pointers_command_execute, .cleanup = NULL };
+        
+        struct swap_pointers_command sc = { ptr, NULL, new_value, NULL, 0 };
+        
+        cbox_rt_execute_cmd_sync(rt, &scdef, &sc);
+
+        return sc.old_value;
+    } else {
+        void *old_ptr = *ptr;
+        *ptr = new_value;
+        return old_ptr;
+    }
 }
 
 void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, void *new_value, int *pcount, int new_count)
 {
-    static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = swap_pointers_command_execute, .cleanup = NULL };
-    
-    struct swap_pointers_command sc = { ptr, NULL, new_value, pcount, new_count };
-    
-    cbox_rt_execute_cmd_sync(rt, &scdef, &sc);
-    
-    return sc.old_value;
+    if (rt)
+    {
+        static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = swap_pointers_command_execute, .cleanup = NULL };
+        
+        struct swap_pointers_command sc = { ptr, NULL, new_value, pcount, new_count };
+        
+        cbox_rt_execute_cmd_sync(rt, &scdef, &sc);
+        
+        return sc.old_value;
+    }
+    else
+    {
+        void *old_ptr = *ptr;
+        *ptr = new_value;
+        *pcount = new_count;
+        return old_ptr;        
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
