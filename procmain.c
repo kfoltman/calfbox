@@ -72,6 +72,8 @@ struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
     rt->master->song = cbox_song_new(rt->master);
     rt->started = 0;
     rt->instruments = cbox_instruments_new(rt);
+    rt->srate = 0;
+    rt->buffer_size = 0;
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
     CBOX_SET_AS_SINGLETON(rt);
     
@@ -411,25 +413,50 @@ void cbox_rt_set_io(struct cbox_rt *rt, struct cbox_io *io)
 {
     assert(!rt->started);
     rt->io = io;
-    cbox_master_set_sample_rate(rt->master, jack_get_sample_rate(io->client));
+    if (io)
+    {
+        rt->srate = jack_get_sample_rate(io->client);
+        rt->buffer_size = io->buffer_size;
+        cbox_master_set_sample_rate(rt->master, rt->srate);
+    }
+    else
+    {
+        rt->srate = 0;
+        rt->buffer_size = 0;
+    }
+}
+
+void cbox_rt_set_offline(struct cbox_rt *rt, int sample_rate, int buffer_size)
+{
+    assert(!rt->started);
+    rt->io = NULL;
+    rt->srate = sample_rate;
+    rt->buffer_size = buffer_size;
+    cbox_master_set_sample_rate(rt->master, rt->srate);
 }
 
 void cbox_rt_start(struct cbox_rt *rt)
 {
-    rt->started = 1;
-    rt->cbs = malloc(sizeof(struct cbox_io_callbacks));
-    rt->cbs->user_data = rt;
-    rt->cbs->process = cbox_rt_process;
+    if (rt->io)
+    {
+        rt->started = 1;
+        rt->cbs = malloc(sizeof(struct cbox_io_callbacks));
+        rt->cbs->user_data = rt;
+        rt->cbs->process = cbox_rt_process;
 
-    cbox_io_start(rt->io, rt->cbs);        
+        cbox_io_start(rt->io, rt->cbs);
+    }
 }
 
 void cbox_rt_stop(struct cbox_rt *rt)
 {
-    cbox_io_stop(rt->io);
-    free(rt->cbs);
-    rt->cbs = NULL;
-    rt->started = 0;
+    if (rt->io)
+    {
+        cbox_io_stop(rt->io);
+        free(rt->cbs);
+        rt->cbs = NULL;
+        rt->started = 0;
+    }
 }
 
 void cbox_rt_handle_cmd_queue(struct cbox_rt *rt)
@@ -626,7 +653,8 @@ static int send_events_command_execute(void *user_data)
         cbox_midi_buffer_copy_event(&cmd->rt->midibuf_aux, event, time);
         cmd->pos++;
     }
-    cmd->time_delta += cmd->rt->io->buffer_size;
+    assert(cmd->rt->buffer_size);
+    cmd->time_delta += cmd->rt->buffer_size;
     
     return (cmd->pos >= cbox_midi_buffer_get_count(cmd->buffer)) ? 1 : 0;
 }
@@ -716,12 +744,14 @@ struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scen
 
 int cbox_rt_get_sample_rate(struct cbox_rt *rt)
 {
-    return cbox_io_get_sample_rate(rt->io);
+    assert(rt->srate);
+    return rt->srate;
 }
 
 int cbox_rt_get_buffer_size(struct cbox_rt *rt)
 {
-    return rt->io->buffer_size;
+    assert(rt->buffer_size);
+    return rt->buffer_size;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
