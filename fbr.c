@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dspmath.h"
 #include "eq.h"
 #include "module.h"
-#include "procmain.h"
+#include "rt.h"
 #include <complex.h>
 #include <glib.h>
 #include <malloc.h>

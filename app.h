@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "cmd.h"
 #include "dom.h"
 #include "io.h"
-#include "procmain.h"
+#include "rt.h"
 #include <glib.h>
 
 struct cbox_song;

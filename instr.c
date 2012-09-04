@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config-api.h"
 #include "instr.h"
 #include "module.h"
-#include "procmain.h"
+#include "rt.h"
 #include "scene.h"
 #include <assert.h>
 #include <glib.h>

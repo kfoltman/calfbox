@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "cmd.h"
 #include "config-api.h"
 #include "module.h"
-#include "procmain.h"
+#include "rt.h"
 
 #include <assert.h>
 #include <glib.h>

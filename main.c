@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "midi.h"
 #include "module.h"
 #include "pattern.h"
-#include "procmain.h"
+#include "rt.h"
 #include "scene.h"
 #include "scripting.h"
 #include "ui.h"

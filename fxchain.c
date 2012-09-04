@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config-api.h"
 #include "dspmath.h"
 #include "module.h"
-#include "procmain.h"
+#include "rt.h"
 #include <glib.h>
 #include <malloc.h>
 #include <math.h>

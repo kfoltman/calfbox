@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "master.h"
-#include "procmain.h"
+#include "rt.h"
 #include "seq.h"
 #include "track.h"
 #include <malloc.h>

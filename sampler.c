@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "errors.h"
 #include "midi.h"
 #include "module.h"
-#include "procmain.h"
+#include "rt.h"
 #include "sampler.h"
 #include "sfzloader.h"
 #include <assert.h>

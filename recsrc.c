@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "app.h"
 #include "errors.h"
-#include "procmain.h"
 #include "recsrc.h"
+#include "rt.h"
 #include "stm.h"
 
 static gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);

@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "meter.h"
 #include "midi.h"
 #include "module.h"
-#include "procmain.h"
 #include "scene.h"
 #include "seq.h"
 #include "song.h"
