@@ -84,7 +84,7 @@ struct cbox_track_playback
 
 extern struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master);
 extern void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int nsamples);
-extern void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, int time_ppqn, int skip_this_pos);
+extern void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, int time_ppqn, int min_time_ppqn);
 extern void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, int time_samples);
 extern void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, int is_ppqn, int skip_this_pos);
 extern void cbox_track_playback_destroy(struct cbox_track_playback *pb);
@@ -109,7 +109,7 @@ struct cbox_song_playback
     int track_count;
     struct cbox_tempo_map_item *tempo_map_items;
     int tempo_map_item_count;
-    uint32_t song_pos_samples, song_pos_ppqn;
+    uint32_t song_pos_samples, song_pos_ppqn, min_time_ppqn;
     uint32_t loop_start_ppqn, loop_end_ppqn;
 };
 

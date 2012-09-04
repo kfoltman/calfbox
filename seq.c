@@ -88,17 +88,17 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     cbox_midi_pattern_playback_init(&pb->playback, &pb->active_notes, master);
     cbox_midi_playback_active_notes_init(&pb->active_notes);
     cbox_midi_buffer_init(&pb->output_buffer);
-    cbox_track_playback_start_item(pb, 0, FALSE, FALSE);
+    cbox_track_playback_start_item(pb, 0, FALSE, 0);
     
     return pb;
 }
     
-void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, int time_ppqn, int skip_this_pos)
+void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, int time_ppqn, int min_time_ppqn)
 {
     pb->pos = 0;
     while(pb->pos < pb->items_count && pb->items[pb->pos].time + pb->items[pb->pos].length < time_ppqn)
         pb->pos++;
-    cbox_track_playback_start_item(pb, time_ppqn, TRUE, skip_this_pos);
+    cbox_track_playback_start_item(pb, time_ppqn, TRUE, min_time_ppqn);
 }
 
 void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, int time_samples)
@@ -106,10 +106,10 @@ void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, int time_s
     pb->pos = 0;
     while(pb->pos < pb->items_count && cbox_master_ppqn_to_samples(pb->master, pb->items[pb->pos].time + pb->items[pb->pos].length) < time_samples)
         pb->pos++;
-    cbox_track_playback_start_item(pb, time_samples, FALSE, FALSE);
+    cbox_track_playback_start_item(pb, time_samples, FALSE, 0);
 }
 
-void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, int is_ppqn, int skip_this_pos)
+void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, int is_ppqn, int min_time_ppqn)
 {
     if (pb->pos >= pb->items_count)
     {
@@ -132,11 +132,21 @@ void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, in
     int start_time_samples = cbox_master_ppqn_to_samples(pb->master, start_time_ppqn);
     int end_time_samples = cbox_master_ppqn_to_samples(pb->master, end_time_ppqn);
     cbox_midi_pattern_playback_set_pattern(&pb->playback, cur->pattern, start_time_samples, end_time_samples, cur->time, cur->offset);
-    
-    if (time_ppqn < start_time_ppqn)
-        cbox_midi_pattern_playback_seek_ppqn(&pb->playback, 0, skip_this_pos);
+
+    if (is_ppqn)
+    {
+        if (time_ppqn < start_time_ppqn)
+            cbox_midi_pattern_playback_seek_ppqn(&pb->playback, 0, min_time_ppqn);
+        else
+            cbox_midi_pattern_playback_seek_ppqn(&pb->playback, time_ppqn - start_time_ppqn, min_time_ppqn);
+    }
     else
-        cbox_midi_pattern_playback_seek_ppqn(&pb->playback, time_ppqn - start_time_ppqn, skip_this_pos);
+    {
+        if (time_ppqn < start_time_ppqn)
+            cbox_midi_pattern_playback_seek_samples(&pb->playback, 0);
+        else
+            cbox_midi_pattern_playback_seek_samples(&pb->playback, time_samples - start_time_samples);
+    }
 }
 
 void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int nsamples)
@@ -237,14 +247,14 @@ void cbox_midi_pattern_playback_render(struct cbox_midi_pattern_playback *pb, st
     pb->rel_time_samples += nsamples;
 }
 
-void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn, int skip_this_pos)
+void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn, int min_time_ppqn)
 {
     int pos = 0;
     int patrel_time_ppqn = time_ppqn + pb->offset_ppqn;
     while (pos < pb->pattern->event_count && patrel_time_ppqn > pb->pattern->events[pos].time)
         pos++;
     pb->rel_time_samples = cbox_master_ppqn_to_samples(pb->master, pb->item_start_ppqn + time_ppqn) - pb->start_time_samples;
-    pb->min_time_ppqn = time_ppqn + skip_this_pos;
+    pb->min_time_ppqn = min_time_ppqn;
     pb->pos = pos;
 }
 
@@ -310,6 +320,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song)
     spb->tracks = malloc(spb->track_count * sizeof(struct cbox_track_playback *));
     spb->song_pos_samples = 0;
     spb->song_pos_ppqn = 0;
+    spb->min_time_ppqn = 0;
     spb->loop_start_ppqn = song->loop_start_ppqn;
     spb->loop_end_ppqn = song->loop_end_ppqn;
     int pos = 0;
@@ -352,7 +363,7 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
     if (spb->master->new_tempo != spb->master->tempo)
     {
         spb->master->tempo = spb->master->new_tempo;
-        cbox_song_playback_seek_ppqn(spb, spb->song_pos_ppqn, TRUE);
+        cbox_song_playback_seek_ppqn(spb, spb->song_pos_ppqn, spb->min_time_ppqn);
     }
     if (spb->master->state == CMTS_STOP)
     {
@@ -387,6 +398,8 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
             if (end_pos < end_samples)
             {
                 spb->song_pos_samples += rend - rpos;
+                // XXXKF optimize
+                spb->min_time_ppqn = cbox_master_samples_to_ppqn(spb->master, spb->song_pos_samples - 1) + 1;
                 spb->song_pos_ppqn = cbox_master_samples_to_ppqn(spb->master, spb->song_pos_samples);
             }
             else
@@ -394,7 +407,7 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
                 if (spb->loop_start_ppqn >= spb->loop_end_ppqn)
                     return;
                     
-                cbox_song_playback_seek_ppqn(spb, spb->loop_start_ppqn, FALSE);
+                cbox_song_playback_seek_ppqn(spb, spb->loop_start_ppqn, spb->loop_start_ppqn);
             }
             rpos = rend;
         }
@@ -420,15 +433,16 @@ int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, stru
     return 1;
 }
 
-void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int skip_this_pos)
+void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int min_time_ppqn)
 {
     for(int i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *trk = spb->tracks[i];
-        cbox_track_playback_seek_ppqn(trk, time_ppqn, skip_this_pos);
+        cbox_track_playback_seek_ppqn(trk, time_ppqn, min_time_ppqn);
     }
     spb->song_pos_samples = cbox_master_ppqn_to_samples(spb->master, time_ppqn);
     spb->song_pos_ppqn = time_ppqn;
+    spb->min_time_ppqn = min_time_ppqn;
 }
 
 void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_samples)
@@ -440,6 +454,7 @@ void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_sa
     }
     spb->song_pos_samples = time_samples;
     spb->song_pos_ppqn = cbox_master_samples_to_ppqn(spb->master, time_samples);
+    spb->min_time_ppqn = spb->song_pos_ppqn;
 }
 
 struct cbox_tempo_map_item *cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, int time_ppqn)
