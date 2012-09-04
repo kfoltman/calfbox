@@ -362,8 +362,24 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
     
     if (spb->master->new_tempo != spb->master->tempo)
     {
+        int opos = spb->song_pos_samples;
+        int ppos = spb->song_pos_ppqn;
+        int pos1 = cbox_master_ppqn_to_samples(spb->master, ppos);
+        int pos2 = cbox_master_ppqn_to_samples(spb->master, ppos + 1);
+        double relpos = 0.0;
+        if (pos1 != pos2)
+            relpos = (spb->song_pos_samples - pos1) * 1.0 / (pos2 - pos1);
         spb->master->tempo = spb->master->new_tempo;
-        cbox_song_playback_seek_ppqn(spb, spb->song_pos_ppqn, spb->min_time_ppqn);
+
+        // This seek loses the fractional value of the PPQN song position.
+        // This needs to be compensated for by shifting the playback
+        // position by the fractional part.
+        cbox_song_playback_seek_ppqn(spb, ppos, spb->min_time_ppqn);
+        if (relpos > 0)
+        {
+            pos2 = cbox_master_ppqn_to_samples(spb->master, ppos + 1);
+            cbox_song_playback_seek_samples(spb, spb->song_pos_samples + (pos2 - spb->song_pos_samples) * relpos + 0.5);
+        }
     }
     if (spb->master->state == CMTS_STOP)
     {
