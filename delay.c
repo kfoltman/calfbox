@@ -47,7 +47,7 @@ struct delay_module
 
 #define MODULE_PARAMS delay_params
 
-gboolean delay_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+MODULE_PROCESSCMD_FUNCTION(delay)
 {
     struct delay_module *m = (struct delay_module *)ct->user_data;
     
@@ -100,7 +100,9 @@ void delay_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbo
     m->pos = pos;
 }
 
-MODULE_CREATE_FUNCTION(delay_create)
+MODULE_SIMPLE_DESTROY_FUNCTION(delay)
+
+MODULE_CREATE_FUNCTION(delay)
 {
     static int inited = 0;
     int i;
@@ -110,7 +112,7 @@ MODULE_CREATE_FUNCTION(delay_create)
     }
     
     struct delay_module *m = malloc(sizeof(struct delay_module));
-    CALL_MODULE_INIT(m, 2, 2, delay_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, delay);
     struct delay_params *p = malloc(sizeof(struct delay_params));
     m->params = p;
     m->module.process_event = delay_process_event;

@@ -188,7 +188,9 @@ void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     m->pos += CBOX_BLOCK_SIZE;
 }
 
-MODULE_CREATE_FUNCTION(reverb_create)
+MODULE_SIMPLE_DESTROY_FUNCTION(reverb)
+
+MODULE_CREATE_FUNCTION(reverb)
 {
     static int inited = 0;
     int i;
@@ -198,7 +200,7 @@ MODULE_CREATE_FUNCTION(reverb_create)
     }
     
     struct reverb_module *m = malloc(sizeof(struct reverb_module));
-    CALL_MODULE_INIT(m, 2, 2, reverb_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, reverb);
     m->module.process_event = reverb_process_event;
     m->module.process_block = reverb_process_block;
     m->pos = 0;

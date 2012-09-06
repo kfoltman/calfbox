@@ -45,7 +45,7 @@ GQuark cbox_sampler_error_quark()
 static void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void destroy_program(struct sampler_module *m, struct sampler_program *prg);
-static void sampler_destroy(struct cbox_module *module);
+static void sampler_destroyfunc(struct cbox_module *module);
 
 static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
 {
@@ -1408,7 +1408,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     return TRUE;
 }
 
-MODULE_CREATE_FUNCTION(sampler_create)
+MODULE_CREATE_FUNCTION(sampler)
 {
     int result = 0;
     int i;
@@ -1440,13 +1440,12 @@ MODULE_CREATE_FUNCTION(sampler_create)
     }
     
     struct sampler_module *m = malloc(sizeof(struct sampler_module));
-    CALL_MODULE_INIT(m, 0, (output_pairs + aux_pairs) * 2, sampler_process_cmd);
+    CALL_MODULE_INIT(m, 0, (output_pairs + aux_pairs) * 2, sampler);
     m->output_pairs = output_pairs;
     m->aux_pairs = aux_pairs;
     m->module.aux_offset = m->output_pairs * 2;
     m->module.process_event = sampler_process_event;
     m->module.process_block = sampler_process_block;
-    m->module.destroy = sampler_destroy;
     m->programs = NULL;
     m->max_voices = max_voices;
     m->serial_no = 0;
@@ -1511,7 +1510,7 @@ MODULE_CREATE_FUNCTION(sampler_create)
     return &m->module;
 }
 
-void sampler_destroy(struct cbox_module *module)
+void sampler_destroyfunc(struct cbox_module *module)
 {
     struct sampler_module *m = (struct sampler_module *)module;
     

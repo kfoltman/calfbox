@@ -153,7 +153,9 @@ void cbox_eq_reset_bands(struct cbox_biquadf_state state[1][2], int bands)
             cbox_biquadf_reset(&state[b][c]);
 }
 
-MODULE_CREATE_FUNCTION(parametric_eq_create)
+MODULE_SIMPLE_DESTROY_FUNCTION(parametric_eq)
+
+MODULE_CREATE_FUNCTION(parametric_eq)
 {
     static int inited = 0;
     if (!inited)
@@ -162,7 +164,7 @@ MODULE_CREATE_FUNCTION(parametric_eq_create)
     }
     
     struct parametric_eq_module *m = malloc(sizeof(struct parametric_eq_module));
-    CALL_MODULE_INIT(m, 2, 2, parametric_eq_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, parametric_eq);
     m->module.process_event = parametric_eq_process_event;
     m->module.process_block = parametric_eq_process_block;
     struct parametric_eq_params *p = malloc(sizeof(struct parametric_eq_params));

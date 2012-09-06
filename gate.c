@@ -136,7 +136,9 @@ void gate_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox
     }
 }
 
-MODULE_CREATE_FUNCTION(gate_create)
+MODULE_SIMPLE_DESTROY_FUNCTION(gate)
+
+MODULE_CREATE_FUNCTION(gate)
 {
     static int inited = 0;
     if (!inited)
@@ -145,7 +147,7 @@ MODULE_CREATE_FUNCTION(gate_create)
     }
     
     struct gate_module *m = malloc(sizeof(struct gate_module));
-    CALL_MODULE_INIT(m, 2, 2, gate_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, gate);
     m->module.process_event = gate_process_event;
     m->module.process_block = gate_process_block;
     m->hold_time = 0;

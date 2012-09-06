@@ -50,7 +50,7 @@ struct compressor_module
     struct cbox_onepolef_state tracker2;
 };
 
-gboolean compressor_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+MODULE_PROCESSCMD_FUNCTION(compressor)
 {
     struct compressor_module *m = (struct compressor_module *)ct->user_data;
     
@@ -113,7 +113,9 @@ void compressor_process_block(struct cbox_module *module, cbox_sample_t **inputs
     }
 }
 
-MODULE_CREATE_FUNCTION(compressor_create)
+MODULE_SIMPLE_DESTROY_FUNCTION(compressor)
+
+MODULE_CREATE_FUNCTION(compressor)
 {
     static int inited = 0;
     if (!inited)
@@ -122,7 +124,7 @@ MODULE_CREATE_FUNCTION(compressor_create)
     }
     
     struct compressor_module *m = malloc(sizeof(struct compressor_module));
-    CALL_MODULE_INIT(m, 2, 2, compressor_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, compressor);
     m->module.process_event = compressor_process_event;
     m->module.process_block = compressor_process_block;
     

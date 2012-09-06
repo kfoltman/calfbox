@@ -119,7 +119,7 @@ struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manife
     return module;
 }
 
-void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler)
+void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler, void (*destroy)(struct cbox_module *module))
 {
     module->user_data = user_data;
     module->rt = rt;
@@ -135,7 +135,7 @@ void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user
     cbox_command_target_init(&module->cmd_target, cmd_handler, module);
     module->process_event = NULL;
     module->process_block = NULL;
-    module->destroy = NULL;
+    module->destroy = destroy;
 }
 
 struct cbox_module *cbox_module_new_from_fx_preset(const char *name, struct cbox_rt *rt, GError **error)

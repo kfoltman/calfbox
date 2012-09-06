@@ -421,7 +421,7 @@ static void stream_state_destroy(struct stream_state *ss)
     free(ss);
 }
 
-void stream_player_destroy(struct cbox_module *module)
+void stream_player_destroyfunc(struct cbox_module *module)
 {
     struct stream_player_module *m = (struct stream_player_module *)module;
     if (m->stream)
@@ -680,7 +680,7 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
     return TRUE;
 }
 
-MODULE_CREATE_FUNCTION(stream_player_create)
+MODULE_CREATE_FUNCTION(stream_player)
 {
     int rest;
     static int inited = 0;
@@ -692,10 +692,9 @@ MODULE_CREATE_FUNCTION(stream_player_create)
     
     struct stream_player_module *m = malloc(sizeof(struct stream_player_module));
     gchar *filename = cbox_config_get_string(cfg_section, "file");
-    CALL_MODULE_INIT(m, 0, 2, stream_player_process_cmd);
+    CALL_MODULE_INIT(m, 0, 2, stream_player);
     m->module.process_event = stream_player_process_event;
     m->module.process_block = stream_player_process_block;
-    m->module.destroy = stream_player_destroy;
     m->fade_increment = 1.0 / (cbox_config_get_float(cfg_section, "fade_time", 0.01) * (m->module.srate / CBOX_BLOCK_SIZE));
     if (filename)
     {

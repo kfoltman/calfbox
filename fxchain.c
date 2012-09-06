@@ -157,6 +157,16 @@ void fxchain_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
      
 }
 
+static void fxchain_destroyfunc(struct cbox_module *module)
+{
+    struct fxchain_module *m = module->user_data;
+    for (int i = 0; i < m->module_count; i++)
+    {
+        cbox_module_destroy(m->modules[i]);
+        m->modules[i] = NULL;
+    }
+}
+
 struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, struct cbox_rt *rt, GError **error)
 {
     static int inited = 0;
@@ -182,7 +192,7 @@ struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, str
     }
     
     struct fxchain_module *m = malloc(sizeof(struct fxchain_module));
-    cbox_module_init(&m->module, rt, m, 2, 2, fxchain_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, fxchain);
     m->module.process_event = fxchain_process_event;
     m->module.process_block = fxchain_process_block;
     m->modules = malloc(sizeof(struct cbox_module *) * fx_count);

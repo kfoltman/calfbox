@@ -54,7 +54,7 @@ struct chorus_module
     uint32_t phase;
 };
 
-gboolean chorus_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+MODULE_PROCESSCMD_FUNCTION(chorus)
 {
     struct chorus_module *m = (struct chorus_module *)ct->user_data;
     
@@ -130,7 +130,9 @@ void chorus_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     m->pos += CBOX_BLOCK_SIZE;
 }
 
-MODULE_CREATE_FUNCTION(chorus_create)
+MODULE_SIMPLE_DESTROY_FUNCTION(chorus)
+
+MODULE_CREATE_FUNCTION(chorus)
 {
     static int inited = 0;
     int i;
@@ -142,7 +144,7 @@ MODULE_CREATE_FUNCTION(chorus_create)
     }
     
     struct chorus_module *m = malloc(sizeof(struct chorus_module));
-    CALL_MODULE_INIT(m, 2, 2, chorus_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, chorus);
     m->module.process_event = chorus_process_event;
     m->module.process_block = chorus_process_block;
     m->pos = 0;

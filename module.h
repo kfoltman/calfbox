@@ -120,7 +120,7 @@ extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module
 
 extern struct cbox_module *cbox_module_new_from_fx_preset(const char *name, struct cbox_rt *rt, GError **error);
 
-extern void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler);
+extern void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler, void (*destroy)(struct cbox_module *module));
 extern void cbox_module_destroy(struct cbox_module *module);
 extern void cbox_module_swap_pointers_and_free(struct cbox_module *sm, void **pptr, void *value);
 
@@ -153,11 +153,24 @@ extern gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cb
         cbox_module_swap_pointers_and_free(&m->module, (void **)&m->params, pp); \
     } \
 
-#define MODULE_CREATE_FUNCTION(funcname) \
-    struct cbox_module *funcname(void *user_data, const char *cfg_section, struct cbox_rt *rt, GError **error)
+#define MODULE_CREATE_FUNCTION(module) \
+    struct cbox_module *module##_create(void *user_data, const char *cfg_section, struct cbox_rt *rt, GError **error)
 
-#define CALL_MODULE_INIT(m, inputs, outputs, func) \
-    cbox_module_init(&(m)->module, rt, (m), inputs, outputs, func);
+#define MODULE_PROCESSCMD_FUNCTION(module) \
+    gboolean module##_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+
+#define MODULE_SIMPLE_DESTROY_FUNCTION(module) \
+    static void module##_destroyfunc(struct cbox_module *module_) \
+    { \
+        struct module##_module *m = (struct module##_module *)module_; \
+        free(m->params); \
+    }
+
+#define CALL_MODULE_INIT(m, inputs, outputs, name) \
+    cbox_module_init(&(m)->module, rt, (m), inputs, outputs, name##_process_cmd, name##_destroyfunc);
+
+#define CALL_MODULE_INIT_SIMPLE(m, inputs, outputs) \
+    cbox_module_init(&(m)->module, rt, (m), inputs, outputs, NULL, NULL);
 
 
 #endif

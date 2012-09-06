@@ -65,7 +65,7 @@ static gboolean validate_input_index(int input, const char *cfg_section, const c
     return TRUE;
 }
 
-MODULE_CREATE_FUNCTION(jack_input_create)
+MODULE_CREATE_FUNCTION(jack_input)
 {
     static int inited = 0;
     if (!inited)
@@ -81,7 +81,7 @@ MODULE_CREATE_FUNCTION(jack_input_create)
         return NULL;
     
     struct jack_input_module *m = malloc(sizeof(struct jack_input_module));
-    CALL_MODULE_INIT(m, 0, 2, NULL);
+    CALL_MODULE_INIT_SIMPLE(m, 0, 2);
     m->module.process_event = jack_input_process_event;
     m->module.process_block = jack_input_process_block;
     

@@ -399,7 +399,7 @@ static void read_drawbars(int *drawbars, int count, const char *registration)
     }
 }
 
-MODULE_CREATE_FUNCTION(tonewheel_organ_create)
+MODULE_CREATE_FUNCTION(tonewheel_organ)
 {
     static int inited = 0;
     int i, srate;
@@ -421,7 +421,7 @@ MODULE_CREATE_FUNCTION(tonewheel_organ_create)
     }
     
     struct tonewheel_organ_module *m = malloc(sizeof(struct tonewheel_organ_module));
-    CALL_MODULE_INIT(m, 0, 2, NULL);
+    CALL_MODULE_INIT_SIMPLE(m, 0, 2);
     srate = m->module.srate;
     m->module.process_event = tonewheel_organ_process_event;
     m->module.process_block = tonewheel_organ_process_block;

@@ -130,7 +130,9 @@ void fuzz_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox
     }
 }
 
-MODULE_CREATE_FUNCTION(fuzz_create)
+MODULE_SIMPLE_DESTROY_FUNCTION(fuzz)
+
+MODULE_CREATE_FUNCTION(fuzz)
 {
     static int inited = 0;
     if (!inited)
@@ -139,7 +141,7 @@ MODULE_CREATE_FUNCTION(fuzz_create)
     }
     
     struct fuzz_module *m = malloc(sizeof(struct fuzz_module));
-    CALL_MODULE_INIT(m, 2, 2, fuzz_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, fuzz);
     m->module.process_event = fuzz_process_event;
     m->module.process_block = fuzz_process_block;
     struct fuzz_params *p = malloc(sizeof(struct fuzz_params));

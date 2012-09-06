@@ -102,7 +102,9 @@ void distortion_process_block(struct cbox_module *module, cbox_sample_t **inputs
     }
 }
 
-MODULE_CREATE_FUNCTION(distortion_create)
+MODULE_SIMPLE_DESTROY_FUNCTION(distortion)
+
+MODULE_CREATE_FUNCTION(distortion)
 {
     static int inited = 0;
     if (!inited)
@@ -111,7 +113,7 @@ MODULE_CREATE_FUNCTION(distortion_create)
     }
     
     struct distortion_module *m = malloc(sizeof(struct distortion_module));
-    CALL_MODULE_INIT(m, 2, 2, distortion_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, distortion);
     m->module.process_event = distortion_process_event;
     m->module.process_block = distortion_process_block;
     struct distortion_params *p = malloc(sizeof(struct distortion_params));

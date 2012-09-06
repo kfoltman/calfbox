@@ -41,7 +41,7 @@ GQuark cbox_fluidsynth_error_quark()
 static void fluidsynth_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 static void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
-static void fluidsynth_destroy(struct cbox_module *module);
+static void fluidsynth_destroyfunc(struct cbox_module *module);
 
 struct fluidsynth_module
 {
@@ -82,7 +82,7 @@ static gboolean select_patch_by_name(struct fluidsynth_module *m, int channel, c
     return FALSE;
 }
 
-MODULE_CREATE_FUNCTION(fluidsynth_create)
+MODULE_CREATE_FUNCTION(fluidsynth)
 {
     int result = 0;
     int i;
@@ -110,20 +110,19 @@ MODULE_CREATE_FUNCTION(fluidsynth_create)
     }
     if (pairs == 0)
     {
-        CALL_MODULE_INIT(m, 0, 2 * m->output_pairs, fluidsynth_process_cmd);
+        CALL_MODULE_INIT(m, 0, 2 * m->output_pairs, fluidsynth);
         m->left_outputs = NULL;
         m->right_outputs = NULL;
     }
     else
     {
         g_message("Multichannel mode enabled, %d output pairs, 2 effects", m->output_pairs);
-        CALL_MODULE_INIT(m, 0, 2 * m->output_pairs + 4, fluidsynth_process_cmd);
+        CALL_MODULE_INIT(m, 0, 2 * m->output_pairs + 4, fluidsynth);
         m->left_outputs = malloc(sizeof(float *) * (m->output_pairs + 2));
         m->right_outputs = malloc(sizeof(float *) * (m->output_pairs + 2));
     }
     m->module.process_event = fluidsynth_process_event;
     m->module.process_block = fluidsynth_process_block;
-    m->module.destroy = fluidsynth_destroy;
     m->module.aux_offset = 2 * m->output_pairs;
     m->settings = new_fluid_settings();
     fluid_settings_setnum(m->settings, "synth.sample-rate", m->module.srate);
@@ -279,7 +278,7 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     return TRUE;
 }
 
-void fluidsynth_destroy(struct cbox_module *module)
+void fluidsynth_destroyfunc(struct cbox_module *module)
 {
     struct fluidsynth_module *m = (struct fluidsynth_module *)module;
     

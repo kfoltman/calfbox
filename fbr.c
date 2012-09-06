@@ -323,7 +323,9 @@ void feedback_reducer_process_block(struct cbox_module *module, cbox_sample_t **
     }
 }
 
-MODULE_CREATE_FUNCTION(feedback_reducer_create)
+MODULE_SIMPLE_DESTROY_FUNCTION(feedback_reducer)
+
+MODULE_CREATE_FUNCTION(feedback_reducer)
 {
     static int inited = 0;
     if (!inited)
@@ -345,7 +347,7 @@ MODULE_CREATE_FUNCTION(feedback_reducer_create)
     }
     
     struct feedback_reducer_module *m = malloc(sizeof(struct feedback_reducer_module));
-    CALL_MODULE_INIT(m, 2, 2, feedback_reducer_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, feedback_reducer);
     m->module.process_event = feedback_reducer_process_event;
     m->module.process_block = feedback_reducer_process_block;
     struct feedback_reducer_params *p = malloc(sizeof(struct feedback_reducer_params));

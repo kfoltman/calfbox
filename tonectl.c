@@ -89,7 +89,9 @@ void tone_control_process_block(struct cbox_module *module, cbox_sample_t **inpu
     cbox_onepolef_process(&m->highpass_state[1], &m->highpass_coeffs, outputs[1]);
 }
 
-MODULE_CREATE_FUNCTION(tone_control_create)
+MODULE_SIMPLE_DESTROY_FUNCTION(tone_control)
+
+MODULE_CREATE_FUNCTION(tone_control)
 {
     static int inited = 0;
     if (!inited)
@@ -98,7 +100,7 @@ MODULE_CREATE_FUNCTION(tone_control_create)
     }
     
     struct tone_control_module *m = malloc(sizeof(struct tone_control_module));
-    CALL_MODULE_INIT(m, 2, 2, tone_control_process_cmd);
+    CALL_MODULE_INIT(m, 2, 2, tone_control);
     m->module.process_event = tone_control_process_event;
     m->module.process_block = tone_control_process_block;
     
