@@ -119,10 +119,16 @@ static int process_cb(jack_nframes_t frames, void *arg)
     struct cbox_io *io = arg;
     struct cbox_io_callbacks *cb = io->cb;
     
+    io->buffer_size = frames;
+    for (int i = 0; i < io->input_count; i++)
+        io->input_buffers[i] = jack_port_get_buffer(io->inputs[i], frames);
+    for (int i = 0; i < io->output_count; i++)
+        io->output_buffers[i] = jack_port_get_buffer(io->outputs[i], frames);
+    cb->process(cb->user_data, io, frames);
     for (int i = 0; i < io->input_count; i++)
         io->input_buffers[i] = NULL;
-    io->buffer_size = frames;
-    cb->process(cb->user_data, io, frames);
+    for (int i = 0; i < io->output_count; i++)
+        io->output_buffers[i] = NULL;
     return 0;
 }
 
@@ -282,17 +288,6 @@ int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *destinati
     
     return event_count;
 }
-
-void *cbox_io_get_input_buffer(struct cbox_io *io, int index)
-{
-    return jack_port_get_buffer(io->inputs[index], io->buffer_size);
-}
-
-void *cbox_io_get_output_buffer(struct cbox_io *io, int index)
-{
-    return jack_port_get_buffer(io->outputs[index], io->buffer_size);
-}
-
 
 int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
 {

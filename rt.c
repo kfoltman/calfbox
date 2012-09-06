@@ -187,9 +187,6 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         }
     }
     scene = rt->scene;
-        
-    for (i = 0; i < io->input_count; i++)
-        io->input_buffers[i] = cbox_io_get_input_buffer(io, i);
     
     for (i = 0; i < io->input_count; i++)
     {
@@ -205,9 +202,6 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         }
     }
     
-    for (i = 0; i < io->output_count; i++)
-        io->output_buffers[i] = cbox_io_get_output_buffer(io, i);
-
     if (scene)
     {
         struct cbox_midi_buffer midibuf_jack, midibuf_pattern, midibuf_total, *midibufsrcs[3];

@@ -70,8 +70,6 @@ static inline int cbox_io_get_buffer_size(struct cbox_io *io)
     return io->buffer_size;
 }
 extern int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *destination);
-extern void *cbox_io_get_input_buffer(struct cbox_io *io, int index);
-extern void *cbox_io_get_output_buffer(struct cbox_io *io, int index);
 extern void cbox_io_poll_ports(struct cbox_io *io);
 extern void cbox_io_close(struct cbox_io *io);
 
