@@ -32,6 +32,14 @@
 /config/delete_section(string section)
 /config/save(string ?filename)
 
+/scene/
+/scene/transpose(int semitones)
+/scene/new()
+/scene/load(string scene_name)
+/scene/add_layer(int layer_pos, string layer_name)
+/scene/add_instrument(int layer_pos, string instrument_name)
+/scene/delete_layer(int pos)
+/scene/move_layer(int oldpos, int newpos)
 /scene/instr/
 /scene/instr/<name>/status() ->
     /engine(string name),
@@ -53,15 +61,6 @@
 /scene/instr/<name>/aux/<index>/gain(float gain_dB)
 /scene/instr/<name>/aux/<index>/bus(string bus)
 /scene/instr/<name>/aux/<index>/{add: @moduleslot}
-
-/scene/
-/scene/transpose(int semitones)
-/scene/new()
-/scene/load(string scene_name)
-/scene/add_layer(int layer_pos, string layer_name)
-/scene/add_instrument(int layer_pos, string instrument_name)
-/scene/delete_layer(int pos)
-/scene/move_layer(int oldpos, int newpos)
 /scene/layer/<index>/
 /scene/layer/<index>/status() ->
     /enable(int),
