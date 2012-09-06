@@ -56,7 +56,7 @@ struct cbox_midi_pattern_maker
 
 struct cbox_midi_pattern_maker *cbox_midi_pattern_maker_new()
 {
-    struct cbox_midi_pattern_maker *maker = malloc(sizeof(struct cbox_midi_pattern_maker *));
+    struct cbox_midi_pattern_maker *maker = malloc(sizeof(struct cbox_midi_pattern_maker));
     maker->events = g_tree_new_full(event_entry_compare, NULL, event_entry_destroy, NULL);
     return maker;
 }
