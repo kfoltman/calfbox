@@ -720,7 +720,8 @@ static gboolean waves_process_cmd(struct cbox_command_target *ct, struct cbox_co
 
 void cbox_app_on_idle()
 {
-    cbox_io_poll_ports(&app.io);
+    if (app.rt->io)
+        cbox_io_poll_ports(&app.io);
     if (app.rt)
         cbox_rt_handle_cmd_queue(app.rt);    
 }
