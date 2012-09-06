@@ -452,6 +452,7 @@ void cbox_rt_stop(struct cbox_rt *rt)
 {
     if (rt->io)
     {
+        assert(rt->started);
         cbox_io_stop(rt->io);
         free(rt->cbs);
         rt->cbs = NULL;

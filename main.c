@@ -42,11 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:r:e:s:t:b:d:D:nmh";
+static const char *short_options = "i:c:r:e:s:t:b:d:D:N:nmh";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
     {"no-ui", 0, 0, 'n'},
+    {"no-io", 1, 0, 'N'},
     {"instrument", 1, 0, 'i'},
     {"scene", 1, 0, 's'},
     {"effect", 1, 0, 'e'},
@@ -68,6 +69,7 @@ void print_help(char *progname)
         " -h | --help               Show this help text\n"
         " -m | --metronome          Create a simple metronome pattern\n"
         " -n | --no-ui              Do not start the user interface\n"
+        " -N | --no-io <rate>       Use off-line processing instead of JACK I/O\n"
         " -d | --drum-pattern <p>   Load drum pattern with a given name\n"
         " -D | --drum-track <t>     Load drum track with a given name\n"
         " -t | --tempo <bpm>        Use given tempo (specified in beats/min)\n"
@@ -134,6 +136,8 @@ int main(int argc, char *argv[])
     float tempo = 0;
     GError *error = NULL;
     gboolean no_ui = FALSE;
+    gboolean no_io = FALSE;
+    int no_io_srate = 0;
     
     cbox_dom_init();
     
@@ -172,6 +176,10 @@ int main(int argc, char *argv[])
             case 'n':
                 no_ui = TRUE;
                 break;
+            case 'N':
+                no_io = TRUE;
+                no_io_srate = atoi(optarg);
+                break;
             case 'b':
                 bpb = atoi(optarg);
                 break;
@@ -194,12 +202,19 @@ int main(int argc, char *argv[])
     if (bpb < 1)
         bpb = cbox_config_get_int("master", "beats_per_bar", 4);
 
-    if (!cbox_io_init(&app.io, &params))
+    if (no_io)
     {
-        fprintf(stderr, "Cannot initialise sound I/O\n");
-        return 1;
+        cbox_rt_set_offline(app.rt, no_io_srate, 1024);
     }
-    cbox_rt_set_io(app.rt, &app.io);
+    else
+    {
+        if (!cbox_io_init(&app.io, &params))
+        {
+            fprintf(stderr, "Cannot initialise sound I/O\n");
+            return 1;
+        }
+        cbox_rt_set_io(app.rt, &app.io);
+    }
     cbox_wavebank_init();
     
     if (!scene_name && !instrument_name)
@@ -277,7 +292,8 @@ int main(int argc, char *argv[])
     }
     scene = cbox_rt_set_scene(app.rt, NULL);
     cbox_rt_stop(app.rt);
-    cbox_io_close(&app.io);
+    if (!no_io)
+        cbox_io_close(&app.io);
     goto ok;
 
 fail:
