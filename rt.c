@@ -89,225 +89,23 @@ void cbox_rt_destroyfunc(struct cbox_objhdr *obj_ptr)
 {
 }
 
-int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbox_scene *scene)
-{
-    uint32_t i;
-    uint32_t event_count = cbox_midi_buffer_get_count(source);
-
-    for (i = 0; i < scene->instrument_count; i++)
-    {
-        cbox_midi_buffer_clear(&scene->instruments[i]->module->midi_input);
-    }
-    for (i = 0; i < event_count; i++)
-    {
-        struct cbox_midi_event *event = cbox_midi_buffer_get_event(source, i);
-        
-        // XXXKF ignore sysex for now
-        if (event->size >= 4)
-            continue;
-        
-        for (int l = 0; l < scene->layer_count; l++)
-        {
-            struct cbox_layer *lp = scene->layers[l];
-            if (!lp->enabled)
-                continue;
-            uint8_t data[4] = {0, 0, 0, 0};
-            memcpy(data, event->data_inline, event->size);
-            if (data[0] < 0xF0) // per-channel messages
-            {
-                int cmd = data[0] >> 4;
-                // filter on MIDI channel
-                if (lp->in_channel >= 0 && lp->in_channel != (data[0] & 0x0F))
-                    continue;
-                // force output channel
-                if (lp->out_channel >= 0)
-                    data[0] = (data[0] & 0xF0) + (lp->out_channel & 0x0F);
-                if (cmd >= 8 && cmd <= 10)
-                {
-                    if (cmd == 10 && lp->disable_aftertouch)
-                        continue;
-                    // note filter
-                    if (data[1] < lp->low_note || data[1] > lp->high_note)
-                        continue;
-                    // transpose
-                    int transpose = lp->transpose + (lp->ignore_scene_transpose ? 0 : scene->transpose);
-                    if (transpose)
-                    {
-                        int note = data[1] + transpose;
-                        if (note < 0 || note > 127)
-                            continue;
-                        data[1] = (uint8_t)note;
-                    }
-                    // fixed note
-                    if (lp->fixed_note != -1)
-                    {
-                        data[1] = (uint8_t)lp->fixed_note;
-                    }
-                }
-                else if (cmd == 11 && data[1] == 64 && lp->invert_sustain)
-                {
-                    data[2] = 127 - data[2];
-                }
-                else if (cmd == 13 && lp->disable_aftertouch)
-                    continue;
-            }
-            if (!cbox_midi_buffer_write_event(&lp->instrument->module->midi_input, event->time, data, event->size))
-                return -i;
-            if (lp->consume)
-                break;
-        }
-    }
-    
-    return event_count;
-}
-
-static void cbox_rt_render_scene(struct cbox_rt *rt, struct cbox_scene *scene, uint32_t nframes, struct cbox_midi_buffer *midibuf_jack, float *output_buffers[])
-{
-    int n, i, j;
-    
-    struct cbox_midi_buffer midibuf_pattern, midibuf_total, *midibufsrcs[3];
-    cbox_midi_buffer_init(&midibuf_total);
-    
-    int pos[3] = {0, 0, 0};
-    cbox_midi_buffer_init(&midibuf_pattern);
-    if (rt->master->spb)
-        cbox_song_playback_render(rt->master->spb, &midibuf_pattern, nframes);
-    midibufsrcs[0] = midibuf_jack;
-    midibufsrcs[1] = &midibuf_pattern;
-    midibufsrcs[2] = &rt->midibuf_aux;
-    cbox_midi_buffer_merge(&midibuf_total, midibufsrcs, 3, pos);
-    
-    write_events_to_instrument_ports(&midibuf_total, scene);
-
-    for (n = 0; n < scene->aux_bus_count; n++)
-    {
-        for (i = 0; i < nframes; i ++)
-        {
-            scene->aux_buses[n]->input_bufs[0][i] = 0.f;
-            scene->aux_buses[n]->input_bufs[1][i] = 0.f;
-        }
-    }
-    
-    for (n = 0; n < scene->instrument_count; n++)
-    {
-        struct cbox_instrument *instr = scene->instruments[n];
-        struct cbox_module *module = instr->module;
-        int event_count = instr->module->midi_input.count;
-        int cur_event = 0;
-        uint32_t highwatermark = 0;
-        cbox_sample_t channels[CBOX_MAX_AUDIO_PORTS][CBOX_BLOCK_SIZE];
-        cbox_sample_t *outputs[CBOX_MAX_AUDIO_PORTS];
-        for (i = 0; i < module->outputs; i++)
-            outputs[i] = channels[i];
-        
-        for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
-        {            
-            if (i >= highwatermark)
-            {
-                while(cur_event < event_count)
-                {
-                    struct cbox_midi_event *event = cbox_midi_buffer_get_event(&module->midi_input, cur_event);
-                    if (event)
-                    {
-                        if (event->time <= i)
-                            (*module->process_event)(module, cbox_midi_event_get_data(event), event->size);
-                        else
-                        {
-                            highwatermark = event->time;
-                            break;
-                        }
-                    }
-                    else
-                        break;
-                    
-                    cur_event++;
-                }
-            }
-            (*module->process_block)(module, NULL, outputs);
-            for (int o = 0; o < module->outputs / 2; o++)
-            {
-                struct cbox_instrument_output *oobj = &instr->outputs[o];
-                struct cbox_module *insert = oobj->insert;
-                float gain = oobj->gain;
-                if (IS_RECORDING_SOURCE_CONNECTED(oobj->rec_dry))
-                    cbox_recording_source_push(&oobj->rec_dry, (const float **)(outputs + 2 * o), CBOX_BLOCK_SIZE);
-                if (insert && !insert->bypass)
-                    (*insert->process_block)(insert, outputs + 2 * o, outputs + 2 * o);
-                if (IS_RECORDING_SOURCE_CONNECTED(oobj->rec_wet))
-                    cbox_recording_source_push(&oobj->rec_wet, (const float **)(outputs + 2 * o), CBOX_BLOCK_SIZE);
-                float *leftbuf, *rightbuf;
-                if (o < module->aux_offset / 2)
-                {
-                    int leftch = oobj->output_bus * 2;
-                    int rightch = leftch + 1;
-                    leftbuf = output_buffers[leftch];
-                    rightbuf = output_buffers[rightch];
-                }
-                else
-                {
-                    int bus = o - module->aux_offset / 2;
-                    struct cbox_aux_bus *busobj = instr->aux_outputs[bus];
-                    if (busobj == NULL)
-                        continue;
-                    leftbuf = busobj->input_bufs[0];
-                    rightbuf = busobj->input_bufs[1];
-                }
-                for (j = 0; j < CBOX_BLOCK_SIZE; j++)
-                {
-                    leftbuf[i + j] += gain * channels[2 * o][j];
-                    rightbuf[i + j] += gain * channels[2 * o + 1][j];
-                }
-            }
-        }
-        while(cur_event < event_count)
-        {
-            struct cbox_midi_event *event = cbox_midi_buffer_get_event(&module->midi_input, cur_event);
-            if (event)
-            {
-                (*module->process_event)(module, cbox_midi_event_get_data(event), event->size);
-            }
-            else
-                break;
-            
-            cur_event++;
-        }
-    }
-    
-    for (n = 0; n < scene->aux_bus_count; n++)
-    {
-        struct cbox_aux_bus *bus = scene->aux_buses[n];
-        float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
-        float *outputs[2] = {left, right};
-        for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
-        {
-            float *inputs[2];
-            inputs[0] = &bus->input_bufs[0][i];
-            inputs[1] = &bus->input_bufs[1][i];
-            bus->module->process_block(bus->module, inputs, outputs);
-            for (int j = 0; j < CBOX_BLOCK_SIZE; j++)
-            {
-                output_buffers[0][i + j] += left[j];
-                output_buffers[1][i + j] += right[j];
-            }
-        }
-    }
-}
-
 static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
 {
     struct cbox_rt *rt = user_data;
     struct cbox_scene *scene = NULL;
     struct cbox_module *effect = rt->effect;
     struct cbox_rt_cmd_instance cmd;
-    struct cbox_midi_buffer midibuf_jack;
+    struct cbox_midi_buffer midibuf_jack, midibuf_song, midibuf_total, *midibufsrcs[3];
     int cost;
     uint32_t i, j, n;
     
     cbox_midi_buffer_init(&rt->midibuf_aux);
     cbox_midi_buffer_init(&midibuf_jack);
+    cbox_midi_buffer_init(&midibuf_song);
+    cbox_midi_buffer_init(&midibuf_total);
     cbox_io_get_midi_data(io, &midibuf_jack);
     
-    // Process command queue
+    // Process command queue, needs MIDI aux buf to work
     cost = 0;
     while(cost < RT_MAX_COST_PER_CALL && jack_ringbuffer_peek(rt->rb_execute, (char *)&cmd, sizeof(cmd)))
     {
@@ -336,8 +134,24 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         }
     }
     
+    // Combine various sources of events (song, non-RT thread, JACK input)
+    int pos[3] = {0, 0, 0};
+    int cnt = 0;
+    if (cbox_midi_buffer_get_count(&midibuf_jack))
+        midibufsrcs[cnt++] = &midibuf_jack;
+    if (rt->master->spb)
+    {
+        cbox_song_playback_render(rt->master->spb, &midibuf_song, nframes);
+        if (cbox_midi_buffer_get_count(&midibuf_song))
+            midibufsrcs[cnt++] = &midibuf_song;
+    }
+    if (cbox_midi_buffer_get_count(&rt->midibuf_aux))
+        midibufsrcs[cnt++] = &rt->midibuf_aux;
+    if (cnt > 0)
+        cbox_midi_buffer_merge(&midibuf_total, midibufsrcs, cnt, pos);
+
     if (rt->scene)
-        cbox_rt_render_scene(rt, rt->scene, nframes, &midibuf_jack, io->output_buffers);
+        cbox_scene_render(rt->scene, nframes, &midibuf_total, io->output_buffers);
     
     // Process "master" effect
     if (effect)
