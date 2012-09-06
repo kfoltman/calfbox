@@ -402,35 +402,6 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     if (pos)
     {
         int len = pos - obj;
-        if (!strncmp(obj, "instr/", 6))
-        {
-            obj = &pos[1];
-            pos = strchr(obj, '/');
-            if (!pos)
-            {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid instrument path '%s'", cmd->command);
-                return FALSE;
-            }
-            len = pos - obj;
-            
-            gchar *name = g_strndup(obj, len);
-            struct cbox_instrument *instr = cbox_instruments_get_by_name(app.rt->scene->instrument_mgr, name, FALSE, error);
-            if (instr)
-            {
-                g_free(name);
-                
-                return cbox_execute_sub(&instr->cmd_target, fb, cmd, pos, error);
-            }
-            else
-            {
-                cbox_force_error(error);
-                g_prefix_error(error, "Cannot access instrument '%s': ", name);
-                g_free(name);
-                return FALSE;
-            }
-            return TRUE;
-        }
-        else
         if (!strncmp(obj, "master/", 7))
             return cbox_execute_sub(&app.rt->master->cmd_target, fb, cmd, pos, error);
         else

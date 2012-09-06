@@ -32,27 +32,27 @@
 /config/delete_section(string section)
 /config/save(string ?filename)
 
-/instr/
-/instr/<name>/status() ->
+/scene/instr/
+/scene/instr/<name>/status() ->
     /engine(string name),
     /aux_offset(int first_aux_output_no),
     /outputs(int stereo_output_count)
-/instr/<name>/output/<index>/status() ->
+/scene/instr/<name>/output/<index>/status() ->
     /gain_linear(float gain),
     /gain(float gain_dB),
     /output(int output_bus),
     {add: @moduleslot/status()}
-/instr/<name>/output/<index>/gain(float gain_dB),
-/instr/<name>/output/<index>/output(int output_bus)
-/instr/<name>/output/<index>/{add: @moduleslot}
-/instr/<name>/aux/<index>/status() ->
+/scene/instr/<name>/output/<index>/gain(float gain_dB),
+/scene/instr/<name>/output/<index>/output(int output_bus)
+/scene/instr/<name>/output/<index>/{add: @moduleslot}
+/scene/instr/<name>/aux/<index>/status() ->
     /gain_linear(float gain),
     /gain(float gain_dB),
     /bus(string output_bus),
     {add: @moduleslot/status()}
-/instr/<name>/aux/<index>/gain(float gain_dB)
-/instr/<name>/aux/<index>/bus(string bus)
-/instr/<name>/aux/<index>/{add: @moduleslot}
+/scene/instr/<name>/aux/<index>/gain(float gain_dB)
+/scene/instr/<name>/aux/<index>/bus(string bus)
+/scene/instr/<name>/aux/<index>/{add: @moduleslot}
 
 /scene/
 /scene/transpose(int semitones)

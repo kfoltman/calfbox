@@ -240,6 +240,36 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             return FALSE;
         return cbox_aux_bus_process_cmd(s->aux_buses[index - 1], fb, cmd, subcommand, error);
     }
+    else if (!strncmp(cmd->command, "/instr/", 7))
+    {
+        const char *obj = &cmd->command[1];
+        const char *pos = strchr(obj, '/');
+        obj = &pos[1];
+        pos = strchr(obj, '/');
+        if (!pos)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid instrument path '%s'", cmd->command);
+            return FALSE;
+        }
+        int len = pos - obj;
+        
+        gchar *name = g_strndup(obj, len);
+        struct cbox_instrument *instr = cbox_instruments_get_by_name(s->instrument_mgr, name, FALSE, error);
+        if (instr)
+        {
+            g_free(name);
+            
+            return cbox_execute_sub(&instr->cmd_target, fb, cmd, pos, error);
+        }
+        else
+        {
+            cbox_force_error(error);
+            g_prefix_error(error, "Cannot access instrument '%s': ", name);
+            g_free(name);
+            return FALSE;
+        }
+        return TRUE;
+    }
     else if (!strcmp(cmd->command, "/load_aux") && !strcmp(cmd->arg_types, "s"))
     {
         struct cbox_aux_bus *bus = cbox_scene_get_aux_bus(s, (const char *)cmd->arg_values[0], error);

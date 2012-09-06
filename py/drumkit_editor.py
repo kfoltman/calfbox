@@ -307,10 +307,10 @@ class FileView(gtk.TreeView):
             if fn.endswith("/"):
                 return
             if fn != "":
-                cbox.do_cmd("/instr/_preview_sample/engine/load", None, [fn, -1])
-                cbox.do_cmd("/instr/_preview_sample/engine/play", None, [])
+                cbox.do_cmd("/scene/instr/_preview_sample/engine/load", None, [fn, -1])
+                cbox.do_cmd("/scene/instr/_preview_sample/engine/play", None, [])
             else:
-                cbox.do_cmd("/instr/_preview_sample/engine/unload", None, [])
+                cbox.do_cmd("/scene/instr/_preview_sample/engine/unload", None, [])
             
     def drag_data_get(self, treeview, context, selection, target_id, etime):
         cursor = treeview.get_cursor()
@@ -398,7 +398,7 @@ class EditorDialog(gtk.Dialog):
         self.update_kit()
 
     def update_kit(self):
-        cbox.do_cmd("/instr/_preview_kit/engine/load_patch_from_string", None, [0, "", self.bank_model.to_sfz(), "Preview"])
+        cbox.do_cmd("/scene/instr/_preview_kit/engine/load_patch_from_string", None, [0, "", self.bank_model.to_sfz(), "Preview"])
         self.update_source = None
         return False
         
