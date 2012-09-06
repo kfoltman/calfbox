@@ -17,14 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "auxbus.h"
+#include "blob.h"
 #include "config-api.h"
 #include "errors.h"
 #include "instr.h"
 #include "layer.h"
+#include "master.h"
 #include "midi.h"
 #include "module.h"
 #include "rt.h"
 #include "scene.h"
+#include "seq.h"
 #include <assert.h>
 #include <glib.h>
 
@@ -320,6 +323,39 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         }
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/render_stereo") && !strcmp(cmd->arg_types, "i"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        if (s->rt->io)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot use render function in real-time mode.");
+            return FALSE;
+        }
+        struct cbox_midi_buffer midibuf_song;
+        cbox_midi_buffer_init(&midibuf_song);
+        int nframes = *(int *)cmd->arg_values[0];
+        float *data = malloc(2 * nframes * sizeof(float));
+        float *data_i = malloc(2 * nframes * sizeof(float));
+        float *buffers[2] = { data, data + nframes };
+        for (int i = 0; i < nframes; i++)
+        {
+            buffers[0][i] = 0.f;
+            buffers[1][i] = 0.f;
+        }
+        cbox_song_playback_render(s->rt->master->spb, &midibuf_song, nframes);
+        cbox_scene_render(s, nframes, &midibuf_song, buffers);
+        for (int i = 0; i < nframes; i++)
+        {
+            data_i[i * 2] = buffers[0][i];
+            data_i[i * 2 + 1] = buffers[1][i];
+        }
+        //free(data);
+
+        if (!cbox_execute_on(fb, NULL, "/data", "b", error, cbox_blob_new_acquire_data(data_i, nframes * 2 * sizeof(float))))
+            return FALSE;
+        return TRUE;
+    }
     else
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
@@ -520,12 +556,14 @@ struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char
 static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbox_midi_buffer *source)
 {
     uint32_t i;
-    uint32_t event_count = cbox_midi_buffer_get_count(source);
 
     for (i = 0; i < scene->instrument_count; i++)
-    {
         cbox_midi_buffer_clear(&scene->instruments[i]->module->midi_input);
-    }
+
+    if (!source)
+        return 0;
+
+    uint32_t event_count = cbox_midi_buffer_get_count(source);
     for (i = 0; i < event_count; i++)
     {
         struct cbox_midi_event *event = cbox_midi_buffer_get_event(source, i);
