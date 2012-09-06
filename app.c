@@ -78,7 +78,7 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
     struct cbox_scene *scene = CBOX_NEW(app.document, cbox_scene);
-    struct cbox_layer *layer = cbox_layer_new(app.rt, (char *)item->item.item_context, &error);
+    struct cbox_layer *layer = cbox_layer_new(scene, (char *)item->item.item_context, &error);
     
     if (layer)
     {
@@ -99,7 +99,7 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
     struct cbox_scene *scene = CBOX_NEW(app.document, cbox_scene);
-    struct cbox_layer *layer = cbox_layer_load(app.rt, (char *)item->item.item_context, &error);
+    struct cbox_layer *layer = cbox_layer_load(scene, (char *)item->item.item_context, &error);
     
     if (layer)
     {
@@ -414,7 +414,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             len = pos - obj;
             
             gchar *name = g_strndup(obj, len);
-            struct cbox_instrument *instr = cbox_instruments_get_by_name(app.rt->instruments, name, FALSE, error);
+            struct cbox_instrument *instr = cbox_instruments_get_by_name(app.rt->scene->instrument_mgr, name, FALSE, error);
             if (instr)
             {
                 g_free(name);

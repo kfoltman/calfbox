@@ -41,8 +41,8 @@ struct cbox_layer
     gboolean ignore_scene_transpose;
 };
 
-extern struct cbox_layer *cbox_layer_new(struct cbox_rt *rt, const char *name, GError **error);
-extern struct cbox_layer *cbox_layer_load(struct cbox_rt *rt, const char *instrument_name, GError **error);
+extern struct cbox_layer *cbox_layer_new(struct cbox_scene *scene, const char *name, GError **error);
+extern struct cbox_layer *cbox_layer_load(struct cbox_scene *scene, const char *instrument_name, GError **error);
 extern void cbox_layer_destroy(struct cbox_layer *layer);
 
 #endif

@@ -35,6 +35,7 @@ struct cbox_scene
     gchar *name;
     gchar *title;
     
+    struct cbox_instruments *instrument_mgr;
     struct cbox_rt *rt;
     struct cbox_layer **layers;
     int layer_count;

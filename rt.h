@@ -50,7 +50,6 @@ struct cbox_rt
     CBOX_OBJECT_HEADER()
     
     struct cbox_scene *scene;
-    struct cbox_instruments *instruments;
     struct cbox_module *effect;
     
     struct cbox_io *io;

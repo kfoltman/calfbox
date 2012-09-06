@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
     {
         app.current_scene_name = g_strdup_printf("instrument:%s", instrument_name);
         scene = CBOX_NEW(app.document, cbox_scene);
-        layer = cbox_layer_new(app.rt, instrument_name, &error);
+        layer = cbox_layer_new(scene, instrument_name, &error);
         if (!layer)
             goto fail;
 

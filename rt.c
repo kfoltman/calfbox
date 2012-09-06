@@ -71,7 +71,6 @@ struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
     rt->master = cbox_master_new(rt);
     rt->master->song = cbox_song_new(rt->master);
     rt->started = 0;
-    rt->instruments = cbox_instruments_new(rt);
     rt->srate = 0;
     rt->buffer_size = 0;
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
@@ -550,9 +549,6 @@ void cbox_rt_destroy(struct cbox_rt *rt)
 
     cbox_master_destroy(rt->master);
     rt->master = NULL;
-
-    cbox_instruments_destroy(rt->instruments);
-    rt->instruments = NULL;
 
     free(rt);
 }

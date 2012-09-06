@@ -164,7 +164,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             pos = s->layer_count;
         else
             pos--;
-        struct cbox_layer *layer = cbox_layer_load(s->rt, (const gchar *)cmd->arg_values[1], error);
+        struct cbox_layer *layer = cbox_layer_load(s, (const gchar *)cmd->arg_values[1], error);
         if (!layer)
             return FALSE;
         if (!cbox_scene_insert_layer(s, layer, pos, error))
@@ -186,7 +186,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             pos = s->layer_count;
         else
             pos--;
-        struct cbox_layer *layer = cbox_layer_new(s->rt, (const gchar *)cmd->arg_values[1], error);
+        struct cbox_layer *layer = cbox_layer_new(s, (const gchar *)cmd->arg_values[1], error);
         if (!layer)
             return FALSE;
         if (!cbox_scene_insert_layer(s, layer, pos, error))
@@ -330,7 +330,7 @@ gboolean cbox_scene_load(struct cbox_scene *s, const char *name, GError **error)
         if (!cv)
             break;
         
-        l = cbox_layer_load(s->rt, cv, error);
+        l = cbox_layer_load(s, cv, error);
         if (!l)
             goto error;
         
@@ -698,6 +698,7 @@ struct cbox_objhdr *cbox_scene_newfunc(struct cbox_class *class_ptr, struct cbox
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
     CBOX_OBJECT_HEADER_INIT(s, cbox_scene, document);
     s->rt = (struct cbox_rt *)cbox_document_get_service(document, "rt");
+    s->instrument_mgr = cbox_instruments_new(s->rt);
     s->name = g_strdup("");
     s->title = g_strdup("");
     s->layers = NULL;
@@ -721,5 +722,6 @@ static void cbox_scene_destroyfunc(struct cbox_objhdr *scene_obj)
     free(scene->layers);
     free(scene->aux_buses);
     free(scene->instruments);
+    cbox_instruments_destroy(scene->instrument_mgr);
     free(scene);
 }
