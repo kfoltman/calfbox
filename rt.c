@@ -28,9 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "song.h"
 #include "track.h"
 #include <assert.h>
-#include <jack/jack.h>
-#include <jack/types.h>
-#include <jack/midiport.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -90,34 +87,6 @@ struct cbox_objhdr *cbox_rt_newfunc(struct cbox_class *class_ptr, struct cbox_do
 
 void cbox_rt_destroyfunc(struct cbox_objhdr *obj_ptr)
 {
-}
-
-int convert_midi_from_jack(jack_port_t *port, uint32_t nframes, struct cbox_midi_buffer *destination)
-{
-    void *midi = jack_port_get_buffer(port, nframes);
-    uint32_t event_count = jack_midi_get_event_count(midi);
-
-    cbox_midi_buffer_clear(destination);
-    for (uint32_t i = 0; i < event_count; i++)
-    {
-        jack_midi_event_t event;
-        
-        if (!jack_midi_event_get(&event, midi, i))
-        {
-            // XXXKF ignore sysex for now
-            if (event.size >= 4)
-                continue;
-            
-            uint8_t data[4];
-            memcpy(data, event.buffer, event.size);
-            if (!cbox_midi_buffer_write_event(destination, event.time, data, event.size))
-                return -i;
-        }
-        else
-            return -i;
-    }
-    
-    return event_count;
 }
 
 int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbox_scene *scene)
@@ -220,7 +189,7 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     scene = rt->scene;
         
     for (i = 0; i < io->input_count; i++)
-        io->input_buffers[i] = jack_port_get_buffer(io->inputs[i], nframes);
+        io->input_buffers[i] = cbox_io_get_input_buffer(io, i);
     
     for (i = 0; i < io->input_count; i++)
     {
@@ -237,7 +206,7 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     }
     
     for (i = 0; i < io->output_count; i++)
-        io->output_buffers[i] = jack_port_get_buffer(io->outputs[i], nframes);
+        io->output_buffers[i] = cbox_io_get_output_buffer(io, i);
 
     if (scene)
     {
@@ -247,7 +216,7 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         int pos[3] = {0, 0, 0};
         cbox_midi_buffer_init(&midibuf_jack);
         cbox_midi_buffer_init(&midibuf_pattern);
-        convert_midi_from_jack(io->midi, nframes, &midibuf_jack);
+        cbox_io_get_midi_data(io, &midibuf_jack);
         if (rt->master->spb)
             cbox_song_playback_render(rt->master->spb, &midibuf_pattern, nframes);
         midibufsrcs[0] = &midibuf_jack;
@@ -418,8 +387,8 @@ void cbox_rt_set_io(struct cbox_rt *rt, struct cbox_io *io)
     rt->io = io;
     if (io)
     {
-        rt->srate = jack_get_sample_rate(io->client);
-        rt->buffer_size = io->buffer_size;
+        rt->srate = cbox_io_get_sample_rate(io);
+        rt->buffer_size = cbox_io_get_buffer_size(io);
         cbox_master_set_sample_rate(rt->master, rt->srate);
     }
     else

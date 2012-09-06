@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "hwcfg.h"
 #include "io.h"
 #include "meter.h"
+#include "midi.h"
 #include "recsrc.h"
 
 #include <errno.h>
@@ -29,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib.h>
 #include <jack/ringbuffer.h>
 #include <jack/types.h>
+#include <jack/midiport.h>
 
 static const char *io_section = "io";
 
@@ -251,6 +253,46 @@ void cbox_io_poll_ports(struct cbox_io *io)
         
     }
 }
+
+int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *destination)
+{
+    jack_port_t *port = io->midi;
+    void *midi = jack_port_get_buffer(port, io->buffer_size);
+    uint32_t event_count = jack_midi_get_event_count(midi);
+
+    cbox_midi_buffer_clear(destination);
+    for (uint32_t i = 0; i < event_count; i++)
+    {
+        jack_midi_event_t event;
+        
+        if (!jack_midi_event_get(&event, midi, i))
+        {
+            // XXXKF ignore sysex for now
+            if (event.size >= 4)
+                continue;
+            
+            uint8_t data[4];
+            memcpy(data, event.buffer, event.size);
+            if (!cbox_midi_buffer_write_event(destination, event.time, data, event.size))
+                return -i;
+        }
+        else
+            return -i;
+    }
+    
+    return event_count;
+}
+
+void *cbox_io_get_input_buffer(struct cbox_io *io, int index)
+{
+    return jack_port_get_buffer(io->inputs[index], io->buffer_size);
+}
+
+void *cbox_io_get_output_buffer(struct cbox_io *io, int index)
+{
+    return jack_port_get_buffer(io->outputs[index], io->buffer_size);
+}
+
 
 int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
 {
