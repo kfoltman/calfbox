@@ -490,6 +490,10 @@ struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char
 void cbox_scene_clear(struct cbox_scene *scene)
 {
     int i;
+    g_free(scene->name);
+    g_free(scene->title);
+    scene->name = g_strdup("");
+    scene->title = g_strdup("");
     while(scene->layer_count > 0)
         cbox_layer_destroy(cbox_scene_remove_layer(scene, 0));
             
@@ -515,8 +519,15 @@ struct cbox_objhdr *cbox_scene_newfunc(struct cbox_class *class_ptr, struct cbox
     CBOX_RETURN_OBJECT(s);
 }
 
-static void cbox_scene_destroyfunc(struct cbox_objhdr *scene)
+static void cbox_scene_destroyfunc(struct cbox_objhdr *scene_obj)
 {
-    cbox_scene_clear((struct cbox_scene *)scene);
+    struct cbox_scene *scene = (struct cbox_scene *)scene_obj;
+    cbox_scene_clear(scene);
+    g_free(scene->name);
+    g_free(scene->title);
+    assert(scene->instrument_count == 0);
+    free(scene->layers);
+    free(scene->aux_buses);
+    free(scene->instruments);
     free(scene);
 }

@@ -194,3 +194,12 @@ int cbox_master_samples_to_ppqn(struct cbox_master *master, int time_samples)
     return offset + (int)(tempo * PPQN * time_samples / (master->srate * 60.0));
 }
 
+void cbox_master_destroy(struct cbox_master *master)
+{
+    if (master->spb)
+    {
+        cbox_song_playback_destroy(master->spb);
+        master->spb = NULL;
+    }
+    free(master);
+}

@@ -197,6 +197,8 @@ void cbox_document_dump(struct cbox_document *document)
 
 void cbox_document_destroy(struct cbox_document *document)
 {
+    g_hash_table_destroy(document->classes_per_document);
+    g_hash_table_destroy(document->services_per_document);
     free(document);
 }
 

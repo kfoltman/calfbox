@@ -1488,9 +1488,11 @@ MODULE_CREATE_FUNCTION(sampler_create)
         
         if (!load_program(m, &m->programs[i], pgm_section, pgm_section + 5, pgm_id, error))
         {
+            g_free(pgm_section);
             success = 0;
             break;
         }
+        g_free(pgm_section);
     }
     if (!success)
     {
@@ -1515,6 +1517,7 @@ void sampler_destroy(struct cbox_module *module)
     
     for (int i = 0; i < m->program_count; i++)
         destroy_program(m, m->programs[i]);
+    free(m->programs);
 }
 
 enum sampler_filter_type sampler_filter_type_from_string(const char *name)

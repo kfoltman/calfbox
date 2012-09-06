@@ -162,14 +162,13 @@ struct cbox_module *cbox_module_new_from_fx_preset(const char *name, struct cbox
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "FX preset '%s' refers to non-existing engine '%s'", name, engine);
         goto fxpreset_error;
     }
-    effect = cbox_module_manifest_create_module(mptr, section, rt, section, error);
+    effect = cbox_module_manifest_create_module(mptr, section, rt, name, error);
     if (!effect)
     {
         cbox_force_error(error);
         g_prefix_error(error, "Could not instantiate FX preset '%s': ", name);
         goto fxpreset_error;
     }
-    effect->instance_name = g_strdup(name);
     g_free(section);
     return effect;
     

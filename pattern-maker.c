@@ -145,6 +145,7 @@ gboolean cbox_midi_pattern_maker_load_smf(struct cbox_midi_pattern_maker *maker,
 void cbox_midi_pattern_maker_destroy(struct cbox_midi_pattern_maker *maker)
 {
     g_tree_destroy(maker->events);
+    free(maker);
 }
 
 

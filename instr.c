@@ -33,9 +33,8 @@ struct cbox_instruments
 
 struct cbox_instruments *cbox_instruments_new(struct cbox_rt *rt)
 {
-    // XXXKF needs to use 'full' version with g_free for key and value
     struct cbox_instruments *res = malloc(sizeof(struct cbox_instruments));
-    res->hash = g_hash_table_new(g_str_hash, g_str_equal);
+    res->hash = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     res->rt = rt;
     return res;
 }

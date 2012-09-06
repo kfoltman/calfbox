@@ -764,7 +764,7 @@ void cbox_rt_destroy(struct cbox_rt *rt)
     jack_ringbuffer_free(rt->rb_execute);
     jack_ringbuffer_free(rt->rb_cleanup);
 
-    free(rt->master);
+    cbox_master_destroy(rt->master);
     rt->master = NULL;
 
     cbox_instruments_destroy(rt->instruments);

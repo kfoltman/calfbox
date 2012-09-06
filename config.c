@@ -38,8 +38,7 @@ void cbox_config_init(const char *override_file)
     if (config_keyfile)
         return;
 
-    // XXXKF use g_hash_table_new_full
-    config_sections_hash = g_hash_table_new(g_str_hash, g_str_equal);
+    config_sections_hash = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
     cfg_strings = g_string_chunk_new(100);
     config_keyfile = g_key_file_new();
