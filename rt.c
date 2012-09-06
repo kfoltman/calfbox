@@ -50,7 +50,10 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count);
+        if (rt->io)
+            return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count);
+        else
+            return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, 0, 2);
     }
     else
     {
