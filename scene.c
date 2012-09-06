@@ -350,7 +350,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             data_i[i * 2] = buffers[0][i];
             data_i[i * 2 + 1] = buffers[1][i];
         }
-        //free(data);
+        free(data);
 
         if (!cbox_execute_on(fb, NULL, "/data", "b", error, cbox_blob_new_acquire_data(data_i, nframes * 2 * sizeof(float))))
             return FALSE;
