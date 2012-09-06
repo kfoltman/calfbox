@@ -501,7 +501,7 @@ struct cbox_objhdr *cbox_scene_newfunc(struct cbox_class *class_ptr, struct cbox
 {
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
     CBOX_OBJECT_HEADER_INIT(s, cbox_scene, document);
-    s->rt = CBOX_GET_SINGLETON(document, cbox_rt);
+    s->rt = (struct cbox_rt *)cbox_document_get_service(document, "rt");
     s->name = g_strdup("");
     s->title = g_strdup("");
     s->layers = NULL;

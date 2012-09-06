@@ -75,7 +75,7 @@ struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
     rt->srate = 0;
     rt->buffer_size = 0;
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
-    CBOX_SET_AS_SINGLETON(rt);
+    cbox_document_set_service(doc, "rt", &rt->_obj_hdr);
     
     return rt;
 }

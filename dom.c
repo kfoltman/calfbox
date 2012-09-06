@@ -23,18 +23,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <glib.h>
 #include <malloc.h>
+#include <string.h>
 
 static GHashTable *class_name_hash = NULL;
 
 struct cbox_class_per_document
 {
     GList *instances;
-    struct cbox_objhdr *singleton;
 };
 
 struct cbox_document
 {
     GHashTable *classes_per_document;
+    GHashTable *services_per_document;
     struct cbox_command_target cmd_target;
     int item_ctr;
 };
@@ -72,7 +73,6 @@ static struct cbox_class_per_document *get_cpd_for_class(struct cbox_document *d
         return p;
     p = malloc(sizeof(struct cbox_class_per_document));
     p->instances = NULL;
-    p->singleton = NULL;
     g_hash_table_insert(doc->classes_per_document, class_ptr, p);
     return p;
 }
@@ -111,12 +111,6 @@ struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_p
     return hdr_ptr->class_ptr->getcmdtargetfunc(hdr_ptr);
 }
 
-void cbox_object_set_as_singleton(struct cbox_objhdr *hdr_ptr)
-{
-    struct cbox_class_per_document *cpd = get_cpd_for_class(hdr_ptr->owner, hdr_ptr->class_ptr);
-    cpd->singleton = hdr_ptr;
-}
-
 void cbox_object_destroy(struct cbox_objhdr *hdr_ptr)
 {
     struct cbox_class_per_document *cpd = get_cpd_for_class(hdr_ptr->owner, hdr_ptr->class_ptr);
@@ -144,6 +138,7 @@ struct cbox_document *cbox_document_new()
 {
     struct cbox_document *res = malloc(sizeof(struct cbox_document));
     res->classes_per_document = g_hash_table_new(NULL, NULL);
+    res->services_per_document = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     res->cmd_target.process_cmd = document_process_cmd;
     res->cmd_target.user_data = res;
     res->item_ctr = 0;
@@ -156,10 +151,14 @@ struct cbox_command_target *cbox_document_get_cmd_target(struct cbox_document *d
     return &doc->cmd_target;
 }
 
-struct cbox_objhdr *cbox_document_get_singleton(struct cbox_document *document, struct cbox_class *class_ptr)
+struct cbox_objhdr *cbox_document_get_service(struct cbox_document *document, const char *name)
 {
-    struct cbox_class_per_document *cpd = get_cpd_for_class(document, class_ptr);
-    return cpd->singleton;
+    return g_hash_table_lookup(document->services_per_document, name);
+}
+
+void cbox_document_set_service(struct cbox_document *document, const char *name, struct cbox_objhdr *obj)
+{
+    g_hash_table_insert(document->services_per_document, g_strdup(name), obj);
 }
 
 static void iter_func(gpointer key, gpointer value, gpointer document)
@@ -168,11 +167,6 @@ static void iter_func(gpointer key, gpointer value, gpointer document)
     struct cbox_class_per_document *cpd = value;
     int first = 1;
     printf("Class %s: ", class_ptr->name);
-    if (cpd->singleton)
-    {
-        printf("Singleton %p", cpd->singleton);
-        first = 0;
-    }
     GList *l = cpd->instances;
     while(l) {
         if (!first)
@@ -186,9 +180,19 @@ static void iter_func(gpointer key, gpointer value, gpointer document)
     printf("\n");
 }
 
+static void iter_func2(gpointer key, gpointer value, gpointer document)
+{
+    struct cbox_objhdr *oh = value;
+    int first = 1;
+    printf("Service %s: %p", (const char *)key, value);
+    fflush(stdout);
+    printf(" (%s)\n", oh->class_ptr->name);
+}
+
 void cbox_document_dump(struct cbox_document *document)
 {
      g_hash_table_foreach(document->classes_per_document, iter_func, document);
+     g_hash_table_foreach(document->services_per_document, iter_func2, document);
 }
 
 void cbox_document_destroy(struct cbox_document *document)

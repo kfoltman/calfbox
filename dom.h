@@ -53,13 +53,14 @@ inline int cbox_class_is_a(struct cbox_class *c1, struct cbox_class *c2)
 extern struct cbox_objhdr *cbox_object_new_by_class(struct cbox_document *doc, struct cbox_class *class_ptr);
 extern struct cbox_objhdr *cbox_object_new_by_class_name(struct cbox_document *doc, const char *name);
 extern struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_ptr);
-extern void cbox_object_set_as_singleton(struct cbox_objhdr *hdr_ptr);
+
 extern void cbox_object_destroy(struct cbox_objhdr *hdr_ptr);
 
 extern struct cbox_document *cbox_document_new();
-extern struct cbox_objhdr *cbox_document_get_singleton(struct cbox_document *document, struct cbox_class *class_ptr);
 extern void cbox_document_dump(struct cbox_document *);
 extern struct cbox_command_target *cbox_document_get_cmd_target(struct cbox_document *);
+extern struct cbox_objhdr *cbox_document_get_service(struct cbox_document *doc, const char *name);
+extern void cbox_document_set_service(struct cbox_document *doc, const char *name, struct cbox_objhdr *hdr_ptr);
 extern void cbox_document_destroy(struct cbox_document *);
 
 extern void cbox_dom_init();
@@ -72,9 +73,6 @@ extern void cbox_dom_close();
 #define CBOX_EXTERN_CLASS(class) \
     extern struct cbox_class CBOX_CLASS_##class;
 
-#define CBOX_GET_SINGLETON(document, class) \
-    (struct class *)cbox_document_get_singleton((document), &CBOX_CLASS_##class)
-    
 #define CBOX_GET_DOCUMENT(obj) \
     ((obj)->_obj_hdr.owner)
 
@@ -93,9 +91,6 @@ extern void cbox_dom_close();
         (self)->_obj_hdr.owner = (document); \
         (self)->_obj_hdr.link_in_document = NULL; \
     } while(0)
-    
-#define CBOX_SET_AS_SINGLETON(self) \
-    cbox_object_set_as_singleton(&(self)->_obj_hdr)
     
 #define CBOX_CLASS_DEFINITION_ROOT(class) \
     static struct cbox_objhdr *class##_newfunc(struct cbox_class *class_ptr, struct cbox_document *owner); \

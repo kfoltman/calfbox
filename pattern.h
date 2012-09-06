@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_PATTERN_H
 #define CBOX_PATTERN_H
 
+#include "dom.h"
 #include "master.h"
 #include "midi.h"
 
