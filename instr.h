@@ -55,6 +55,7 @@ extern struct cbox_rt *cbox_instruments_get_rt(struct cbox_instruments *instrume
 extern void cbox_instrument_unref_aux_buses(struct cbox_instrument *instrument);
 extern void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrument, struct cbox_aux_bus *bus);
 extern void cbox_instrument_destroy(struct cbox_instrument *instrument);
+extern void cbox_instrument_destroy_if_unused(struct cbox_instrument *instrument);
 extern void cbox_instruments_destroy(struct cbox_instruments *instruments);
 
 extern void cbox_instrument_output_init(struct cbox_instrument_output *output, uint32_t max_numsamples);

@@ -51,7 +51,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(int ts)
 void cbox_midi_pattern_destroy(struct cbox_midi_pattern *pattern)
 {
     g_free(pattern->name);
-    if (pattern->event_count)
+    if (pattern->events != NULL)
         free(pattern->events);
     free(pattern);
 }

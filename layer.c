@@ -80,6 +80,8 @@ struct cbox_layer *cbox_layer_load(struct cbox_rt *rt, const char *name, GError 
     return l;
 
 error:
+    cbox_instrument_destroy_if_unused(instr);
+
     g_free(section);
     free(l);
     return NULL;

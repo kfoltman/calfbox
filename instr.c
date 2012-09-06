@@ -277,6 +277,12 @@ struct cbox_rt *cbox_instruments_get_rt(struct cbox_instruments *instruments)
     return instruments->rt;
 }
 
+void cbox_instrument_destroy_if_unused(struct cbox_instrument *instrument)
+{
+    if (instrument->refcount == 0)
+        cbox_instrument_destroy(instrument);
+}
+
 void cbox_instrument_destroy(struct cbox_instrument *instrument)
 {
     assert(instrument->refcount == 0);
@@ -285,11 +291,15 @@ void cbox_instrument_destroy(struct cbox_instrument *instrument)
     {
         cbox_instrument_output_uninit(&instrument->outputs[i]);
     }
+    free(instrument->outputs);
     for (int i = 0; i < instrument->aux_output_count; i++)
     {
         g_free(instrument->aux_output_names[i]);
     }
+    free(instrument->aux_output_names);
+    free(instrument->aux_outputs);
     cbox_module_destroy(instrument->module);
+    free(instrument);
 }
 
 void cbox_instrument_unref_aux_buses(struct cbox_instrument *instrument)

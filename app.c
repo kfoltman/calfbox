@@ -290,13 +290,6 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_pattern *pattern)
-{
-    struct cbox_song *old = cbox_rt_set_pattern(rt, pattern, -1);
-    if (old)
-        cbox_song_destroy(old);
-}
-
 int cmd_pattern_none(struct cbox_menu_item_command *item, void *context)
 {
     cbox_rt_set_pattern_and_destroy(app.rt, NULL);

@@ -612,6 +612,7 @@ struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_patte
     
     struct cbox_song *song = cbox_song_new(rt->master);
     cbox_song_add_track(song, track);
+    cbox_song_add_pattern(song, pattern);
 #if 0
     cbox_song_add_track(song, track2);
 #endif
@@ -623,6 +624,13 @@ struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_patte
     rt->master->song = song;
     cbox_rt_update_song(rt, new_pos_ppqn);
     return old_song;
+}
+
+void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_pattern *pattern)
+{
+    struct cbox_song *old = cbox_rt_set_pattern(rt, pattern, -1);
+    if (old)
+        cbox_song_destroy(old);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "rt.h"
 #include "scene.h"
 #include "scripting.h"
+#include "song.h"
 #include "ui.h"
 #include "wavebank.h"
 
@@ -271,11 +272,11 @@ int main(int argc, char *argv[])
 
     cbox_rt_start(app.rt);
     if (drum_pattern_name)
-        cbox_rt_set_pattern(app.rt, cbox_midi_pattern_load(drum_pattern_name, 1), 0);
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(drum_pattern_name, 1));
     else if (drum_track_name)
-        cbox_rt_set_pattern(app.rt, cbox_midi_pattern_load_track(drum_track_name, 1), 0);
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(drum_track_name, 1));
     else if (metronome)
-        cbox_rt_set_pattern(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->timesig_nom), 0);
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->timesig_nom));
     cbox_master_play(app.rt->master);
     cbox_rt_set_scene(app.rt, scene);
     if (script_name)
