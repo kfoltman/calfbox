@@ -161,82 +161,34 @@ int write_events_to_instrument_ports(struct cbox_midi_buffer *source, struct cbo
     return event_count;
 }
 
-static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
+static void cbox_rt_render_scene(struct cbox_rt *rt, struct cbox_scene *scene, uint32_t nframes, struct cbox_midi_buffer *midibuf_jack, float *output_buffers[])
 {
-    struct cbox_rt *rt = user_data;
-    struct cbox_scene *scene = NULL;
-    struct cbox_module *effect = rt->effect;
-    struct cbox_rt_cmd_instance cmd;
-    int cost;
-    uint32_t i, j, n;
+    int n, i, j;
     
-    cbox_midi_buffer_init(&rt->midibuf_aux);
+    struct cbox_midi_buffer midibuf_pattern, midibuf_total, *midibufsrcs[3];
+    cbox_midi_buffer_init(&midibuf_total);
     
-    // Process command queue
-    cost = 0;
-    while(cost < RT_MAX_COST_PER_CALL && jack_ringbuffer_peek(rt->rb_execute, (char *)&cmd, sizeof(cmd)))
+    int pos[3] = {0, 0, 0};
+    cbox_midi_buffer_init(&midibuf_pattern);
+    if (rt->master->spb)
+        cbox_song_playback_render(rt->master->spb, &midibuf_pattern, nframes);
+    midibufsrcs[0] = midibuf_jack;
+    midibufsrcs[1] = &midibuf_pattern;
+    midibufsrcs[2] = &rt->midibuf_aux;
+    cbox_midi_buffer_merge(&midibuf_total, midibufsrcs, 3, pos);
+    
+    write_events_to_instrument_ports(&midibuf_total, scene);
+
+    for (n = 0; n < scene->aux_bus_count; n++)
     {
-        int result = (cmd.definition->execute)(cmd.user_data);
-        if (!result)
-            break;
-        cost += result;
-        jack_ringbuffer_read_advance(rt->rb_execute, sizeof(cmd));
-        if (cmd.definition->cleanup || !cmd.is_async)
-        {
-            jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
-        }
-    }
-    scene = rt->scene;
-    
-    for (i = 0; i < io->input_count; i++)
-    {
-        if (IS_RECORDING_SOURCE_CONNECTED(io->rec_mono_inputs[i]))
-            cbox_recording_source_push(&io->rec_mono_inputs[i], (const float **)&io->input_buffers[i], nframes);
-    }
-    for (i = 0; i < io->input_count / 2; i++)
-    {
-        if (IS_RECORDING_SOURCE_CONNECTED(io->rec_stereo_inputs[i]))
-        {
-            const float *buf[2] = { io->input_buffers[i * 2], io->input_buffers[i * 2 + 1] };
-            cbox_recording_source_push(&io->rec_stereo_inputs[i], buf, nframes);
-        }
-    }
-    
-    if (scene)
-    {
-        struct cbox_midi_buffer midibuf_jack, midibuf_pattern, midibuf_total, *midibufsrcs[3];
-        cbox_midi_buffer_init(&midibuf_total);
-        
-        int pos[3] = {0, 0, 0};
-        cbox_midi_buffer_init(&midibuf_jack);
-        cbox_midi_buffer_init(&midibuf_pattern);
-        cbox_io_get_midi_data(io, &midibuf_jack);
-        if (rt->master->spb)
-            cbox_song_playback_render(rt->master->spb, &midibuf_pattern, nframes);
-        midibufsrcs[0] = &midibuf_jack;
-        midibufsrcs[1] = &midibuf_pattern;
-        midibufsrcs[2] = &rt->midibuf_aux;
-        cbox_midi_buffer_merge(&midibuf_total, midibufsrcs, 3, pos);
-        
-        write_events_to_instrument_ports(&midibuf_total, scene);
-    }
-    
-    for (n = 0; n < io->output_count; n++)
         for (i = 0; i < nframes; i ++)
-            io->output_buffers[n][i] = 0.f;
-    if (scene)
-    {
-        for (n = 0; n < scene->aux_bus_count; n++)
         {
-            for (i = 0; i < nframes; i ++)
-            {
-                scene->aux_buses[n]->input_bufs[0][i] = 0.f;
-                scene->aux_buses[n]->input_bufs[1][i] = 0.f;
-            }
+            scene->aux_buses[n]->input_bufs[0][i] = 0.f;
+            scene->aux_buses[n]->input_bufs[1][i] = 0.f;
         }
     }
     
-    for (n = 0; scene && n < scene->instrument_count; n++)
+    for (n = 0; n < scene->instrument_count; n++)
     {
         struct cbox_instrument *instr = scene->instruments[n];
         struct cbox_module *module = instr->module;
@@ -288,8 +240,8 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
                 {
                     int leftch = oobj->output_bus * 2;
                     int rightch = leftch + 1;
-                    leftbuf = io->output_buffers[leftch];
-                    rightbuf = io->output_buffers[rightch];
+                    leftbuf = output_buffers[leftch];
+                    rightbuf = output_buffers[rightch];
                 }
                 else
                 {
@@ -321,28 +273,72 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         }
     }
     
-    if (scene)
+    for (n = 0; n < scene->aux_bus_count; n++)
     {
-        for (n = 0; n < scene->aux_bus_count; n++)
+        struct cbox_aux_bus *bus = scene->aux_buses[n];
+        float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
+        float *outputs[2] = {left, right};
+        for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
         {
-            struct cbox_aux_bus *bus = scene->aux_buses[n];
-            float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
-            float *outputs[2] = {left, right};
-            for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
+            float *inputs[2];
+            inputs[0] = &bus->input_bufs[0][i];
+            inputs[1] = &bus->input_bufs[1][i];
+            bus->module->process_block(bus->module, inputs, outputs);
+            for (int j = 0; j < CBOX_BLOCK_SIZE; j++)
             {
-                float *inputs[2];
-                inputs[0] = &bus->input_bufs[0][i];
-                inputs[1] = &bus->input_bufs[1][i];
-                bus->module->process_block(bus->module, inputs, outputs);
-                for (int j = 0; j < CBOX_BLOCK_SIZE; j++)
-                {
-                    io->output_buffers[0][i + j] += left[j];
-                    io->output_buffers[1][i + j] += right[j];
-                }
+                output_buffers[0][i + j] += left[j];
+                output_buffers[1][i + j] += right[j];
             }
         }
     }
+}
 
+static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
+{
+    struct cbox_rt *rt = user_data;
+    struct cbox_scene *scene = NULL;
+    struct cbox_module *effect = rt->effect;
+    struct cbox_rt_cmd_instance cmd;
+    struct cbox_midi_buffer midibuf_jack;
+    int cost;
+    uint32_t i, j, n;
+    
+    cbox_midi_buffer_init(&rt->midibuf_aux);
+    cbox_midi_buffer_init(&midibuf_jack);
+    cbox_io_get_midi_data(io, &midibuf_jack);
+    
+    // Process command queue
+    cost = 0;
+    while(cost < RT_MAX_COST_PER_CALL && jack_ringbuffer_peek(rt->rb_execute, (char *)&cmd, sizeof(cmd)))
+    {
+        int result = (cmd.definition->execute)(cmd.user_data);
+        if (!result)
+            break;
+        cost += result;
+        jack_ringbuffer_read_advance(rt->rb_execute, sizeof(cmd));
+        if (cmd.definition->cleanup || !cmd.is_async)
+        {
+            jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
+        }
+    }
+    
+    for (i = 0; i < io->input_count; i++)
+    {
+        if (IS_RECORDING_SOURCE_CONNECTED(io->rec_mono_inputs[i]))
+            cbox_recording_source_push(&io->rec_mono_inputs[i], (const float **)&io->input_buffers[i], nframes);
+    }
+    for (i = 0; i < io->input_count / 2; i++)
+    {
+        if (IS_RECORDING_SOURCE_CONNECTED(io->rec_stereo_inputs[i]))
+        {
+            const float *buf[2] = { io->input_buffers[i * 2], io->input_buffers[i * 2 + 1] };
+            cbox_recording_source_push(&io->rec_stereo_inputs[i], buf, nframes);
+        }
+    }
+    
+    if (rt->scene)
+        cbox_rt_render_scene(rt, rt->scene, nframes, &midibuf_jack, io->output_buffers);
+    
     // Process "master" effect
     if (effect)
     {

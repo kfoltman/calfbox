@@ -114,17 +114,21 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
     return 1;
 };
 
-static int process_cb(jack_nframes_t frames, void *arg)
+static int process_cb(jack_nframes_t nframes, void *arg)
 {
     struct cbox_io *io = arg;
     struct cbox_io_callbacks *cb = io->cb;
     
-    io->buffer_size = frames;
+    io->buffer_size = nframes;
     for (int i = 0; i < io->input_count; i++)
-        io->input_buffers[i] = jack_port_get_buffer(io->inputs[i], frames);
+        io->input_buffers[i] = jack_port_get_buffer(io->inputs[i], nframes);
     for (int i = 0; i < io->output_count; i++)
-        io->output_buffers[i] = jack_port_get_buffer(io->outputs[i], frames);
-    cb->process(cb->user_data, io, frames);
+    {
+        io->output_buffers[i] = jack_port_get_buffer(io->outputs[i], nframes);
+        for (int j = 0; j < nframes; j ++)
+            io->output_buffers[i][j] = 0.f;
+    }
+    cb->process(cb->user_data, io, nframes);
     for (int i = 0; i < io->input_count; i++)
         io->input_buffers[i] = NULL;
     for (int i = 0; i < io->output_count; i++)
