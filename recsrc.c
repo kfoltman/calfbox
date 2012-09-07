@@ -36,8 +36,7 @@ void cbox_recording_source_init(struct cbox_recording_source *src, uint32_t max_
 void cbox_recording_source_attach(struct cbox_recording_source *src, struct cbox_recorder *rec)
 {
     rec->attach(rec, src);
-    void **new_array = stm_array_clone_insert((void **)src->handlers, src->handler_count, 0, rec);
-    cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&src->handlers, new_array, &src->handler_count, src->handler_count + 1);
+    cbox_rt_array_insert(app.rt, (void **)&src->handlers, &src->handler_count, 0, rec);
 }
 
 int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_recorder *rec)
@@ -55,8 +54,7 @@ int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_
         return 0;
     
     rec->detach(rec);
-    void **new_array = stm_array_clone_remove((void **)src->handlers, src->handler_count, index);
-    cbox_rt_swap_pointers_and_update_count(app.rt, (void **)&src->handlers, new_array, &src->handler_count, src->handler_count - 1);
+    cbox_rt_array_remove(app.rt, (void **)&src->handlers, &src->handler_count, index);
     return 1;
 }
 

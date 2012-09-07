@@ -438,18 +438,11 @@ gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *la
     }
     if (i == scene->layer_count)
     {
-        struct cbox_instrument **instruments = malloc(sizeof(struct cbox_instrument *) * (scene->instrument_count + 1));
-        memcpy(instruments, scene->instruments, sizeof(struct cbox_instrument *) * scene->instrument_count);
-        instruments[scene->instrument_count] = layer->instrument;
         layer->instrument->scene = scene;
-        free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->instruments, instruments, &scene->instrument_count, scene->instrument_count + 1));        
+        cbox_rt_array_insert(scene->rt, (void **)&scene->instruments, &scene->instrument_count, -1, layer->instrument);
     }
-    struct cbox_layer **layers = malloc(sizeof(struct cbox_layer *) * (scene->layer_count + 1));
-    memcpy(layers, scene->layers, sizeof(struct cbox_layer *) * pos);
-    layers[pos] = layer;
-    memcpy(layers + pos + 1, scene->layers + pos, sizeof(struct cbox_layer *) * (scene->layer_count - pos));
+    cbox_rt_array_insert(scene->rt, (void **)&scene->layers, &scene->layer_count, pos, layer);
     
-    free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->layers, layers, &scene->layer_count, scene->layer_count + 1));
     return TRUE;
 }
 
@@ -461,10 +454,7 @@ gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer
 struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos)
 {
     struct cbox_layer *removed = scene->layers[pos];
-    struct cbox_layer **layers = malloc(sizeof(struct cbox_layer *) * (scene->layer_count - 1));
-    memcpy(layers, scene->layers, sizeof(struct cbox_layer *) * pos);
-    memcpy(layers + pos, scene->layers + pos + 1, sizeof(struct cbox_layer *) * (scene->layer_count - pos - 1));
-    free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->layers, layers, &scene->layer_count, scene->layer_count - 1));
+    cbox_rt_array_remove(scene->rt, (void **)&scene->layers, &scene->layer_count, pos);
     cbox_instrument_unref_aux_buses(removed->instrument);
     
     return removed;
@@ -500,11 +490,7 @@ gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_inst
     {
         if (scene->instruments[pos] == instrument)
         {
-            struct cbox_instrument **instruments = malloc(sizeof(struct cbox_instrument *) * (scene->instrument_count - 1));
-            memcpy(instruments, scene->instruments, sizeof(struct cbox_instrument *) * pos);
-            memcpy(instruments + pos, scene->instruments + pos + 1, sizeof(struct cbox_instrument *) * (scene->instrument_count - pos - 1));
-            free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->instruments, instruments, &scene->instrument_count, scene->instrument_count - 1));
-            
+            cbox_rt_array_remove(scene->rt, (void **)&scene->instruments, &scene->instrument_count, pos);            
             instrument->scene = NULL;
             return TRUE;
         }

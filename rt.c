@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "scene.h"
 #include "seq.h"
 #include "song.h"
+#include "stm.h"
 #include "track.h"
 #include <assert.h>
 #include <stdio.h>
@@ -515,6 +516,28 @@ void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, voi
         *pcount = new_count;
         return old_ptr;        
     }
+}
+
+void cbox_rt_array_insert(struct cbox_rt *rt, void **ptr, int *pcount, int index, void *new_value)
+{
+    assert(index >= -1);
+    assert(index <= *pcount);
+    assert(*pcount >= 0);
+    void **new_array = stm_array_clone_insert(*ptr, *pcount, index, new_value);
+    if (rt)
+        free(cbox_rt_swap_pointers_and_update_count(rt, (void **)ptr, new_array, pcount, *pcount + 1));            
+}
+
+void *cbox_rt_array_remove(struct cbox_rt *rt, void **ptr, int *pcount, int index)
+{
+    if (index == 0)
+        index = *pcount - 1;
+    assert(index >= 0);
+    assert(index < *pcount);
+    assert(*pcount > 0);
+    void **new_array = stm_array_clone_remove(*ptr, *pcount, index);
+    if (rt)
+        free(cbox_rt_swap_pointers_and_update_count(rt, (void **)ptr, new_array, pcount, *pcount - 1));            
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

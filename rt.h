@@ -79,6 +79,9 @@ extern void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_def
 extern void *cbox_rt_swap_pointers(struct cbox_rt *rt, void **ptr, void *new_value);
 extern void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, void *new_value, int *pcount, int new_count);
 
+extern void cbox_rt_array_insert(struct cbox_rt *rt, void **ptr, int *pcount, int index, void *new_value);
+extern void *cbox_rt_array_remove(struct cbox_rt *rt, void **ptr, int *pcount, int index);
+
 // These use an RT command internally
 extern struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scene);
 extern struct cbox_song *cbox_rt_set_song(struct cbox_rt *rt, struct cbox_song *song, int new_pos);

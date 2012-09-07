@@ -7,10 +7,13 @@
 static inline void **stm_array_clone_insert(void **old_array, int old_count, int index, void *data)
 {
     size_t ps = sizeof(void *);
+    if (index == -1)
+        index = old_count;
     void **new_array = malloc(ps * (old_count + 1));
     memcpy(&new_array[0], &old_array[0], ps * index);
     new_array[index] = data;
-    memcpy(&new_array[index + 1], &old_array[index], ps * (old_count - index));
+    if (index != old_count)
+        memcpy(&new_array[index + 1], &old_array[index], ps * (old_count - index));
     return new_array;
 }
 
