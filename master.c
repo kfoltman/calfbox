@@ -122,6 +122,8 @@ void cbox_master_set_sample_rate(struct cbox_master *master, int srate)
 
 void cbox_master_set_tempo(struct cbox_master *master, float tempo)
 {
+    // XXXKF not realtime-safe; won't crash, but may lose tempo
+    // changes when used multiple times in rapid succession
     master->new_tempo = tempo;
 }
 
@@ -166,9 +168,10 @@ int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn)
     int offset = 0;
     if (master->spb)
     {
-        struct cbox_tempo_map_item *tmi = cbox_song_playback_tmi_from_ppqn(master->spb, time_ppqn);
-        if (tmi)
+        int idx = cbox_song_playback_tmi_from_ppqn(master->spb, time_ppqn);
+        if (idx != -1)
         {
+            const struct cbox_tempo_map_item *tmi = &master->spb->tempo_map_items[idx];
             tempo = tmi->tempo;
             time_ppqn -= tmi->time_ppqn;
             offset = tmi->time_samples;
@@ -183,9 +186,10 @@ int cbox_master_samples_to_ppqn(struct cbox_master *master, int time_samples)
     int offset = 0;
     if (master->spb)
     {
-        struct cbox_tempo_map_item *tmi = cbox_song_playback_tmi_from_samples(master->spb, time_samples);
-        if (tmi)
+        int idx = cbox_song_playback_tmi_from_samples(master->spb, time_samples);
+        if (idx != -1)
         {
+            const struct cbox_tempo_map_item *tmi = &master->spb->tempo_map_items[idx];
             tempo = tmi->tempo;
             time_samples -= tmi->time_samples;
             offset = tmi->time_ppqn;

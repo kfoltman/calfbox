@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "seq.h"
 #include "song.h"
 #include "track.h"
+#include <assert.h>
 
 static inline void accumulate_event(struct cbox_midi_playback_active_notes *notes, const struct cbox_midi_event *event)
 {
@@ -347,12 +348,54 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song)
         
         pos_ppqn += mti->duration_ppqn;
         pos_samples += song->master->srate * 60.0 * mti->duration_ppqn / (mti->tempo * PPQN);
-        
+        pos++;
     }
     return spb;
 }
 
 #define MAX_TRACKS 16
+
+static void cbox_song_playback_set_tempo(struct cbox_song_playback *spb, double tempo)
+{
+    int opos = spb->song_pos_samples;
+    int ppos = spb->song_pos_ppqn;
+    int pos1 = cbox_master_ppqn_to_samples(spb->master, ppos);
+    int pos2 = cbox_master_ppqn_to_samples(spb->master, ppos + 1);
+    double relpos = 0.0;
+    if (pos1 != pos2)
+        relpos = (spb->song_pos_samples - pos1) * 1.0 / (pos2 - pos1);
+    spb->master->tempo = tempo;
+
+    // This seek loses the fractional value of the PPQN song position.
+    // This needs to be compensated for by shifting the playback
+    // position by the fractional part.
+    cbox_song_playback_seek_ppqn(spb, ppos, spb->min_time_ppqn);
+    if (relpos > 0)
+    {
+        pos2 = cbox_master_ppqn_to_samples(spb->master, ppos + 1);
+        cbox_song_playback_seek_samples(spb, spb->song_pos_samples + (pos2 - spb->song_pos_samples) * relpos + 0.5);
+    }
+}
+
+int cbox_song_playback_get_next_tempo_change(struct cbox_song_playback *spb)
+{
+    double new_tempo = 0;
+    // Skip items at or already past the playback pointer
+    while (spb->tempo_map_pos + 1 < spb->tempo_map_item_count && 
+        spb->song_pos_samples >= spb->tempo_map_items[spb->tempo_map_pos + 1].time_samples)
+    {
+        new_tempo = spb->tempo_map_items[spb->tempo_map_pos + 1].tempo;
+        spb->tempo_map_pos++;
+    }
+    if (new_tempo != 0.0 && new_tempo != spb->master->tempo)
+        cbox_song_playback_set_tempo(spb, new_tempo);
+        
+    // No more items?
+    if (spb->tempo_map_pos + 1 >= spb->tempo_map_item_count)
+        return -1;
+    
+    return spb->tempo_map_items[spb->tempo_map_pos + 1].time_samples;
+}
 
 void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, int nsamples)
 {
@@ -360,26 +403,10 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
     
     cbox_midi_buffer_clear(output);
     
-    if (spb->master->new_tempo != spb->master->tempo)
+    if (spb->master->new_tempo != 0 && spb->master->new_tempo != spb->master->tempo)
     {
-        int opos = spb->song_pos_samples;
-        int ppos = spb->song_pos_ppqn;
-        int pos1 = cbox_master_ppqn_to_samples(spb->master, ppos);
-        int pos2 = cbox_master_ppqn_to_samples(spb->master, ppos + 1);
-        double relpos = 0.0;
-        if (pos1 != pos2)
-            relpos = (spb->song_pos_samples - pos1) * 1.0 / (pos2 - pos1);
-        spb->master->tempo = spb->master->new_tempo;
-
-        // This seek loses the fractional value of the PPQN song position.
-        // This needs to be compensated for by shifting the playback
-        // position by the fractional part.
-        cbox_song_playback_seek_ppqn(spb, ppos, spb->min_time_ppqn);
-        if (relpos > 0)
-        {
-            pos2 = cbox_master_ppqn_to_samples(spb->master, ppos + 1);
-            cbox_song_playback_seek_samples(spb, spb->song_pos_samples + (pos2 - spb->song_pos_samples) * relpos + 0.5);
-        }
+        cbox_song_playback_set_tempo(spb, spb->master->new_tempo);
+        spb->master->new_tempo = 0;
     }
     if (spb->master->state == CMTS_STOP)
     {
@@ -398,6 +425,18 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
         while (rpos < nsamples)
         {
             int rend = nsamples;
+            
+            // 1. Shorten the period so that it doesn't go past a tempo change
+            int tmpos = cbox_song_playback_get_next_tempo_change(spb);
+            if (tmpos != -1)
+            {
+                // Number of samples until the next tempo change
+                int stntc = tmpos - spb->song_pos_samples;
+                if (rend - rpos > stntc)
+                    rend = rpos + stntc;
+            }
+            
+            // 2. Shorten the period so that it doesn't go past the song length
             int end_pos = spb->song_pos_samples + (rend - rpos);
             if (end_pos >= end_samples)
             {
@@ -459,6 +498,7 @@ void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn,
     spb->song_pos_samples = cbox_master_ppqn_to_samples(spb->master, time_ppqn);
     spb->song_pos_ppqn = time_ppqn;
     spb->min_time_ppqn = min_time_ppqn;
+    spb->tempo_map_pos = cbox_song_playback_tmi_from_ppqn(spb, time_ppqn);
 }
 
 void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_samples)
@@ -471,32 +511,37 @@ void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_sa
     spb->song_pos_samples = time_samples;
     spb->song_pos_ppqn = cbox_master_samples_to_ppqn(spb->master, time_samples);
     spb->min_time_ppqn = spb->song_pos_ppqn;
+    spb->tempo_map_pos = cbox_song_playback_tmi_from_samples(spb, time_samples);
 }
 
-struct cbox_tempo_map_item *cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, int time_ppqn)
+int cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, int time_ppqn)
 {
     if (!spb->tempo_map_item_count)
-        return NULL;
+        return -1;
+    assert(spb->tempo_map_items[0].time_samples == 0);
+    assert(spb->tempo_map_items[0].time_ppqn == 0);
     // XXXKF should use binary search here really
     for (int i = 1; i < spb->tempo_map_item_count; i++)
     {
         if (time_ppqn < spb->tempo_map_items[i].time_ppqn)
-            return &spb->tempo_map_items[i - 1];
+            return i - 1;
     }
-    return &spb->tempo_map_items[spb->tempo_map_item_count - 1];
+    return spb->tempo_map_item_count - 1;
 }
 
-struct cbox_tempo_map_item *cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, int time_samples)
+int cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, int time_samples)
 {
     if (!spb->tempo_map_item_count)
-        return NULL;
+        return -1;
+    assert(spb->tempo_map_items[0].time_samples == 0);
+    assert(spb->tempo_map_items[0].time_ppqn == 0);
     // XXXKF should use binary search here really
     for (int i = 1; i < spb->tempo_map_item_count; i++)
     {
         if (time_samples < spb->tempo_map_items[i].time_samples)
-            return &spb->tempo_map_items[i - 1];
+            return i - 1;
     }
-    return &spb->tempo_map_items[spb->tempo_map_item_count - 1];
+    return spb->tempo_map_item_count - 1;
 }
 
 void cbox_song_playback_destroy(struct cbox_song_playback *spb)
