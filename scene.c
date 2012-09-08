@@ -362,9 +362,9 @@ gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *la
     if (i == scene->layer_count)
     {
         layer->instrument->scene = scene;
-        cbox_rt_array_insert(scene->rt, (void **)&scene->instruments, &scene->instrument_count, -1, layer->instrument);
+        cbox_rt_array_insert(scene->rt, (void ***)&scene->instruments, &scene->instrument_count, -1, layer->instrument);
     }
-    cbox_rt_array_insert(scene->rt, (void **)&scene->layers, &scene->layer_count, pos, layer);
+    cbox_rt_array_insert(scene->rt, (void ***)&scene->layers, &scene->layer_count, pos, layer);
     
     return TRUE;
 }
@@ -377,7 +377,7 @@ gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer
 struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos)
 {
     struct cbox_layer *removed = scene->layers[pos];
-    cbox_rt_array_remove(scene->rt, (void **)&scene->layers, &scene->layer_count, pos);
+    cbox_rt_array_remove(scene->rt, (void ***)&scene->layers, &scene->layer_count, pos);
     cbox_instrument_unref_aux_buses(removed->instrument);
     
     return removed;
@@ -413,7 +413,7 @@ gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_inst
     {
         if (scene->instruments[pos] == instrument)
         {
-            cbox_rt_array_remove(scene->rt, (void **)&scene->instruments, &scene->instrument_count, pos);            
+            cbox_rt_array_remove(scene->rt, (void ***)&scene->instruments, &scene->instrument_count, pos);            
             instrument->scene = NULL;
             return TRUE;
         }

@@ -518,26 +518,26 @@ void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, voi
     }
 }
 
-void cbox_rt_array_insert(struct cbox_rt *rt, void **ptr, int *pcount, int index, void *new_value)
+void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, int *pcount, int index, void *new_value)
 {
     assert(index >= -1);
     assert(index <= *pcount);
     assert(*pcount >= 0);
     void **new_array = stm_array_clone_insert(*ptr, *pcount, index, new_value);
-    if (rt)
-        free(cbox_rt_swap_pointers_and_update_count(rt, (void **)ptr, new_array, pcount, *pcount + 1));            
+    free(cbox_rt_swap_pointers_and_update_count(rt, (void **)ptr, new_array, pcount, *pcount + 1));            
 }
 
-void *cbox_rt_array_remove(struct cbox_rt *rt, void **ptr, int *pcount, int index)
+void *cbox_rt_array_remove(struct cbox_rt *rt, void ***ptr, int *pcount, int index)
 {
-    if (index == 0)
+    if (index == -1)
         index = *pcount - 1;
     assert(index >= 0);
     assert(index < *pcount);
     assert(*pcount > 0);
+    void *p = (*ptr)[index];
     void **new_array = stm_array_clone_remove(*ptr, *pcount, index);
-    if (rt)
-        free(cbox_rt_swap_pointers_and_update_count(rt, (void **)ptr, new_array, pcount, *pcount - 1));            
+    free(cbox_rt_swap_pointers_and_update_count(rt, (void **)ptr, new_array, pcount, *pcount - 1));            
+    return p;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
