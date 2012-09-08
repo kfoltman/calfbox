@@ -196,7 +196,7 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     }
     else if (!strcmp(cmd->command, "/high_note") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->low_note = *(int *)cmd->arg_values[0];
+        layer->high_note = *(int *)cmd->arg_values[0];
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/in_channel") && !strcmp(cmd->arg_types, "i"))
