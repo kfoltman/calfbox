@@ -273,12 +273,19 @@ class SelectObjectDialog(gtk.Dialog):
         
         self.update_model(model)
                 
+        scroll = gtk.ScrolledWindow()
         scenes = gtk.TreeView(model)
         scenes.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=0)
         scenes.insert_column_with_attributes(1, "Title", gtk.CellRendererText(), text=3)
         scenes.insert_column_with_attributes(2, "Type", gtk.CellRendererText(), text=1)
-        self.vbox.pack_start(scenes)
+        scenes.get_column(0).set_property('min_width', 150)
+        scenes.get_column(1).set_property('min_width', 300)
+        scenes.get_column(2).set_property('min_width', 150)
+        scroll.add(scenes)
+        self.vbox.pack_start(scroll)
         scenes.show()
+        scroll.set_size_request(640, 500)
+        scroll.show()
         scenes.grab_focus()
         self.scenes = scenes
         self.scenes.connect('row-activated', lambda w, path, column: self.response(gtk.RESPONSE_OK))
