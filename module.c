@@ -177,7 +177,7 @@ fxpreset_error:
     return NULL;
 }
 
-gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
+gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, struct cbox_rt *rt, GError **error)
 {
     struct cbox_module *sm = *psm;
     if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
@@ -192,10 +192,10 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
     }
     if (!strcmp(subcmd, "/insert_preset") && !strcmp(cmd->arg_types, "s"))
     {
-        struct cbox_module *effect = cbox_module_new_from_fx_preset((const char *)cmd->arg_values[0], sm->rt, error);
+        struct cbox_module *effect = cbox_module_new_from_fx_preset((const char *)cmd->arg_values[0], rt, error);
         if (!effect)
             return FALSE;
-        cbox_rt_swap_pointers(sm->rt, (void **)psm, effect);
+        cbox_rt_swap_pointers(rt, (void **)psm, effect);
         return TRUE;
     }
     if (!strcmp(subcmd, "/insert_engine") && !strcmp(cmd->arg_types, "s"))
@@ -209,11 +209,11 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No effect engine '%s'", (const char *)cmd->arg_values[0]);
                 return FALSE;
             }
-            effect = cbox_module_manifest_create_module(manifest, NULL, sm->rt, "unnamed", error);
+            effect = cbox_module_manifest_create_module(manifest, NULL, rt, "unnamed", error);
             if (!effect)
                 return FALSE;
         }
-        cbox_rt_swap_pointers(sm->rt, (void **)psm, effect);
+        cbox_rt_swap_pointers(rt, (void **)psm, effect);
         return TRUE;
     }
     if (!strncmp(subcmd, "/engine/", 8))

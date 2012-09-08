@@ -33,17 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 CBOX_CLASS_DEFINITION_ROOT(cbox_scene)
 
-static gboolean cbox_aux_bus_process_cmd(struct cbox_aux_bus *aux_bus, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
+static gboolean cbox_aux_bus_process_cmd(struct cbox_aux_bus *aux_bus, struct cbox_rt *rt, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
 {
     if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
 
-        return cbox_module_slot_process_cmd(&aux_bus->module, fb, cmd, subcmd, error);
+        return cbox_module_slot_process_cmd(&aux_bus->module, fb, cmd, subcmd, rt, error);
     }
     else 
-        return cbox_module_slot_process_cmd(&aux_bus->module, fb, cmd, subcmd, error);
+        return cbox_module_slot_process_cmd(&aux_bus->module, fb, cmd, subcmd, rt, error);
 }
 
 static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -164,7 +164,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     {
         if (!subcommand)
             return FALSE;
-        return cbox_aux_bus_process_cmd(s->aux_buses[index - 1], fb, cmd, subcommand, error);
+        return cbox_aux_bus_process_cmd(s->aux_buses[index - 1], s->rt, fb, cmd, subcommand, error);
     }
     else if (!strncmp(cmd->command, "/instr/", 7))
     {

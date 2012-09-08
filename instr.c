@@ -47,7 +47,7 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
             cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
             cbox_execute_on(fb, NULL, "/output", "i", error, output->output_bus + 1)))
             return FALSE;
-        return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, error);
+        return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, instr->owner->rt, error);
     }
     if (!strcmp(subcmd, "/gain") && !strcmp(cmd->arg_types, "f"))
     {
@@ -61,7 +61,7 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
         output->output_bus = obus - 1;
         return TRUE;
     }
-    return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, error);
+    return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, instr->owner->rt, error);
 }
 
 static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, struct cbox_instrument_output *output, int id, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
@@ -74,7 +74,7 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
             cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
             cbox_execute_on(fb, NULL, "/bus", "s", error, instr->aux_output_names[id] ? instr->aux_output_names[id] : "")))
             return FALSE;
-        return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, error);
+        return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, instr->owner->rt, error);
     }
     else if (!strcmp(subcmd, "/bus") && !strcmp(cmd->arg_types, "s"))
     {

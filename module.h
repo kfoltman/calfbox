@@ -124,7 +124,7 @@ extern void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, voi
 extern void cbox_module_destroy(struct cbox_module *module);
 extern void cbox_module_swap_pointers_and_free(struct cbox_module *sm, void **pptr, void *value);
 
-extern gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error);
+extern gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, struct cbox_rt *rt, GError **error);
 
 #define EFFECT_PARAM_CLONE(res) \
     struct MODULE_PARAMS *res = malloc(sizeof(struct MODULE_PARAMS)); \
