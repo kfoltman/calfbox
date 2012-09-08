@@ -79,11 +79,11 @@ extern void cbox_dom_close();
 #define CBOX_NEW(document, class) \
     (struct class *)cbox_object_new_by_class((document), &CBOX_CLASS_##class)
 
-#define CBOX_CREATE_OTHER_CLASS(obj, class) \
+#define CBOX_CREATE_OTHER(obj, class) \
     (struct class *)cbox_object_new_by_class((obj)->_obj_hdr.owner, &CBOX_CLASS_##class)
 
 #define CBOX_DELETE(obj) \
-    cbox_object_destroy(&(obj)->_obj_hdr)
+    (obj) && (cbox_object_destroy(&(obj)->_obj_hdr), 1)
 
 #define CBOX_OBJECT_HEADER_INIT(self, class, document) \
     do { \

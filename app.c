@@ -99,7 +99,7 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
     struct cbox_scene *scene = CBOX_NEW(app.document, cbox_scene);
-    struct cbox_layer *layer = cbox_layer_load(scene, (char *)item->item.item_context, &error);
+    struct cbox_layer *layer = cbox_layer_load2(scene, (char *)item->item.item_context, &error);
     
     if (layer)
     {

@@ -33,84 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 CBOX_CLASS_DEFINITION_ROOT(cbox_scene)
 
-static gboolean cbox_layer_process_cmd(struct cbox_layer *layer, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
-{
-    if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
-    {
-        if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
-
-        if (!(cbox_execute_on(fb, NULL, "/enable", "i", error, (int)layer->enabled) && 
-            cbox_execute_on(fb, NULL, "/instrument_name", "s", error, layer->instrument->module->instance_name) && 
-            cbox_execute_on(fb, NULL, "/consume", "i", error, (int)layer->consume) && 
-            cbox_execute_on(fb, NULL, "/ignore_scene_transpose", "i", error, (int)layer->ignore_scene_transpose) && 
-            cbox_execute_on(fb, NULL, "/disable_aftertouch", "i", error, (int)layer->disable_aftertouch) && 
-            cbox_execute_on(fb, NULL, "/transpose", "i", error, (int)layer->transpose) && 
-            cbox_execute_on(fb, NULL, "/fixed_note", "i", error, (int)layer->fixed_note) && 
-            cbox_execute_on(fb, NULL, "/low_note", "i", error, (int)layer->low_note) && 
-            cbox_execute_on(fb, NULL, "/high_note", "i", error, (int)layer->high_note) && 
-            cbox_execute_on(fb, NULL, "/in_channel", "i", error, layer->in_channel + 1) && 
-            cbox_execute_on(fb, NULL, "/out_channel", "i", error, layer->out_channel + 1)))
-            return FALSE;
-        return TRUE;
-    }
-    else if (!strcmp(subcmd, "/enable") && !strcmp(cmd->arg_types, "i"))
-    {
-        layer->enabled = 0 != *(int *)cmd->arg_values[0];
-        return TRUE;
-    }
-    else if (!strcmp(subcmd, "/consume") && !strcmp(cmd->arg_types, "i"))
-    {
-        layer->consume = 0 != *(int *)cmd->arg_values[0];
-        return TRUE;
-    }
-    else if (!strcmp(subcmd, "/ignore_scene_transpose") && !strcmp(cmd->arg_types, "i"))
-    {
-        layer->ignore_scene_transpose = 0 != *(int *)cmd->arg_values[0];
-        return TRUE;
-    }
-    else if (!strcmp(subcmd, "/disable_aftertouch") && !strcmp(cmd->arg_types, "i"))
-    {
-        layer->disable_aftertouch = 0 != *(int *)cmd->arg_values[0];
-        return TRUE;
-    }
-    else if (!strcmp(subcmd, "/transpose") && !strcmp(cmd->arg_types, "i"))
-    {
-        layer->transpose = *(int *)cmd->arg_values[0];
-        return TRUE;
-    }
-    else if (!strcmp(subcmd, "/fixed_note") && !strcmp(cmd->arg_types, "i"))
-    {
-        layer->fixed_note = *(int *)cmd->arg_values[0];
-        return TRUE;
-    }
-    else if (!strcmp(subcmd, "/low_note") && !strcmp(cmd->arg_types, "i"))
-    {
-        layer->low_note = *(int *)cmd->arg_values[0];
-        return TRUE;
-    }
-    else if (!strcmp(subcmd, "/high_note") && !strcmp(cmd->arg_types, "i"))
-    {
-        layer->low_note = *(int *)cmd->arg_values[0];
-        return TRUE;
-    }
-    else if (!strcmp(subcmd, "/in_channel") && !strcmp(cmd->arg_types, "i"))
-    {
-        layer->in_channel = *(int *)cmd->arg_values[0] - 1;
-        return TRUE;
-    }
-    else if (!strcmp(subcmd, "/out_channel") && !strcmp(cmd->arg_types, "i"))
-    {
-        layer->out_channel = *(int *)cmd->arg_values[0] - 1;
-        return TRUE;
-    }
-    else // otherwise, treat just like an command on normal (non-aux) output
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
-        return FALSE;
-    }
-}
-
 static gboolean cbox_aux_bus_process_cmd(struct cbox_aux_bus *aux_bus, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
 {
     if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
@@ -137,7 +59,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "s"))
     {
-        struct cbox_scene *scene = CBOX_CREATE_OTHER_CLASS(s, cbox_scene);
+        struct cbox_scene *scene = CBOX_CREATE_OTHER(s, cbox_scene);
         if (!scene)
             return FALSE;
         if (!cbox_scene_load(scene, (const gchar *)cmd->arg_values[0], error))
@@ -148,7 +70,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/new") && !strcmp(cmd->arg_types, ""))
     {
-        struct cbox_scene *scene = CBOX_CREATE_OTHER_CLASS(s, cbox_scene);
+        struct cbox_scene *scene = CBOX_CREATE_OTHER(s, cbox_scene);
         if (!scene) // not really expected
             return FALSE;
         struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
@@ -167,12 +89,12 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             pos = s->layer_count;
         else
             pos--;
-        struct cbox_layer *layer = cbox_layer_load(s, (const gchar *)cmd->arg_values[1], error);
+        struct cbox_layer *layer = cbox_layer_load2(s, (const gchar *)cmd->arg_values[1], error);
         if (!layer)
             return FALSE;
         if (!cbox_scene_insert_layer(s, layer, pos, error))
         {
-            cbox_layer_destroy(layer);
+            CBOX_DELETE(layer);
             return FALSE;
         }
         return TRUE;
@@ -194,7 +116,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             return FALSE;
         if (!cbox_scene_insert_layer(s, layer, pos, error))
         {
-            cbox_layer_destroy(layer);
+            CBOX_DELETE(layer);
             return FALSE;
         }
         return TRUE;
@@ -211,7 +133,8 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             pos = s->layer_count - 1;
         else
             pos--;
-        cbox_layer_destroy(cbox_scene_remove_layer(s, pos));
+        struct cbox_layer *layer = cbox_scene_remove_layer(s, pos);
+        CBOX_DELETE(layer);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/move_layer") && !strcmp(cmd->arg_types, "ii"))
@@ -235,7 +158,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     {
         if (!subcommand)
             return FALSE;
-        return cbox_layer_process_cmd(s->layers[index - 1], fb, cmd, subcommand, error);
+        return cbox_execute_sub(&s->layers[index - 1]->cmd_target, fb, cmd, subcommand, error);
     }
     else if (cbox_parse_path_part(cmd, "/aux/", &subcommand, &index, 1, s->aux_bus_count, error))
     {
@@ -396,7 +319,7 @@ gboolean cbox_scene_load(struct cbox_scene *s, const char *name, GError **error)
         if (!cv)
             break;
         
-        l = cbox_layer_load(s, cv, error);
+        l = cbox_layer_load2(s, cv, error);
         if (!l)
             goto error;
         
@@ -741,7 +664,10 @@ void cbox_scene_clear(struct cbox_scene *scene)
     scene->name = g_strdup("");
     scene->title = g_strdup("");
     while(scene->layer_count > 0)
-        cbox_layer_destroy(cbox_scene_remove_layer(scene, 0));
+    {
+        struct cbox_layer *layer = cbox_scene_remove_layer(scene, 0);
+        CBOX_DELETE(layer);
+    }
             
     while(scene->aux_bus_count > 0)
         cbox_aux_bus_destroy(scene->aux_buses[--scene->aux_bus_count]);

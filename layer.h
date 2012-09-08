@@ -19,15 +19,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_LAYER_H
 #define CBOX_LAYER_H
 
+#include "dom.h"
 #include <glib.h>
 #include <stdint.h>
 
 struct cbox_module;
 struct cbox_rt;
 
+CBOX_EXTERN_CLASS(cbox_layer)
+
 struct cbox_layer
 {
+    CBOX_OBJECT_HEADER()
     struct cbox_instrument *instrument;
+    struct cbox_command_target cmd_target;
     gboolean enabled;
     int8_t in_channel; // -1 for Omni
     int8_t out_channel; // -1 for Omni
@@ -41,8 +46,11 @@ struct cbox_layer
     gboolean ignore_scene_transpose;
 };
 
-extern struct cbox_layer *cbox_layer_new(struct cbox_scene *scene, const char *name, GError **error);
-extern struct cbox_layer *cbox_layer_load(struct cbox_scene *scene, const char *instrument_name, GError **error);
+extern struct cbox_layer *cbox_layer_new(struct cbox_scene *scene, const char *instrument_name, GError **error);
+extern struct cbox_layer *cbox_layer_load2(struct cbox_scene *scene, const char *instrument_name, GError **error);
+
+extern gboolean cbox_layer_load(struct cbox_layer *layer, struct cbox_instruments *instruments, const char *name, GError **error);
+extern void cbox_layer_set_instrument(struct cbox_layer *layer, struct cbox_instrument *instrument);
 extern void cbox_layer_destroy(struct cbox_layer *layer);
 
 #endif
