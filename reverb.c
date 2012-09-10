@@ -34,15 +34,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define DELAY_BUFFER 1024
 #define ALLPASS_BUFFER 2048
-#define REVERB_BLOCKS 4
-#define ALLPASS_UNITS_PER_BLOCK 3
 
-struct cbox_reverb_block
+struct cbox_reverb_leg_params
 {
-    float allpass_storage[ALLPASS_UNITS_PER_BLOCK][ALLPASS_BUFFER];
+    int delay_length;
+    int allpass_units;
+    int allpass_lengths[0];
+};
+
+struct cbox_reverb_leg
+{
+    struct cbox_reverb_leg_params *params;
+    float (*allpass_storage)[ALLPASS_BUFFER];
     float delay_storage[DELAY_BUFFER];
     struct cbox_onepolef_state filter_state;
+    float buffer[CBOX_BLOCK_SIZE];
 };
+
+static struct cbox_reverb_leg_params *leg_params_new(int delay_length, int allpasses, const int *lengths)
+{
+    struct cbox_reverb_leg_params *p = malloc(sizeof(struct cbox_reverb_leg_params) + sizeof(int) * allpasses);
+    p->delay_length = delay_length;
+    p->allpass_units = allpasses;
+    
+    if (lengths)
+    {
+        for (int i = 0; i < allpasses; i++)
+            p->allpass_lengths[i] = lengths[i];
+    }
+
+    return p;
+}
+
+static void cbox_reverb_leg_reset(struct cbox_reverb_leg *leg)
+{
+    cbox_onepolef_reset(&leg->filter_state);
+    int i;
+    for (int a = 0; a < leg->params->allpass_units; a++)
+        for (i = 0; i < ALLPASS_BUFFER; i++)
+            leg->allpass_storage[a][i] = 0.f;
+    for (i = 0; i < DELAY_BUFFER; i++)
+        leg->delay_storage[i] = 0.f;
+}
+
+static void cbox_reverb_leg_init(struct cbox_reverb_leg *leg)
+{
+    leg->allpass_storage = malloc(leg->params->allpass_units * ALLPASS_BUFFER * sizeof(float));
+    cbox_reverb_leg_reset(leg);
+}
+
+static void cbox_reverb_leg_cleanup(struct cbox_reverb_leg *leg)
+{
+    free(leg->params);
+    free(leg->allpass_storage);
+}
 
 #define MODULE_PARAMS reverb_params
 
@@ -55,13 +100,20 @@ struct reverb_params
     float diffusion;
 };
 
+struct reverb_state
+{
+    struct cbox_reverb_leg *legs;
+    int leg_count;
+};
+
 struct reverb_module
 {
     struct cbox_module module;
 
-    struct cbox_reverb_block blocks[REVERB_BLOCKS];
     struct cbox_onepolef_coeffs filter_coeffs[2];
     struct reverb_params *params, *old_params;
+    struct reverb_state state;
+    float gain;
     int pos;
 };
 
@@ -96,99 +148,127 @@ void reverb_process_event(struct cbox_module *module, const uint8_t *data, uint3
     struct reverb_module *m = (struct reverb_module *)module;
 }
 
+static void cbox_reverb_process_leg(struct reverb_module *m, int u)
+{
+    int pos;
+    int dv;
+    float *storage;
+    
+    struct reverb_params *p = m->params;
+    struct reverb_state *state = &m->state;
+    struct cbox_reverb_leg *b = &state->legs[u];
+    int uprev = u ? (u - 1) : (state->leg_count - 1);
+    struct cbox_reverb_leg *bprev = &state->legs[uprev];    
+    
+    float gain = m->gain;
+    pos = m->pos;
+    storage = bprev->delay_storage;
+    float *buf = b->buffer;
+    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+    {
+        buf[i] += cbox_onepolef_process_sample(&b->filter_state, &m->filter_coeffs[u&1], storage[pos & (DELAY_BUFFER - 1)] * gain);
+        pos++;
+    }
+
+    float w = p->diffusion;
+    int units = b->params->allpass_units;
+    for (int a = 0; a < units; a++)
+    {
+        pos = m->pos;
+        storage = b->allpass_storage[a];
+        dv = b->params->allpass_lengths[a];
+        for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+        {
+            float dry = buf[i];
+            float out = dry;
+        
+            float delayed = storage[pos & (ALLPASS_BUFFER - 1)];
+            
+            float feedback = sanef(out - w * delayed);
+            
+            buf[i] = sanef(feedback * w + delayed);
+            
+            storage[(pos + dv) & (ALLPASS_BUFFER - 1)] = feedback;
+            pos++;
+        }
+    }
+    pos = m->pos;
+    storage = b->delay_storage;
+    dv = b->params->delay_length;
+    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+    {
+        storage[(pos + dv) & (DELAY_BUFFER - 1)] = buf[i];
+        pos++;
+    }
+}
+
 void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct reverb_module *m = (struct reverb_module *)module;
     struct reverb_params *p = m->params;
     
-    float rv = p->decay_time * m->module.srate / 1000;
     float dryamt = p->dryamt;
     float wetamt = p->wetamt;
+    struct reverb_state *s = &m->state;
 
     if (p != m->old_params)
     {
         float tpdsr = 2 * M_PI / m->module.srate;
         cbox_onepolef_set_lowpass(&m->filter_coeffs[0], p->lowpass * tpdsr);
         cbox_onepolef_set_highpass(&m->filter_coeffs[1], p->highpass * tpdsr);
+        float rv = p->decay_time * m->module.srate / 1000;
+        m->gain = pow(0.001, 3488.0 / rv);
         m->old_params = p;
     }
 
-    float temp[REVERB_BLOCKS][CBOX_BLOCK_SIZE];
-    
-    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+    int mid = s->leg_count >> 1;
+    memcpy(s->legs[0].buffer, inputs[0], CBOX_BLOCK_SIZE * sizeof(float));
+    memcpy(s->legs[mid].buffer, inputs[1], CBOX_BLOCK_SIZE * sizeof(float));
+    for (int u = 1; u < mid; u++)
     {
-        temp[0][i] = inputs[0][i];
-        temp[1][i] = 0.f;
-        temp[2][i] = inputs[1][i];
-        temp[3][i] = 0;
+        for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+            s->legs[u].buffer[i] = 0.f;
+        for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+            s->legs[u + mid].buffer[i] = 0.f;
     }
-    
-    static int dvs[REVERB_BLOCKS][ALLPASS_UNITS_PER_BLOCK + 1] = {
-        {731, 873, 1215, 133},
-        {1054, 1519, 973, 461},
-        {617, 941, 1277, 251},
-        {1119, 1477, 933, 379},
-    };
-    
-    float gain = pow(0.001, 3488.0 / rv);
-    
-    for (int u = 0; u < REVERB_BLOCKS; u++)
-    {
-        struct cbox_reverb_block *b = &m->blocks[u];
-        int uprev = (u + REVERB_BLOCKS - 1) % REVERB_BLOCKS;
-        struct cbox_reverb_block *bprev = &m->blocks[uprev];
-
-        int pos;
-        int dv;
-        float *storage;
         
-        pos = m->pos;
-        storage = bprev->delay_storage;
-        for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
-        {
-            temp[u][i] += cbox_onepolef_process_sample(&b->filter_state, &m->filter_coeffs[u&1], storage[pos & (DELAY_BUFFER - 1)] * gain);
-            pos++;
-        }
+    for (int u = 0; u < s->leg_count; u++)
+        cbox_reverb_process_leg(m, u);
 
-        float w = p->diffusion;
-        for (int a = 0; a < ALLPASS_UNITS_PER_BLOCK; a++)
-        {
-            pos = m->pos;
-            storage = b->allpass_storage[a];
-            dv = dvs[u][a];
-            for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
-            {
-                float dry = temp[u][i];
-                float out = dry;
-            
-                float delayed = storage[pos & (ALLPASS_BUFFER - 1)];
-                
-                float feedback = sanef(out - w * delayed);
-                
-                temp[u][i] = sanef(feedback * w + delayed);
-                
-                storage[(pos + dv) & (ALLPASS_BUFFER - 1)] = feedback;
-                pos++;
-            }
-        }
-        pos = m->pos;
-        storage = b->delay_storage;
-        dv = dvs[u][ALLPASS_UNITS_PER_BLOCK];
-        for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
-        {
-            storage[(pos + dv) & (DELAY_BUFFER - 1)] = temp[u][i];
-            pos++;
-        }
-    }
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
-    {
-        outputs[0][i] = inputs[0][i] * dryamt + temp[1][i] * wetamt;
-        outputs[1][i] = inputs[1][i] * dryamt + temp[3][i] * wetamt;
-    }
+        outputs[0][i] = inputs[0][i] * dryamt + s->legs[mid - 1].buffer[i] * wetamt;
+    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+        outputs[1][i] = inputs[1][i] * dryamt + s->legs[s->leg_count - 1].buffer[i] * wetamt;
     m->pos += CBOX_BLOCK_SIZE;
 }
 
-MODULE_SIMPLE_DESTROY_FUNCTION(reverb)
+static void reverb_destroyfunc(struct cbox_module *module_)
+{
+    struct reverb_module *m = (struct reverb_module *)module_;
+    free(m->params);
+    for (int i = 0; i < m->state.leg_count; i++)
+        cbox_reverb_leg_cleanup(&m->state.legs[i]);
+    free(m->state.legs);
+}
+
+static void init_reverb_state(struct reverb_state *state, int leg_count, ...)
+{
+    state->leg_count = 4;
+    state->legs = malloc(state->leg_count * sizeof(struct cbox_reverb_leg));
+    va_list va;
+    va_start(va, leg_count);
+    for (int u = 0; u < state->leg_count; u++)
+    {
+        int delay_length = va_arg(va, int);
+        int allpasses = va_arg(va, int);
+        state->legs[u].params = leg_params_new(delay_length, allpasses, NULL);
+        for (int i = 0; i < allpasses; i++)
+            state->legs[u].params->allpass_lengths[i] = va_arg(va, int);
+    }
+    va_end(va);
+    for (int u = 0; u < state->leg_count; u++)
+        cbox_reverb_leg_init(&state->legs[u]);
+}
 
 MODULE_CREATE_FUNCTION(reverb)
 {
@@ -209,16 +289,16 @@ MODULE_CREATE_FUNCTION(reverb)
     m->params->decay_time = cbox_config_get_float(cfg_section, "reverb_time", 1000);
     m->params->dryamt = cbox_config_get_gain_db(cfg_section, "dry_gain", 0.f);
     m->params->wetamt = cbox_config_get_gain_db(cfg_section, "wet_gain", -6.f);
-    for (int u = 0; u < REVERB_BLOCKS; u++)
-    {
-        struct cbox_reverb_block *b = &m->blocks[u];
-        cbox_onepolef_reset(&b->filter_state);
-        for (int a = 0; a < ALLPASS_UNITS_PER_BLOCK; a++)
-            for (i = 0; i < ALLPASS_BUFFER; i++)
-                b->allpass_storage[a][i] = 0.f;
-        for (i = 0; i < DELAY_BUFFER; i++)
-            b->delay_storage[i] = 0.f;
-    }
+    
+    init_reverb_state(&m->state, 4, 
+        133, 3, 
+            731, 873, 1215,
+        461, 3, 
+            1054, 1519, 973,
+        251, 3, 
+            617, 941, 1277, 
+        379, 3,
+            1119, 1477, 933);
     
     float tpdsr = 2 * M_PI / m->module.srate;
     
