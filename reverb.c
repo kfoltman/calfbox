@@ -109,6 +109,7 @@ struct reverb_state
 {
     struct cbox_reverb_leg *legs;
     int leg_count;
+    int total_time;
 };
 
 struct reverb_module
@@ -220,7 +221,7 @@ void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
         cbox_onepolef_set_lowpass(&m->filter_coeffs[0], p->lowpass * tpdsr);
         cbox_onepolef_set_highpass(&m->filter_coeffs[1], p->highpass * tpdsr);
         float rv = p->decay_time * m->module.srate / 1000;
-        m->gain = pow(0.001, 3488.0 / rv);
+        m->gain = pow(0.001, s->total_time / rv);
         m->old_params = p;
     }
 
@@ -262,15 +263,19 @@ static struct reverb_state *create_reverb_state(int leg_count, ...)
     state->legs = malloc(state->leg_count * sizeof(struct cbox_reverb_leg));
     va_list va;
     va_start(va, leg_count);
+    state->total_time = 0;
     for (int u = 0; u < state->leg_count; u++)
     {
         int delay_length = va_arg(va, int);
         int allpasses = va_arg(va, int);
+        state->total_time += delay_length;
         state->legs[u].params = leg_params_new(delay_length, allpasses, NULL);
         for (int i = 0; i < allpasses; i++)
         {
-            state->legs[u].params->allpasses[i].delay = va_arg(va, int);
-            state->legs[u].params->allpasses[i].diffusion = va_arg(va, double);
+            struct allpass_param *ap = &state->legs[u].params->allpasses[i];
+            ap->delay = va_arg(va, int);
+            ap->diffusion = va_arg(va, double);
+            state->total_time += ap->delay * ap->diffusion; // very rough approximation
         }
     }
     va_end(va);
