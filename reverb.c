@@ -300,7 +300,7 @@ MODULE_CREATE_FUNCTION(reverb)
     m->pos = 0;
     m->old_params = NULL;
     m->params = malloc(sizeof(struct reverb_params));
-    m->params->decay_time = cbox_config_get_float(cfg_section, "reverb_time", 1000);
+    m->params->decay_time = cbox_config_get_float(cfg_section, "decay_time", 1000);
     m->params->dryamt = cbox_config_get_gain_db(cfg_section, "dry_gain", 0.f);
     m->params->wetamt = cbox_config_get_gain_db(cfg_section, "wet_gain", -6.f);
     
