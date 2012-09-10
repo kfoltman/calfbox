@@ -35,11 +35,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define DELAY_BUFFER 1024
 #define ALLPASS_BUFFER 2048
 
+struct allpass_param
+{
+    int delay;
+    float diffusion;
+};
+
 struct cbox_reverb_leg_params
 {
     int delay_length;
     int allpass_units;
-    int allpass_lengths[0];
+    struct allpass_param allpasses[0];
 };
 
 struct cbox_reverb_leg
@@ -51,16 +57,16 @@ struct cbox_reverb_leg
     float buffer[CBOX_BLOCK_SIZE];
 };
 
-static struct cbox_reverb_leg_params *leg_params_new(int delay_length, int allpasses, const int *lengths)
+static struct cbox_reverb_leg_params *leg_params_new(int delay_length, int allpasses, const struct allpass_param *allpass_params)
 {
-    struct cbox_reverb_leg_params *p = malloc(sizeof(struct cbox_reverb_leg_params) + sizeof(int) * allpasses);
+    struct cbox_reverb_leg_params *p = malloc(sizeof(struct cbox_reverb_leg_params) + sizeof(struct allpass_param) * allpasses);
     p->delay_length = delay_length;
     p->allpass_units = allpasses;
     
-    if (lengths)
+    if (allpass_params)
     {
         for (int i = 0; i < allpasses; i++)
-            p->allpass_lengths[i] = lengths[i];
+            memcpy(&p->allpasses[i], &allpass_params[i], sizeof(struct allpass_param));
     }
 
     return p;
@@ -97,7 +103,6 @@ struct reverb_params
     float wetamt;
     float dryamt;
     float lowpass, highpass;
-    float diffusion;
 };
 
 struct reverb_state
@@ -124,7 +129,6 @@ gboolean reverb_process_cmd(struct cbox_command_target *ct, struct cbox_command_
     EFFECT_PARAM("/wet_amt", "f", wetamt, double, dB2gain_simple, -100, 100) else
     EFFECT_PARAM("/dry_amt", "f", dryamt, double, dB2gain_simple, -100, 100) else
     EFFECT_PARAM("/decay_time", "f", decay_time, double, , 500, 5000) else
-    EFFECT_PARAM("/diffusion", "f", diffusion, double, , 0, 1) else
     EFFECT_PARAM("/lowpass", "f", lowpass, double, , 30, 20000) else
     EFFECT_PARAM("/highpass", "f", highpass, double, , 30, 20000) else
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
@@ -134,7 +138,6 @@ gboolean reverb_process_cmd(struct cbox_command_target *ct, struct cbox_command_
         return cbox_execute_on(fb, NULL, "/wet_amt", "f", error, gain2dB_simple(m->params->wetamt)) &&
             cbox_execute_on(fb, NULL, "/dry_amt", "f", error, gain2dB_simple(m->params->dryamt)) &&
             cbox_execute_on(fb, NULL, "/decay_time", "f", error, m->params->decay_time) &&
-            cbox_execute_on(fb, NULL, "/diffusion", "f", error, m->params->diffusion) &&
             cbox_execute_on(fb, NULL, "/lowpass", "f", error, m->params->lowpass) &&
             cbox_execute_on(fb, NULL, "/highpass", "f", error, m->params->highpass);
     }
@@ -170,13 +173,13 @@ static void cbox_reverb_process_leg(struct reverb_module *m, int u)
         pos++;
     }
 
-    float w = p->diffusion;
     int units = b->params->allpass_units;
     for (int a = 0; a < units; a++)
     {
         pos = m->pos;
         storage = b->allpass_storage[a];
-        dv = b->params->allpass_lengths[a];
+        dv = b->params->allpasses[a].delay;
+        float w = b->params->allpasses[a].diffusion;
         for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
         {
             float dry = buf[i];
@@ -265,7 +268,10 @@ static struct reverb_state *create_reverb_state(int leg_count, ...)
         int allpasses = va_arg(va, int);
         state->legs[u].params = leg_params_new(delay_length, allpasses, NULL);
         for (int i = 0; i < allpasses; i++)
-            state->legs[u].params->allpass_lengths[i] = va_arg(va, int);
+        {
+            state->legs[u].params->allpasses[i].delay = va_arg(va, int);
+            state->legs[u].params->allpasses[i].diffusion = va_arg(va, double);
+        }
     }
     va_end(va);
     for (int u = 0; u < state->leg_count; u++)
@@ -295,17 +301,24 @@ MODULE_CREATE_FUNCTION(reverb)
     
     m->state = create_reverb_state(4, 
         133, 3, 
-            731, 873, 1215,
-        461, 3, 
-            1054, 1519, 973,
+            731, 0.45,
+            873, 0.5,
+            1215, 0.55,
+        461, 3,
+            1054, 0.5,
+            1519, 0.5,
+            973, 0.5,
         251, 3, 
-            617, 941, 1277, 
+            617, 0.45,
+            941, 0.5,
+            1277, 0.55,
         379, 3,
-            1119, 1477, 933);
+            1119, 0.5,
+            1477, 0.5,
+            933, 0.5);
     
     float tpdsr = 2 * M_PI / m->module.srate;
     
-    m->params->diffusion = cbox_config_get_float(cfg_section, "diffusion", 0.45);
     m->params->lowpass = cbox_config_get_float(cfg_section, "lowpass", 8000.f);
     m->params->highpass = cbox_config_get_float(cfg_section, "highpass", 35.f);
     

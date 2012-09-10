@@ -121,8 +121,7 @@ class ReverbWindow(EffectWindow):
         SliderRow("Dry amount", "dry_amt", -100, 12),
         SliderRow("Wet amount", "wet_amt", -100, 12),
         MappedSliderRow("Lowpass", "lowpass", LogMapper(300, 20000, freq_format)),
-        MappedSliderRow("Highpass", "highpass", LogMapper(30, 2000, freq_format)),
-        SliderRow("Diffusion", "diffusion", 0.2, 0.8, step = 0.025, digits = 2)
+        MappedSliderRow("Highpass", "highpass", LogMapper(30, 2000, freq_format))
     ]
     engine_name = "reverb"
     effect_name = "Reverb"
