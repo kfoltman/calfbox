@@ -38,7 +38,6 @@ struct cbox_instrument_output
 
 struct cbox_instrument
 {
-    struct cbox_instruments *owner;
     struct cbox_module *module;
     struct cbox_instrument_output *outputs;
     struct cbox_scene *scene;
@@ -49,14 +48,11 @@ struct cbox_instrument
     int aux_output_count;
 };
 
-extern struct cbox_instruments *cbox_instruments_new(struct cbox_rt *rt);
-extern struct cbox_instrument *cbox_instruments_get_by_name(struct cbox_instruments *instruments, const char *name, gboolean load, GError **error);
-extern struct cbox_rt *cbox_instruments_get_rt(struct cbox_instruments *instruments);
 extern void cbox_instrument_unref_aux_buses(struct cbox_instrument *instrument);
 extern void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrument, struct cbox_aux_bus *bus);
 extern void cbox_instrument_destroy(struct cbox_instrument *instrument);
 extern void cbox_instrument_destroy_if_unused(struct cbox_instrument *instrument);
-extern void cbox_instruments_destroy(struct cbox_instruments *instruments);
+extern gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 
 extern void cbox_instrument_output_init(struct cbox_instrument_output *output, uint32_t max_numsamples);
 extern void cbox_instrument_output_uninit(struct cbox_instrument_output *output);

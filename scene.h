@@ -35,7 +35,7 @@ struct cbox_scene
     gchar *name;
     gchar *title;
     
-    struct cbox_instruments *instrument_mgr;
+    GHashTable *instrument_hash;
     struct cbox_rt *rt;
     struct cbox_layer **layers;
     int layer_count;
@@ -56,5 +56,7 @@ extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, con
 extern struct cbox_aux_bus *cbox_scene_remove_aux_bus(struct cbox_scene *scene, int pos);
 extern void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_midi_buffer *midibuf_total, float *output_buffers[]);
 extern void cbox_scene_clear(struct cbox_scene *scene);
+extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *scene, const char *name, gboolean load, GError **error);
+
 
 #endif

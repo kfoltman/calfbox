@@ -31,6 +31,7 @@ CBOX_EXTERN_CLASS(cbox_layer)
 struct cbox_layer
 {
     CBOX_OBJECT_HEADER()
+    struct cbox_scene *scene;
     struct cbox_instrument *instrument;
     struct cbox_command_target cmd_target;
     gboolean enabled;
@@ -49,7 +50,7 @@ struct cbox_layer
 extern struct cbox_layer *cbox_layer_new(struct cbox_scene *scene, const char *instrument_name, GError **error);
 extern struct cbox_layer *cbox_layer_load2(struct cbox_scene *scene, const char *instrument_name, GError **error);
 
-extern gboolean cbox_layer_load(struct cbox_layer *layer, struct cbox_instruments *instruments, const char *name, GError **error);
+extern gboolean cbox_layer_load(struct cbox_layer *layer, const char *name, GError **error);
 extern void cbox_layer_set_instrument(struct cbox_layer *layer, struct cbox_instrument *instrument);
 extern void cbox_layer_destroy(struct cbox_layer *layer);
 

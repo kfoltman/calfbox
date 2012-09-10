@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "scene.h"
 #include <glib.h>
 
-gboolean cbox_layer_load(struct cbox_layer *layer, struct cbox_instruments *instrument_mgr, const char *name, GError **error)
+gboolean cbox_layer_load(struct cbox_layer *layer, const char *name, GError **error)
 {
     const char *cv = NULL;
     struct cbox_instrument *instr = NULL;
@@ -44,7 +44,7 @@ gboolean cbox_layer_load(struct cbox_layer *layer, struct cbox_instruments *inst
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Instrument not specified for layer %s", name);
         goto error;
     }
-    instr = cbox_instruments_get_by_name(instrument_mgr, cv, TRUE, error);
+    instr = cbox_scene_get_instrument_by_name(layer->scene, cv, TRUE, error);
     if (!instr)
     {
         cbox_force_error(error);
@@ -120,6 +120,7 @@ static struct cbox_objhdr *cbox_layer_newfunc(struct cbox_class *class_ptr, stru
     l->invert_sustain = FALSE;
     l->consume = FALSE;
     l->ignore_scene_transpose = FALSE;
+    l->scene = NULL;
     
     return &l->_obj_hdr;
 }
@@ -221,7 +222,7 @@ CBOX_CLASS_DEFINITION_ROOT(cbox_layer)
 struct cbox_layer *cbox_layer_new(struct cbox_scene *scene, const char *instrument_name, GError **error)
 {
     struct cbox_instrument *instr;
-    instr = cbox_instruments_get_by_name(scene->instrument_mgr, instrument_name, TRUE, error);
+    instr = cbox_scene_get_instrument_by_name(scene, instrument_name, TRUE, error);
     if (!instr)
     {
         cbox_force_error(error);
@@ -231,6 +232,7 @@ struct cbox_layer *cbox_layer_new(struct cbox_scene *scene, const char *instrume
 
     struct cbox_layer *layer = (struct cbox_layer *)CBOX_CREATE_OTHER(scene, cbox_layer);
     if (!layer) goto error;
+    layer->scene = scene;
     cbox_layer_set_instrument(layer, instr);
     return layer;
 
@@ -244,7 +246,8 @@ struct cbox_layer *cbox_layer_load2(struct cbox_scene *scene, const char *instru
     struct cbox_layer *layer = (struct cbox_layer *)CBOX_CREATE_OTHER(scene, cbox_layer);
     if (!layer) goto error;
 
-    if (!cbox_layer_load(layer, scene->instrument_mgr, instrument_name, error))
+    layer->scene = scene;
+    if (!cbox_layer_load(layer, instrument_name, error))
         goto error;
 
     return layer;
