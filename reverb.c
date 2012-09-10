@@ -198,7 +198,7 @@ static void cbox_reverb_process_leg(struct reverb_module *m, int u)
     }
     pos = m->pos;
     storage = b->delay_storage;
-    dv = b->params->delay_length;
+    dv = b->params->delay_length - (u == 0 ? CBOX_BLOCK_SIZE : 0);
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         storage[(pos + dv) & (DELAY_BUFFER - 1)] = buf[i];
@@ -221,7 +221,7 @@ void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
         cbox_onepolef_set_lowpass(&m->filter_coeffs[0], p->lowpass * tpdsr);
         cbox_onepolef_set_highpass(&m->filter_coeffs[1], p->highpass * tpdsr);
         float rv = p->decay_time * m->module.srate / 1000;
-        m->gain = pow(0.001, s->total_time / rv);
+        m->gain = pow(0.001, s->total_time / (rv * s->leg_count / 2));
         m->old_params = p;
     }
 
@@ -321,6 +321,24 @@ MODULE_CREATE_FUNCTION(reverb)
             1119, 0.5,
             1477, 0.5,
             933, 0.5);
+
+#if 0
+    m->state = create_reverb_state(2, 
+        133, 6, 
+            1573, 0.35,
+            587, 0.35,
+            921, 0.45,
+            605, 0.5,
+            1051, 0.45,
+            397, 0.5,
+        251, 6, 
+            1561, 0.35,
+            594, 0.35,
+            927, 0.55,
+            611, 0.5,
+            1147, 0.55,
+            393, 0.5);
+#endif
     
     float tpdsr = 2 * M_PI / m->module.srate;
     
