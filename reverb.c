@@ -112,7 +112,7 @@ struct reverb_module
 
     struct cbox_onepolef_coeffs filter_coeffs[2];
     struct reverb_params *params, *old_params;
-    struct reverb_state state;
+    struct reverb_state *state;
     float gain;
     int pos;
 };
@@ -155,7 +155,7 @@ static void cbox_reverb_process_leg(struct reverb_module *m, int u)
     float *storage;
     
     struct reverb_params *p = m->params;
-    struct reverb_state *state = &m->state;
+    struct reverb_state *state = m->state;
     struct cbox_reverb_leg *b = &state->legs[u];
     int uprev = u ? (u - 1) : (state->leg_count - 1);
     struct cbox_reverb_leg *bprev = &state->legs[uprev];    
@@ -209,7 +209,7 @@ void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     
     float dryamt = p->dryamt;
     float wetamt = p->wetamt;
-    struct reverb_state *s = &m->state;
+    struct reverb_state *s = m->state;
 
     if (p != m->old_params)
     {
@@ -246,14 +246,16 @@ static void reverb_destroyfunc(struct cbox_module *module_)
 {
     struct reverb_module *m = (struct reverb_module *)module_;
     free(m->params);
-    for (int i = 0; i < m->state.leg_count; i++)
-        cbox_reverb_leg_cleanup(&m->state.legs[i]);
-    free(m->state.legs);
+    for (int i = 0; i < m->state->leg_count; i++)
+        cbox_reverb_leg_cleanup(&m->state->legs[i]);
+    free(m->state->legs);
+    free(m->state);
 }
 
-static void init_reverb_state(struct reverb_state *state, int leg_count, ...)
+static struct reverb_state *create_reverb_state(int leg_count, ...)
 {
-    state->leg_count = 4;
+    struct reverb_state *state = malloc(sizeof(struct reverb_state));
+    state->leg_count = leg_count;
     state->legs = malloc(state->leg_count * sizeof(struct cbox_reverb_leg));
     va_list va;
     va_start(va, leg_count);
@@ -268,6 +270,7 @@ static void init_reverb_state(struct reverb_state *state, int leg_count, ...)
     va_end(va);
     for (int u = 0; u < state->leg_count; u++)
         cbox_reverb_leg_init(&state->legs[u]);
+    return state;
 }
 
 MODULE_CREATE_FUNCTION(reverb)
@@ -290,7 +293,7 @@ MODULE_CREATE_FUNCTION(reverb)
     m->params->dryamt = cbox_config_get_gain_db(cfg_section, "dry_gain", 0.f);
     m->params->wetamt = cbox_config_get_gain_db(cfg_section, "wet_gain", -6.f);
     
-    init_reverb_state(&m->state, 4, 
+    m->state = create_reverb_state(4, 
         133, 3, 
             731, 873, 1215,
         461, 3, 
