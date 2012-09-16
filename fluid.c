@@ -149,7 +149,7 @@ MODULE_CREATE_FUNCTION(fluidsynth)
         {
             if (!select_patch_by_name(m, i, preset, error))
             {
-                cbox_module_destroy(&m->module);
+                CBOX_DELETE(&m->module);
                 return NULL;
             }
         }

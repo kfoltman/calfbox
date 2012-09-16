@@ -19,12 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_MODULE_H
 #define CBOX_MODULE_H
 
-#include "cmd.h"
+#include "dom.h"
 #include "dspmath.h"
 #include "errors.h"
 #include "midi.h"
 
 #include <stdint.h>
+
+CBOX_EXTERN_CLASS(cbox_module)
 
 #define CBOX_MAX_AUDIO_PORTS 32
 
@@ -62,6 +64,7 @@ struct cbox_module_voicingparam_metadata
 
 struct cbox_module
 {
+    CBOX_OBJECT_HEADER()
     void *user_data;
     struct cbox_rt *rt;
     const char *engine_name;
@@ -121,7 +124,6 @@ extern struct cbox_module *cbox_module_manifest_create_module(struct cbox_module
 extern struct cbox_module *cbox_module_new_from_fx_preset(const char *name, struct cbox_rt *rt, GError **error);
 
 extern void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler, void (*destroy)(struct cbox_module *module));
-extern void cbox_module_destroy(struct cbox_module *module);
 extern void cbox_module_swap_pointers_and_free(struct cbox_module *sm, void **pptr, void *value);
 
 extern gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, struct cbox_rt *rt, GError **error);

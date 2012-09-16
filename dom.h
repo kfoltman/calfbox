@@ -37,6 +37,7 @@ struct cbox_class
 {
     struct cbox_class *parent;
     const char *name;
+    int hdr_offset;
     void (*destroyfunc)(struct cbox_objhdr *objhdr);
     struct cbox_command_target *(*getcmdtargetfunc)(struct cbox_objhdr *objhdr);
 };
@@ -112,11 +113,16 @@ extern void cbox_dom_close();
     struct cbox_class CBOX_CLASS_##class = { \
         .parent = NULL, \
         .name = #class, \
+        .hdr_offset = offsetof(struct class, _obj_hdr), \
         .destroyfunc = class##_destroyfunc, \
         .getcmdtargetfunc = class##_getcmdtarget \
     }; \
     
 #define CBOX_RETURN_OBJECT(result) \
     return &(result)->_obj_hdr
+    
+// Convert header to object, regardless of the relative position of the header.
+#define CBOX_H2O(hdr) \
+    (void *)(((char *)(hdr)) - (hdr)->class_ptr->hdr_offset)
 
 #endif

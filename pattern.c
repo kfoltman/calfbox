@@ -52,7 +52,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_document *
 
 void cbox_midi_pattern_destroyfunc(struct cbox_objhdr *objhdr)
 {
-    struct cbox_midi_pattern *pattern = (struct cbox_midi_pattern *)objhdr;
+    struct cbox_midi_pattern *pattern = CBOX_H2O(objhdr);
     g_free(pattern->name);
     if (pattern->events != NULL)
         free(pattern->events);

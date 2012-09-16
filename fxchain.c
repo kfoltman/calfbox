@@ -110,7 +110,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
         void *old_modules = cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->modules, new_modules, &m->module_count, m->module_count - 1);
         free(old_modules);
         if (deleted_module)
-            cbox_module_destroy(deleted_module);
+            CBOX_DELETE(deleted_module);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/move") && !strcmp(cmd->arg_types, "ii"))
@@ -162,7 +162,7 @@ static void fxchain_destroyfunc(struct cbox_module *module)
     struct fxchain_module *m = module->user_data;
     for (int i = 0; i < m->module_count; i++)
     {
-        cbox_module_destroy(m->modules[i]);
+        CBOX_DELETE(m->modules[i]);
         m->modules[i] = NULL;
     }
 }
@@ -216,7 +216,7 @@ struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, str
 
 failed:
     m->module_count = i;
-    cbox_module_destroy(&m->module);
+    CBOX_DELETE(&m->module);
     return NULL;
 }
 

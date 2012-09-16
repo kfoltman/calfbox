@@ -53,7 +53,7 @@ void cbox_aux_bus_unref(struct cbox_aux_bus *bus)
 
 void cbox_aux_bus_destroy(struct cbox_aux_bus *bus)
 {
-    cbox_module_destroy(bus->module);
+    CBOX_DELETE(bus->module);
     bus->module = NULL;
     assert(!bus->refcount);
     g_free(bus->name);

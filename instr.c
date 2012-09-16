@@ -115,7 +115,7 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
             return FALSE;
         if (!cbox_execute_on(fb, NULL, "/outputs", "i", error, instr->module->outputs / 2))
             return FALSE;
-        return TRUE;
+        return CBOX_OBJECT_DEFAULT_STATUS(instr->module, fb, error);
     }
     else if (cbox_parse_path_part_int(cmd, "/output/", &subcommand, &index, 1, aux_offset, error))
     {
@@ -166,7 +166,7 @@ void cbox_instrument_destroy(struct cbox_instrument *instrument)
     }
     free(instrument->aux_output_names);
     free(instrument->aux_outputs);
-    cbox_module_destroy(instrument->module);
+    CBOX_DELETE(instrument->module);
     free(instrument);
 }
 
@@ -206,5 +206,8 @@ void cbox_instrument_output_uninit(struct cbox_instrument_output *output)
     cbox_recording_source_uninit(&output->rec_dry);
     cbox_recording_source_uninit(&output->rec_wet);
     if (output->insert)
-        cbox_module_destroy(output->insert);
+    {
+        CBOX_DELETE(output->insert);
+        output->insert = NULL;
+    }
 }

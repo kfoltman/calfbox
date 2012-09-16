@@ -313,7 +313,10 @@ ok:
     if (error)
         g_error_free(error);
     if (app.rt->effect)
-        cbox_module_destroy(app.rt->effect);
+    {
+        CBOX_DELETE(app.rt->effect);
+        app.rt->effect = NULL;
+    }
     if (scene)
         CBOX_DELETE(scene);
     

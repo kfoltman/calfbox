@@ -99,9 +99,9 @@ void cbox_layer_set_instrument(struct cbox_layer *layer, struct cbox_instrument 
 
 static gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 
-static void cbox_layer_destroyfunc(struct cbox_objhdr *layer_)
+static void cbox_layer_destroyfunc(struct cbox_objhdr *objhdr)
 {
-    struct cbox_layer *layer = (struct cbox_layer *)layer_;
+    struct cbox_layer *layer = CBOX_H2O(objhdr);
     if (!--(layer->instrument->refcount))
     {
         if (layer->instrument->scene)
@@ -122,6 +122,7 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
 
         if (!(cbox_execute_on(fb, NULL, "/enable", "i", error, (int)layer->enabled) && 
             cbox_execute_on(fb, NULL, "/instrument_name", "s", error, layer->instrument->module->instance_name) && 
+            cbox_execute_on(fb, NULL, "/instrument_uuid", "o", error, layer->instrument->module) && 
             cbox_execute_on(fb, NULL, "/consume", "i", error, (int)layer->consume) && 
             cbox_execute_on(fb, NULL, "/ignore_scene_transpose", "i", error, (int)layer->ignore_scene_transpose) && 
             cbox_execute_on(fb, NULL, "/disable_aftertouch", "i", error, (int)layer->disable_aftertouch) && 

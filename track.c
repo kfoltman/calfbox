@@ -79,7 +79,7 @@ void cbox_track_update_playback(struct cbox_track *track, struct cbox_master *ma
 
 void cbox_track_destroyfunc(struct cbox_objhdr *objhdr)
 {
-    struct cbox_track *track = (struct cbox_track *)objhdr;
+    struct cbox_track *track = CBOX_H2O(objhdr);
     // XXXKF I'm not sure if I want the lifecycle of track playback objects to be managed by the track itself
     if (track->pb)
         cbox_track_playback_destroy(track->pb);

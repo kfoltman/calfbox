@@ -807,9 +807,9 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document)
     return s;
 }
 
-static void cbox_scene_destroyfunc(struct cbox_objhdr *scene_obj)
+static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
 {
-    struct cbox_scene *scene = (struct cbox_scene *)scene_obj;
+    struct cbox_scene *scene = CBOX_H2O(objhdr);
     cbox_scene_clear(scene);
     g_free(scene->name);
     g_free(scene->title);

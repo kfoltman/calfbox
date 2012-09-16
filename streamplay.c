@@ -701,7 +701,7 @@ MODULE_CREATE_FUNCTION(stream_player)
         m->stream = stream_state_new(cfg_section, filename, (uint64_t)(int64_t)cbox_config_get_int(cfg_section, "loop", -1), m->fade_increment, error);
         if (!m->stream)
         {
-            cbox_module_destroy(&m->module);
+            CBOX_DELETE(&m->module);
             return NULL;
         }
     }

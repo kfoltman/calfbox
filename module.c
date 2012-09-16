@@ -67,6 +67,8 @@ struct cbox_module_manifest *cbox_module_list[] = {
     NULL
 };
 
+CBOX_CLASS_DEFINITION_ROOT(cbox_module)
+
 void cbox_module_manifest_dump(struct cbox_module_manifest *manifest)
 {
     static const char *ctl_classes[] = { "Switch CC#", "Continuous CC#", "Cont. Param", "Discrete Param", "Enum" };
@@ -121,6 +123,7 @@ struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manife
 
 void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler, void (*destroy)(struct cbox_module *module))
 {
+    CBOX_OBJECT_HEADER_INIT(module, cbox_module, CBOX_GET_DOCUMENT(rt));
     module->user_data = user_data;
     module->rt = rt;
     module->instance_name = NULL;
@@ -136,6 +139,7 @@ void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user
     module->process_event = NULL;
     module->process_block = NULL;
     module->destroy = destroy;
+    CBOX_OBJECT_REGISTER(module);
 }
 
 struct cbox_module *cbox_module_new_from_fx_preset(const char *name, struct cbox_rt *rt, GError **error)
@@ -186,7 +190,8 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
             return FALSE;
         if (!(cbox_execute_on(fb, NULL, "/insert_engine", "s", error, sm ? sm->engine_name : "") &&
             cbox_execute_on(fb, NULL, "/insert_preset", "s", error, sm ? sm->instance_name : "") &&
-            cbox_execute_on(fb, NULL, "/bypass", "i", error, sm ? sm->bypass : 0)))
+            cbox_execute_on(fb, NULL, "/bypass", "i", error, sm ? sm->bypass : 0)) &&
+            CBOX_OBJECT_DEFAULT_STATUS(sm, fb, error))
             return FALSE;
         return TRUE;
     }
@@ -240,7 +245,7 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
         sm->bypass = *(int *)cmd->arg_values[0];
         return TRUE;
     }
-    return cbox_set_command_error(error, cmd);
+    return cbox_object_default_process_cmd(&sm->cmd_target, fb, cmd, error);
 }
 
 void cbox_module_swap_pointers_and_free(struct cbox_module *sm, void **pptr, void *value)
@@ -248,8 +253,9 @@ void cbox_module_swap_pointers_and_free(struct cbox_module *sm, void **pptr, voi
     free(cbox_rt_swap_pointers(sm->rt, pptr, value));
 }
 
-void cbox_module_destroy(struct cbox_module *module)
+void cbox_module_destroyfunc(struct cbox_objhdr *hdr)
 {
+    struct cbox_module *module = CBOX_H2O(hdr);
     g_free(module->instance_name);
     free(module->input_samples);
     free(module->output_samples);
