@@ -232,7 +232,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         
         for (int i = 0; i < s->layer_count; i++)
         {
-            if (!cbox_execute_on(fb, NULL, "/layer", "i", error, i + 1))
+            if (!cbox_execute_on(fb, NULL, "/layer", "io", error, i + 1, s->layers[i]))
                 return FALSE;
         }
         for (int i = 0; i < s->instrument_count; i++)

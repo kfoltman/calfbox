@@ -103,6 +103,14 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
             PyList_SetItem(arg_values, i, PyString_FromString(cmd->arg_values[i]));
         }
         else
+        if (cmd->arg_types[i] == 'o')
+        {
+            struct cbox_objhdr *oh = cmd->arg_values[i];
+            char buf[40];
+            uuid_unparse(oh->instance_uuid.uuid, buf);
+            PyList_SetItem(arg_values, i, PyString_FromString(buf));
+        }
+        else
         if (cmd->arg_types[i] == 'i')
         {
             PyList_SetItem(arg_values, i, PyInt_FromLong(*(int *)cmd->arg_values[i]));

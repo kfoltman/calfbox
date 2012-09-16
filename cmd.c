@@ -18,12 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "blob.h"
 #include "cmd.h"
+#include "dom.h"
 #include "errors.h"
 #include <assert.h>
 #include <glib.h>
 #include <malloc.h>
 #include <stdlib.h>
 #include <string.h>
+#include <uuid/uuid.h>
 
 void cbox_command_target_init(struct cbox_command_target *ct, cbox_process_cmd cmd, void *user_data)
 {
@@ -82,6 +84,9 @@ gboolean cbox_execute_on_v(struct cbox_command_target *ct, struct cbox_command_t
             case 'b':
                 cmd.arg_values[i] = va_arg(av, struct cbox_blob *);
                 break;
+            case 'o':
+                cmd.arg_values[i] = va_arg(av, struct cbox_objhdr *);
+                break;
             default:
                 g_error("Invalid format character '%c' for command '%s'", args[i], cmd_name);
                 assert(0);
@@ -102,6 +107,14 @@ gboolean cbox_osc_command_dump(const struct cbox_osc_command *cmd)
             case 's':
                 g_message("Args[%d] = '%s'", i, (const char *)cmd->arg_values[i]);
                 break;
+            case 'o':
+            {
+                struct cbox_objhdr *oh = cmd->arg_values[i];
+                char buf[40];
+                uuid_unparse(oh->instance_uuid.uuid, buf);
+                g_message("Args[%d] = uuid:'%s'", i, buf);
+                break;
+            }
             case 'i':
                 g_message("Args[%d] = %d", i, *(int *)cmd->arg_values[i]);
                 break;
