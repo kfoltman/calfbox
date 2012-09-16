@@ -55,6 +55,13 @@ gboolean cbox_set_command_error(GError **error, const struct cbox_osc_command *c
     return FALSE;
 }
 
+gboolean cbox_set_command_error_with_msg(GError **error, const struct cbox_osc_command *cmd, const char *extra_msg)
+{
+    if (error && !*error)
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_OUT_OF_RANGE, "Invalid command '%s' with args '%s': %s", cmd->command, cmd->arg_types, extra_msg);
+    return FALSE;
+}
+
 gboolean cbox_set_range_error(GError **error, const char *param, double minv, double maxv)
 {
     if (error && !*error)

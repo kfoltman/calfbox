@@ -130,7 +130,8 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             cbox_execute_on(fb, NULL, "/low_note", "i", error, (int)layer->low_note) && 
             cbox_execute_on(fb, NULL, "/high_note", "i", error, (int)layer->high_note) && 
             cbox_execute_on(fb, NULL, "/in_channel", "i", error, layer->in_channel + 1) && 
-            cbox_execute_on(fb, NULL, "/out_channel", "i", error, layer->out_channel + 1)))
+            cbox_execute_on(fb, NULL, "/out_channel", "i", error, layer->out_channel + 1) &&
+            CBOX_OBJECT_DEFAULT_STATUS(layer, fb, error)))
             return FALSE;
         return TRUE;
     }
@@ -185,10 +186,7 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return TRUE;
     }
     else // otherwise, treat just like an command on normal (non-aux) output
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
-        return FALSE;
-    }
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
 CBOX_CLASS_DEFINITION_ROOT(cbox_layer)

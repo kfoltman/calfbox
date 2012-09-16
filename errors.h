@@ -38,6 +38,7 @@ extern void cbox_force_error(GError **error);
 extern void cbox_print_error(GError *error);
 extern void cbox_print_error_if(GError *error);
 extern gboolean cbox_set_command_error(GError **error, const struct cbox_osc_command *cmd);
+extern gboolean cbox_set_command_error_with_msg(GError **error, const struct cbox_osc_command *cmd, const char *extra_msg);
 extern gboolean cbox_set_range_error(GError **error, const char *param, double minv, double maxv);
 
 #endif

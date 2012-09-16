@@ -154,13 +154,13 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         cbox_scene_move_layer(s, oldpos - 1, newpos - 1);
         return TRUE;
     }
-    else if (cbox_parse_path_part(cmd, "/layer/", &subcommand, &index, 1, s->layer_count, error))
+    else if (cbox_parse_path_part_int(cmd, "/layer/", &subcommand, &index, 1, s->layer_count, error))
     {
         if (!subcommand)
             return FALSE;
         return cbox_execute_sub(&s->layers[index - 1]->cmd_target, fb, cmd, subcommand, error);
     }
-    else if (cbox_parse_path_part(cmd, "/aux/", &subcommand, &index, 1, s->aux_bus_count, error))
+    else if (cbox_parse_path_part_int(cmd, "/aux/", &subcommand, &index, 1, s->aux_bus_count, error))
     {
         if (!subcommand)
             return FALSE;
@@ -226,7 +226,8 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
 
         if (!cbox_execute_on(fb, NULL, "/name", "s", error, s->name) || 
             !cbox_execute_on(fb, NULL, "/title", "s", error, s->title) ||
-            !cbox_execute_on(fb, NULL, "/transpose", "i", error, s->transpose))
+            !cbox_execute_on(fb, NULL, "/transpose", "i", error, s->transpose) ||
+            !CBOX_OBJECT_DEFAULT_STATUS(s, fb, error))
             return FALSE;
         
         for (int i = 0; i < s->layer_count; i++)
@@ -281,10 +282,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         return TRUE;
     }
     else
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
-        return FALSE;
-    }
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
 gboolean cbox_scene_load(struct cbox_scene *s, const char *name, GError **error)

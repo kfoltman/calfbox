@@ -117,13 +117,13 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
             return FALSE;
         return TRUE;
     }
-    else if (cbox_parse_path_part(cmd, "/output/", &subcommand, &index, 1, aux_offset, error))
+    else if (cbox_parse_path_part_int(cmd, "/output/", &subcommand, &index, 1, aux_offset, error))
     {
         if (!subcommand)
             return FALSE;
         return cbox_instrument_output_process_cmd(instr, &instr->outputs[index - 1], fb, cmd, subcommand, error);
     }
-    else if (cbox_parse_path_part(cmd, "/aux/", &subcommand, &index, 1, instr->aux_output_count, error))
+    else if (cbox_parse_path_part_int(cmd, "/aux/", &subcommand, &index, 1, instr->aux_output_count, error))
     {
         if (!subcommand)
             return FALSE;

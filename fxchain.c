@@ -83,7 +83,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
         }
         return TRUE;
     }
-    else if (cbox_parse_path_part(cmd, "/module/", &subcommand, &index, 1, m->module_count, error))
+    else if (cbox_parse_path_part_int(cmd, "/module/", &subcommand, &index, 1, m->module_count, error))
     {
         if (!subcommand)
             return FALSE;

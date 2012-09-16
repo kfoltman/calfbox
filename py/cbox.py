@@ -114,3 +114,6 @@ class Document:
     @staticmethod
     def dump():
         do_cmd("/doc/dump", None, [])
+    @staticmethod
+    def uuid_cmd(uuid, cmd):
+        return "/doc/uuid/%s%s" % (uuid, cmd)

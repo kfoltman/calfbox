@@ -118,6 +118,26 @@ struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_p
     return hdr_ptr->class_ptr->getcmdtargetfunc(hdr_ptr);
 }
 
+gboolean cbox_object_default_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct cbox_objhdr *obj = ct->user_data;
+    if (!strcmp(cmd->command, "/get_uuid") && !strcmp(cmd->arg_types, ""))
+    {
+        char buf[40];
+        uuid_unparse(obj->instance_uuid.uuid, buf);
+        return cbox_execute_on(fb, NULL, "/uuid", "s", error, buf);
+    }
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s' for object class '%s'", cmd->command, cmd->arg_types, obj->class_ptr->name);
+    return FALSE;
+}
+
+gboolean cbox_object_default_status(struct cbox_objhdr *objhdr, struct cbox_command_target *fb, GError **error)
+{
+    char buf[40];
+    uuid_unparse(objhdr->instance_uuid.uuid, buf);
+    return cbox_execute_on(fb, NULL, "/uuid", "s", error, buf);    
+}
+
 void cbox_object_destroy(struct cbox_objhdr *hdr_ptr)
 {
     struct cbox_class_per_document *cpd = get_cpd_for_class(hdr_ptr->owner, hdr_ptr->class_ptr);
@@ -132,11 +152,35 @@ void cbox_object_destroy(struct cbox_objhdr *hdr_ptr)
 
 static gboolean document_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
+    char *uuid;
+    const char *subcommand;
     if (!strcmp(cmd->command, "/dump") && !strcmp(cmd->arg_types, ""))
     {
         struct cbox_document *doc = ct->user_data;
         cbox_document_dump(doc);
         return TRUE;
+    }
+    if (cbox_parse_path_part_str(cmd, "/uuid/", &subcommand, &uuid, error))
+    {
+        struct cbox_document *doc = ct->user_data;
+        if (!subcommand)
+            return FALSE;
+        struct cbox_uuid uuidv;
+        if (uuid_parse(uuid, uuidv.uuid))
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Malformed UUID: '%s' for command '%s'", uuid, cmd->command);
+            g_free(uuid);
+            return FALSE;
+        }
+        struct cbox_objhdr *obj = cbox_document_get_object_by_uuid(doc, &uuidv);
+        if (!obj)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "UUID not found: '%s' for command '%s'", uuid, cmd->command);
+            g_free(uuid);
+            return FALSE;
+        }
+        struct cbox_command_target *ct2 = cbox_object_get_cmd_target(obj);
+        return cbox_execute_sub(ct2, fb, cmd, subcommand, error);
     }
     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
     return FALSE;    
@@ -170,7 +214,7 @@ void cbox_document_set_service(struct cbox_document *document, const char *name,
     g_hash_table_insert(document->services_per_document, g_strdup(name), obj);
 }
 
-struct cbox_objhdr *cbox_document_get_by_uuid(struct cbox_document *doc, const struct cbox_uuid *uuid)
+struct cbox_objhdr *cbox_document_get_object_by_uuid(struct cbox_document *doc, const struct cbox_uuid *uuid)
 {
     return g_hash_table_lookup(doc->uuids_per_document, uuid);
 }
@@ -193,7 +237,7 @@ static void iter_func(gpointer key, gpointer value, gpointer doc_)
         uuid_unparse(hdr->instance_uuid.uuid, buf);
         printf("[%s]", buf);
         fflush(stdout);
-        assert(cbox_document_get_by_uuid(doc, &hdr->instance_uuid));
+        assert(cbox_document_get_object_by_uuid(doc, &hdr->instance_uuid));
         l = l->next;
         first = 0;
     }

@@ -140,34 +140,49 @@ gboolean cbox_execute_sub(struct cbox_command_target *ct, struct cbox_command_ta
     return ct->process_cmd(ct, fb, &subcmd, error);
 }
 
-gboolean cbox_parse_path_part(const struct cbox_osc_command *cmd, const char *path, const char **subcommand, int *index, int min_index, int max_index, GError **error)
+gboolean cbox_parse_path_part_int(const struct cbox_osc_command *cmd, const char *path, const char **subcommand, int *index, int min_index, int max_index, GError **error)
 {
+    char *numcopy = NULL;
+    if (!cbox_parse_path_part_str(cmd, path, subcommand, &numcopy, error))
+        return FALSE;
+    if (!*subcommand)
+        return TRUE;
+    char *endptr = NULL;
+    *index = strtol(numcopy, &endptr, 10);
+    if (!*numcopy && *endptr)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid index %s for command %s", numcopy, cmd->command);
+        g_free(numcopy);
+        *subcommand = NULL;
+        return TRUE;
+    }
+    if (*index < min_index || *index > max_index)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Index %s out of range [%d, %d] for command %s", numcopy, min_index, max_index, cmd->command);
+        g_free(numcopy);
+        *subcommand = NULL;
+        return TRUE;
+    }
+    g_free(numcopy);
+    return TRUE;
+}
+
+gboolean cbox_parse_path_part_str(const struct cbox_osc_command *cmd, const char *path, const char **subcommand, char **path_element, GError **error)
+{
+    *path_element = NULL;
+    *subcommand = NULL;
     int plen = strlen(path);
     if (!strncmp(cmd->command, path, plen))
     {
         const char *num = cmd->command + plen;
         const char *slash = strchr(num, '/');
         if (!slash)
-            return cbox_set_command_error(error, cmd);            
+        {
+            cbox_set_command_error_with_msg(error, cmd, "needs at least one extra path element");
+            return TRUE;
+        }
         
-        gchar *numcopy = g_strndup(num, slash-num);
-        char *endptr = NULL;
-        *index = strtol(numcopy, &endptr, 10);
-        if (!*numcopy && *endptr)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid index %s for command %s", numcopy, cmd->command);
-            g_free(numcopy);
-            *subcommand = NULL;
-            return TRUE;
-        }
-        if (*index < min_index || *index > max_index)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Index %s out of range [%d, %d] for command %s", numcopy, min_index, max_index, cmd->command);
-            g_free(numcopy);
-            *subcommand = NULL;
-            return TRUE;
-        }
-        g_free(numcopy);
+        *path_element = g_strndup(num, slash-num);
         *subcommand = slash;
         return TRUE;
     }

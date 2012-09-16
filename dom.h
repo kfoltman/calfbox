@@ -19,9 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_DOM_H
 #define CBOX_DOM_H
 
+#include <glib.h>
 #include <uuid/uuid.h>
 
 struct cbox_command_target;
+struct cbox_osc_command;
 struct cbox_objhdr;
 struct cbox_document;
 struct GList;
@@ -59,6 +61,9 @@ inline int cbox_class_is_a(struct cbox_class *c1, struct cbox_class *c2)
 
 extern void cbox_object_register_instance(struct cbox_document *doc, struct cbox_objhdr *obj);
 extern struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_ptr);
+extern gboolean cbox_object_default_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
+extern gboolean cbox_object_default_status(struct cbox_objhdr *objhdr, struct cbox_command_target *fb, GError **error);
+
 extern void cbox_object_destroy(struct cbox_objhdr *hdr_ptr);
 
 extern struct cbox_document *cbox_document_new();
@@ -66,7 +71,7 @@ extern void cbox_document_dump(struct cbox_document *);
 extern struct cbox_command_target *cbox_document_get_cmd_target(struct cbox_document *);
 extern struct cbox_objhdr *cbox_document_get_service(struct cbox_document *doc, const char *name);
 extern void cbox_document_set_service(struct cbox_document *doc, const char *name, struct cbox_objhdr *hdr_ptr);
-extern struct cbox_objhdr *cbox_document_get_by_uuid(struct cbox_document *doc, const struct cbox_uuid *uuid);
+extern struct cbox_objhdr *cbox_document_get_object_by_uuid(struct cbox_document *doc, const struct cbox_uuid *uuid);
 extern void cbox_document_destroy(struct cbox_document *);
 
 extern void cbox_dom_init();
@@ -95,6 +100,9 @@ extern void cbox_dom_close();
     
 #define CBOX_OBJECT_REGISTER(self) \
     (cbox_object_register_instance((self)->_obj_hdr.owner, &(self)->_obj_hdr))
+
+#define CBOX_OBJECT_DEFAULT_STATUS(self, fb, error) \
+    (cbox_object_default_status(&(self)->_obj_hdr, (fb), (error)))
 
 #define CBOX_CLASS_DEFINITION_ROOT(class) \
     static void class##_destroyfunc(struct cbox_objhdr *hdr_ptr); \
