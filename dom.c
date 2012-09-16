@@ -79,29 +79,14 @@ static struct cbox_class_per_document *get_cpd_for_class(struct cbox_document *d
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_objhdr *cbox_object_new_by_class(struct cbox_document *doc, struct cbox_class *class_ptr)
+void cbox_object_register_instance(struct cbox_document *doc, struct cbox_objhdr *obj)
 {
-    assert(class_ptr != NULL);
+    assert(obj != NULL);
 
-    struct cbox_objhdr *obj = class_ptr->newfunc(class_ptr, doc);
-    if (!obj)
-        return NULL;
-    
-    struct cbox_class_per_document *cpd = get_cpd_for_class(doc, class_ptr);
+    struct cbox_class_per_document *cpd = get_cpd_for_class(doc, obj->class_ptr);
     cpd->instances = g_list_prepend(cpd->instances, obj);
     obj->owner = doc;
     obj->link_in_document = cpd->instances;
-    
-    return obj;
-}
-
-struct cbox_objhdr *cbox_object_new_by_class_name(struct cbox_document *doc, const char *name)
-{
-    struct cbox_class *class_ptr = cbox_class_find_by_name(name);
-    if (class_ptr == NULL)
-        return NULL;
-    
-    return cbox_object_new_by_class(doc, (struct cbox_class *)class_ptr);
 }
 
 struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_ptr)

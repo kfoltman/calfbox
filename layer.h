@@ -47,9 +47,9 @@ struct cbox_layer
     gboolean ignore_scene_transpose;
 };
 
-extern struct cbox_layer *cbox_layer_new(struct cbox_scene *scene, const char *instrument_name, GError **error);
-extern struct cbox_layer *cbox_layer_load2(struct cbox_scene *scene, const char *instrument_name, GError **error);
-
+extern struct cbox_layer *cbox_layer_new(struct cbox_scene *scene);
+extern struct cbox_layer *cbox_layer_new_with_instrument(struct cbox_scene *scene, const char *instrument_name, GError **error);
+extern struct cbox_layer *cbox_layer_new_from_config(struct cbox_scene *scene, const char *instrument_name, GError **error);
 extern gboolean cbox_layer_load(struct cbox_layer *layer, const char *name, GError **error);
 extern void cbox_layer_set_instrument(struct cbox_layer *layer, struct cbox_instrument *instrument);
 extern void cbox_layer_destroy(struct cbox_layer *layer);

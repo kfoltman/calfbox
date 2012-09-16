@@ -28,7 +28,6 @@ struct cbox_class
 {
     struct cbox_class *parent;
     const char *name;
-    struct cbox_objhdr *(*newfunc)(struct cbox_class *class_ptr, struct cbox_document *owner);
     void (*destroyfunc)(struct cbox_objhdr *objhdr);
     struct cbox_command_target *(*getcmdtargetfunc)(struct cbox_objhdr *objhdr);
 };
@@ -50,10 +49,8 @@ inline int cbox_class_is_a(struct cbox_class *c1, struct cbox_class *c2)
     return c1 == c2;
 }
 
-extern struct cbox_objhdr *cbox_object_new_by_class(struct cbox_document *doc, struct cbox_class *class_ptr);
-extern struct cbox_objhdr *cbox_object_new_by_class_name(struct cbox_document *doc, const char *name);
+extern void cbox_object_register_instance(struct cbox_document *doc, struct cbox_objhdr *obj);
 extern struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_ptr);
-
 extern void cbox_object_destroy(struct cbox_objhdr *hdr_ptr);
 
 extern struct cbox_document *cbox_document_new();
@@ -76,12 +73,6 @@ extern void cbox_dom_close();
 #define CBOX_GET_DOCUMENT(obj) \
     ((obj)->_obj_hdr.owner)
 
-#define CBOX_NEW(document, class) \
-    (struct class *)cbox_object_new_by_class((document), &CBOX_CLASS_##class)
-
-#define CBOX_CREATE_OTHER(obj, class) \
-    (struct class *)cbox_object_new_by_class((obj)->_obj_hdr.owner, &CBOX_CLASS_##class)
-
 #define CBOX_DELETE(obj) \
     (obj) && (cbox_object_destroy(&(obj)->_obj_hdr), 1)
 
@@ -92,8 +83,10 @@ extern void cbox_dom_close();
         (self)->_obj_hdr.link_in_document = NULL; \
     } while(0)
     
+#define CBOX_OBJECT_REGISTER(self) \
+    (cbox_object_register_instance((self)->_obj_hdr.owner, &(self)->_obj_hdr))
+
 #define CBOX_CLASS_DEFINITION_ROOT(class) \
-    static struct cbox_objhdr *class##_newfunc(struct cbox_class *class_ptr, struct cbox_document *owner); \
     static void class##_destroyfunc(struct cbox_objhdr *hdr_ptr); \
     static struct cbox_command_target *class##_getcmdtarget(struct cbox_objhdr *hdr) { \
         return &(((struct class *)hdr)->cmd_target);\
@@ -101,7 +94,6 @@ extern void cbox_dom_close();
     struct cbox_class CBOX_CLASS_##class = { \
         .parent = NULL, \
         .name = #class, \
-        .newfunc = class##_newfunc, \
         .destroyfunc = class##_destroyfunc, \
         .getcmdtargetfunc = class##_getcmdtarget \
     }; \

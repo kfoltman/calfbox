@@ -59,7 +59,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "s"))
     {
-        struct cbox_scene *scene = CBOX_CREATE_OTHER(s, cbox_scene);
+        struct cbox_scene *scene = cbox_scene_new(CBOX_GET_DOCUMENT(s));
         if (!scene)
             return FALSE;
         if (!cbox_scene_load(scene, (const gchar *)cmd->arg_values[0], error))
@@ -70,7 +70,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/new") && !strcmp(cmd->arg_types, ""))
     {
-        struct cbox_scene *scene = CBOX_CREATE_OTHER(s, cbox_scene);
+        struct cbox_scene *scene = cbox_scene_new(CBOX_GET_DOCUMENT(s));
         if (!scene) // not really expected
             return FALSE;
         struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
@@ -89,7 +89,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             pos = s->layer_count;
         else
             pos--;
-        struct cbox_layer *layer = cbox_layer_load2(s, (const gchar *)cmd->arg_values[1], error);
+        struct cbox_layer *layer = cbox_layer_new_from_config(s, (const gchar *)cmd->arg_values[1], error);
         if (!layer)
             return FALSE;
         if (!cbox_scene_insert_layer(s, layer, pos, error))
@@ -111,7 +111,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             pos = s->layer_count;
         else
             pos--;
-        struct cbox_layer *layer = cbox_layer_new(s, (const gchar *)cmd->arg_values[1], error);
+        struct cbox_layer *layer = cbox_layer_new_with_instrument(s, (const gchar *)cmd->arg_values[1], error);
         if (!layer)
             return FALSE;
         if (!cbox_scene_insert_layer(s, layer, pos, error))
@@ -319,7 +319,7 @@ gboolean cbox_scene_load(struct cbox_scene *s, const char *name, GError **error)
         if (!cv)
             break;
         
-        l = cbox_layer_load2(s, cv, error);
+        l = cbox_layer_new_from_config(s, cv, error);
         if (!l)
             goto error;
         
@@ -785,9 +785,12 @@ error:
     return NULL;
 }
 
-struct cbox_objhdr *cbox_scene_newfunc(struct cbox_class *class_ptr, struct cbox_document *document)
+struct cbox_scene *cbox_scene_new(struct cbox_document *document)
 {
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
+    if (!s)
+        return NULL;
+
     CBOX_OBJECT_HEADER_INIT(s, cbox_scene, document);
     s->rt = (struct cbox_rt *)cbox_document_get_service(document, "rt");
     s->instrument_hash = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
@@ -801,7 +804,8 @@ struct cbox_objhdr *cbox_scene_newfunc(struct cbox_class *class_ptr, struct cbox
     s->aux_bus_count = 0;
     cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
     s->transpose = 0;
-    CBOX_RETURN_OBJECT(s);
+    CBOX_OBJECT_REGISTER(s);
+    return s;
 }
 
 static void cbox_scene_destroyfunc(struct cbox_objhdr *scene_obj)

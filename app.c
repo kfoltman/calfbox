@@ -63,7 +63,7 @@ void switch_scene(struct cbox_menu_item_command *item, struct cbox_scene *new_sc
 int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = CBOX_NEW(app.document, cbox_scene);
+    struct cbox_scene *scene = cbox_scene_new(app.document);
     if (scene && cbox_scene_load(scene, item->item.item_context, &error))
         switch_scene(item, scene, "scene");
     else {
@@ -77,8 +77,8 @@ int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = CBOX_NEW(app.document, cbox_scene);
-    struct cbox_layer *layer = cbox_layer_new(scene, (char *)item->item.item_context, &error);
+    struct cbox_scene *scene = cbox_scene_new(app.document);
+    struct cbox_layer *layer = cbox_layer_new_with_instrument(scene, (char *)item->item.item_context, &error);
     
     if (layer)
     {
@@ -98,8 +98,8 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = CBOX_NEW(app.document, cbox_scene);
-    struct cbox_layer *layer = cbox_layer_load2(scene, (char *)item->item.item_context, &error);
+    struct cbox_scene *scene = cbox_scene_new(app.document);
+    struct cbox_layer *layer = cbox_layer_new_from_config(scene, (char *)item->item.item_context, &error);
     
     if (layer)
     {

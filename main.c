@@ -246,7 +246,7 @@ int main(int argc, char *argv[])
     if (scene_name)
     {
         app.current_scene_name = g_strdup_printf("scene:%s", scene_name);
-        scene = CBOX_NEW(app.document, cbox_scene);
+        scene = cbox_scene_new(app.document);
         if (!scene)
             goto fail;
         if (!cbox_scene_load(scene, scene_name, &error))
@@ -255,8 +255,10 @@ int main(int argc, char *argv[])
     else
     {
         app.current_scene_name = g_strdup_printf("instrument:%s", instrument_name);
-        scene = CBOX_NEW(app.document, cbox_scene);
-        layer = cbox_layer_new(scene, instrument_name, &error);
+        scene = cbox_scene_new(app.document);
+        if (!scene)
+            goto fail;
+        layer = cbox_layer_new_with_instrument(scene, instrument_name, &error);
         if (!layer)
             goto fail;
 

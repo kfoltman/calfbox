@@ -99,32 +99,6 @@ void cbox_layer_set_instrument(struct cbox_layer *layer, struct cbox_instrument 
 
 static gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 
-static struct cbox_objhdr *cbox_layer_newfunc(struct cbox_class *class_ptr, struct cbox_document *doc)
-{
-    struct cbox_layer *l = malloc(sizeof(struct cbox_layer));
-    const char *cv = NULL;
-    struct cbox_instrument *instr = NULL;
-    
-    CBOX_OBJECT_HEADER_INIT(l, cbox_layer, doc);
-    cbox_command_target_init(&l->cmd_target, cbox_layer_process_cmd, l);
-    l->enabled = TRUE;
-    l->instrument = instr;
-    l->low_note = 0;
-    l->high_note = 127;
-    
-    l->transpose = 0;
-    l->fixed_note = -1;
-    l->in_channel = -1;
-    l->out_channel = -1;
-    l->disable_aftertouch = FALSE;
-    l->invert_sustain = FALSE;
-    l->consume = FALSE;
-    l->ignore_scene_transpose = FALSE;
-    l->scene = NULL;
-    
-    return &l->_obj_hdr;
-}
-
 static void cbox_layer_destroyfunc(struct cbox_objhdr *layer_)
 {
     struct cbox_layer *layer = (struct cbox_layer *)layer_;
@@ -219,35 +193,60 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
 
 CBOX_CLASS_DEFINITION_ROOT(cbox_layer)
 
-struct cbox_layer *cbox_layer_new(struct cbox_scene *scene, const char *instrument_name, GError **error)
+struct cbox_layer *cbox_layer_new(struct cbox_scene *scene)
 {
-    struct cbox_instrument *instr;
-    instr = cbox_scene_get_instrument_by_name(scene, instrument_name, TRUE, error);
+    struct cbox_document *doc = CBOX_GET_DOCUMENT(scene);
+    struct cbox_layer *l = malloc(sizeof(struct cbox_layer));
+    
+    CBOX_OBJECT_HEADER_INIT(l, cbox_layer, doc);
+    cbox_command_target_init(&l->cmd_target, cbox_layer_process_cmd, l);
+    l->enabled = TRUE;
+    l->instrument = NULL;
+    l->low_note = 0;
+    l->high_note = 127;
+    
+    l->transpose = 0;
+    l->fixed_note = -1;
+    l->in_channel = -1;
+    l->out_channel = -1;
+    l->disable_aftertouch = FALSE;
+    l->invert_sustain = FALSE;
+    l->consume = FALSE;
+    l->ignore_scene_transpose = FALSE;
+    l->scene = scene;
+    CBOX_OBJECT_REGISTER(l);
+    return l;
+}
+
+struct cbox_layer *cbox_layer_new_with_instrument(struct cbox_scene *scene, const char *instrument_name, GError **error)
+{
+    struct cbox_layer *layer = cbox_layer_new(scene);
+    if (!layer) goto error;
+    struct cbox_instrument *instr = cbox_scene_get_instrument_by_name(scene, instrument_name, TRUE, error);
     if (!instr)
     {
         cbox_force_error(error);
         g_prefix_error(error, "Cannot get instrument %s for new layer: ", instrument_name);
-        goto error;
+        CBOX_DELETE(layer);
+        return NULL;
     }
-
-    struct cbox_layer *layer = (struct cbox_layer *)CBOX_CREATE_OTHER(scene, cbox_layer);
-    if (!layer) goto error;
-    layer->scene = scene;
     cbox_layer_set_instrument(layer, instr);
     return layer;
 
 error:
+    CBOX_DELETE(layer);
     cbox_instrument_destroy_if_unused(instr);
     return NULL;
 }
 
-struct cbox_layer *cbox_layer_load2(struct cbox_scene *scene, const char *instrument_name, GError **error)
+struct cbox_layer *cbox_layer_new_from_config(struct cbox_scene *scene, const char *layer_name, GError **error)
 {
-    struct cbox_layer *layer = (struct cbox_layer *)CBOX_CREATE_OTHER(scene, cbox_layer);
-    if (!layer) goto error;
+    struct cbox_layer *layer = cbox_layer_new(scene);
+    if (!layer)
+        goto error;
 
     layer->scene = scene;
-    if (!cbox_layer_load(layer, instrument_name, error))
+    if (!cbox_layer_load(layer, layer_name, error))
         goto error;
 
     return layer;
@@ -256,4 +255,5 @@ error:
     CBOX_DELETE(layer);
     return NULL;
 }
+
 

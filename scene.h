@@ -46,6 +46,7 @@ struct cbox_scene
     int transpose;
 };
 
+extern struct cbox_scene *cbox_scene_new(struct cbox_document *document);
 extern gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error);
 extern gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *layer, int pos, GError **error);
 extern struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos);
