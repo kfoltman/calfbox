@@ -73,6 +73,7 @@ extern struct cbox_command_target *cbox_document_get_cmd_target(struct cbox_docu
 extern struct cbox_objhdr *cbox_document_get_service(struct cbox_document *doc, const char *name);
 extern void cbox_document_set_service(struct cbox_document *doc, const char *name, struct cbox_objhdr *hdr_ptr);
 extern struct cbox_objhdr *cbox_document_get_object_by_uuid(struct cbox_document *doc, const struct cbox_uuid *uuid);
+extern struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *doc, const char *uuid, GError **error);
 extern void cbox_document_destroy(struct cbox_document *);
 
 extern void cbox_dom_init();

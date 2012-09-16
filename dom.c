@@ -120,6 +120,7 @@ struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_p
 
 gboolean cbox_object_default_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
+    // XXXKF this assumes objhdr ptr == object ptr - needs to add the header offset in cmd target?
     struct cbox_objhdr *obj = ct->user_data;
     if (!strcmp(cmd->command, "/get_uuid") && !strcmp(cmd->arg_types, ""))
     {
@@ -165,20 +166,10 @@ static gboolean document_process_cmd(struct cbox_command_target *ct, struct cbox
         struct cbox_document *doc = ct->user_data;
         if (!subcommand)
             return FALSE;
-        struct cbox_uuid uuidv;
-        if (uuid_parse(uuid, uuidv.uuid))
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Malformed UUID: '%s' for command '%s'", uuid, cmd->command);
-            g_free(uuid);
-            return FALSE;
-        }
-        struct cbox_objhdr *obj = cbox_document_get_object_by_uuid(doc, &uuidv);
+        struct cbox_objhdr *obj = cbox_document_get_object_by_text_uuid(doc, uuid, error);
+        g_free(uuid);
         if (!obj)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "UUID not found: '%s' for command '%s'", uuid, cmd->command);
-            g_free(uuid);
             return FALSE;
-        }
         struct cbox_command_target *ct2 = cbox_object_get_cmd_target(obj);
         return cbox_execute_sub(ct2, fb, cmd, subcommand, error);
     }
@@ -217,6 +208,23 @@ void cbox_document_set_service(struct cbox_document *document, const char *name,
 struct cbox_objhdr *cbox_document_get_object_by_uuid(struct cbox_document *doc, const struct cbox_uuid *uuid)
 {
     return g_hash_table_lookup(doc->uuids_per_document, uuid);
+}
+
+struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *doc, const char *uuid, GError **error)
+{
+    struct cbox_uuid uuidv;
+    if (uuid_parse(uuid, uuidv.uuid))
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Malformed UUID: '%s'", uuid);
+        return NULL;
+    }
+    struct cbox_objhdr *obj = cbox_document_get_object_by_uuid(doc, &uuidv);
+    if (!obj)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "UUID not found: '%s'", uuid);
+        return NULL;
+    }
+    return obj;
 }
 
 static void iter_func(gpointer key, gpointer value, gpointer doc_)
