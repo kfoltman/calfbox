@@ -170,6 +170,11 @@ void cbox_document_set_service(struct cbox_document *document, const char *name,
     g_hash_table_insert(document->services_per_document, g_strdup(name), obj);
 }
 
+struct cbox_objhdr *cbox_document_get_by_uuid(struct cbox_document *doc, const struct cbox_uuid *uuid)
+{
+    return g_hash_table_lookup(doc->uuids_per_document, uuid);
+}
+
 static void iter_func(gpointer key, gpointer value, gpointer doc_)
 {
     struct cbox_document *doc = (struct cbox_document *)doc_;
@@ -188,7 +193,7 @@ static void iter_func(gpointer key, gpointer value, gpointer doc_)
         uuid_unparse(hdr->instance_uuid.uuid, buf);
         printf("[%s]", buf);
         fflush(stdout);
-        assert(g_hash_table_lookup(doc->uuids_per_document, &hdr->instance_uuid));
+        assert(cbox_document_get_by_uuid(doc, &hdr->instance_uuid));
         l = l->next;
         first = 0;
     }
@@ -200,8 +205,12 @@ static void iter_func(gpointer key, gpointer value, gpointer doc_)
 static void iter_func2(gpointer key, gpointer value, gpointer document)
 {
     struct cbox_objhdr *oh = value;
+    char buf[40];
+    uuid_unparse(oh->instance_uuid.uuid, buf);
     int first = 1;
     printf("Service %s: %p", (const char *)key, value);
+    fflush(stdout);
+    printf("[%s]", buf);
     fflush(stdout);
     printf(" (%s)\n", oh->class_ptr->name);
 }
