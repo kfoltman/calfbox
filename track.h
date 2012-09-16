@@ -19,8 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_TRACK_H
 #define CBOX_TRACK_H
 
-#include <stdint.h>
-#include <glib.h>
+#include "dom.h"
+
+CBOX_EXTERN_CLASS(cbox_track)
 
 struct cbox_midi_pattern;
 
@@ -34,12 +35,14 @@ struct cbox_track_item
 
 struct cbox_track
 {
+    CBOX_OBJECT_HEADER()
+    struct cbox_command_target cmd_target;
     gchar *name;
     GList *items;
     struct cbox_track_playback *pb;
 };
 
-extern struct cbox_track *cbox_track_new();
+extern struct cbox_track *cbox_track_new(struct cbox_document *document);
 extern void cbox_track_add_item(struct cbox_track *track, uint32_t time, struct cbox_midi_pattern *pattern, uint32_t offset, uint32_t length);
 extern void cbox_track_update_playback(struct cbox_track *track, struct cbox_master *master);
 extern void cbox_track_destroy(struct cbox_track *track);

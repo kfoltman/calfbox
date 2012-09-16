@@ -22,17 +22,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "track.h"
 #include <malloc.h>
 
+CBOX_CLASS_DEFINITION_ROOT(cbox_track)
+
+static gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
+
 void cbox_track_item_destroy(struct cbox_track_item *item)
 {
     free(item);
 }
 
-struct cbox_track *cbox_track_new()
+struct cbox_track *cbox_track_new(struct cbox_document *document)
 {
     struct cbox_track *p = malloc(sizeof(struct cbox_track));
+    CBOX_OBJECT_HEADER_INIT(p, cbox_track, document);
+    
     p->name = g_strdup("Unnamed");
     p->items = NULL;
     p->pb = NULL;
+
+    cbox_command_target_init(&p->cmd_target, cbox_track_process_cmd, p);
+    CBOX_OBJECT_REGISTER(p);
     return p;
 }
 
@@ -68,8 +77,9 @@ void cbox_track_update_playback(struct cbox_track *track, struct cbox_master *ma
         cbox_track_playback_destroy(old_pb);
 }
 
-void cbox_track_destroy(struct cbox_track *track)
+void cbox_track_destroyfunc(struct cbox_objhdr *objhdr)
 {
+    struct cbox_track *track = (struct cbox_track *)objhdr;
     // XXXKF I'm not sure if I want the lifecycle of track playback objects to be managed by the track itself
     if (track->pb)
         cbox_track_playback_destroy(track->pb);
@@ -78,3 +88,26 @@ void cbox_track_destroy(struct cbox_track *track)
     free(track);
 }
 
+gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct cbox_track *track = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        GList *it = track->items;
+        while(it != NULL)
+        {
+            struct cbox_track_item *trki = it->data;
+            if (!cbox_execute_on(fb, NULL, "/item", "iiio", error, trki->time, trki->offset, trki->length, trki->pattern))
+                return FALSE;
+            it = g_list_next(it);
+        }
+
+        return cbox_execute_on(fb, NULL, "/name", "s", error, track->name) &&
+            CBOX_OBJECT_DEFAULT_STATUS(track, fb, error);
+    }
+    else
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
+}

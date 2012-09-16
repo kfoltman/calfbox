@@ -44,7 +44,7 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
         for(GList *p = song->tracks; p; p = g_list_next(p))
         {
             struct cbox_track *trk = p->data;
-            if (!cbox_execute_on(fb, NULL, "/track", "isi", error, nt++, trk->name, g_list_length(trk->items)))
+            if (!cbox_execute_on(fb, NULL, "/track", "isio", error, nt++, trk->name, g_list_length(trk->items), trk))
                 return FALSE;
         }
         int np = 1;
@@ -54,10 +54,10 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
             if (!cbox_execute_on(fb, NULL, "/pattern", "isio", error, np++, pat->name, pat->loop_end, pat))
                 return FALSE;
         }
-        return TRUE;
+        return CBOX_OBJECT_DEFAULT_STATUS(song, fb, error);
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 
@@ -118,7 +118,7 @@ void cbox_song_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_song *song = (struct cbox_song *)objhdr;
     g_list_free_full(song->master_track_items, (GDestroyNotify)cbox_master_track_item_destroy);
-    g_list_free_full(song->tracks, (GDestroyNotify)cbox_track_destroy);
+    g_list_free_full(song->tracks, (GDestroyNotify)cbox_object_destroy);
     g_list_free_full(song->patterns, (GDestroyNotify)cbox_object_destroy);
     free(song);
 }

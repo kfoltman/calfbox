@@ -375,7 +375,7 @@ void cbox_rt_update_song(struct cbox_rt *rt, int new_pos_ppqn)
 
 struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos_ppqn)
 {
-    struct cbox_track *track = cbox_track_new();
+    struct cbox_track *track = cbox_track_new(CBOX_GET_DOCUMENT(pattern));
     cbox_track_add_item(track, 0, pattern, 0, pattern->loop_end);
     cbox_track_update_playback(track, rt->master);
 
