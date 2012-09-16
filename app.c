@@ -298,37 +298,37 @@ int cmd_pattern_none(struct cbox_menu_item_command *item, void *context)
 
 int cmd_pattern_simple(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_metronome(1));
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_metronome(CBOX_GET_DOCUMENT(app.rt), 1));
     return 0;
 }
 
 int cmd_pattern_normal(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_metronome(app.rt->master->timesig_nom));
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_metronome(CBOX_GET_DOCUMENT(app.rt), app.rt->master->timesig_nom));
     return 0;
 }
 
 int cmd_load_drumpattern(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(item->item.item_context, 1));
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(CBOX_GET_DOCUMENT(app.rt), item->item.item_context, 1));
     return 0;
 }
 
 int cmd_load_drumtrack(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(item->item.item_context, 1));
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(CBOX_GET_DOCUMENT(app.rt), item->item.item_context, 1));
     return 0;
 }
 
 int cmd_load_pattern(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(item->item.item_context, 0));
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(CBOX_GET_DOCUMENT(app.rt), item->item.item_context, 0));
     return 0;
 }
 
 int cmd_load_track(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(item->item.item_context, 0));
+    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(CBOX_GET_DOCUMENT(app.rt), item->item.item_context, 0));
     return 0;
 }
 
@@ -470,19 +470,19 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     else
     if (!strcmp(obj, "play_drum_pattern") && !strcmp(cmd->arg_types, "s"))
     {
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load((const char *)cmd->arg_values[0], 1));
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(CBOX_GET_DOCUMENT(app.rt), (const char *)cmd->arg_values[0], 1));
         return TRUE;
     }
     else
     if (!strcmp(obj, "play_drum_track") && !strcmp(cmd->arg_types, "s"))
     {
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track((const char *)cmd->arg_values[0], 1));
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(CBOX_GET_DOCUMENT(app.rt), (const char *)cmd->arg_values[0], 1));
         return TRUE;
     }
     else
     if (!strcmp(obj, "play_blob") && !strcmp(cmd->arg_types, "bi"))
     {
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_from_blob((const struct cbox_blob *)cmd->arg_values[0], *(int *)cmd->arg_values[1]));
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_from_blob(CBOX_GET_DOCUMENT(app.rt), (const struct cbox_blob *)cmd->arg_values[0], *(int *)cmd->arg_values[1]));
         return TRUE;
     }
     else

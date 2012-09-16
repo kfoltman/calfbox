@@ -51,6 +51,7 @@ static void event_entry_destroy(gpointer p)
 
 struct cbox_midi_pattern_maker
 {
+    CBOX_OBJECT_HEADER()    
     GTree *events;
 };
 
@@ -104,9 +105,11 @@ static gboolean traverse_func(gpointer key, gpointer value, gpointer pstate)
     return FALSE;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_midi_pattern_maker *maker, gchar *name)
+struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_midi_pattern_maker *maker, struct cbox_document *document, gchar *name)
 {
     struct cbox_midi_pattern *p = malloc(sizeof(struct cbox_midi_pattern));
+    CBOX_OBJECT_HEADER_INIT(p, cbox_midi_pattern, document);
+    cbox_command_target_init(&p->cmd_target, cbox_midi_pattern_process_cmd, p);
     p->name = name;
     p->event_count = g_tree_nnodes(maker->events);
     p->events = malloc(sizeof(struct cbox_midi_event[1]) * p->event_count);
@@ -114,6 +117,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_mid
     struct traverse_state st = { p->events, 0 };
     
     g_tree_foreach(maker->events, traverse_func, &st);
+    CBOX_OBJECT_REGISTER(p);
     
     return p;
 }

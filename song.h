@@ -19,8 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_SONG_H
 #define CBOX_SONG_H
 
-#include "cmd.h"
+#include "dom.h"
 #include "pattern.h"
+
+CBOX_EXTERN_CLASS(cbox_song)
 
 struct cbox_track;
 
@@ -38,8 +40,8 @@ struct cbox_master_track
 
 struct cbox_song
 {
+    CBOX_OBJECT_HEADER()
     struct cbox_command_target cmd_target;
-    struct cbox_master *master;
     GList *master_track_items;
     GList *tracks;
     GList *patterns;
@@ -47,7 +49,7 @@ struct cbox_song
     uint32_t loop_start_ppqn, loop_end_ppqn;
 };
 
-extern struct cbox_song *cbox_song_new(struct cbox_master *master);
+extern struct cbox_song *cbox_song_new(struct cbox_document *document);
 extern void cbox_song_add_track(struct cbox_song *song, struct cbox_track *track);
 extern void cbox_song_remove_track(struct cbox_song *song, struct cbox_track *track);
 extern void cbox_song_add_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern);

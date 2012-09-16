@@ -312,11 +312,11 @@ int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_not
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song)
+struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master)
 {
     struct cbox_song_playback *spb = malloc(sizeof(struct cbox_song_playback));
     memset(spb, 0, sizeof(struct cbox_song_playback));
-    spb->master = song->master;
+    spb->master = master;
     spb->track_count = g_list_length(song->tracks);
     spb->tracks = malloc(spb->track_count * sizeof(struct cbox_track_playback *));
     spb->song_pos_samples = 0;
@@ -328,7 +328,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song)
     for (GList *p = song->tracks; p != NULL; p = g_list_next(p))
     {
         struct cbox_track *trk = p->data;
-        spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, song->master);
+        spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master);
     }
     
     spb->tempo_map_item_count = g_list_length(song->master_track_items);
@@ -347,7 +347,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song)
         tmi->timesig_denom = mti->timesig_denom;
         
         pos_ppqn += mti->duration_ppqn;
-        pos_samples += song->master->srate * 60.0 * mti->duration_ppqn / (mti->tempo * PPQN);
+        pos_samples += spb->master->srate * 60.0 * mti->duration_ppqn / (mti->tempo * PPQN);
         pos++;
     }
     return spb;

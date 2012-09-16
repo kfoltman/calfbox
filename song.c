@@ -21,6 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "track.h"
 #include <stdlib.h>
 
+CBOX_CLASS_DEFINITION_ROOT(cbox_song)
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 void cbox_master_track_item_destroy(struct cbox_master_track_item *item)
 {
     free(item);
@@ -47,7 +51,7 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
         for(GList *p = song->patterns; p; p = g_list_next(p))
         {
             struct cbox_midi_pattern *pat = p->data;
-            if (!cbox_execute_on(fb, NULL, "/pattern", "isi", error, np++, pat->name, pat->loop_end))
+            if (!cbox_execute_on(fb, NULL, "/pattern", "isio", error, np++, pat->name, pat->loop_end, pat))
                 return FALSE;
         }
         return TRUE;
@@ -60,16 +64,17 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_song *cbox_song_new(struct cbox_master *master)
+struct cbox_song *cbox_song_new(struct cbox_document *document)
 {
     struct cbox_song *p = malloc(sizeof(struct cbox_song));
-    p->master = master;
+    CBOX_OBJECT_HEADER_INIT(p, cbox_song, document);
     p->master_track_items = NULL;
     p->tracks = NULL;
     p->patterns = NULL;
     p->lyrics_sheet = NULL;
     p->chord_sheet = NULL;
     cbox_command_target_init(&p->cmd_target, cbox_song_process_cmd, p);
+    CBOX_OBJECT_REGISTER(p);
     
 #if 0
     struct cbox_master_track_item *mti = malloc(sizeof(struct cbox_master_track_item));
@@ -109,11 +114,12 @@ void cbox_song_remove_patterns(struct cbox_song *song, struct cbox_midi_pattern 
     song->patterns = g_list_remove(song->patterns, pattern);
 }
 
-void cbox_song_destroy(struct cbox_song *song)
+void cbox_song_destroyfunc(struct cbox_objhdr *objhdr)
 {
+    struct cbox_song *song = (struct cbox_song *)objhdr;
     g_list_free_full(song->master_track_items, (GDestroyNotify)cbox_master_track_item_destroy);
     g_list_free_full(song->tracks, (GDestroyNotify)cbox_track_destroy);
-    g_list_free_full(song->patterns, (GDestroyNotify)cbox_midi_pattern_destroy);
+    g_list_free_full(song->patterns, (GDestroyNotify)cbox_object_destroy);
     free(song);
 }
 

@@ -69,7 +69,7 @@ struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
     rt->rb_cleanup = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS * 2);
     rt->io = NULL;
     rt->master = cbox_master_new(rt);
-    rt->master->song = cbox_song_new(rt->master);
+    rt->master->song = cbox_song_new(CBOX_GET_DOCUMENT(rt));
     rt->started = 0;
     rt->srate = 0;
     rt->buffer_size = 0;
@@ -365,7 +365,7 @@ void cbox_rt_update_song(struct cbox_rt *rt, int new_pos_ppqn)
 {
     static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = set_song_command_execute, .cleanup = NULL };
     
-    struct set_song_command cmd = { rt, cbox_song_playback_new(rt->master->song), NULL, new_pos_ppqn };
+    struct set_song_command cmd = { rt, cbox_song_playback_new(rt->master->song, rt->master), NULL, new_pos_ppqn };
     cbox_rt_execute_cmd_sync(rt, &def, &cmd);
     if (cmd.old_song)
         cbox_song_playback_destroy(cmd.old_song);
@@ -386,7 +386,7 @@ struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_patte
     cbox_track_update_playback(track2, rt->master);
 #endif
     
-    struct cbox_song *song = cbox_song_new(rt->master);
+    struct cbox_song *song = cbox_song_new(CBOX_GET_DOCUMENT(rt));
     cbox_song_add_track(song, track);
     cbox_song_add_pattern(song, pattern);
 #if 0
@@ -406,7 +406,7 @@ void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_patter
 {
     struct cbox_song *old = cbox_rt_set_pattern(rt, pattern, -1);
     if (old)
-        cbox_song_destroy(old);
+        CBOX_DELETE(old);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -566,7 +566,7 @@ int cbox_rt_get_buffer_size(struct cbox_rt *rt)
 void cbox_rt_destroy(struct cbox_rt *rt)
 {
     if (rt->master->song)
-        cbox_song_destroy(rt->master->song);
+        CBOX_DELETE(rt->master->song);
     jack_ringbuffer_free(rt->rb_execute);
     jack_ringbuffer_free(rt->rb_cleanup);
 

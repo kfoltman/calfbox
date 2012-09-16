@@ -114,7 +114,7 @@ struct cbox_song_playback
     uint32_t loop_start_ppqn, loop_end_ppqn;
 };
 
-extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song);
+extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master);
 extern void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, int nsamples);
 extern int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf);
 extern void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int skip_this_pos);
