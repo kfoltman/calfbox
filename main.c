@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:r:e:s:t:b:d:D:N:nmh";
+static const char *short_options = "i:c:r:e:s:t:b:d:D:N:o:nmh";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
@@ -59,6 +59,7 @@ static struct option long_options[] = {
     {"drum-pattern", 1, 0, 'd'},
     {"drum-track", 1, 0, 'D'},
     {"run-script", 1, 0, 'r'},
+    {"output", 1, 0, 'o'},
     {0,0,0,0},
 };
 
@@ -80,6 +81,7 @@ void print_help(char *progname)
         " -s | --scene <s>          Load a scene <s>\n"
         " -c | --config <c>         Use specified config file instead of default\n"
         " -r | --run-script <s>     Run a Python script from a given file\n"
+        " -o | --output <o>         Write the first stereo output to a WAV file\n"
         "\n",
         progname);
     exit(0);
@@ -130,6 +132,7 @@ int main(int argc, char *argv[])
     const char *drum_pattern_name = NULL;
     const char *drum_track_name = NULL;
     const char *script_name = NULL;
+    const char *output_name = NULL;
     char *instr_section = NULL;
     struct cbox_scene *scene = NULL;
     int metronome = 0;
@@ -155,6 +158,9 @@ int main(int argc, char *argv[])
                 break;
             case 'i':
                 instrument_name = optarg;
+                break;
+            case 'o':
+                output_name = optarg;
                 break;
             case 's':
                 scene_name = optarg;
@@ -270,6 +276,8 @@ int main(int argc, char *argv[])
     cbox_master_set_tempo(app.rt->master, tempo);
     cbox_master_set_timesig(app.rt->master, bpb, 4);
 
+    if (output_name)
+        cbox_recording_source_attach(&app.io.rec_stereo_outputs[0], cbox_recorder_new_stream(app.rt, output_name));
     cbox_rt_start(app.rt);
     if (drum_pattern_name)
         cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(drum_pattern_name, 1));
