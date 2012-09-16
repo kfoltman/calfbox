@@ -19,10 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_DOM_H
 #define CBOX_DOM_H
 
+#include <uuid/uuid.h>
+
 struct cbox_command_target;
 struct cbox_objhdr;
 struct cbox_document;
 struct GList;
+
+struct cbox_uuid
+{
+    uuid_t uuid;
+};
 
 struct cbox_class
 {
@@ -40,6 +47,7 @@ struct cbox_objhdr
     struct cbox_class *class_ptr;
     struct cbox_document *owner;
     void *link_in_document;
+    struct cbox_uuid instance_uuid;
 };
 
 inline int cbox_class_is_a(struct cbox_class *c1, struct cbox_class *c2)
@@ -81,6 +89,7 @@ extern void cbox_dom_close();
         (self)->_obj_hdr.class_ptr = &CBOX_CLASS_##class; \
         (self)->_obj_hdr.owner = (document); \
         (self)->_obj_hdr.link_in_document = NULL; \
+        uuid_generate((self)->_obj_hdr.instance_uuid.uuid); \
     } while(0)
     
 #define CBOX_OBJECT_REGISTER(self) \

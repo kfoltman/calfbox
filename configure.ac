@@ -21,6 +21,8 @@ AC_HEADER_STDC
 
 PKG_CHECK_MODULES(JACK_DEPS, jack >= 0.116.0, true, AC_MSG_ERROR([JACK is required]))
 AC_CHECK_HEADER(jack/jack.h, true, AC_MSG_ERROR([JACK is required]))
+AC_CHECK_HEADER(uuid/uuid.h, true, AC_MSG_ERROR([libuuid header (uuid/uuid.h) is required]))
+AC_CHECK_LIB(uuid, uuid_unparse, true, AC_MSG_ERROR([libuuid is required]))
 PKG_CHECK_MODULES(GLIB_DEPS, glib-2.0 >= 2.6, true, AC_MSG_ERROR([libglib-2.0 is required]))
 PKG_CHECK_MODULES(FLUIDSYNTH_DEPS, fluidsynth >= 1.0.8, true, AC_MSG_ERROR([fluidsynth 1.0.8 is required]))
 PKG_CHECK_MODULES(PYTHON_DEPS, python-2.7 >= 2.7, true, AC_MSG_ERROR([python 2.7 or newer is required]))

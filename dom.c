@@ -25,6 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <malloc.h>
 #include <string.h>
 
+static guint cbox_uuid_hash(gconstpointer v);
+static gboolean cbox_uuid_equal(gconstpointer v1, gconstpointer v2);
+
 static GHashTable *class_name_hash = NULL;
 
 struct cbox_class_per_document
@@ -36,6 +39,7 @@ struct cbox_document
 {
     GHashTable *classes_per_document;
     GHashTable *services_per_document;
+    GHashTable *uuids_per_document;
     struct cbox_command_target cmd_target;
     int item_ctr;
 };
@@ -79,6 +83,23 @@ static struct cbox_class_per_document *get_cpd_for_class(struct cbox_document *d
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+guint cbox_uuid_hash(gconstpointer v)
+{
+    char buf[40];
+    uuid_unparse_lower(((struct cbox_uuid *)v)->uuid, buf);
+    return g_str_hash(buf);
+}
+
+gboolean cbox_uuid_equal(gconstpointer v1, gconstpointer v2)
+{
+    const struct cbox_uuid *p1 = v1;
+    const struct cbox_uuid *p2 = v2;
+    
+    return !uuid_compare(p1->uuid, p2->uuid);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 void cbox_object_register_instance(struct cbox_document *doc, struct cbox_objhdr *obj)
 {
     assert(obj != NULL);
@@ -87,6 +108,7 @@ void cbox_object_register_instance(struct cbox_document *doc, struct cbox_objhdr
     cpd->instances = g_list_prepend(cpd->instances, obj);
     obj->owner = doc;
     obj->link_in_document = cpd->instances;
+    g_hash_table_insert(obj->owner->uuids_per_document, &obj->instance_uuid, obj);
 }
 
 struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_ptr)
@@ -101,6 +123,7 @@ void cbox_object_destroy(struct cbox_objhdr *hdr_ptr)
     struct cbox_class_per_document *cpd = get_cpd_for_class(hdr_ptr->owner, hdr_ptr->class_ptr);
     cpd->instances = g_list_remove_link(cpd->instances, hdr_ptr->link_in_document);
     hdr_ptr->link_in_document = NULL;
+    g_hash_table_remove(hdr_ptr->owner->uuids_per_document, &hdr_ptr->instance_uuid);
     
     hdr_ptr->class_ptr->destroyfunc(hdr_ptr);
 }
@@ -124,6 +147,7 @@ struct cbox_document *cbox_document_new()
     struct cbox_document *res = malloc(sizeof(struct cbox_document));
     res->classes_per_document = g_hash_table_new(NULL, NULL);
     res->services_per_document = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+    res->uuids_per_document = g_hash_table_new(cbox_uuid_hash, cbox_uuid_equal);
     res->cmd_target.process_cmd = document_process_cmd;
     res->cmd_target.user_data = res;
     res->item_ctr = 0;
@@ -146,8 +170,9 @@ void cbox_document_set_service(struct cbox_document *document, const char *name,
     g_hash_table_insert(document->services_per_document, g_strdup(name), obj);
 }
 
-static void iter_func(gpointer key, gpointer value, gpointer document)
+static void iter_func(gpointer key, gpointer value, gpointer doc_)
 {
+    struct cbox_document *doc = (struct cbox_document *)doc_;
     struct cbox_class *class_ptr = key;
     struct cbox_class_per_document *cpd = value;
     int first = 1;
@@ -157,6 +182,13 @@ static void iter_func(gpointer key, gpointer value, gpointer document)
         if (!first)
             printf(", ");
         printf("%p", l->data);
+        fflush(stdout);
+        struct cbox_objhdr *hdr = (struct cbox_objhdr *)l->data;
+        char buf[40];
+        uuid_unparse(hdr->instance_uuid.uuid, buf);
+        printf("[%s]", buf);
+        fflush(stdout);
+        assert(g_hash_table_lookup(doc->uuids_per_document, &hdr->instance_uuid));
         l = l->next;
         first = 0;
     }
@@ -184,6 +216,7 @@ void cbox_document_destroy(struct cbox_document *document)
 {
     g_hash_table_destroy(document->classes_per_document);
     g_hash_table_destroy(document->services_per_document);
+    g_hash_table_destroy(document->uuids_per_document);
     free(document);
 }
 
