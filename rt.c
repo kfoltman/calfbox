@@ -49,15 +49,14 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         if (rt->io)
-            return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count);
+            return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count) &&
+                CBOX_OBJECT_DEFAULT_STATUS(rt, fb, error);
         else
-            return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, 0, 2);
+            return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, 0, 2) &&
+                CBOX_OBJECT_DEFAULT_STATUS(rt, fb, error);
     }
     else
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
-        return FALSE;
-    }    
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
 struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
