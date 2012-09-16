@@ -266,7 +266,8 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             buffers[0][i] = 0.f;
             buffers[1][i] = 0.f;
         }
-        cbox_song_playback_render(s->rt->master->spb, &midibuf_song, nframes);
+        if (s->rt->master->spb)
+            cbox_song_playback_render(s->rt->master->spb, &midibuf_song, nframes);
         cbox_scene_render(s, nframes, &midibuf_song, buffers);
         for (int i = 0; i < nframes; i++)
         {
