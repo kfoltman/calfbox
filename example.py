@@ -79,7 +79,7 @@ class SceneLayersModel(gtk.ListStore):
     def refresh(self, scene):
         self.clear()
         for l in scene.layer:
-            layer = cbox.GetThings("/scene/layer/%d/status" % l, ["enable", "instrument_name", "in_channel", "out_channel", "consume", "low_note", "high_note", "fixed_note", "transpose"], [])
+            layer = cbox.GetThings("/scene/layer/%d/status" % l[0], ["enable", "instrument_name", "in_channel", "out_channel", "consume", "low_note", "high_note", "fixed_note", "transpose"], [])
             self.append((layer.instrument_name, layer.enable != 0, layer.in_channel, layer.out_channel, layer.consume != 0, layer.low_note, layer.high_note, layer.fixed_note, layer.transpose))
 
 class SceneLayersView(gtk.TreeView):
