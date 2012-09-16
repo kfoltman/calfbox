@@ -115,12 +115,12 @@ def combo_value_changed_use_column(combo, vpath, column):
 
 def tree_toggle_changed_bool(renderer, tree_path, model, opath, column):
     model[int(tree_path)][column] = not model[int(tree_path)][column]
-    cbox.do_cmd(opath % (1 + int(tree_path)), None, [1 if model[int(tree_path)][column] else 0])
+    cbox.do_cmd(model.make_row_item(opath, tree_path), None, [1 if model[int(tree_path)][column] else 0])
         
 def tree_combo_changed(renderer, tree_path, new_value, model, opath, column):
     new_value = renderer.get_property('model')[new_value][0]
     model[int(tree_path)][column] = new_value
-    cbox.do_cmd(opath % (1 + int(tree_path)), None, [new_value])
+    cbox.do_cmd(model.make_row_item(opath, tree_path), None, [new_value])
         
 def standard_toggle_renderer(list_model, path, column):
     toggle = gtk.CellRendererToggle()

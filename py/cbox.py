@@ -2,6 +2,9 @@ from _cbox import *
 import struct
 
 class GetThings:
+    @staticmethod
+    def by_uuid(uuid, cmd, anames, args):
+        return GetThings(Document.uuid_cmd(uuid, cmd), anames, args)
     def __init__(self, cmd, anames, args):
         for i in anames:
             if i.startswith("*"):
