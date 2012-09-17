@@ -20,12 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_RECSRC_H
 
 #include "cmd.h"
+#include "dom.h"
 
 struct cbox_recording_source;
 struct cbox_rt;
+CBOX_EXTERN_CLASS(cbox_recorder)
 
 struct cbox_recorder
 {
+    CBOX_OBJECT_HEADER()    
     void *user_data;
     struct cbox_command_target cmd_target;
     

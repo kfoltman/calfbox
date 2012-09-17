@@ -405,9 +405,6 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         if (!strncmp(obj, "master/", 7))
             return cbox_execute_sub(&app.rt->master->cmd_target, fb, cmd, pos, error);
         else
-        if (!strncmp(obj, "meter/", 6)) // very hacky
-            return cbox_execute_sub(&app.io.meter_output->recorder.cmd_target, fb, cmd, pos, error);
-        else
         if (!strncmp(obj, "config/", 7))
             return cbox_execute_sub(&app.config_cmd_target, fb, cmd, pos, error);
         else

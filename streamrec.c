@@ -48,7 +48,7 @@ struct stream_recorder
 
     struct cbox_rt *rt;
     gchar *filename;
-    SNDFILE *sndfile;
+    SNDFILE *volatile sndfile;
     SF_INFO info;
     pthread_t thr_writeout;
     sem_t sem_sync_completed;
@@ -108,7 +108,7 @@ static void stream_recorder_attach(struct cbox_recorder *handler, struct cbox_re
         if (!self->sndfile)
             g_warning("SF error: %s", sf_strerror(NULL));
         
-        self->thr_writeout = pthread_create(&self->thr_writeout, NULL, stream_recorder_thread, self);
+        pthread_create(&self->thr_writeout, NULL, stream_recorder_thread, self);
     }
     else
         assert(self->info.channels == src->channels); // changes of channel counts are supported
@@ -175,6 +175,7 @@ struct cbox_recorder *cbox_recorder_new_stream(struct cbox_rt *rt, const char *f
 {
     struct stream_recorder *self = malloc(sizeof(struct stream_recorder));
     self->rt = rt;
+    CBOX_OBJECT_HEADER_INIT(&self->iface, cbox_recorder, CBOX_GET_DOCUMENT(rt));
     self->iface.user_data = self;
     self->iface.attach = stream_recorder_attach;
     self->iface.record_block = stream_recorder_record_block;
@@ -188,6 +189,8 @@ struct cbox_recorder *cbox_recorder_new_stream(struct cbox_rt *rt, const char *f
     self->rb_for_writing = jack_ringbuffer_create(STREAM_BUFFER_COUNT + 1);
     self->rb_just_written = jack_ringbuffer_create(STREAM_BUFFER_COUNT + 1);
     sem_init(&self->sem_sync_completed, 0, 0);
+    
+    CBOX_OBJECT_REGISTER(&self->iface);
 
     for (uint8_t i = 0; i < STREAM_BUFFER_COUNT; i++)
         jack_ringbuffer_write(self->rb_just_written, &i, 1);

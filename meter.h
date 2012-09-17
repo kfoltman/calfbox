@@ -33,6 +33,6 @@ struct cbox_meter
     int smpcounter;
 };
 
-extern struct cbox_meter *cbox_meter_new(int srate);
+extern struct cbox_meter *cbox_meter_new(struct cbox_document *document, int srate);
 
 #endif

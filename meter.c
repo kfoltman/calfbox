@@ -117,9 +117,10 @@ static gboolean cbox_meter_process_cmd(struct cbox_command_target *ct, struct cb
     }
 }
 
-struct cbox_meter *cbox_meter_new(int srate)
+struct cbox_meter *cbox_meter_new(struct cbox_document *document, int srate)
 {
     struct cbox_meter *m = malloc(sizeof(struct cbox_meter));
+    CBOX_OBJECT_HEADER_INIT(&m->recorder, cbox_recorder, document);
     m->recorder.user_data = m;
     cbox_command_target_init(&m->recorder.cmd_target, cbox_meter_process_cmd, m);
     m->recorder.attach = cbox_meter_attach;
@@ -128,5 +129,6 @@ struct cbox_meter *cbox_meter_new(int srate)
     m->recorder.destroy = cbox_meter_destroy;
     m->srate = srate;
     clear_meter(m);
+    CBOX_OBJECT_REGISTER(&m->recorder);
     return m;
 }

@@ -45,7 +45,6 @@ struct cbox_io
     int buffer_size;
     struct cbox_recording_source *rec_mono_inputs, *rec_mono_outputs;
     struct cbox_recording_source *rec_stereo_inputs, *rec_stereo_outputs;
-    struct cbox_meter *meter_output;
     
     jack_ringbuffer_t *rb_autoconnect;
     

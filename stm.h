@@ -27,8 +27,15 @@ static inline void **stm_array_clone_remove(void **old_array, int old_count, int
 }
 
 #define STM_ARRAY_FREE(old_array, count, destructor) \
-    for (int i = 0; i < count; i++) \
-        destructor(old_array[i]); \
+    for (int i = 0; i < (count); i++) \
+        destructor((old_array)[i]); \
     free(old_array);
+
+#define STM_ARRAY_FREE_OBJS(old_array, count) \
+    do { \
+        for (int i = 0; i < (count); i++) \
+            cbox_object_destroy(&(old_array)[i]->_obj_hdr); \
+        free(old_array); \
+    } while(0)
 
 #endif

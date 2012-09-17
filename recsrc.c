@@ -22,6 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "rt.h"
 #include "stm.h"
 
+CBOX_CLASS_DEFINITION_ROOT(cbox_recorder)
+
 static gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 
 void cbox_recording_source_init(struct cbox_recording_source *src, uint32_t max_numsamples, int channels)
@@ -76,11 +78,31 @@ void cbox_recording_source_push(struct cbox_recording_source *src, const float *
 
 void cbox_recording_source_uninit(struct cbox_recording_source *src)
 {
-    STM_ARRAY_FREE(src->handlers, src->handler_count, (src->handlers[i]->detach));
+    STM_ARRAY_FREE_OBJS(src->handlers, src->handler_count);
+    src->handler_count = 0;
 }
 
 gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
-    cbox_set_command_error(error, cmd);
-    return FALSE;
+    struct cbox_recording_source *src = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        for (int i = 0; i < src->handler_count; i++)
+        {
+            if (!cbox_execute_on(fb, NULL, "/handler", "io", error, i + 1, src->handlers[i]))
+                return FALSE;            
+        }
+        return TRUE;
+    }
+    else    
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
+}
+
+void cbox_recorder_destroyfunc(struct cbox_objhdr *objhdr)
+{
+    struct cbox_recorder *recorder = CBOX_H2O(objhdr);
+    recorder->destroy(recorder);
 }

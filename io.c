@@ -107,9 +107,6 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
     if (!io->midi)
         return 0;
     
-    io->meter_output = cbox_meter_new(cbox_io_get_sample_rate(io));
-    cbox_recording_source_attach(&io->rec_stereo_outputs[0], &io->meter_output->recorder);
-    
     return 1;
 };
 
