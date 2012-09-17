@@ -21,3 +21,10 @@ assert(layers[1] == layer_uuid)
 instr_uuid = cbox.GetThings(cbox.Document.uuid_cmd(layer_uuid, "/status"), ['instrument_uuid'], []).instrument_uuid
 iname = cbox.GetThings(cbox.Document.uuid_cmd(layer_uuid, "/status"), ['instrument_name'], []).instrument_name
 assert cbox.GetThings("/scene/instr/%s/status" % iname, ['uuid'], []).uuid == instr_uuid
+
+assert cbox.GetThings("/scene/instr/%s/output/1/rec_dry/status" % iname, ['*handler'], []).handler == []
+meter_uuid = cbox.GetThings("/new_meter", ['uuid'], []).uuid
+cbox.do_cmd('/scene/instr/vintage/output/1/rec_dry/attach', None, [meter_uuid])
+assert cbox.GetThings("/scene/instr/%s/output/1/rec_dry/status" % iname, ['*handler'], []).handler == [[1, meter_uuid]]
+cbox.do_cmd('/scene/instr/vintage/output/1/rec_dry/detach', None, [meter_uuid])
+assert cbox.GetThings("/scene/instr/%s/output/1/rec_dry/status" % iname, ['*handler'], []).handler == []
