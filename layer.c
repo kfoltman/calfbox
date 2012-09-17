@@ -138,52 +138,52 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     }
     else if (!strcmp(cmd->command, "/enable") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->enabled = 0 != *(int *)cmd->arg_values[0];
+        layer->enabled = 0 != CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/consume") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->consume = 0 != *(int *)cmd->arg_values[0];
+        layer->consume = 0 != CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/ignore_scene_transpose") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->ignore_scene_transpose = 0 != *(int *)cmd->arg_values[0];
+        layer->ignore_scene_transpose = 0 != CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/disable_aftertouch") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->disable_aftertouch = 0 != *(int *)cmd->arg_values[0];
+        layer->disable_aftertouch = 0 != CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/transpose") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->transpose = *(int *)cmd->arg_values[0];
+        layer->transpose = CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/fixed_note") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->fixed_note = *(int *)cmd->arg_values[0];
+        layer->fixed_note = CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/low_note") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->low_note = *(int *)cmd->arg_values[0];
+        layer->low_note = CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/high_note") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->high_note = *(int *)cmd->arg_values[0];
+        layer->high_note = CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/in_channel") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->in_channel = *(int *)cmd->arg_values[0] - 1;
+        layer->in_channel = CBOX_ARG_I(cmd, 0) - 1;
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/out_channel") && !strcmp(cmd->arg_types, "i"))
     {
-        layer->out_channel = *(int *)cmd->arg_values[0] - 1;
+        layer->out_channel = CBOX_ARG_I(cmd, 0) - 1;
         return TRUE;
     }
     else // otherwise, treat just like an command on normal (non-aux) output

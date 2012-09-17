@@ -91,7 +91,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
     }
     else if (!strcmp(cmd->command, "/insert") && !strcmp(cmd->arg_types, "i"))
     {
-        int pos = (*(int *)cmd->arg_values[0]) - 1;
+        int pos = CBOX_ARG_I(cmd, 0) - 1;
         struct cbox_module **new_modules = malloc((m->module_count + 1) * sizeof(struct cbox_module *));
         memcpy(new_modules, m->modules, pos * sizeof(struct cbox_module *));
         new_modules[pos] = NULL;
@@ -102,7 +102,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
     }
     else if (!strcmp(cmd->command, "/delete") && !strcmp(cmd->arg_types, "i"))
     {
-        int pos = (*(int *)cmd->arg_values[0]) - 1;
+        int pos = CBOX_ARG_I(cmd, 0) - 1;
         struct cbox_module **new_modules = malloc((m->module_count + 1) * sizeof(struct cbox_module *));
         memcpy(new_modules, m->modules, pos * sizeof(struct cbox_module *));
         memcpy(new_modules + pos, m->modules + pos + 1, (m->module_count - pos - 1) * sizeof(struct cbox_module *));
@@ -115,8 +115,8 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
     }
     else if (!strcmp(cmd->command, "/move") && !strcmp(cmd->arg_types, "ii"))
     {
-        int oldpos = (*(int *)cmd->arg_values[0]) - 1;
-        int newpos = (*(int *)cmd->arg_values[1]) - 1;
+        int oldpos = CBOX_ARG_I(cmd, 0) - 1;
+        int newpos = CBOX_ARG_I(cmd, 1) - 1;
         fxchain_move(m, oldpos, newpos);
     }
     else

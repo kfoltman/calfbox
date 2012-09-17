@@ -437,13 +437,13 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     else
     if (!strcmp(obj, "send_event") && (!strcmp(cmd->arg_types, "iii") || !strcmp(cmd->arg_types, "ii") || !strcmp(cmd->arg_types, "i")))
     {
-        int mcmd = *(int *)cmd->arg_values[0];
+        int mcmd = CBOX_ARG_I(cmd, 0);
         int arg1 = 0, arg2 = 0;
         if (cmd->arg_types[1] == 'i')
         {
-            arg1 = *(int *)cmd->arg_values[1];
+            arg1 = CBOX_ARG_I(cmd, 1);
             if (cmd->arg_types[2] == 'i')
-                arg2 = *(int *)cmd->arg_values[2];
+                arg2 = CBOX_ARG_I(cmd, 2);
         }
         struct cbox_midi_buffer buf;
         cbox_midi_buffer_init(&buf);
@@ -454,9 +454,9 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     else
     if (!strcmp(obj, "play_note") && !strcmp(cmd->arg_types, "iii"))
     {
-        int channel = *(int *)cmd->arg_values[0];
-        int note = *(int *)cmd->arg_values[1];
-        int velocity = *(int *)cmd->arg_values[2];
+        int channel = CBOX_ARG_I(cmd, 0);
+        int note = CBOX_ARG_I(cmd, 1);
+        int velocity = CBOX_ARG_I(cmd, 2);
         struct cbox_midi_buffer buf;
         cbox_midi_buffer_init(&buf);
         cbox_midi_buffer_write_inline(&buf, 0, 0x90 + ((channel - 1) & 15), note & 127, velocity & 127);
@@ -467,19 +467,19 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     else
     if (!strcmp(obj, "play_drum_pattern") && !strcmp(cmd->arg_types, "s"))
     {
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(CBOX_GET_DOCUMENT(app.rt), (const char *)cmd->arg_values[0], 1));
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(CBOX_GET_DOCUMENT(app.rt), CBOX_ARG_S(cmd, 0), 1));
         return TRUE;
     }
     else
     if (!strcmp(obj, "play_drum_track") && !strcmp(cmd->arg_types, "s"))
     {
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(CBOX_GET_DOCUMENT(app.rt), (const char *)cmd->arg_values[0], 1));
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(CBOX_GET_DOCUMENT(app.rt), CBOX_ARG_S(cmd, 0), 1));
         return TRUE;
     }
     else
     if (!strcmp(obj, "play_blob") && !strcmp(cmd->arg_types, "bi"))
     {
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_from_blob(CBOX_GET_DOCUMENT(app.rt), (const struct cbox_blob *)cmd->arg_values[0], *(int *)cmd->arg_values[1]));
+        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_from_blob(CBOX_GET_DOCUMENT(app.rt), CBOX_ARG_B(cmd, 0), CBOX_ARG_I(cmd, 1)));
         return TRUE;
     }
     else
@@ -522,19 +522,19 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     else
     if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))
     {
-        g_message("Print: %s", (const char *)cmd->arg_values[0]);
+        g_message("Print: %s", CBOX_ARG_S(cmd, 0));
         return TRUE;
     }
     else
     if (!strcmp(obj, "print_i") && !strcmp(cmd->arg_types, "i"))
     {
-        g_message("Print: %d", *(const int *)cmd->arg_values[0]);
+        g_message("Print: %d", CBOX_ARG_I(cmd, 0));
         return TRUE;
     }
     else
     if (!strcmp(obj, "print_f") && !strcmp(cmd->arg_types, "f"))
     {
-        g_message("Print: %f", *(const double *)cmd->arg_values[0]);
+        g_message("Print: %f", CBOX_ARG_F(cmd, 0));
         return TRUE;
     }
     else
@@ -575,7 +575,7 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        struct config_foreach_data cfd = {cmd->arg_types[0] == 's' ? (const char *)cmd->arg_values[0] : NULL, "/section", fb, error, TRUE};
+        struct config_foreach_data cfd = {cmd->arg_types[0] == 's' ? CBOX_ARG_S(cmd, 0) : NULL, "/section", fb, error, TRUE};
         cbox_config_foreach_section(api_config_cb, &cfd);
         return cfd.success;
     }
@@ -584,8 +584,8 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        struct config_foreach_data cfd = {cmd->arg_types[1] == 's' ? (const char *)cmd->arg_values[1] : NULL, "/key", fb, error, TRUE};
-        cbox_config_foreach_key(api_config_cb, cmd->arg_values[0], &cfd);
+        struct config_foreach_data cfd = {cmd->arg_types[1] == 's' ? CBOX_ARG_S(cmd, 1) : NULL, "/key", fb, error, TRUE};
+        cbox_config_foreach_key(api_config_cb, CBOX_ARG_S(cmd, 0), &cfd);
         return cfd.success;
     }
     else if (!strcmp(cmd->command, "/get") && !strcmp(cmd->arg_types, "ss"))
@@ -593,24 +593,24 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        const char *value = cbox_config_get_string((const char *)cmd->arg_values[0], (const char *)cmd->arg_values[1]);
+        const char *value = cbox_config_get_string(CBOX_ARG_S(cmd, 0), CBOX_ARG_S(cmd, 1));
         if (!value)
             return TRUE;
         return cbox_execute_on(fb, NULL, "/value", "s", error, value);
     }
     else if (!strcmp(cmd->command, "/set") && !strcmp(cmd->arg_types, "sss"))
     {
-        cbox_config_set_string((const char *)cmd->arg_values[0], (const char *)cmd->arg_values[1], (const char *)cmd->arg_values[2]);
+        cbox_config_set_string(CBOX_ARG_S(cmd, 0), CBOX_ARG_S(cmd, 1), CBOX_ARG_S(cmd, 2));
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/delete") && !strcmp(cmd->arg_types, "ss"))
     {
-        cbox_config_remove_key((const char *)cmd->arg_values[0], (const char *)cmd->arg_values[1]);
+        cbox_config_remove_key(CBOX_ARG_S(cmd, 0), CBOX_ARG_S(cmd, 1));
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/delete_section") && !strcmp(cmd->arg_types, "s"))
     {
-        cbox_config_remove_section((const char *)cmd->arg_values[0]);
+        cbox_config_remove_section(CBOX_ARG_S(cmd, 0));
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/save") && !strcmp(cmd->arg_types, ""))
@@ -619,7 +619,7 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
     }
     else if (!strcmp(cmd->command, "/save") && !strcmp(cmd->arg_types, "s"))
     {
-        return cbox_config_save((const char *)cmd->arg_values[0], error);
+        return cbox_config_save(CBOX_ARG_S(cmd, 0), error);
     }
     else
     {
@@ -671,7 +671,7 @@ static gboolean waves_process_cmd(struct cbox_command_target *ct, struct cbox_co
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        int id = *(int *)cmd->arg_values[0];
+        int id = CBOX_ARG_I(cmd, 0);
         struct cbox_waveform *waveform = cbox_wavebank_peek_waveform_by_id(id);
         if (waveform == NULL)
         {

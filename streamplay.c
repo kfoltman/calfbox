@@ -612,7 +612,7 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
     {
         if (!require_stream(m, error))
             return FALSE;
-        m->stream->readptr_new = *(int *)cmd->arg_values[0];
+        m->stream->readptr_new = CBOX_ARG_I(cmd, 0);
         cbox_rt_execute_cmd_async(m->module.rt, &stream_seek_command, m);
     }
     else if (!strcmp(cmd->command, "/play") && !strcmp(cmd->arg_types, ""))
@@ -649,8 +649,8 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
         c->module = m;
         c->stream = NULL;
         c->old_stream = NULL;
-        c->filename = g_strdup((gchar *)cmd->arg_values[0]);
-        c->loop_start = *(int *)cmd->arg_values[1];
+        c->filename = g_strdup(CBOX_ARG_S(cmd, 0));
+        c->loop_start = CBOX_ARG_I(cmd, 1);
         c->error = error;
         cbox_rt_execute_cmd_sync(m->module.rt, &stream_load_command, c);
         gboolean success = c->stream != NULL;

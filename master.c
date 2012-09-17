@@ -53,13 +53,13 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     else
     if (!strcmp(cmd->command, "/set_tempo") && !strcmp(cmd->arg_types, "f"))
     {
-        cbox_master_set_tempo(m, *(double *)cmd->arg_values[0]);
+        cbox_master_set_tempo(m, CBOX_ARG_F(cmd, 0));
         return TRUE;
     }
     else
     if (!strcmp(cmd->command, "/set_timesig") && !strcmp(cmd->arg_types, "ii"))
     {
-        cbox_master_set_timesig(m, *(int *)cmd->arg_values[0], *(int *)cmd->arg_values[1]);
+        cbox_master_set_timesig(m, CBOX_ARG_I(cmd, 0), CBOX_ARG_I(cmd, 1));
         return TRUE;
     }
     else
@@ -77,13 +77,13 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     else
     if (!strcmp(cmd->command, "/seek_samples") && !strcmp(cmd->arg_types, "i"))
     {
-        cbox_song_playback_seek_samples(m->spb, *(int *)cmd->arg_values[0]);
+        cbox_song_playback_seek_samples(m->spb, CBOX_ARG_I(cmd, 0));
         return TRUE;
     }
     else
     if (!strcmp(cmd->command, "/seek_ppqn") && !strcmp(cmd->arg_types, "i"))
     {
-        cbox_song_playback_seek_ppqn(m->spb, *(int *)cmd->arg_values[0], FALSE);
+        cbox_song_playback_seek_ppqn(m->spb, CBOX_ARG_I(cmd, 0), FALSE);
         return TRUE;
     }
     else

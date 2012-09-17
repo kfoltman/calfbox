@@ -37,12 +37,12 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
     }
     if (!strcmp(subcmd, "/gain") && !strcmp(cmd->arg_types, "f"))
     {
-        output->gain = dB2gain_simple(*(double *)cmd->arg_values[0]);
+        output->gain = dB2gain_simple(CBOX_ARG_F(cmd, 0));
         return TRUE;
     }
     if (!strcmp(subcmd, "/output") && !strcmp(cmd->arg_types, "i"))
     {
-        int obus = *(int *)cmd->arg_values[0];
+        int obus = CBOX_ARG_I(cmd, 0);
         // XXXKF add error checking
         output->output_bus = obus - 1;
         return TRUE;
@@ -69,7 +69,7 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
     else if (!strcmp(subcmd, "/bus") && !strcmp(cmd->arg_types, "s"))
     {
         struct cbox_scene *scene = instr->scene;
-        if (!*(const char *)cmd->arg_values[0])
+        if (!CBOX_ARG_S(cmd, 0))
         {
             struct cbox_aux_bus *old_bus = cbox_rt_swap_pointers(instr->module->rt, (void **)&instr->aux_outputs[id], NULL);
             if (old_bus)
@@ -80,7 +80,7 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
         {
             if (!scene->aux_buses[i])
                 continue;
-            if (!strcmp(scene->aux_buses[i]->name, (const char *)cmd->arg_values[0]))
+            if (!strcmp(scene->aux_buses[i]->name, CBOX_ARG_S(cmd, 0)))
             {
                 g_free(instr->aux_output_names[id]);
                 instr->aux_output_names[id] = g_strdup(scene->aux_buses[i]->name);
@@ -91,7 +91,7 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
                 return TRUE;
             }
         }
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown aux bus: %s", (const char *)cmd->arg_values[0]);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown aux bus: %s", CBOX_ARG_S(cmd, 0));
         return FALSE;
     }
     else if (!strcmp(subcmd, "/output") && !strcmp(cmd->arg_types, "i")) // not supported

@@ -197,7 +197,7 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
     }
     if (!strcmp(subcmd, "/insert_preset") && !strcmp(cmd->arg_types, "s"))
     {
-        struct cbox_module *effect = cbox_module_new_from_fx_preset((const char *)cmd->arg_values[0], rt, error);
+        struct cbox_module *effect = cbox_module_new_from_fx_preset(CBOX_ARG_S(cmd, 0), rt, error);
         if (!effect)
             return FALSE;
         cbox_rt_swap_pointers(rt, (void **)psm, effect);
@@ -206,12 +206,12 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
     if (!strcmp(subcmd, "/insert_engine") && !strcmp(cmd->arg_types, "s"))
     {
         struct cbox_module *effect = NULL;
-        if (*(const char *)cmd->arg_values[0])
+        if (*CBOX_ARG_S(cmd, 0))
         {
-            struct cbox_module_manifest *manifest = cbox_module_manifest_get_by_name((const char *)cmd->arg_values[0]);
+            struct cbox_module_manifest *manifest = cbox_module_manifest_get_by_name(CBOX_ARG_S(cmd, 0));
             if (!manifest)
             {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No effect engine '%s'", (const char *)cmd->arg_values[0]);
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No effect engine '%s'", CBOX_ARG_S(cmd, 0));
                 return FALSE;
             }
             effect = cbox_module_manifest_create_module(manifest, NULL, rt, "unnamed", error);
@@ -242,7 +242,7 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine on module in path '%s'", cmd->command);
             return FALSE;
         }
-        sm->bypass = *(int *)cmd->arg_values[0];
+        sm->bypass = CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     return cbox_object_default_process_cmd(&sm->cmd_target, fb, cmd, error);

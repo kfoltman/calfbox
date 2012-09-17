@@ -54,7 +54,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     
     if (!strcmp(cmd->command, "/transpose") && !strcmp(cmd->arg_types, "i"))
     {
-        s->transpose = *(int *)cmd->arg_values[0];
+        s->transpose = CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "s"))
@@ -62,7 +62,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         struct cbox_scene *scene = cbox_scene_new(CBOX_GET_DOCUMENT(s));
         if (!scene)
             return FALSE;
-        if (!cbox_scene_load(scene, (const gchar *)cmd->arg_values[0], error))
+        if (!cbox_scene_load(scene, CBOX_ARG_S(cmd, 0), error))
             return FALSE;
         struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
         CBOX_DELETE(old_scene);
@@ -79,7 +79,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/add_layer") && !strcmp(cmd->arg_types, "is"))
     {
-        int pos = *(int *)cmd->arg_values[0];
+        int pos = CBOX_ARG_I(cmd, 0);
         if (pos < 0 || pos > s->layer_count)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", pos, s->layer_count);
@@ -89,7 +89,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             pos = s->layer_count;
         else
             pos--;
-        struct cbox_layer *layer = cbox_layer_new_from_config(s, (const gchar *)cmd->arg_values[1], error);
+        struct cbox_layer *layer = cbox_layer_new_from_config(s, CBOX_ARG_S(cmd, 1), error);
         if (!layer)
             return FALSE;
         if (!cbox_scene_insert_layer(s, layer, pos, error))
@@ -101,7 +101,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/add_instrument") && !strcmp(cmd->arg_types, "is"))
     {
-        int pos = *(int *)cmd->arg_values[0];
+        int pos = CBOX_ARG_I(cmd, 0);
         if (pos < 0 || pos > s->layer_count)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", pos, s->layer_count);
@@ -111,7 +111,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             pos = s->layer_count;
         else
             pos--;
-        struct cbox_layer *layer = cbox_layer_new_with_instrument(s, (const gchar *)cmd->arg_values[1], error);
+        struct cbox_layer *layer = cbox_layer_new_with_instrument(s, CBOX_ARG_S(cmd, 1), error);
         if (!layer)
             return FALSE;
         if (!cbox_scene_insert_layer(s, layer, pos, error))
@@ -123,7 +123,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/delete_layer") && !strcmp(cmd->arg_types, "i"))
     {
-        int pos = *(int *)cmd->arg_values[0];
+        int pos = CBOX_ARG_I(cmd, 0);
         if (pos < 0 || pos > s->layer_count)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for last)", pos, s->layer_count);
@@ -139,13 +139,13 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/move_layer") && !strcmp(cmd->arg_types, "ii"))
     {
-        int oldpos = *(int *)cmd->arg_values[0];
+        int oldpos = CBOX_ARG_I(cmd, 0);
         if (oldpos < 1 || oldpos > s->layer_count)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d)", oldpos, s->layer_count);
             return FALSE;
         }
-        int newpos = *(int *)cmd->arg_values[1];
+        int newpos = CBOX_ARG_I(cmd, 1);
         if (newpos < 1 || newpos > s->layer_count)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d)", newpos, s->layer_count);
@@ -198,7 +198,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/load_aux") && !strcmp(cmd->arg_types, "s"))
     {
-        struct cbox_aux_bus *bus = cbox_scene_get_aux_bus(s, (const char *)cmd->arg_values[0], error);
+        struct cbox_aux_bus *bus = cbox_scene_get_aux_bus(s, CBOX_ARG_S(cmd, 0), error);
         if (!bus)
             return FALSE;
         cbox_aux_bus_unref(bus);
@@ -206,7 +206,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/delete_aux") && !strcmp(cmd->arg_types, "i"))
     {
-        int pos = *(int *)cmd->arg_values[0];
+        int pos = CBOX_ARG_I(cmd, 0);
         if (pos < 0 || pos > s->aux_bus_count)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for last)", pos, s->aux_bus_count);
@@ -258,7 +258,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         }
         struct cbox_midi_buffer midibuf_song;
         cbox_midi_buffer_init(&midibuf_song);
-        int nframes = *(int *)cmd->arg_values[0];
+        int nframes = CBOX_ARG_I(cmd, 0);
         float *data = malloc(2 * nframes * sizeof(float));
         float *data_i = malloc(2 * nframes * sizeof(float));
         float *buffers[2] = { data, data + nframes };

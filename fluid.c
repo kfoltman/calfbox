@@ -254,18 +254,18 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     }
     else if (!strcmp(cmd->command, "/set_patch") && !strcmp(cmd->arg_types, "ii"))
     {
-        int channel = *(int *)cmd->arg_values[0];
+        int channel = CBOX_ARG_I(cmd, 0);
         if (channel < 1 || channel > 16)
         {
             g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Invalid channel %d", channel);
             return FALSE;
         }
-        int value = *(int *)cmd->arg_values[1];
+        int value = CBOX_ARG_I(cmd, 1);
         return fluid_synth_program_select(m->synth, channel - 1, m->sfid, value >> 7, value & 127) == FLUID_OK;
     }
     else if (!strcmp(cmd->command, "/polyphony") && !strcmp(cmd->arg_types, "i"))
     {
-        int polyphony = *(int *)cmd->arg_values[0];
+        int polyphony = CBOX_ARG_I(cmd, 0);
         if (polyphony < 2 || polyphony > 256)
         {
             g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Invalid polyphony %d (must be between 2 and 256)", polyphony);

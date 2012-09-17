@@ -1359,7 +1359,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     }
     else if (!strcmp(cmd->command, "/polyphony") && !strcmp(cmd->arg_types, "i"))
     {
-        int polyphony = *(int *)cmd->arg_values[0];
+        int polyphony = CBOX_ARG_I(cmd, 0);
         if (polyphony < 1 || polyphony > MAX_SAMPLER_VOICES)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid polyphony %d (must be between 1 and %d)", polyphony, (int)MAX_SAMPLER_VOICES);
@@ -1370,13 +1370,13 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     }
     else if (!strcmp(cmd->command, "/set_patch") && !strcmp(cmd->arg_types, "ii"))
     {
-        int channel = *(int *)cmd->arg_values[0];
+        int channel = CBOX_ARG_I(cmd, 0);
         if (channel < 1 || channel > 16)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid channel %d", channel);
             return FALSE;
         }
-        int value = *(int *)cmd->arg_values[1];
+        int value = CBOX_ARG_I(cmd, 1);
         struct sampler_program *pgm = NULL;
         for (int i = 0; i < m->program_count; i++)
         {
@@ -1391,11 +1391,11 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     }
     else if (!strcmp(cmd->command, "/load_patch") && !strcmp(cmd->arg_types, "iss"))
     {
-        return load_program_at(m, (const char *)cmd->arg_values[1], (const char *)cmd->arg_values[2], *(int *)cmd->arg_values[0], error);
+        return load_program_at(m, CBOX_ARG_S(cmd, 1), CBOX_ARG_S(cmd, 2), CBOX_ARG_I(cmd, 0), error);
     }
     else if (!strcmp(cmd->command, "/load_patch_from_string") && !strcmp(cmd->arg_types, "isss"))
     {
-        return load_from_string(m, (const char *)cmd->arg_values[1], (const char *)cmd->arg_values[2], (const char *)cmd->arg_values[3], *(int *)cmd->arg_values[0], error);
+        return load_from_string(m, CBOX_ARG_S(cmd, 1), CBOX_ARG_S(cmd, 2), CBOX_ARG_S(cmd, 3), CBOX_ARG_I(cmd, 0), error);
     }
     else if (!strcmp(cmd->command, "/get_unused_program") && !strcmp(cmd->arg_types, ""))
     {
