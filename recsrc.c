@@ -56,8 +56,11 @@ int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_
     if (index == -1)
         return 0;
     
-    rec->detach(rec);
     cbox_rt_array_remove(app.rt, (void ***)&src->handlers, &src->handler_count, index);
+    // XXXKF: when converting to async API, the array_remove must be done synchronously or
+    // detach needs to be called in the cleanup part of the remove command, otherwise detach
+    // may be called on 'live' recorder, which may cause unpredictable results.
+    rec->detach(rec);
     return 1;
 }
 

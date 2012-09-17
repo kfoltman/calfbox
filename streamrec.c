@@ -28,6 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <unistd.h>
 
+// XXXKF the syncing model here is flawed in several ways:
+// - it's not possible to do block-accurate syncing
+// - it's not possible to flush the output buffer and stop recording
+// - rb_for_writing is being written from two threads (audio and UI),
+//   which is not guaranteed to work
+// - 
+
 // 1/8s for 44.1kHz stereo float
 #define STREAM_BUFFER_SIZE 16384
 #define STREAM_BUFFER_COUNT 8
@@ -74,6 +81,10 @@ static void *stream_recorder_thread(void *user_data)
             break;
         if (buf_idx == STREAM_CMD_SYNC)
         {
+            // this assumes that the recorder is already detached from any source
+            if (self->cur_buffer && self->cur_buffer->write_ptr)
+                sf_write_float(self->sndfile, self->cur_buffer->data, self->cur_buffer->write_ptr);
+            
             sf_command(self->sndfile, SFC_UPDATE_HEADER_NOW, NULL, 0);
             sf_write_sync(self->sndfile);
             sem_post(&self->sem_sync_completed);
@@ -171,11 +182,28 @@ void stream_recorder_destroy(struct cbox_recorder *handler)
 }
 
 
+static gboolean stream_recorder_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct stream_recorder *rec = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        if (!cbox_execute_on(fb, NULL, "/filename", "s", error, rec->filename))
+            return FALSE;
+        return CBOX_OBJECT_DEFAULT_STATUS(&rec->iface, fb, error);
+    }
+    return cbox_object_default_process_cmd(ct, fb, cmd, error);
+}
+
 struct cbox_recorder *cbox_recorder_new_stream(struct cbox_rt *rt, const char *filename)
 {
     struct stream_recorder *self = malloc(sizeof(struct stream_recorder));
     self->rt = rt;
     CBOX_OBJECT_HEADER_INIT(&self->iface, cbox_recorder, CBOX_GET_DOCUMENT(rt));
+    cbox_command_target_init(&self->iface.cmd_target, stream_recorder_process_cmd, self);
+    
     self->iface.user_data = self;
     self->iface.attach = stream_recorder_attach;
     self->iface.record_block = stream_recorder_record_block;

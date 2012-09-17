@@ -86,6 +86,10 @@ void cbox_meter_destroy(struct cbox_recorder *handler)
 static gboolean cbox_meter_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct cbox_meter *m = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        return CBOX_OBJECT_DEFAULT_STATUS(&m->recorder, fb, error);
+    }
     if (!strcmp(cmd->command, "/get_peak") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
@@ -111,10 +115,7 @@ static gboolean cbox_meter_process_cmd(struct cbox_command_target *ct, struct cb
         return cbox_execute_on(fb, NULL, "/rms", "ff", error, sqrt(m->volume[0]), sqrt(m->volume[1]));
     }
     else
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
-        return FALSE;
-    }
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
 struct cbox_meter *cbox_meter_new(struct cbox_document *document, int srate)
