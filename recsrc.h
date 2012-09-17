@@ -41,6 +41,7 @@ struct cbox_recorder
 struct cbox_recording_source
 {
     struct cbox_command_target cmd_target;
+    struct cbox_document *doc;
     
     struct cbox_recorder **handlers;
     int handler_count;
@@ -50,7 +51,7 @@ struct cbox_recording_source
 
 #define IS_RECORDING_SOURCE_CONNECTED(src) ((src).handler_count != 0)
 
-extern void cbox_recording_source_init(struct cbox_recording_source *src, uint32_t max_numsamples, int channels);
+extern void cbox_recording_source_init(struct cbox_recording_source *src, struct cbox_document *doc, uint32_t max_numsamples, int channels);
 extern void cbox_recording_source_attach(struct cbox_recording_source *src, struct cbox_recorder *rec);
 extern int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_recorder *rec);
 extern void cbox_recording_source_change(struct cbox_recording_source *src, uint32_t max_numsamples, int channels);

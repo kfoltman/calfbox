@@ -681,6 +681,7 @@ extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_sce
     gchar *instr_section = NULL;
     gpointer value = g_hash_table_lookup(scene->instrument_hash, name);
     const char *cv, *instr_engine;
+    struct cbox_document *doc = CBOX_GET_DOCUMENT(scene);
     assert(scene);
     
     if (value)
@@ -724,7 +725,7 @@ extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_sce
     for (int i = 0; i < module->outputs / 2; i ++)
     {
         struct cbox_instrument_output *oobj = outputs + i;
-        cbox_instrument_output_init(oobj, cbox_rt_get_buffer_size(module->rt));
+        cbox_instrument_output_init(oobj, doc, cbox_rt_get_buffer_size(module->rt));
         
         gchar *key = i == 0 ? g_strdup("output_bus") : g_strdup_printf("output%d_bus", 1 + i);
         oobj->output_bus = cbox_config_get_int(instr_section, key, 1) - 1;

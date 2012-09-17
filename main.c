@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        if (!cbox_io_init(&app.io, &params))
+        if (!cbox_io_init(&app.io, app.document, &params))
         {
             fprintf(stderr, "Cannot initialise sound I/O\n");
             return 1;

@@ -26,8 +26,9 @@ CBOX_CLASS_DEFINITION_ROOT(cbox_recorder)
 
 static gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 
-void cbox_recording_source_init(struct cbox_recording_source *src, uint32_t max_numsamples, int channels)
+void cbox_recording_source_init(struct cbox_recording_source *src, struct cbox_document *doc, uint32_t max_numsamples, int channels)
 {
+    src->doc = doc;
     src->handlers = NULL;
     src->handler_count = 0;
     src->max_numsamples = max_numsamples;
@@ -95,6 +96,26 @@ gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struc
             if (!cbox_execute_on(fb, NULL, "/handler", "io", error, i + 1, src->handlers[i]))
                 return FALSE;            
         }
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/attach") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_objhdr *objhdr = CBOX_ARG_O(cmd, 0, error);
+        if (!objhdr)
+            return FALSE;
+        struct cbox_recorder *rec = CBOX_H2O(objhdr);
+        cbox_recording_source_attach(src, rec);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/detach") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_objhdr *objhdr = CBOX_ARG_O(cmd, 0, error);
+        if (!objhdr)
+            return FALSE;
+        struct cbox_recorder *rec = CBOX_H2O(objhdr);
+        cbox_recording_source_detach(src, rec);
         return TRUE;
     }
     else    

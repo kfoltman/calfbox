@@ -47,6 +47,10 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
         output->output_bus = obus - 1;
         return TRUE;
     }
+    if (!strncmp(subcmd, "/rec_dry/", 9))
+        return cbox_execute_sub(&output->rec_dry.cmd_target, fb, cmd, subcmd + 8, error);
+    if (!strncmp(subcmd, "/rec_wet/", 9))
+        return cbox_execute_sub(&output->rec_wet.cmd_target, fb, cmd, subcmd + 8, error);
     return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, instr->scene->rt, error);
 }
 
@@ -191,10 +195,10 @@ void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrument, stru
     }    
 }
 
-void cbox_instrument_output_init(struct cbox_instrument_output *output, uint32_t max_numsamples)
+void cbox_instrument_output_init(struct cbox_instrument_output *output, struct cbox_document *doc, uint32_t max_numsamples)
 {
-    cbox_recording_source_init(&output->rec_dry, max_numsamples, 2);
-    cbox_recording_source_init(&output->rec_wet, max_numsamples, 2);
+    cbox_recording_source_init(&output->rec_dry, doc, max_numsamples, 2);
+    cbox_recording_source_init(&output->rec_wet, doc, max_numsamples, 2);
     output->insert = NULL;
     output->output_bus = 0;
     output->gain = 1.0;

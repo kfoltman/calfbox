@@ -23,6 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdarg.h>
 #include <stdint.h>
 
+#define CBOX_ARG_I(cmd, idx) (*(int *)(cmd)->arg_values[(idx)])
+#define CBOX_ARG_S(cmd, idx) ((const char *)(cmd)->arg_values[(idx)])
+#define CBOX_ARG_F(cmd, idx) (*(float *)(cmd)->arg_values[(idx)])
+#define CBOX_ARG_O(cmd, idx, error) cbox_document_get_object_by_text_uuid(src->doc, (const char *)(cmd)->arg_values[(idx)], (error))
+
 struct cbox_command_target;
 
 struct cbox_osc_command

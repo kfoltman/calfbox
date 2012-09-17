@@ -510,6 +510,16 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return TRUE;
     }
     else
+    if (!strcmp(obj, "new_meter") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        struct cbox_meter *meter = cbox_meter_new(app.document, cbox_rt_get_sample_rate(app.rt));
+
+        return cbox_execute_on(fb, NULL, "/uuid", "o", error, meter);
+    }
+    else
     if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))
     {
         g_message("Print: %s", (const char *)cmd->arg_values[0]);
