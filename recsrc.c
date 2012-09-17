@@ -119,7 +119,7 @@ gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struc
         return TRUE;
     }
     else    
-        return cbox_object_default_process_cmd(ct, fb, cmd, error);
+        return cbox_set_command_error(error, cmd);
 }
 
 void cbox_recorder_destroyfunc(struct cbox_objhdr *objhdr)
