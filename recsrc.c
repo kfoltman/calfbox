@@ -36,13 +36,15 @@ void cbox_recording_source_init(struct cbox_recording_source *src, struct cbox_d
     cbox_command_target_init(&src->cmd_target, cbox_recording_source_process_cmd, src);
 }
 
-void cbox_recording_source_attach(struct cbox_recording_source *src, struct cbox_recorder *rec)
+gboolean cbox_recording_source_attach(struct cbox_recording_source *src, struct cbox_recorder *rec, GError **error)
 {
-    rec->attach(rec, src);
+    if (!rec->attach(rec, src, error))
+        return FALSE;
     cbox_rt_array_insert(app.rt, (void ***)&src->handlers, &src->handler_count, 0, rec);
+    return TRUE;
 }
 
-int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_recorder *rec)
+int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_recorder *rec, GError **error)
 {
     int index = -1;
     for (int i = 0; i < src->handler_count; i++)
@@ -54,24 +56,17 @@ int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_
         }
     }
     if (index == -1)
+    {
+        if (error)
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Recorder is not attached to this source");
         return 0;
+    }
     
     cbox_rt_array_remove(app.rt, (void ***)&src->handlers, &src->handler_count, index);
     // XXXKF: when converting to async API, the array_remove must be done synchronously or
     // detach needs to be called in the cleanup part of the remove command, otherwise detach
     // may be called on 'live' recorder, which may cause unpredictable results.
-    rec->detach(rec);
-    return 1;
-}
-
-void cbox_recording_source_change(struct cbox_recording_source *src, uint32_t max_numsamples, int channels)
-{
-    for (int i = 0; i < src->handler_count; i++)
-        src->handlers[i]->detach(src->handlers[i]);
-    src->max_numsamples = max_numsamples;
-    src->channels = channels;
-    for (int i = 0; i < src->handler_count; i++)
-        src->handlers[i]->attach(src->handlers[i], src);
+    return rec->detach(rec, error);
 }
 
 void cbox_recording_source_push(struct cbox_recording_source *src, const float **buffers, uint32_t numsamples)
@@ -108,8 +103,7 @@ gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struc
         if (!objhdr)
             return FALSE;
         struct cbox_recorder *rec = CBOX_H2O(objhdr);
-        cbox_recording_source_attach(src, rec);
-        return TRUE;
+        return cbox_recording_source_attach(src, rec, error);
     }
     else
     if (!strcmp(cmd->command, "/detach") && !strcmp(cmd->arg_types, "s"))
@@ -118,8 +112,7 @@ gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struc
         if (!objhdr)
             return FALSE;
         struct cbox_recorder *rec = CBOX_H2O(objhdr);
-        cbox_recording_source_detach(src, rec);
-        return TRUE;
+        return cbox_recording_source_detach(src, rec, error);
     }
     else    
         return cbox_set_command_error(error, cmd);

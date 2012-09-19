@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "errors.h"
 #include "recsrc.h"
 #include "rt.h"
 #include <assert.h>
@@ -101,28 +102,35 @@ static void *stream_recorder_thread(void *user_data)
     
 }
 
-static void stream_recorder_attach(struct cbox_recorder *handler, struct cbox_recording_source *src)
+static gboolean stream_recorder_attach(struct cbox_recorder *handler, struct cbox_recording_source *src, GError **error)
 {
     struct stream_recorder *self = handler->user_data;
     
+    if (self->sndfile)
+    {
+        if (error)
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Recorder already attached to a different source");
+        return FALSE;
+    }
+
+    memset(&self->info, 0, sizeof(self->info));
+    self->info.frames = 0;
+    self->info.samplerate = cbox_rt_get_sample_rate(self->rt);
+    self->info.channels = src->channels;
+    self->info.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT; // XXXKF make format configurable on instantiation
+    self->info.sections = 0;
+    self->info.seekable = 0;
+    
+    self->sndfile = sf_open(self->filename, SFM_WRITE, &self->info);
     if (!self->sndfile)
     {
-        memset(&self->info, 0, sizeof(self->info));
-        self->info.frames = 0;
-        self->info.samplerate = cbox_rt_get_sample_rate(self->rt);
-        self->info.channels = src->channels;
-        self->info.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT; // XXXKF 
-        self->info.sections = 0;
-        self->info.seekable = 0;
-        
-        self->sndfile = sf_open(self->filename, SFM_WRITE, &self->info);
-        if (!self->sndfile)
-            g_warning("SF error: %s", sf_strerror(NULL));
-        
-        pthread_create(&self->thr_writeout, NULL, stream_recorder_thread, self);
+        if (error)
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot open sound file '%s': %s", self->filename, sf_strerror(NULL));
+        return FALSE;
     }
-    else
-        assert(self->info.channels == src->channels); // changes of channel counts are supported
+    
+    pthread_create(&self->thr_writeout, NULL, stream_recorder_thread, self);
+    return TRUE;
 }
 
 void stream_recorder_record_block(struct cbox_recorder *handler, const float **buffers, uint32_t numsamples)
@@ -155,16 +163,21 @@ void stream_recorder_record_block(struct cbox_recorder *handler, const float **b
     self->cur_buffer->write_ptr += nc * numsamples;
 }
 
-void stream_recorder_detach(struct cbox_recorder *handler)
+gboolean stream_recorder_detach(struct cbox_recorder *handler, GError **error)
 {
     struct stream_recorder *self = handler->user_data;
     
-    if (self->sndfile)
+    if (!self->sndfile)
     {
-        int8_t cmd = STREAM_CMD_SYNC;
-        jack_ringbuffer_write(self->rb_for_writing, &cmd, 1);
-        sem_wait(&self->sem_sync_completed);
+        if (error)
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No sound file associated with stream recorder");
+        return FALSE;
     }
+
+    int8_t cmd = STREAM_CMD_SYNC;
+    jack_ringbuffer_write(self->rb_for_writing, &cmd, 1);
+    sem_wait(&self->sem_sync_completed);
+    return TRUE;
 }
 
 void stream_recorder_destroy(struct cbox_recorder *handler)

@@ -32,9 +32,9 @@ struct cbox_recorder
     void *user_data;
     struct cbox_command_target cmd_target;
     
-    void (*attach)(struct cbox_recorder *handler, struct cbox_recording_source *src);
+    gboolean (*attach)(struct cbox_recorder *handler, struct cbox_recording_source *src, GError **error);
     void (*record_block)(struct cbox_recorder *handler, const float **buffers, uint32_t numsamples);
-    void (*detach)(struct cbox_recorder *handler);
+    gboolean (*detach)(struct cbox_recorder *handler, GError **error);
     void (*destroy)(struct cbox_recorder *handler);
 };
 
@@ -52,9 +52,8 @@ struct cbox_recording_source
 #define IS_RECORDING_SOURCE_CONNECTED(src) ((src).handler_count != 0)
 
 extern void cbox_recording_source_init(struct cbox_recording_source *src, struct cbox_document *doc, uint32_t max_numsamples, int channels);
-extern void cbox_recording_source_attach(struct cbox_recording_source *src, struct cbox_recorder *rec);
-extern int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_recorder *rec);
-extern void cbox_recording_source_change(struct cbox_recording_source *src, uint32_t max_numsamples, int channels);
+extern gboolean cbox_recording_source_attach(struct cbox_recording_source *src, struct cbox_recorder *rec, GError **error);
+extern int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_recorder *rec, GError **error);
 extern void cbox_recording_source_push(struct cbox_recording_source *src, const float **buffers, uint32_t numsamples);
 extern void cbox_recording_source_uninit(struct cbox_recording_source *src);
 

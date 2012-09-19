@@ -34,11 +34,12 @@ static void clear_meter(struct cbox_meter *m)
     m->smpcounter = 0;
 }
 
-void cbox_meter_attach(struct cbox_recorder *handler, struct cbox_recording_source *src)
+gboolean cbox_meter_attach(struct cbox_recorder *handler, struct cbox_recording_source *src, GError **error)
 {
     struct cbox_meter *m = handler->user_data;
     m->channels = src->channels;
     clear_meter(m);
+    return TRUE;
 }
 
 void cbox_meter_record_block(struct cbox_recorder *handler, const float **buffers, uint32_t numsamples)
@@ -70,11 +71,12 @@ void cbox_meter_record_block(struct cbox_recorder *handler, const float **buffer
     }
 }
 
-void cbox_meter_detach(struct cbox_recorder *handler)
+gboolean cbox_meter_detach(struct cbox_recorder *handler, GError **error)
 {
     struct cbox_meter *m = handler->user_data;
     m->channels = 0;
     clear_meter(m);
+    return TRUE;
 }
 
 void cbox_meter_destroy(struct cbox_recorder *handler)

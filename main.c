@@ -279,7 +279,11 @@ int main(int argc, char *argv[])
     cbox_master_set_timesig(app.rt->master, bpb, 4);
 
     if (output_name)
-        cbox_recording_source_attach(&app.io.rec_stereo_outputs[0], cbox_recorder_new_stream(app.rt, output_name));
+    {
+        GError *error = NULL;
+        if (!cbox_recording_source_attach(&app.io.rec_stereo_outputs[0], cbox_recorder_new_stream(app.rt, output_name), &error))
+            cbox_print_error(error);
+    }
     cbox_rt_start(app.rt);
     if (drum_pattern_name)
         cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(CBOX_GET_DOCUMENT(app.rt), drum_pattern_name, 1));
