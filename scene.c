@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config-api.h"
 #include "errors.h"
 #include "instr.h"
+#include "io.h"
 #include "layer.h"
 #include "master.h"
 #include "midi.h"
@@ -540,6 +541,24 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_m
 {
     int n, i, j;
 
+    if (scene->rt && scene->rt->io)
+    {
+        struct cbox_io *io = scene->rt->io;
+        for (i = 0; i < io->input_count; i++)
+        {
+            if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_mono_inputs[i]))
+                cbox_recording_source_push(&scene->rec_mono_inputs[i], (const float **)&io->input_buffers[i], nframes);
+        }
+        for (i = 0; i < io->input_count / 2; i++)
+        {
+            if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_stereo_inputs[i]))
+            {
+                const float *buf[2] = { io->input_buffers[i * 2], io->input_buffers[i * 2 + 1] };
+                cbox_recording_source_push(&scene->rec_stereo_inputs[i], buf, nframes);
+            }
+        }
+    }
+    
     write_events_to_instrument_ports(scene, midibuf_total);
 
     for (n = 0; n < scene->aux_bus_count; n++)
@@ -654,6 +673,24 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_m
             }
         }
     }
+    if (scene->rt && scene->rt->io)
+    {
+        struct cbox_io *io = scene->rt->io;
+        // XXXKF this assumes that the buffers are zeroed on start - which isn't true if there are multiple scenes
+        for (i = 0; i < io->output_count; i++)
+        {
+            if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_mono_outputs[i]))
+                cbox_recording_source_push(&scene->rec_mono_outputs[i], (const float **)&io->output_buffers[i], nframes);
+        }
+        for (i = 0; i < io->output_count / 2; i++)
+        {
+            if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_stereo_outputs[i]))
+            {
+                const float *buf[2] = { io->output_buffers[i * 2], io->output_buffers[i * 2 + 1] };
+                cbox_recording_source_push(&scene->rec_stereo_outputs[i], buf, nframes);
+            }
+        }
+    }
 }
 
 void cbox_scene_clear(struct cbox_scene *scene)
@@ -725,7 +762,7 @@ extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_sce
     for (int i = 0; i < module->outputs / 2; i ++)
     {
         struct cbox_instrument_output *oobj = outputs + i;
-        cbox_instrument_output_init(oobj, doc, cbox_rt_get_buffer_size(module->rt));
+        cbox_instrument_output_init(oobj, scene, cbox_rt_get_buffer_size(module->rt));
         
         gchar *key = i == 0 ? g_strdup("output_bus") : g_strdup_printf("output%d_bus", 1 + i);
         oobj->output_bus = cbox_config_get_int(instr_section, key, 1) - 1;
@@ -785,6 +822,20 @@ error:
     return NULL;
 }
 
+static struct cbox_recording_source *create_rec_sources(struct cbox_scene *scene, struct cbox_io *io, int count, int channels)
+{
+    struct cbox_recording_source *s = malloc(sizeof(struct cbox_recording_source) * count);
+    for (int i = 0; i < count; i++)
+        cbox_recording_source_init(&s[i], scene, io->buffer_size, channels);
+    return s;
+}
+
+static void destroy_rec_sources(struct cbox_recording_source *s, int count)
+{
+    for (int i = 0; i < count; i++)
+        cbox_recording_source_uninit(&s[i]);
+}
+
 struct cbox_scene *cbox_scene_new(struct cbox_document *document)
 {
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
@@ -804,6 +855,23 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document)
     s->aux_bus_count = 0;
     cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
     s->transpose = 0;
+
+    if (s->rt && s->rt->io)
+    {
+        struct cbox_io *io = s->rt->io;
+        s->rec_mono_inputs = create_rec_sources(s, io, io->input_count, 1);
+        s->rec_stereo_inputs = create_rec_sources(s, io, io->input_count / 2, 2);
+        s->rec_mono_outputs = create_rec_sources(s, io, io->output_count, 1);
+        s->rec_stereo_outputs = create_rec_sources(s, io, io->output_count / 2, 2);
+    }
+    else
+    {
+        s->rec_mono_inputs = NULL;
+        s->rec_stereo_inputs = NULL;
+        s->rec_mono_outputs = NULL;
+        s->rec_stereo_outputs = NULL;
+    }
+    
     CBOX_OBJECT_REGISTER(s);
     return s;
 }
@@ -819,5 +887,13 @@ static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
     free(scene->aux_buses);
     free(scene->instruments);
     g_hash_table_destroy(scene->instrument_hash);
+    if (scene->rt && scene->rt->io)
+    {
+        struct cbox_io *io = scene->rt->io;
+        destroy_rec_sources(scene->rec_mono_inputs, io->input_count);
+        destroy_rec_sources(scene->rec_stereo_inputs, io->input_count / 2);
+        destroy_rec_sources(scene->rec_mono_outputs, io->output_count);
+        destroy_rec_sources(scene->rec_stereo_outputs, io->output_count / 2);
+    }
     free(scene);
 }

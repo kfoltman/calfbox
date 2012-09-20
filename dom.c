@@ -166,7 +166,7 @@ static gboolean document_process_cmd(struct cbox_command_target *ct, struct cbox
         struct cbox_document *doc = ct->user_data;
         if (!subcommand)
             return FALSE;
-        struct cbox_objhdr *obj = cbox_document_get_object_by_text_uuid(doc, uuid, error);
+        struct cbox_objhdr *obj = cbox_document_get_object_by_text_uuid(doc, uuid, NULL, error);
         g_free(uuid);
         if (!obj)
             return FALSE;
@@ -210,7 +210,7 @@ struct cbox_objhdr *cbox_document_get_object_by_uuid(struct cbox_document *doc, 
     return g_hash_table_lookup(doc->uuids_per_document, uuid);
 }
 
-struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *doc, const char *uuid, GError **error)
+struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *doc, const char *uuid, const struct cbox_class *class_ptr, GError **error)
 {
     struct cbox_uuid uuidv;
     if (uuid_parse(uuid, uuidv.uuid))
@@ -222,6 +222,11 @@ struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *
     if (!obj)
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "UUID not found: '%s'", uuid);
+        return NULL;
+    }
+    if (class_ptr && !cbox_class_is_a(obj->class_ptr, class_ptr))
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unexpected object type '%s' for UUID '%s' (expected '%s')", obj->class_ptr->name, uuid, class_ptr->name);
         return NULL;
     }
     return obj;

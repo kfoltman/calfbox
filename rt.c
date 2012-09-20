@@ -120,20 +120,6 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         }
     }
     
-    for (i = 0; i < io->input_count; i++)
-    {
-        if (IS_RECORDING_SOURCE_CONNECTED(io->rec_mono_inputs[i]))
-            cbox_recording_source_push(&io->rec_mono_inputs[i], (const float **)&io->input_buffers[i], nframes);
-    }
-    for (i = 0; i < io->input_count / 2; i++)
-    {
-        if (IS_RECORDING_SOURCE_CONNECTED(io->rec_stereo_inputs[i]))
-        {
-            const float *buf[2] = { io->input_buffers[i * 2], io->input_buffers[i * 2 + 1] };
-            cbox_recording_source_push(&io->rec_stereo_inputs[i], buf, nframes);
-        }
-    }
-    
     // Combine various sources of events (song, non-RT thread, JACK input)
     int pos[3] = {0, 0, 0};
     int cnt = 0;
@@ -170,19 +156,6 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
         }
     }
 
-    for (i = 0; i < io->output_count; i++)
-    {
-        if (IS_RECORDING_SOURCE_CONNECTED(io->rec_mono_outputs[i]))
-            cbox_recording_source_push(&io->rec_mono_outputs[i], (const float **)&io->output_buffers[i], nframes);
-    }
-    for (i = 0; i < io->output_count / 2; i++)
-    {
-        if (IS_RECORDING_SOURCE_CONNECTED(io->rec_stereo_outputs[i]))
-        {
-            const float *buf[2] = { io->output_buffers[i * 2], io->output_buffers[i * 2 + 1] };
-            cbox_recording_source_push(&io->rec_stereo_outputs[i], buf, nframes);
-        }
-    }
 }
 
 void cbox_rt_set_io(struct cbox_rt *rt, struct cbox_io *io)

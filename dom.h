@@ -53,7 +53,7 @@ struct cbox_objhdr
     struct cbox_uuid instance_uuid;
 };
 
-inline int cbox_class_is_a(struct cbox_class *c1, struct cbox_class *c2)
+inline int cbox_class_is_a(const struct cbox_class *c1, const struct cbox_class *c2)
 {
     while(c1 != c2 && c1->parent)
         c1 = c1->parent;
@@ -73,7 +73,7 @@ extern struct cbox_command_target *cbox_document_get_cmd_target(struct cbox_docu
 extern struct cbox_objhdr *cbox_document_get_service(struct cbox_document *doc, const char *name);
 extern void cbox_document_set_service(struct cbox_document *doc, const char *name, struct cbox_objhdr *hdr_ptr);
 extern struct cbox_objhdr *cbox_document_get_object_by_uuid(struct cbox_document *doc, const struct cbox_uuid *uuid);
-extern struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *doc, const char *uuid, GError **error);
+extern struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *doc, const char *uuid, const struct cbox_class *class_ptr, GError **error);
 extern void cbox_document_destroy(struct cbox_document *);
 
 extern void cbox_dom_init();
@@ -83,14 +83,19 @@ extern void cbox_dom_close();
 #define CBOX_OBJECT_HEADER() \
     struct cbox_objhdr _obj_hdr;
 
+#define CBOX_CLASS(class) CBOX_CLASS_##class
+
 #define CBOX_EXTERN_CLASS(class) \
-    extern struct cbox_class CBOX_CLASS_##class;
+    extern struct cbox_class CBOX_CLASS(class);
 
 #define CBOX_GET_DOCUMENT(obj) \
     ((obj)->_obj_hdr.owner)
 
 #define CBOX_DELETE(obj) \
-    (obj) && (cbox_object_destroy(&(obj)->_obj_hdr), 1)
+    ((obj) && (cbox_object_destroy(&(obj)->_obj_hdr), 1))
+
+#define CBOX_IS_A(obj, class) \
+    ((obj) && cbox_class_is_a((obj)->_obj_hdr.class_ptr, &CBOX_CLASS(class)))
 
 #define CBOX_OBJECT_HEADER_INIT(self, class, document) \
     do { \

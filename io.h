@@ -23,11 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <jack/ringbuffer.h>
 #include "master.h"
 
-struct cbox_document;
 struct cbox_io_callbacks;
 struct cbox_recording_source;
 struct cbox_meter;
 struct cbox_midi_buffer;
+struct cbox_scene;
 
 struct cbox_open_params
 {
@@ -44,12 +44,8 @@ struct cbox_io
     float **output_buffers; // only valid inside jack_rt_process
     jack_port_t *midi;
     int buffer_size;
-    struct cbox_recording_source *rec_mono_inputs, *rec_mono_outputs;
-    struct cbox_recording_source *rec_stereo_inputs, *rec_stereo_outputs;
     
     jack_ringbuffer_t *rb_autoconnect;
-    
-    
     
     struct cbox_io_callbacks *cb;
 };
@@ -61,7 +57,7 @@ struct cbox_io_callbacks
     void (*process)(void *user_data, struct cbox_io *io, uint32_t nframes);
 };
 
-extern int cbox_io_init(struct cbox_io *io, struct cbox_document *doc, struct cbox_open_params *const params);
+extern int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params);
 extern int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb);
 extern int cbox_io_stop(struct cbox_io *io);
 extern int cbox_io_get_sample_rate(struct cbox_io *io);

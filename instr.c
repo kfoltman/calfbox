@@ -195,10 +195,10 @@ void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrument, stru
     }    
 }
 
-void cbox_instrument_output_init(struct cbox_instrument_output *output, struct cbox_document *doc, uint32_t max_numsamples)
+void cbox_instrument_output_init(struct cbox_instrument_output *output, struct cbox_scene *scene, uint32_t max_numsamples)
 {
-    cbox_recording_source_init(&output->rec_dry, doc, max_numsamples, 2);
-    cbox_recording_source_init(&output->rec_wet, doc, max_numsamples, 2);
+    cbox_recording_source_init(&output->rec_dry, scene, max_numsamples, 2);
+    cbox_recording_source_init(&output->rec_wet, scene, max_numsamples, 2);
     output->insert = NULL;
     output->output_bus = 0;
     output->gain = 1.0;

@@ -54,7 +54,7 @@ extern void cbox_instrument_destroy(struct cbox_instrument *instrument);
 extern void cbox_instrument_destroy_if_unused(struct cbox_instrument *instrument);
 extern gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 
-extern void cbox_instrument_output_init(struct cbox_instrument_output *output, struct cbox_document *doc, uint32_t max_numsamples);
+extern void cbox_instrument_output_init(struct cbox_instrument_output *output, struct cbox_scene *scene, uint32_t max_numsamples);
 extern void cbox_instrument_output_uninit(struct cbox_instrument_output *output);
 
 #endif

@@ -27,6 +27,7 @@ CBOX_EXTERN_CLASS(cbox_scene)
 struct cbox_aux_bus;
 struct cbox_instrument;
 struct cbox_midi_buffer;
+struct cbox_recording_source;
 
 struct cbox_scene
 {
@@ -44,6 +45,9 @@ struct cbox_scene
     struct cbox_aux_bus **aux_buses;
     int aux_bus_count;
     int transpose;
+
+    struct cbox_recording_source *rec_mono_inputs, *rec_mono_outputs;
+    struct cbox_recording_source *rec_stereo_inputs, *rec_stereo_outputs;
 };
 
 extern struct cbox_scene *cbox_scene_new(struct cbox_document *document);

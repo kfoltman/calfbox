@@ -34,21 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 static const char *io_section = "io";
 
-static struct cbox_recording_source *create_rec_sources(struct cbox_document *doc, struct cbox_io *io, int count, int channels)
-{
-    struct cbox_recording_source *s = malloc(sizeof(struct cbox_recording_source) * count);
-    for (int i = 0; i < count; i++)
-        cbox_recording_source_init(&s[i], doc, io->buffer_size, channels);
-    return s;
-}
-
-static void destroy_rec_sources(struct cbox_recording_source *s, int count)
-{
-    for (int i = 0; i < count; i++)
-        cbox_recording_source_uninit(&s[i]);
-}
-
-int cbox_io_init(struct cbox_io *io, struct cbox_document *doc, struct cbox_open_params *const params)
+int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
 {
     jack_status_t status = 0;
     io->client = jack_client_open("cbox", JackNoStartServer, &status);
@@ -98,11 +84,6 @@ int cbox_io_init(struct cbox_io *io, struct cbox_document *doc, struct cbox_open
         g_free(name);
     }
     io->midi = jack_port_register(io->client, "midi", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
-    
-    io->rec_mono_inputs = create_rec_sources(doc, io, io->input_count, 1);
-    io->rec_stereo_inputs = create_rec_sources(doc, io, io->input_count / 2, 2);
-    io->rec_mono_outputs = create_rec_sources(doc, io, io->output_count, 1);
-    io->rec_stereo_outputs = create_rec_sources(doc, io, io->output_count / 2, 2);
     
     if (!io->midi)
         return 0;
@@ -314,10 +295,6 @@ void cbox_io_close(struct cbox_io *io)
 {
     if (io->client)
     {
-        destroy_rec_sources(io->rec_mono_inputs, io->input_count);
-        destroy_rec_sources(io->rec_stereo_inputs, io->input_count / 2);
-        destroy_rec_sources(io->rec_mono_outputs, io->output_count);
-        destroy_rec_sources(io->rec_stereo_outputs, io->output_count / 2);
         for (int i = 0; i < io->output_count; i++)
             jack_port_unregister(io->client, io->outputs[i]);
         if (io->midi)

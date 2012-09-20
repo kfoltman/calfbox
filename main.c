@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        if (!cbox_io_init(&app.io, app.document, &params))
+        if (!cbox_io_init(&app.io, &params))
         {
             fprintf(stderr, "Cannot initialise sound I/O\n");
             return 1;
@@ -278,10 +278,10 @@ int main(int argc, char *argv[])
     cbox_master_set_tempo(app.rt->master, tempo);
     cbox_master_set_timesig(app.rt->master, bpb, 4);
 
-    if (output_name)
+    if (output_name && scene)
     {
         GError *error = NULL;
-        if (!cbox_recording_source_attach(&app.io.rec_stereo_outputs[0], cbox_recorder_new_stream(app.rt, output_name), &error))
+        if (!cbox_recording_source_attach(&scene->rec_stereo_outputs[0], cbox_recorder_new_stream(app.rt, output_name), &error))
             cbox_print_error(error);
     }
     cbox_rt_start(app.rt);
