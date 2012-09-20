@@ -420,18 +420,25 @@ struct cbox_blob *cbox_midi_pattern_to_blob(struct cbox_midi_pattern *pat, int *
 
 gboolean cbox_midi_pattern_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
+    struct cbox_midi_pattern *p = ct->user_data;
+    
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        
-        struct cbox_midi_pattern *p = ct->user_data;
         
         return cbox_execute_on(fb, NULL, "/event_count", "i", error, (int)p->event_count) &&
             cbox_execute_on(fb, NULL, "/loop_end", "i", error, (int)p->loop_end) &&
             cbox_execute_on(fb, NULL, "/name", "s", error, p->name) &&
             CBOX_OBJECT_DEFAULT_STATUS(p, fb, error)
             ;
+    }
+    else if (!strcmp(cmd->command, "/name") && !strcmp(cmd->arg_types, "s"))
+    {
+        char *old_name = p->name;
+        p->name = g_strdup(CBOX_ARG_S(cmd, 0));
+        g_free(old_name);
+        return TRUE;
     }
     return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
