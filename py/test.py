@@ -67,6 +67,12 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(tp.track[1][0], 'Unnamed')
         self.assertEqual(tp.pattern[1][0], 'pat1')
         track_uuid = tp.track[1][2]
+        
+        cbox.do_cmd(cbox.Document.uuid_cmd(track_uuid, "/name"), None, ["Now named"])
+        
+        tp = cbox.GetThings("/song/status", ["%track", "%pattern"], [])
+        self.assertEqual(tp.track[1][0], 'Now named')
+        self.assertEqual(tp.pattern[1][0], 'pat1')
         pattern_uuid = tp.pattern[1][2]
         
         clips = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/status"), ["*clip"], []).clip

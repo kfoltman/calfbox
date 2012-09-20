@@ -151,6 +151,13 @@ gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             return cbox_execute_on(fb, NULL, "/uuid", "o", error, trki);
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/name") && !strcmp(cmd->arg_types, "s"))
+    {
+        char *old_name = track->name;
+        track->name = g_strdup(CBOX_ARG_S(cmd, 0));
+        g_free(old_name);
+        return TRUE;
+    }
     else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
