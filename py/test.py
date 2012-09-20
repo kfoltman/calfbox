@@ -70,11 +70,23 @@ class TestCbox(unittest.TestCase):
         pattern_uuid = tp.pattern[1][2]
         
         clips = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/status"), ["*clip"], []).clip
-        self.assertEqual(clips, [[0, 0, 192, pattern_uuid]])
+        self.assertEqual(clips[0][0:4], [0, 0, 192, pattern_uuid])
+        clip1_uuid = clips[0][4]
         
-        cbox.do_cmd(cbox.Document.uuid_cmd(track_uuid, "/add_clip"), None, [192, 96, 96, pattern_uuid])
+        clip2_uuid = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/add_clip"), ["uuid"], [192, 96, 48, pattern_uuid]).uuid
+        
+        clip2_data = cbox.GetThings(cbox.Document.uuid_cmd(clip2_uuid, "/status"), ['pos', 'offset', 'length', 'pattern'], [])
+        self.assertEqual(clip2_data.pos, 192)
+        self.assertEqual(clip2_data.offset, 96)
+        self.assertEqual(clip2_data.length, 48)
+        self.assertEqual(clip2_data.pattern, pattern_uuid)
 
         clips = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/status"), ["*clip"], []).clip
-        self.assertEqual(clips, [[0, 0, 192, pattern_uuid], [192, 96, 96, pattern_uuid]])
+        self.assertEqual(clips, [[0, 0, 192, pattern_uuid, clip1_uuid], [192, 96, 48, pattern_uuid, clip2_uuid]])
+
+        cbox.do_cmd(cbox.Document.uuid_cmd(clip1_uuid, "/delete"), None, [])
+
+        clips = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/status"), ["*clip"], []).clip
+        self.assertEqual(clips, [[192, 96, 48, pattern_uuid, clip2_uuid]])
         
 unittest.main()

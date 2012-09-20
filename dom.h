@@ -131,4 +131,7 @@ extern void cbox_dom_close();
 #define CBOX_H2O(hdr) \
     (void *)(((char *)(hdr)) - (hdr)->class_ptr->hdr_offset)
 
+#define CBOX_O2H(obj) \
+    (&(*(obj))._obj_hdr)
+
 #endif

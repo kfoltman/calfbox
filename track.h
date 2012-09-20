@@ -21,12 +21,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "dom.h"
 
+CBOX_EXTERN_CLASS(cbox_track_item)
 CBOX_EXTERN_CLASS(cbox_track)
 
 struct cbox_midi_pattern;
+struct cbox_track;
 
 struct cbox_track_item
 {
+    CBOX_OBJECT_HEADER()
+    struct cbox_command_target cmd_target;
+    struct cbox_track *owner;
     uint32_t time;
     struct cbox_midi_pattern *pattern;
     uint32_t offset;
@@ -43,8 +48,7 @@ struct cbox_track
 };
 
 extern struct cbox_track *cbox_track_new(struct cbox_document *document);
-extern void cbox_track_add_item(struct cbox_track *track, uint32_t time, struct cbox_midi_pattern *pattern, uint32_t offset, uint32_t length);
+extern struct cbox_track_item *cbox_track_add_item(struct cbox_track *track, uint32_t time, struct cbox_midi_pattern *pattern, uint32_t offset, uint32_t length);
 extern void cbox_track_update_playback(struct cbox_track *track, struct cbox_master *master);
-extern void cbox_track_destroy(struct cbox_track *track);
 
 #endif
