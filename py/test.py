@@ -36,15 +36,15 @@ class TestCbox(unittest.TestCase):
         self.assertEquals(cbox.GetThings("/scene/instr/%s/output/1/rec_dry/status" % iname, ['*handler'], []).handler, [])
         
         meter_uuid = cbox.GetThings("/new_meter", ['uuid'], []).uuid
-        cbox.do_cmd('/scene/instr/vintage/output/1/rec_dry/attach', None, [meter_uuid])
+        cbox.do_cmd('/scene/instr/%s/output/1/rec_dry/attach' % iname, None, [meter_uuid])
         self.assertEquals(cbox.GetThings("/scene/instr/%s/output/1/rec_dry/status" % iname, ['*handler'], []).handler, [[1, meter_uuid]])
-        cbox.do_cmd('/scene/instr/vintage/output/1/rec_dry/detach', None, [meter_uuid])
+        cbox.do_cmd('/scene/instr/%s/output/1/rec_dry/detach' % iname, None, [meter_uuid])
         self.assertEquals(cbox.GetThings("/scene/instr/%s/output/1/rec_dry/status" % iname, ['*handler'], []).handler, [])
 
         rec_uuid = cbox.GetThings("/new_recorder", ['uuid'], ['test.wav']).uuid
-        cbox.do_cmd('/scene/instr/vintage/output/1/rec_dry/attach', None, [rec_uuid])
+        cbox.do_cmd('/scene/instr/%s/output/1/rec_dry/attach' % iname, None, [rec_uuid])
         self.assertEquals(cbox.GetThings("/scene/instr/%s/output/1/rec_dry/status" % iname, ['*handler'], []).handler, [[1, rec_uuid]])
-        cbox.do_cmd('/scene/instr/vintage/output/1/rec_dry/detach', None, [rec_uuid])
+        cbox.do_cmd('/scene/instr/%s/output/1/rec_dry/detach' % iname, None, [rec_uuid])
         self.assertEquals(cbox.GetThings("/scene/instr/%s/output/1/rec_dry/status" % iname, ['*handler'], []).handler, [])
         self.assertTrue(os.path.exists('test.wav'))
         self.assertTrue(os.path.getsize('test.wav') < 512)
@@ -57,5 +57,24 @@ class TestCbox(unittest.TestCase):
         self.assertEquals(cbox.GetThings("/scene/instr/%s/output/1/rec_dry/status" % iname, ['*handler'], []).handler, [])
         self.assertTrue(os.path.exists('test.wav'))
         self.assertTrue(os.path.getsize('test.wav') > 512 * 4 * 2)
+        
+    def test_song(self):
+        tp = cbox.GetThings("/song/status", ["*track", "*pattern"], [])
+        self.assertEqual(tp.track, [])
+        self.assertEqual(tp.pattern, [])
+        cbox.do_cmd("/play_drum_pattern", None, ['pat1'])
+        tp = cbox.GetThings("/song/status", ["%track", "%pattern"], [])
+        self.assertEqual(tp.track[1][0], 'Unnamed')
+        self.assertEqual(tp.pattern[1][0], 'pat1')
+        track_uuid = tp.track[1][2]
+        pattern_uuid = tp.pattern[1][2]
+        
+        clips = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/status"), ["*clip"], []).clip
+        self.assertEqual(clips, [[0, 0, 192, pattern_uuid]])
+        
+        cbox.do_cmd(cbox.Document.uuid_cmd(track_uuid, "/add_clip"), None, [192, 96, 96, pattern_uuid])
+
+        clips = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/status"), ["*clip"], []).clip
+        self.assertEqual(clips, [[0, 0, 192, pattern_uuid], [192, 96, 96, pattern_uuid]])
         
 unittest.main()

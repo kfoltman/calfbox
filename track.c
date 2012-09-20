@@ -16,7 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "errors.h"
 #include "master.h"
+#include "pattern.h"
 #include "rt.h"
 #include "seq.h"
 #include "track.h"
@@ -100,13 +102,40 @@ gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         while(it != NULL)
         {
             struct cbox_track_item *trki = it->data;
-            if (!cbox_execute_on(fb, NULL, "/item", "iiio", error, trki->time, trki->offset, trki->length, trki->pattern))
+            if (!cbox_execute_on(fb, NULL, "/clip", "iiio", error, trki->time, trki->offset, trki->length, trki->pattern))
                 return FALSE;
             it = g_list_next(it);
         }
 
         return cbox_execute_on(fb, NULL, "/name", "s", error, track->name) &&
             CBOX_OBJECT_DEFAULT_STATUS(track, fb, error);
+    }
+    else if (!strcmp(cmd->command, "/add_clip") && !strcmp(cmd->arg_types, "iiis"))
+    {
+        int pos = CBOX_ARG_I(cmd, 0);
+        int offset = CBOX_ARG_I(cmd, 1);
+        int length = CBOX_ARG_I(cmd, 2);
+        if (pos < 0)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid pattern position %d (cannot be negative)", pos);
+            return FALSE;
+        }
+        if (offset < 0)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid pattern offset %d (cannot be negative)", offset);
+            return FALSE;
+        }
+        if (length <= 0)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid pattern length %d (must be positive)", length);
+            return FALSE;
+        }
+        struct cbox_objhdr *pattern = CBOX_ARG_O(cmd, 3, track, cbox_midi_pattern, error);
+        if (!pattern)
+            return FALSE;
+        struct cbox_midi_pattern *mp = CBOX_H2O(pattern);
+        cbox_track_add_item(track, pos, mp, offset, length);
+        return TRUE;
     }
     else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
