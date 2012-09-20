@@ -9,6 +9,8 @@
 @moduleslot/engine/{add: @module}
 @moduleslot/set_bypass(int bypassed)
 
+@track/add_clip(int pos, int offset, int length, string pattern)
+
 /master/
 /master/status() -> /sample_rate, /tempo, /timesig, /playing, /pos, /pos_ppqn
 /master/tell() -> /playing, /pos, /pos_ppqn
@@ -118,3 +120,6 @@
 /print_s(string)
 /print_i(int)
 /print_f(float)
+/new_meter() -> /uuid
+/new_recorder(string filename) -> /uuid
+
