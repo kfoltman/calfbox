@@ -292,43 +292,44 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
 
 int cmd_pattern_none(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, NULL);
+    cbox_song_clear(app.rt->master->song);
+    cbox_rt_update_song_playback(app.rt);
     return 0;
 }
 
 int cmd_pattern_simple(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_metronome(CBOX_GET_DOCUMENT(app.rt), 1));
+    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_new_metronome(app.rt->master->song, 1));
     return 0;
 }
 
 int cmd_pattern_normal(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_metronome(CBOX_GET_DOCUMENT(app.rt), app.rt->master->timesig_nom));
+    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_new_metronome(app.rt->master->song, app.rt->master->timesig_nom));
     return 0;
 }
 
 int cmd_load_drumpattern(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(CBOX_GET_DOCUMENT(app.rt), item->item.item_context, 1));
+    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load(app.rt->master->song, item->item.item_context, 1));
     return 0;
 }
 
 int cmd_load_drumtrack(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(CBOX_GET_DOCUMENT(app.rt), item->item.item_context, 1));
+    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load_track(app.rt->master->song, item->item.item_context, 1));
     return 0;
 }
 
 int cmd_load_pattern(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(CBOX_GET_DOCUMENT(app.rt), item->item.item_context, 0));
+    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load(app.rt->master->song, item->item.item_context, 0));
     return 0;
 }
 
 int cmd_load_track(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(CBOX_GET_DOCUMENT(app.rt), item->item.item_context, 0));
+    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load_track(app.rt->master->song, item->item.item_context, 0));
     return 0;
 }
 
@@ -465,27 +466,9 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return TRUE;
     }
     else
-    if (!strcmp(obj, "play_drum_pattern") && !strcmp(cmd->arg_types, "s"))
+    if (!strcmp(obj, "update_playback") && !strcmp(cmd->arg_types, ""))
     {
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(CBOX_GET_DOCUMENT(app.rt), CBOX_ARG_S(cmd, 0), 1));
-        return TRUE;
-    }
-    else
-    if (!strcmp(obj, "play_drum_track") && !strcmp(cmd->arg_types, "s"))
-    {
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(CBOX_GET_DOCUMENT(app.rt), CBOX_ARG_S(cmd, 0), 1));
-        return TRUE;
-    }
-    else
-    if (!strcmp(obj, "play_blob") && !strcmp(cmd->arg_types, "bi"))
-    {
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_from_blob(CBOX_GET_DOCUMENT(app.rt), CBOX_ARG_B(cmd, 0), CBOX_ARG_I(cmd, 1)));
-        return TRUE;
-    }
-    else
-    if (!strcmp(obj, "stop_pattern") && !strcmp(cmd->arg_types, ""))
-    {
-        cbox_rt_set_pattern_and_destroy(app.rt, NULL);
+        cbox_rt_update_song_playback(app.rt);
         return TRUE;
     }
     else

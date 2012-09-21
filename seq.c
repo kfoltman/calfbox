@@ -43,7 +43,7 @@ static inline void accumulate_event(struct cbox_midi_playback_active_notes *note
     }
 }
 
-struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master)
+struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master, struct cbox_song_playback *spb)
 {
     struct cbox_track_playback *pb = malloc(sizeof(struct cbox_track_playback));
     pb->master = master;
@@ -56,6 +56,8 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     while(it != NULL)
     {
         struct cbox_track_item *item = it->data;
+        struct cbox_midi_pattern_playback *mppb = cbox_song_playback_get_pattern(spb, item->pattern);
+
         // if items overlap, the first one takes precedence
         if (item->time < safe)
         {
@@ -65,7 +67,7 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
             {
                 int cut = safe - item->time;
                 p->time = safe;
-                p->pattern = item->pattern;
+                p->pattern = mppb;
                 p->offset = item->offset + cut;
                 p->length = item->length - cut;
                 p++;
@@ -74,7 +76,7 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
         else
         {
             p->time = item->time;
-            p->pattern = item->pattern;
+            p->pattern = mppb;
             p->offset = item->offset;
             p->length = item->length;
             safe = item->time + item->length;
@@ -86,7 +88,7 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     // in case of full overlap, some items might have been skipped
     pb->items_count = p - pb->items;
     pb->pos = 0;
-    cbox_midi_pattern_playback_init(&pb->playback, &pb->active_notes, master);
+    cbox_midi_clip_playback_init(&pb->playback, &pb->active_notes, master);
     cbox_midi_playback_active_notes_init(&pb->active_notes);
     cbox_midi_buffer_init(&pb->output_buffer);
     cbox_track_playback_start_item(pb, 0, FALSE, 0);
@@ -132,21 +134,21 @@ void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, in
     int start_time_ppqn = cur->time, end_time_ppqn = cur->time + cur->length;
     int start_time_samples = cbox_master_ppqn_to_samples(pb->master, start_time_ppqn);
     int end_time_samples = cbox_master_ppqn_to_samples(pb->master, end_time_ppqn);
-    cbox_midi_pattern_playback_set_pattern(&pb->playback, cur->pattern, start_time_samples, end_time_samples, cur->time, cur->offset);
+    cbox_midi_clip_playback_set_pattern(&pb->playback, cur->pattern, start_time_samples, end_time_samples, cur->time, cur->offset);
 
     if (is_ppqn)
     {
         if (time_ppqn < start_time_ppqn)
-            cbox_midi_pattern_playback_seek_ppqn(&pb->playback, 0, min_time_ppqn);
+            cbox_midi_clip_playback_seek_ppqn(&pb->playback, 0, min_time_ppqn);
         else
-            cbox_midi_pattern_playback_seek_ppqn(&pb->playback, time_ppqn - start_time_ppqn, min_time_ppqn);
+            cbox_midi_clip_playback_seek_ppqn(&pb->playback, time_ppqn - start_time_ppqn, min_time_ppqn);
     }
     else
     {
         if (time_ppqn < start_time_ppqn)
-            cbox_midi_pattern_playback_seek_samples(&pb->playback, 0);
+            cbox_midi_clip_playback_seek_samples(&pb->playback, 0);
         else
-            cbox_midi_pattern_playback_seek_samples(&pb->playback, time_samples - start_time_samples);
+            cbox_midi_clip_playback_seek_samples(&pb->playback, time_samples - start_time_samples);
     }
 }
 
@@ -173,12 +175,12 @@ void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int 
         if (render_end_samples > cur_segment_end_samples)
         {
             rend = cur_segment_end_samples - spb->song_pos_samples;
-            cbox_midi_pattern_playback_render(&pb->playback, &pb->output_buffer, offset, rend - rpos);
+            cbox_midi_clip_playback_render(&pb->playback, &pb->output_buffer, offset, rend - rpos);
             pb->pos++;
             cbox_track_playback_start_item(pb, cur_segment_end_samples, FALSE, FALSE);
         }
         else
-            cbox_midi_pattern_playback_render(&pb->playback, &pb->output_buffer, offset, rend - rpos);
+            cbox_midi_clip_playback_render(&pb->playback, &pb->output_buffer, offset, rend - rpos);
         offset += rend - rpos;
         rpos = rend;
     }
@@ -192,7 +194,7 @@ void cbox_track_playback_destroy(struct cbox_track_playback *pb)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void cbox_midi_pattern_playback_init(struct cbox_midi_pattern_playback *pb, struct cbox_midi_playback_active_notes *active_notes, struct cbox_master *master)
+void cbox_midi_clip_playback_init(struct cbox_midi_clip_playback *pb, struct cbox_midi_playback_active_notes *active_notes, struct cbox_master *master)
 {
     pb->pattern = NULL;
     pb->master = master;
@@ -205,7 +207,7 @@ void cbox_midi_pattern_playback_init(struct cbox_midi_pattern_playback *pb, stru
     // cbox_midi_playback_active_notes_init(active_notes);
 }
 
-void cbox_midi_pattern_playback_set_pattern(struct cbox_midi_pattern_playback *pb, struct cbox_midi_pattern *pattern, int start_time_samples, int end_time_samples, int item_start_ppqn, int offset_ppqn)
+void cbox_midi_clip_playback_set_pattern(struct cbox_midi_clip_playback *pb, struct cbox_midi_pattern_playback *pattern, int start_time_samples, int end_time_samples, int item_start_ppqn, int offset_ppqn)
 {
     pb->pattern = pattern;
     pb->pos = 0;
@@ -217,7 +219,7 @@ void cbox_midi_pattern_playback_set_pattern(struct cbox_midi_pattern_playback *p
     pb->min_time_ppqn = 0;
 }
 
-void cbox_midi_pattern_playback_render(struct cbox_midi_pattern_playback *pb, struct cbox_midi_buffer *buf, int offset, int nsamples)
+void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, int offset, int nsamples)
 {
     uint32_t end_time_samples = pb->end_time_samples;
     uint32_t cur_time_samples = pb->start_time_samples + pb->rel_time_samples;
@@ -248,7 +250,7 @@ void cbox_midi_pattern_playback_render(struct cbox_midi_pattern_playback *pb, st
     pb->rel_time_samples += nsamples;
 }
 
-void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb, int time_ppqn, int min_time_ppqn)
+void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, int time_ppqn, int min_time_ppqn)
 {
     int pos = 0;
     int patrel_time_ppqn = time_ppqn + pb->offset_ppqn;
@@ -259,7 +261,7 @@ void cbox_midi_pattern_playback_seek_ppqn(struct cbox_midi_pattern_playback *pb,
     pb->pos = pos;
 }
 
-void cbox_midi_pattern_playback_seek_samples(struct cbox_midi_pattern_playback *pb, int time_samples)
+void cbox_midi_clip_playback_seek_samples(struct cbox_midi_clip_playback *pb, int time_samples)
 {
     int pos = 0;
     while (pos < pb->pattern->event_count && time_samples > cbox_master_ppqn_to_samples(pb->master, pb->item_start_ppqn + pb->pattern->events[pos].time - pb->offset_ppqn))
@@ -316,6 +318,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
 {
     struct cbox_song_playback *spb = malloc(sizeof(struct cbox_song_playback));
     memset(spb, 0, sizeof(struct cbox_song_playback));
+    spb->pattern_map = g_hash_table_new_full(NULL, NULL, NULL, free);
     spb->master = master;
     spb->track_count = g_list_length(song->tracks);
     spb->tracks = malloc(spb->track_count * sizeof(struct cbox_track_playback *));
@@ -328,7 +331,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
     for (GList *p = song->tracks; p != NULL; p = g_list_next(p))
     {
         struct cbox_track *trk = p->data;
-        spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master);
+        spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master, spb);
     }
     
     spb->tempo_map_item_count = g_list_length(song->master_track_items);
@@ -544,6 +547,22 @@ int cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, int time
     return spb->tempo_map_item_count - 1;
 }
 
+struct cbox_midi_pattern_playback *cbox_song_playback_get_pattern(struct cbox_song_playback *spb, struct cbox_midi_pattern *pattern)
+{
+    struct cbox_midi_pattern_playback *mppb = g_hash_table_lookup(spb->pattern_map, pattern);
+    if (mppb)
+        return mppb;
+    
+    mppb = malloc(sizeof(struct cbox_midi_pattern_playback));
+        
+    mppb->events = malloc(sizeof(struct cbox_midi_event) * pattern->event_count);
+    memcpy(mppb->events, pattern->events, sizeof(struct cbox_midi_event) * pattern->event_count);
+    mppb->event_count = pattern->event_count;
+    g_hash_table_insert(spb->pattern_map, pattern, mppb);
+
+    return mppb;
+}
+
 void cbox_song_playback_destroy(struct cbox_song_playback *spb)
 {
     for (int i = 0; i < spb->track_count; i++)
@@ -552,5 +571,6 @@ void cbox_song_playback_destroy(struct cbox_song_playback *spb)
     }
     free(spb->tempo_map_items);
     free(spb->tracks);
+    g_hash_table_destroy(spb->pattern_map);
     free(spb);
 }

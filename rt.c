@@ -346,40 +346,9 @@ void cbox_rt_update_song(struct cbox_rt *rt, int new_pos_ppqn)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos_ppqn)
+void cbox_rt_update_song_playback(struct cbox_rt *rt)
 {
-    struct cbox_track *track = cbox_track_new(CBOX_GET_DOCUMENT(pattern));
-    cbox_track_add_item(track, 0, pattern, 0, pattern->loop_end);
-    cbox_track_update_playback(track, rt->master);
-
-#if 0    
-    struct cbox_track *track2 = cbox_track_new();
-    struct cbox_midi_pattern *metro = cbox_midi_pattern_new_metronome(4);
-    cbox_track_add_item(track2, 0, metro, 0, metro->loop_end);
-    cbox_track_update_playback(track2, rt->master);
-#endif
-    
-    struct cbox_song *song = cbox_song_new(CBOX_GET_DOCUMENT(rt));
-    cbox_song_add_track(song, track);
-    cbox_song_add_pattern(song, pattern);
-#if 0
-    cbox_song_add_track(song, track2);
-#endif
-
-    song->loop_start_ppqn = 0;
-    song->loop_end_ppqn = pattern->loop_end;
-    
-    struct cbox_song *old_song = rt->master->song;
-    rt->master->song = song;
-    cbox_rt_update_song(rt, new_pos_ppqn);
-    return old_song;
-}
-
-void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_pattern *pattern)
-{
-    struct cbox_song *old = cbox_rt_set_pattern(rt, pattern, -1);
-    if (old)
-        CBOX_DELETE(old);
+    cbox_rt_update_song(rt, -1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

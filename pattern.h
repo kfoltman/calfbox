@@ -26,11 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 CBOX_EXTERN_CLASS(cbox_midi_pattern)
 
 struct cbox_blob;
+struct cbox_song;
 
 struct cbox_midi_pattern
 {
     CBOX_OBJECT_HEADER()
     struct cbox_command_target cmd_target;
+    struct cbox_song *owner;
     gchar *name;
     struct cbox_midi_event *events;
     int event_count;
@@ -43,10 +45,10 @@ struct cbox_blob_serialized_event
     unsigned char len, cmd, byte1, byte2;
 };
 
-extern struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_document *doc, int ts);
-extern struct cbox_midi_pattern *cbox_midi_pattern_load(struct cbox_document *doc, const char *name, int is_drum);
-extern struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_document *doc, const char *name, int is_drum);
-extern struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(struct cbox_document *doc, const struct cbox_blob *blob, int length);
+extern struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_song *song, int ts);
+extern struct cbox_midi_pattern *cbox_midi_pattern_load(struct cbox_song *song, const char *name, int is_drum);
+extern struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_song *song, const char *name, int is_drum);
+extern struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(struct cbox_song *song, const struct cbox_blob *blob, int length);
 
 extern struct cbox_blob *cbox_midi_pattern_to_blob(struct cbox_midi_pattern *pat, int *length);
 

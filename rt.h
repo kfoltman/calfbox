@@ -73,6 +73,8 @@ extern void cbox_rt_start(struct cbox_rt *rt);
 extern void cbox_rt_handle_cmd_queue(struct cbox_rt *rt);
 extern void cbox_rt_stop(struct cbox_rt *rt);
 
+extern void cbox_rt_update_song_playback(struct cbox_rt *rt);
+
 // Those are for calling from the main thread. I will add a RT-thread version later.
 extern void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition *cmd, void *user_data);
 extern void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *cmd, void *user_data);

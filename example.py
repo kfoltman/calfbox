@@ -317,11 +317,27 @@ class MainWindow(gtk.Window):
             if response == gtk.RESPONSE_OK:
                 row = d.get_selected_object()
                 if row[1] == 'Pattern':
-                    cbox.do_cmd("/play_drum_pattern", None, [row[0]])
+                    song = cbox.Document().get_song()
+                    song.clear()
+                    track = song.add_track()
+                    pat = song.load_drum_pattern(row[0])
+                    length = pat.status().loop_end
+                    track.add_clip(0, 0, length, pat)
+                    song.set_loop(0, length)
+                    song.update_playback()
                 elif row[1] == 'Track':
-                    cbox.do_cmd("/play_drum_track", None, [row[0]])
+                    song = cbox.Document().get_song()
+                    song.clear()
+                    track = song.add_track()
+                    pat = song.load_drum_track(row[0])
+                    length = pat.status().loop_end
+                    track.add_clip(0, 0, length, pat)
+                    song.set_loop(0, length)
+                    song.update_playback()
                 elif row[1] == 'Stop':
-                    cbox.do_cmd("/stop_pattern", None, [])
+                    song = cbox.Document().get_song()
+                    song.clear()
+                    song.update_playback()
         finally:
             d.destroy()
 

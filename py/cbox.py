@@ -170,6 +170,9 @@ class DocObj(object):
     def transform_status(self, status):
         return status
 
+    def delete(self):
+        self.cmd("/delete", None)
+
 class DocPattern(DocObj):
     def __init__(self, uuid):
         DocObj.__init__(self, uuid, ["event_count", "loop_end", "name"])
@@ -194,8 +197,6 @@ class DocTrackClip(DocObj):
         DocObj.__init__(self, uuid, ["pos", "offset", "length", "pattern", "uuid"])
     def transform_status(self, status):
         return ClipItem(status.pos, status.offset, status.length, status.pattern, status.uuid)
-    def delete(self):
-        self.cmd("/delete", None)
 
 Document.classmap['cbox_track_item'] = DocTrackClip
         
@@ -235,12 +236,25 @@ class DocSongStatus:
 
 class DocSong(DocObj):
     def __init__(self, uuid):
-        DocObj.__init__(self, uuid, ["*track", "*pattern"])
+        DocObj.__init__(self, uuid, ["*track", "*pattern", 'loop_start', 'loop_end'])
+    def clear(self):
+        return self.cmd("/clear", None)
+    def set_loop(self, ls, le):
+        return self.cmd("/set_loop", None, ls, le)
+    def add_track(self):
+        return self.cmd_makeobj("/add_track")
+    def load_drum_pattern(self, name):
+        return self.cmd_makeobj("/load_pattern", name, 1)
+    def load_drum_track(self, name):
+        return self.cmd_makeobj("/load_track", name, 1)
     def transform_status(self, status):
         res = DocSongStatus()
         res.tracks = [TrackItem(*t) for t in status.track]
         res.patterns = [PatternItem(*t) for t in status.pattern]
         return res
+    def update_playback(self):
+        # XXXKF Maybe make it a song-level API instead of global
+        do_cmd("/update_playback", None, [])
 
 Document.classmap['cbox_song'] = DocSong
 

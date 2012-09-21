@@ -25,6 +25,7 @@ CBOX_EXTERN_CLASS(cbox_midi_pattern_maker)
 
 struct cbox_midi_pattern;
 struct cbox_midi_pattern_maker;
+struct cbox_song;
 
 extern struct cbox_midi_pattern_maker *cbox_midi_pattern_maker_new();
 extern void cbox_midi_pattern_maker_destroy(struct cbox_midi_pattern_maker *maker);
@@ -34,6 +35,6 @@ extern gboolean cbox_midi_pattern_maker_load_smf(struct cbox_midi_pattern_maker 
 extern void cbox_midi_pattern_maker_add(struct cbox_midi_pattern_maker *maker, uint32_t time, uint8_t cmd, uint8_t val1, uint8_t val2);
 extern void cbox_midi_pattern_maker_add_mem(struct cbox_midi_pattern_maker *maker, uint32_t time, const uint8_t *src, uint32_t len);
 
-extern struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_midi_pattern_maker *maker, struct cbox_document *owner, gchar *name);
+extern struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_midi_pattern_maker *maker, struct cbox_song *owner, gchar *name);
 
 #endif

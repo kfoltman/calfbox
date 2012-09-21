@@ -20,14 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config-api.h"
 #include "pattern.h"
 #include "pattern-maker.h"
+#include "song.h"
 
 #include <glib.h>
 
+extern void cbox_song_remove_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern);
+
 CBOX_CLASS_DEFINITION_ROOT(cbox_midi_pattern)
 
-struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_document *doc, int ts)
+struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_song *song, int ts)
 {
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(doc);
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(song);
     
     int length = PPQN;
     int channel = cbox_config_get_int("metronome", "channel", 10);
@@ -42,7 +45,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_document *
         cbox_midi_pattern_maker_add(m, length * i + 1, 0x80 + channel - 1, accent ? accnote : note, 0);
     }
 
-    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, doc, g_strdup_printf("click-%d", ts));
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, song, g_strdup_printf("click-%d", ts));
     p->loop_end = length * ts;
 
     cbox_midi_pattern_maker_destroy(m);
@@ -53,6 +56,8 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_document *
 void cbox_midi_pattern_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_midi_pattern *pattern = CBOX_H2O(objhdr);
+    if (pattern->owner)
+        cbox_song_remove_pattern(pattern->owner, pattern);
     g_free(pattern->name);
     if (pattern->events != NULL)
         free(pattern->events);
@@ -261,16 +266,16 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
     return length;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_load(struct cbox_document *doc, const char *name, int is_drum)
+struct cbox_midi_pattern *cbox_midi_pattern_load(struct cbox_song *song, const char *name, int is_drum)
 {
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(doc);
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(song);
     
     int length = 0;
     if (is_drum)
         length = cbox_midi_pattern_load_drum_into(m, name, 0);
     else
         length = cbox_midi_pattern_load_melodic_into(m, name, 0, 0, -1);
-    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, doc, g_strdup(name));
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, song, g_strdup(name));
     p->loop_end = length;
     
     cbox_midi_pattern_maker_destroy(m);
@@ -278,10 +283,10 @@ struct cbox_midi_pattern *cbox_midi_pattern_load(struct cbox_document *doc, cons
     return p;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_document *doc, const char *name, int is_drum)
+struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_song *song, const char *name, int is_drum)
 {
     int length = 0;
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(doc);
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(song);
     
     gchar *cfg_section = g_strdup_printf(is_drum ? "drumtrack:%s" : "track:%s", name);
     
@@ -356,7 +361,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_document *doc
     
     g_free(cfg_section);
             
-    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, doc, g_strdup(name));
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, song, g_strdup(name));
     p->loop_end = length;
     
     cbox_midi_pattern_maker_destroy(m);
@@ -364,9 +369,9 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_document *doc
     return p;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(struct cbox_document *doc, const struct cbox_blob *blob, int length)
+struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(struct cbox_song *song, const struct cbox_blob *blob, int length)
 {
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(doc);
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(song);
     
     struct cbox_blob_serialized_event event;
     for (size_t i = 0; i < blob->size; i += sizeof(event))
@@ -376,7 +381,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(struct cbox_document *
         cbox_midi_pattern_maker_add(m, event.time, event.cmd, event.byte1, event.byte2);
     }
     
-    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, doc, g_strdup("unnamed-blob"));
+    struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, song, g_strdup("unnamed-blob"));
     p->loop_end = length;
     
     cbox_midi_pattern_maker_destroy(m);

@@ -64,7 +64,11 @@ class TestCbox(unittest.TestCase):
         tp = song.status()
         self.assertEqual(tp.tracks, [])
         self.assertEqual(tp.patterns, [])
-        cbox.do_cmd("/play_drum_pattern", None, ['pat1'])
+        
+        track = song.add_track()
+        pattern = song.load_drum_pattern('pat1')
+        track.add_clip(0, 0, 192, pattern)
+        
         song = Document.get_song()
         tp = song.status()
         self.assertEqual(tp.tracks[0].name, 'Unnamed')

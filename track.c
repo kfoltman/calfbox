@@ -22,6 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "rt.h"
 #include "seq.h"
 #include "track.h"
+#include "song.h"
+#include <assert.h>
 #include <malloc.h>
 
 CBOX_CLASS_DEFINITION_ROOT(cbox_track)
@@ -45,6 +47,7 @@ struct cbox_track *cbox_track_new(struct cbox_document *document)
     p->name = g_strdup("Unnamed");
     p->items = NULL;
     p->pb = NULL;
+    p->owner = NULL;
 
     cbox_command_target_init(&p->cmd_target, cbox_track_process_cmd, p);
     CBOX_OBJECT_REGISTER(p);
@@ -81,17 +84,11 @@ struct cbox_track_item *cbox_track_add_item(struct cbox_track *track, uint32_t t
     return item;
 }
 
-void cbox_track_update_playback(struct cbox_track *track, struct cbox_master *master)
-{
-    struct cbox_track_playback *pb = cbox_track_playback_new_from_track(track, master);
-    struct cbox_track_playback *old_pb = cbox_rt_swap_pointers(master->rt, (void **)&track->pb, pb);
-    if (old_pb)
-        cbox_track_playback_destroy(old_pb);
-}
-
 void cbox_track_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_track *track = CBOX_H2O(objhdr);
+    if (track->owner)
+        cbox_song_remove_track(track->owner, track);
     // XXXKF I'm not sure if I want the lifecycle of track playback objects to be managed by the track itself
     if (track->pb)
         cbox_track_playback_destroy(track->pb);

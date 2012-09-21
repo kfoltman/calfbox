@@ -286,11 +286,11 @@ int main(int argc, char *argv[])
     }
     cbox_rt_start(app.rt);
     if (drum_pattern_name)
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load(CBOX_GET_DOCUMENT(app.rt), drum_pattern_name, 1));
+        cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load(app.rt->master->song, drum_pattern_name, 1));
     else if (drum_track_name)
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_load_track(CBOX_GET_DOCUMENT(app.rt), drum_track_name, 1));
+        cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load_track(app.rt->master->song, drum_track_name, 1));
     else if (metronome)
-        cbox_rt_set_pattern_and_destroy(app.rt, cbox_midi_pattern_new_metronome(CBOX_GET_DOCUMENT(app.rt), app.rt->master->timesig_nom));
+        cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_new_metronome(app.rt->master->song, app.rt->master->timesig_nom));
     cbox_master_play(app.rt->master);
     cbox_rt_set_scene(app.rt, scene);
     if (script_name)

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "errors.h"
 #include "pattern.h"
 #include "pattern-maker.h"
+#include "song.h"
 #include <glib.h>
 #include <smf.h>
 
@@ -105,11 +106,14 @@ static gboolean traverse_func(gpointer key, gpointer value, gpointer pstate)
     return FALSE;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_midi_pattern_maker *maker, struct cbox_document *document, gchar *name)
+extern void cbox_song_add_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern);
+
+struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_midi_pattern_maker *maker, struct cbox_song *song, gchar *name)
 {
     struct cbox_midi_pattern *p = malloc(sizeof(struct cbox_midi_pattern));
-    CBOX_OBJECT_HEADER_INIT(p, cbox_midi_pattern, document);
+    CBOX_OBJECT_HEADER_INIT(p, cbox_midi_pattern, CBOX_GET_DOCUMENT(song));
     cbox_command_target_init(&p->cmd_target, cbox_midi_pattern_process_cmd, p);
+    p->owner = NULL;
     p->name = name;
     p->event_count = g_tree_nnodes(maker->events);
     p->events = malloc(sizeof(struct cbox_midi_event[1]) * p->event_count);
@@ -117,8 +121,11 @@ struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_mid
     struct traverse_state st = { p->events, 0 };
     
     g_tree_foreach(maker->events, traverse_func, &st);
+    
     CBOX_OBJECT_REGISTER(p);
     
+    cbox_song_add_pattern(song, p);
+
     return p;
 }
 

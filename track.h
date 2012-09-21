@@ -44,6 +44,7 @@ struct cbox_track
     struct cbox_command_target cmd_target;
     gchar *name;
     GList *items;
+    struct cbox_song *owner;
     struct cbox_track_playback *pb;
 };
 

@@ -52,8 +52,8 @@ struct cbox_song
 extern struct cbox_song *cbox_song_new(struct cbox_document *document);
 extern void cbox_song_add_track(struct cbox_song *song, struct cbox_track *track);
 extern void cbox_song_remove_track(struct cbox_song *song, struct cbox_track *track);
-extern void cbox_song_add_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern);
-extern void cbox_song_remove_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern);
+extern void cbox_song_clear(struct cbox_song *song);
+extern void cbox_song_use_looped_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern);
 extern void cbox_song_destroy(struct cbox_song *song);
 
 #endif

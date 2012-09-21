@@ -16,9 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "errors.h"
 #include "song.h"
 #include "track.h"
+#include <assert.h>
 #include <stdlib.h>
 
 CBOX_CLASS_DEFINITION_ROOT(cbox_song)
@@ -52,7 +54,83 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
             if (!cbox_execute_on(fb, NULL, "/pattern", "sio", error, pat->name, pat->loop_end, pat))
                 return FALSE;
         }
-        return CBOX_OBJECT_DEFAULT_STATUS(song, fb, error);
+        return cbox_execute_on(fb, NULL, "/loop_start", "i", error, (int)song->loop_start_ppqn) &&
+            cbox_execute_on(fb, NULL, "/loop_end", "i", error, (int)song->loop_end_ppqn) &&
+            CBOX_OBJECT_DEFAULT_STATUS(song, fb, error);
+    }
+    else
+    if (!strcmp(cmd->command, "/set_loop") && !strcmp(cmd->arg_types, "ii"))
+    {
+        song->loop_start_ppqn = CBOX_ARG_I(cmd, 0);
+        song->loop_end_ppqn = CBOX_ARG_I(cmd, 1);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/clear") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_song_clear(song);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/add_track") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        struct cbox_track *track = cbox_track_new(CBOX_GET_DOCUMENT(song));
+        cbox_song_add_track(song, track);
+        if (!cbox_execute_on(fb, NULL, "/uuid", "o", error, track))
+        {
+            CBOX_DELETE(track);
+            return FALSE;
+        }
+        
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/load_pattern") && !strcmp(cmd->arg_types, "si"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        struct cbox_midi_pattern *pattern = cbox_midi_pattern_load(song, CBOX_ARG_S(cmd, 0), CBOX_ARG_I(cmd, 1));
+        if (!cbox_execute_on(fb, NULL, "/uuid", "o", error, pattern))
+        {
+            CBOX_DELETE(pattern);
+            return FALSE;
+        }
+        
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/load_track") && !strcmp(cmd->arg_types, "si"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        struct cbox_midi_pattern *pattern = cbox_midi_pattern_load_track(song, CBOX_ARG_S(cmd, 0), CBOX_ARG_I(cmd, 1));
+        if (!cbox_execute_on(fb, NULL, "/uuid", "o", error, pattern))
+        {
+            CBOX_DELETE(pattern);
+            return FALSE;
+        }
+        
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/load_metronome") && !strcmp(cmd->arg_types, "i"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        struct cbox_midi_pattern *pattern = cbox_midi_pattern_new_metronome(song, CBOX_ARG_I(cmd, 0));
+        if (!cbox_execute_on(fb, NULL, "/uuid", "o", error, pattern))
+        {
+            CBOX_DELETE(pattern);
+            return FALSE;
+        }
+        
+        return TRUE;
     }
     else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
@@ -94,22 +172,52 @@ struct cbox_song *cbox_song_new(struct cbox_document *document)
 
 void cbox_song_add_track(struct cbox_song *song, struct cbox_track *track)
 {
+    track->owner = song;
     song->tracks = g_list_append(song->tracks, track);
 }
 
 void cbox_song_remove_track(struct cbox_song *song, struct cbox_track *track)
 {
+    assert(track->owner == song);
     song->tracks = g_list_remove(song->tracks, track);
+    track->owner = NULL;
 }
 
 void cbox_song_add_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern)
 {
+    pattern->owner = song;
     song->patterns = g_list_append(song->patterns, pattern);
 }
 
-void cbox_song_remove_patterns(struct cbox_song *song, struct cbox_midi_pattern *pattern)
+void cbox_song_remove_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern)
 {
+    assert(pattern->owner == song);
+    pattern->owner = NULL;
     song->patterns = g_list_remove(song->patterns, pattern);
+}
+
+void cbox_song_clear(struct cbox_song *song)
+{
+    while(song->tracks)
+        cbox_object_destroy(song->tracks->data);
+    while(song->patterns)
+        cbox_object_destroy(song->patterns->data);
+}
+
+void cbox_song_use_looped_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern)
+{
+    assert(pattern->owner == song);
+    song->patterns = g_list_remove(song->patterns, pattern);
+    pattern->owner = NULL;
+    
+    cbox_song_clear(song);
+    struct cbox_track *trk = cbox_track_new(CBOX_GET_DOCUMENT(song));
+    cbox_song_add_track(song, trk);
+    cbox_song_add_pattern(song, pattern);
+    song->loop_start_ppqn = 0;
+    song->loop_end_ppqn = pattern->loop_end;
+    cbox_track_add_item(trk, 0, pattern, 0, pattern->loop_end);
+    cbox_rt_update_song_playback(app.rt);
 }
 
 void cbox_song_destroyfunc(struct cbox_objhdr *objhdr)
