@@ -1,6 +1,15 @@
 from _cbox import *
 import struct
 
+class GetUUID:
+    def __init__(self):
+        def callback(cmd, fb, args):
+            if cmd == "/uuid" and len(args) == 1:
+                self.uuid = args[0]
+            else:
+                raise ValueException, "Unexpected callback: %s" % cmd
+        self.__call__ = callback
+    
 class GetThings:
     @staticmethod
     def by_uuid(uuid, cmd, anames, args):
@@ -147,6 +156,11 @@ class DocObj(object):
     def cmd(self, cmd, fb, *args):
         do_cmd(Document.uuid_cmd(self.uuid, cmd), fb, list(args))
         
+    def cmd_makeobj(self, cmd, *args):
+        fb = GetUUID()
+        do_cmd(Document.uuid_cmd(self.uuid, cmd), fb, list(args))
+        return Document.map_uuid(fb.uuid)
+        
     def get_things(self, cmd, fields, *args):
         return GetThings.by_uuid(self.uuid, cmd, fields, list(args))
 
@@ -195,7 +209,7 @@ class DocTrack(DocObj):
     def set_name(self, name):
         self.cmd("/name", None, name)
     def add_clip(self, pos, offset, length, pattern):
-        return Document.map_uuid(self.get_things("/add_clip", ["uuid"], pos, offset, length, pattern.uuid).uuid)
+        return self.cmd_makeobj("/add_clip", pos, offset, length, pattern.uuid)
     def transform_status(self, status):
         res = DocTrackStatus()
         res.name = status.name
