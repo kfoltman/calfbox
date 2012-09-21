@@ -59,41 +59,49 @@ class TestCbox(unittest.TestCase):
         self.assertTrue(os.path.getsize('test.wav') > 512 * 4 * 2)
         
     def test_song(self):
-        tp = cbox.GetThings("/song/status", ["*track", "*pattern"], [])
-        self.assertEqual(tp.track, [])
-        self.assertEqual(tp.pattern, [])
+        Document = cbox.Document
+        song = Document.get_song()
+        tp = song.status()
+        self.assertEqual(tp.tracks, [])
+        self.assertEqual(tp.patterns, [])
         cbox.do_cmd("/play_drum_pattern", None, ['pat1'])
-        tp = cbox.GetThings("/song/status", ["%track", "%pattern"], [])
-        self.assertEqual(tp.track[1][0], 'Unnamed')
-        self.assertEqual(tp.pattern[1][0], 'pat1')
-        track_uuid = tp.track[1][2]
-        pattern_uuid = tp.pattern[1][2]
+        song = Document.get_song()
+        tp = song.status()
+        self.assertEqual(tp.tracks[0].name, 'Unnamed')
+        self.assertEqual(tp.patterns[0].name, 'pat1')
+        track = tp.tracks[0].track
+        pattern = tp.patterns[0].pattern
         
-        cbox.do_cmd(cbox.Document.uuid_cmd(track_uuid, "/name"), None, ["Now named"])
-        cbox.do_cmd(cbox.Document.uuid_cmd(pattern_uuid, "/name"), None, ["pat1alt"])
+        track.set_name("Now named")
+        self.assertEqual(track.status().name, 'Now named')
+        pattern.set_name("pat1alt")
+        self.assertEqual(pattern.status().name, 'pat1alt')
         
-        tp = cbox.GetThings("/song/status", ["%track", "%pattern"], [])
-        self.assertEqual(tp.track[1][0], 'Now named')
-        self.assertEqual(tp.pattern[1][0], 'pat1alt')
+        tp = song.status()
+        self.assertEqual(tp.tracks[0].name, 'Now named')
+        self.assertEqual(tp.patterns[0].name, 'pat1alt')
         
-        clips = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/status"), ["*clip"], []).clip
-        self.assertEqual(clips[0][0:4], [0, 0, 192, pattern_uuid])
-        clip1_uuid = clips[0][4]
+        clips = track.status().clips
+        self.assertEqual(clips[0].pos, 0)
+        self.assertEqual(clips[0].offset, 0)
+        self.assertEqual(clips[0].length, 192)
+        self.assertEqual(clips[0].pattern, pattern)
+        clip1 = clips[0].clip
         
-        clip2_uuid = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/add_clip"), ["uuid"], [192, 96, 48, pattern_uuid]).uuid
+        clip2 = track.add_clip(192, 96, 48, pattern)
         
-        clip2_data = cbox.GetThings(cbox.Document.uuid_cmd(clip2_uuid, "/status"), ['pos', 'offset', 'length', 'pattern'], [])
+        clip2_data = clip2.status()
         self.assertEqual(clip2_data.pos, 192)
         self.assertEqual(clip2_data.offset, 96)
         self.assertEqual(clip2_data.length, 48)
-        self.assertEqual(clip2_data.pattern, pattern_uuid)
+        self.assertEqual(clip2_data.pattern, pattern)
 
-        clips = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/status"), ["*clip"], []).clip
-        self.assertEqual(clips, [[0, 0, 192, pattern_uuid, clip1_uuid], [192, 96, 48, pattern_uuid, clip2_uuid]])
+        clips = track.status().clips
+        self.assertEqual(clips, [cbox.ClipItem(0, 0, 192, pattern.uuid, clip1.uuid), cbox.ClipItem(192, 96, 48, pattern.uuid, clip2.uuid)])
 
-        cbox.do_cmd(cbox.Document.uuid_cmd(clip1_uuid, "/delete"), None, [])
+        clip1.delete()
 
-        clips = cbox.GetThings(cbox.Document.uuid_cmd(track_uuid, "/status"), ["*clip"], []).clip
-        self.assertEqual(clips, [[192, 96, 48, pattern_uuid, clip2_uuid]])
+        clips = track.status().clips
+        self.assertEqual(clips, [cbox.ClipItem(192, 96, 48, pattern.uuid, clip2.uuid)])
         
 unittest.main()

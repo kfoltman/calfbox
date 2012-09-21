@@ -124,9 +124,19 @@ gboolean cbox_object_default_process_cmd(struct cbox_command_target *ct, struct 
     struct cbox_objhdr *obj = ct->user_data;
     if (!strcmp(cmd->command, "/get_uuid") && !strcmp(cmd->arg_types, ""))
     {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
         char buf[40];
         uuid_unparse(obj->instance_uuid.uuid, buf);
         return cbox_execute_on(fb, NULL, "/uuid", "s", error, buf);
+    }
+    if (!strcmp(cmd->command, "/get_class_name") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        return cbox_execute_on(fb, NULL, "/class_name", "s", error, obj->class_ptr->name);
     }
     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s' for object class '%s'", cmd->command, cmd->arg_types, obj->class_ptr->name);
     return FALSE;

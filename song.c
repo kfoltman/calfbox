@@ -40,18 +40,16 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        int nt = 1;
         for(GList *p = song->tracks; p; p = g_list_next(p))
         {
             struct cbox_track *trk = p->data;
-            if (!cbox_execute_on(fb, NULL, "/track", "isio", error, nt++, trk->name, g_list_length(trk->items), trk))
+            if (!cbox_execute_on(fb, NULL, "/track", "sio", error, trk->name, g_list_length(trk->items), trk))
                 return FALSE;
         }
-        int np = 1;
         for(GList *p = song->patterns; p; p = g_list_next(p))
         {
             struct cbox_midi_pattern *pat = p->data;
-            if (!cbox_execute_on(fb, NULL, "/pattern", "isio", error, np++, pat->name, pat->loop_end, pat))
+            if (!cbox_execute_on(fb, NULL, "/pattern", "sio", error, pat->name, pat->loop_end, pat))
                 return FALSE;
         }
         return CBOX_OBJECT_DEFAULT_STATUS(song, fb, error);
