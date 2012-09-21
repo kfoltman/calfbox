@@ -85,8 +85,8 @@ static gboolean set_error_from_python(GError **error)
     Py_DECREF(ptypestr);
     Py_DECREF(pvaluestr);
     Py_DECREF(ptype);
-    Py_DECREF(pvalue);
-    Py_DECREF(ptraceback);
+    Py_XDECREF(pvalue);
+    Py_XDECREF(ptraceback);
     return FALSE;
 }
 
