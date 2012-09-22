@@ -229,7 +229,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         }
         for (int i = 0; i < s->instrument_count; i++)
         {
-            if (!cbox_execute_on(fb, NULL, "/instrument", "ss", error, s->instruments[i]->module->instance_name, s->instruments[i]->module->engine_name))
+            if (!cbox_execute_on(fb, NULL, "/instrument", "sso", error, s->instruments[i]->module->instance_name, s->instruments[i]->module->engine_name, s->instruments[i]))
                 return FALSE;
         }
         for (int i = 0; i < s->aux_bus_count; i++)
@@ -791,6 +791,7 @@ extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_sce
 
     int auxes = (module->outputs - module->aux_offset) / 2;
     instr = malloc(sizeof(struct cbox_instrument));
+    CBOX_OBJECT_HEADER_INIT(instr, cbox_instrument, CBOX_GET_DOCUMENT(scene));
     instr->scene = scene;
     instr->module = module;
     instr->outputs = outputs;
@@ -813,6 +814,7 @@ extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_sce
     free(instr_section);
     
     g_hash_table_insert(scene->instrument_hash, g_strdup(name), instr);
+    CBOX_OBJECT_REGISTER(instr);
     
     // cbox_recording_source_attach(&instr->outputs[0].rec_dry, cbox_recorder_new_stream("output.wav"));
     

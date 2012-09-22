@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "recsrc.h"
 
-#define MAX_AUXBUSES_PER_INSTRUMENT 4
+CBOX_EXTERN_CLASS(cbox_instrument)
 
 struct cbox_module;
 struct cbox_rt;
@@ -38,10 +38,11 @@ struct cbox_instrument_output
 
 struct cbox_instrument
 {
+    CBOX_OBJECT_HEADER()
+    struct cbox_command_target cmd_target;
     struct cbox_module *module;
     struct cbox_instrument_output *outputs;
     struct cbox_scene *scene;
-    struct cbox_command_target cmd_target;
     int refcount;
     gchar **aux_output_names;
     struct cbox_aux_bus **aux_outputs;
@@ -50,7 +51,6 @@ struct cbox_instrument
 
 extern void cbox_instrument_unref_aux_buses(struct cbox_instrument *instrument);
 extern void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrument, struct cbox_aux_bus *bus);
-extern void cbox_instrument_destroy(struct cbox_instrument *instrument);
 extern void cbox_instrument_destroy_if_unused(struct cbox_instrument *instrument);
 extern gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 

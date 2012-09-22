@@ -234,7 +234,7 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             if (!cbox_execute_on(fb, NULL, "/patch", "iis", error, 1 + i, ci.program + 128 * ci.bank, ci.name))
                 return FALSE;
         }
-        return TRUE;
+        return CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
     else if (!strcmp(cmd->command, "/patches") && !strcmp(cmd->arg_types, ""))
     {
@@ -274,7 +274,7 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return fluid_synth_set_polyphony(m->synth, polyphony) == FLUID_OK;
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 

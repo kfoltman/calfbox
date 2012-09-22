@@ -150,7 +150,13 @@ class Document:
     def map_uuid(uuid):
         if uuid in Document.objmap:
             return Document.objmap[uuid]
-        o = Document.classmap[Document.get_obj_class(uuid)](uuid)
+        try:
+            oclass = Document.get_obj_class(uuid)
+        except Exception, e:
+            print "Note: Cannot get class for " + uuid
+            Document.dump()
+            raise
+        o = Document.classmap[oclass](uuid)
         Document.objmap[uuid] = o
         return o
 
@@ -290,14 +296,14 @@ class DocLayer(DocObj):
 Document.classmap['cbox_layer'] = DocLayer
 
 #XXXKF not DOMified yet on C side
-#class DocInstrument(DocObj):
-#    def __init__(self, uuid):
-#        DocObj.__init__(self, uuid, ["name"])
-#Document.classmap['cbox_instrument'] = DocInstrument
+class DocInstrument(DocObj):
+    def __init__(self, uuid):
+        DocObj.__init__(self, uuid, ["name"])
+Document.classmap['cbox_instrument'] = DocInstrument
 
 class DocScene(DocObj):
     def __init__(self, uuid):
-        DocObj.__init__(self, uuid, ["name", "title", "transpose", "*layer", "%instrument", '*aux'])
+        DocObj.__init__(self, uuid, ["name", "title", "transpose", "*layer", "*instrument", '*aux'])
     def clear(self):
         self.cmd("/clear", None)
     def load(self, name):
@@ -327,7 +333,7 @@ class DocScene(DocObj):
         delattr(status, 'layer')
         status.auxes = dict([(name, Document.map_uuid(uuid)) for name, uuid in status.aux])
         delattr(status, 'aux')
-        status.instruments = status.instrument
+        status.instruments = dict([(name, (engine, Document.map_uuid(uuid))) for name, engine, uuid in status.instrument])
         delattr(status, 'instrument')
         return status
 Document.classmap['cbox_scene'] = DocScene
@@ -340,11 +346,18 @@ Document.classmap['cbox_rt'] = DocRt
 class DocAuxBus(DocObj):
     def __init__(self, uuid):
         DocObj.__init__(self, uuid, ["name"])
-    def transform_status(self, status):
-        status.slot = Document.map_uuid(status.slot_uuid)
-        return status
+    #def transform_status(self, status):
+    #    status.slot = Document.map_uuid(status.slot_uuid)
+    #    return status
+    def get_slot_engine(self):
+        return self.cmd_makeobj("/slot/engine/get_uuid")
     def get_slot_status(self):
         return self.get_things("/slot/status", ["insert_preset", "insert_engine"])
-    
 Document.classmap['cbox_aux_bus'] = DocAuxBus
+
+class DocModule(DocObj):
+    def __init__(self, uuid):
+        DocObj.__init__(self, uuid, [])
+Document.classmap['cbox_module'] = DocModule
+    
 

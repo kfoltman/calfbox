@@ -118,26 +118,51 @@ struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_p
     return hdr_ptr->class_ptr->getcmdtargetfunc(hdr_ptr);
 }
 
-gboolean cbox_object_default_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+gboolean cbox_object_try_default_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, gboolean *result, GError **error)
 {
     // XXXKF this assumes objhdr ptr == object ptr - needs to add the header offset in cmd target?
     struct cbox_objhdr *obj = ct->user_data;
-    if (!strcmp(cmd->command, "/get_uuid") && !strcmp(cmd->arg_types, ""))
+    if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_object_default_status(obj, fb, error))
+        {
+            *result = FALSE;
+            return TRUE;
+        }
+        return FALSE;
+    }
+    if (!strcmp(subcmd, "/get_uuid") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
+        {
+            *result = FALSE;
+            return TRUE;
+        }
         
         char buf[40];
         uuid_unparse(obj->instance_uuid.uuid, buf);
-        return cbox_execute_on(fb, NULL, "/uuid", "s", error, buf);
+        *result = cbox_execute_on(fb, NULL, "/uuid", "s", error, buf);
+        return TRUE;
     }
-    if (!strcmp(cmd->command, "/get_class_name") && !strcmp(cmd->arg_types, ""))
+    if (!strcmp(subcmd, "/get_class_name") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
-        
-        return cbox_execute_on(fb, NULL, "/class_name", "s", error, obj->class_ptr->name);
+        {
+            *result = FALSE;
+            return TRUE;
+        }        
+        *result = cbox_execute_on(fb, NULL, "/class_name", "s", error, obj->class_ptr->name);
+        return TRUE;
     }
+    return FALSE;
+}
+
+gboolean cbox_object_default_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    gboolean result = FALSE;
+    if (cbox_object_try_default_process_cmd(ct, fb, cmd, cmd->command, &result, error))
+        return result;
+    struct cbox_objhdr *obj = ct->user_data;
     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s' for object class '%s'", cmd->command, cmd->arg_types, obj->class_ptr->name);
     return FALSE;
 }

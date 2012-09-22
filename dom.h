@@ -62,6 +62,7 @@ inline int cbox_class_is_a(const struct cbox_class *c1, const struct cbox_class 
 
 extern void cbox_object_register_instance(struct cbox_document *doc, struct cbox_objhdr *obj);
 extern struct cbox_command_target *cbox_object_get_cmd_target(struct cbox_objhdr *hdr_ptr);
+extern gboolean cbox_object_try_default_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, gboolean *result, GError **error);
 extern gboolean cbox_object_default_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 extern gboolean cbox_object_default_status(struct cbox_objhdr *objhdr, struct cbox_command_target *fb, GError **error);
 

@@ -1341,7 +1341,8 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         }
         
         return cbox_execute_on(fb, NULL, "/active_voices", "i", error, m->active_voices) &&
-            cbox_execute_on(fb, NULL, "/polyphony", "i", error, MAX_SAMPLER_VOICES);
+            cbox_execute_on(fb, NULL, "/polyphony", "i", error, MAX_SAMPLER_VOICES) && 
+            CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
     else
     if (!strcmp(cmd->command, "/patches") && !strcmp(cmd->arg_types, ""))
@@ -1404,7 +1405,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         return cbox_execute_on(fb, NULL, "/program_no", "i", error, get_first_free_program_no(m));
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 

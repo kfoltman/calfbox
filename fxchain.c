@@ -81,7 +81,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
                 return FALSE;
             res = cbox_execute_on(fb, NULL, "/bypass", "ii", error, i + 1, m->modules[i] ? m->modules[i]->bypass : 0);
         }
-        return TRUE;
+        return CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
     else if (cbox_parse_path_part_int(cmd, "/module/", &subcommand, &index, 1, m->module_count, error))
     {
@@ -120,7 +120,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
         fxchain_move(m, oldpos, newpos);
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 

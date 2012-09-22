@@ -69,10 +69,11 @@ gboolean gate_process_cmd(struct cbox_command_target *ct, struct cbox_command_ta
             && cbox_execute_on(fb, NULL, "/attack", "f", error, m->params->attack)
             && cbox_execute_on(fb, NULL, "/hold", "f", error, m->params->hold)
             && cbox_execute_on(fb, NULL, "/release", "f", error, m->params->release)
+            && CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error)
             ;
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 

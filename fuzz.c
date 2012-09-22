@@ -75,10 +75,12 @@ gboolean fuzz_process_cmd(struct cbox_command_target *ct, struct cbox_command_ta
             && cbox_execute_on(fb, NULL, "/band", "f", error, m->params->band)
             && cbox_execute_on(fb, NULL, "/bandwidth", "f", error, m->params->bandwidth)
             && cbox_execute_on(fb, NULL, "/band2", "f", error, m->params->band2)
-            && cbox_execute_on(fb, NULL, "/bandwidth2", "f", error, m->params->bandwidth2);
+            && cbox_execute_on(fb, NULL, "/bandwidth2", "f", error, m->params->bandwidth2)
+            && CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error)
+        ;
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 

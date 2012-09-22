@@ -92,7 +92,7 @@ gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struc
         
         for (int i = 0; i < src->handler_count; i++)
         {
-            if (!cbox_execute_on(fb, NULL, "/handler", "io", error, i + 1, src->handlers[i]))
+            if (!cbox_execute_on(fb, NULL, "/handler", "o", error, src->handlers[i]))
                 return FALSE;            
         }
         return TRUE;

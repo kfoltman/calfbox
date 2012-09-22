@@ -68,10 +68,11 @@ MODULE_PROCESSCMD_FUNCTION(compressor)
             && cbox_execute_on(fb, NULL, "/ratio", "f", error, m->params->ratio)
             && cbox_execute_on(fb, NULL, "/attack", "f", error, m->params->attack)
             && cbox_execute_on(fb, NULL, "/release", "f", error, m->params->release)
+            && CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error)
             ;
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 

@@ -58,12 +58,14 @@ MODULE_PROCESSCMD_FUNCTION(delay)
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        return cbox_execute_on(fb, NULL, "/time", "f", error, m->params->time) &&
-            cbox_execute_on(fb, NULL, "/fb_amt", "f", error, m->params->fb_amt) &&
-            cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry);
+        return cbox_execute_on(fb, NULL, "/time", "f", error, m->params->time)
+            && cbox_execute_on(fb, NULL, "/fb_amt", "f", error, m->params->fb_amt)
+            && cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry)
+            && CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error)
+        ;
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 

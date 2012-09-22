@@ -140,10 +140,11 @@ gboolean reverb_process_cmd(struct cbox_command_target *ct, struct cbox_command_
             cbox_execute_on(fb, NULL, "/dry_amt", "f", error, gain2dB_simple(m->params->dryamt)) &&
             cbox_execute_on(fb, NULL, "/decay_time", "f", error, m->params->decay_time) &&
             cbox_execute_on(fb, NULL, "/lowpass", "f", error, m->params->lowpass) &&
-            cbox_execute_on(fb, NULL, "/highpass", "f", error, m->params->highpass);
+            cbox_execute_on(fb, NULL, "/highpass", "f", error, m->params->highpass) && 
+            CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 

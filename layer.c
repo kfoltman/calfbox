@@ -107,7 +107,7 @@ static void cbox_layer_destroyfunc(struct cbox_objhdr *objhdr)
         if (layer->instrument->scene)
             cbox_scene_remove_instrument(layer->instrument->scene, layer->instrument);
         
-        cbox_instrument_destroy(layer->instrument);
+        cbox_instrument_destroy_if_unused(layer->instrument);
     }
     free(layer);
 }
@@ -122,7 +122,7 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
 
         if (!(cbox_execute_on(fb, NULL, "/enable", "i", error, (int)layer->enabled) && 
             cbox_execute_on(fb, NULL, "/instrument_name", "s", error, layer->instrument->module->instance_name) && 
-            cbox_execute_on(fb, NULL, "/instrument_uuid", "o", error, layer->instrument->module) && 
+            cbox_execute_on(fb, NULL, "/instrument_uuid", "o", error, layer->instrument) && 
             cbox_execute_on(fb, NULL, "/consume", "i", error, (int)layer->consume) && 
             cbox_execute_on(fb, NULL, "/ignore_scene_transpose", "i", error, (int)layer->ignore_scene_transpose) && 
             cbox_execute_on(fb, NULL, "/disable_aftertouch", "i", error, (int)layer->disable_aftertouch) && 

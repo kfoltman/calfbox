@@ -51,10 +51,10 @@ gboolean {name}_process_cmd(struct cbox_command_target *ct, struct cbox_command_
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         // return cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry);
-        return TRUE;
+        return CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 

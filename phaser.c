@@ -78,10 +78,11 @@ gboolean phaser_process_cmd(struct cbox_command_target *ct, struct cbox_command_
             cbox_execute_on(fb, NULL, "/lfo_freq", "f", error, m->params->lfo_freq) &&
             cbox_execute_on(fb, NULL, "/stereo_phase", "f", error, rad2deg(m->params->sphase)) &&
             cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry) &&
-            cbox_execute_on(fb, NULL, "/stages", "i", error, m->params->stages);
+            cbox_execute_on(fb, NULL, "/stages", "i", error, m->params->stages) && 
+            CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 

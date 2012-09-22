@@ -25,6 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <glib.h>
 
+CBOX_CLASS_DEFINITION_ROOT(cbox_instrument)
+
 static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr, struct cbox_instrument_output *output, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
 {
     if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
@@ -119,7 +121,7 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
             return FALSE;
         if (!cbox_execute_on(fb, NULL, "/outputs", "i", error, instr->module->outputs / 2))
             return FALSE;
-        return CBOX_OBJECT_DEFAULT_STATUS(instr->module, fb, error);
+        return CBOX_OBJECT_DEFAULT_STATUS(instr, fb, error);
     }
     else if (cbox_parse_path_part_int(cmd, "/output/", &subcommand, &index, 1, aux_offset, error))
     {
@@ -144,20 +146,18 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
         return cbox_execute_sub(&instr->module->cmd_target, fb, cmd, cmd->command + 7, error);
     }
     else
-    {
-        cbox_set_command_error(error, cmd);
-        return FALSE;
-    }
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
 void cbox_instrument_destroy_if_unused(struct cbox_instrument *instrument)
 {
     if (instrument->refcount == 0)
-        cbox_instrument_destroy(instrument);
+        CBOX_DELETE(instrument);
 }
 
-void cbox_instrument_destroy(struct cbox_instrument *instrument)
+void cbox_instrument_destroyfunc(struct cbox_objhdr *objhdr)
 {
+    struct cbox_instrument *instrument = CBOX_H2O(objhdr);
     assert(instrument->refcount == 0);
     for (int i = 0; i < instrument->module->outputs / 2; i ++)
     {

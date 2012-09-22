@@ -71,10 +71,11 @@ MODULE_PROCESSCMD_FUNCTION(chorus)
             cbox_execute_on(fb, NULL, "/mod_depth", "f", error, m->params->mod_depth) &&
             cbox_execute_on(fb, NULL, "/lfo_freq", "f", error, m->params->lfo_freq) &&
             cbox_execute_on(fb, NULL, "/stereo_phase", "f", error, m->params->sphase) &&
-            cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry);
+            cbox_execute_on(fb, NULL, "/wet_dry", "f", error, m->params->wet_dry) && 
+            CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
     else
-        return cbox_set_command_error(error, cmd);
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
 
