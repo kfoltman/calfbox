@@ -246,10 +246,10 @@ class MainWindow(gtk.Window):
                 if scene[1] == 'Scene':
                     cbox.do_cmd("/scene/load", None, [scene[2][6:]])
                 elif scene[1] == 'Layer':
-                    cbox.do_cmd("/scene/new", None, [])
+                    cbox.do_cmd("/scene/clear", None, [])
                     cbox.do_cmd("/scene/add_layer", None, [0, scene[2][6:]])
                 elif scene[1] == 'Instrument':
-                    cbox.do_cmd("/scene/new", None, [])
+                    cbox.do_cmd("/scene/clear", None, [])
                     cbox.do_cmd("/scene/add_instrument", None, [0, scene[2][11:]])
                 scene = cbox.GetThings("/scene/status", ['name', 'title'], [])
                 self.scene_label.set_text(scene.name)

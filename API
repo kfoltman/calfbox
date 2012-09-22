@@ -36,7 +36,7 @@
 
 /scene/
 /scene/transpose(int semitones)
-/scene/new()
+/scene/clear()
 /scene/load(string scene_name)
 /scene/add_layer(int layer_pos, string layer_name)
 /scene/add_instrument(int layer_pos, string instrument_name)

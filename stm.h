@@ -20,6 +20,8 @@ static inline void **stm_array_clone_insert(void **old_array, int old_count, int
 static inline void **stm_array_clone_remove(void **old_array, int old_count, int index)
 {
     size_t ps = sizeof(void *);
+    if (old_count == 1)
+        return NULL;
     void **new_array = malloc(ps * (old_count - 1));
     memcpy(&new_array[0], &old_array[0], ps * index);
     memcpy(&new_array[index], &old_array[index + 1], ps * (old_count - index - 1));

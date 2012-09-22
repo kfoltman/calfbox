@@ -48,22 +48,13 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/load") && !strcmp(cmd->arg_types, "s"))
     {
-        struct cbox_scene *scene = cbox_scene_new(CBOX_GET_DOCUMENT(s));
-        if (!scene)
+        if (!cbox_scene_load(s, CBOX_ARG_S(cmd, 0), error))
             return FALSE;
-        if (!cbox_scene_load(scene, CBOX_ARG_S(cmd, 0), error))
-            return FALSE;
-        struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
-        CBOX_DELETE(old_scene);
         return TRUE;
     }
-    else if (!strcmp(cmd->command, "/new") && !strcmp(cmd->arg_types, ""))
+    else if (!strcmp(cmd->command, "/clear") && !strcmp(cmd->arg_types, ""))
     {
-        struct cbox_scene *scene = cbox_scene_new(CBOX_GET_DOCUMENT(s));
-        if (!scene) // not really expected
-            return FALSE;
-        struct cbox_scene *old_scene = cbox_rt_set_scene(s->rt, scene);
-        CBOX_DELETE(old_scene);
+        cbox_scene_clear(s);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/add_layer") && !strcmp(cmd->arg_types, "is"))
