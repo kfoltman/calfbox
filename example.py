@@ -390,7 +390,7 @@ class MainWindow(gtk.Window):
         for bus_name in scene_status.auxes.keys():
             auxbus_ls.append(("Aux: %s" % bus_name, bus_name))
             
-        for iname, iengine in scene_status.instruments.iteritems():
+        for iname, (iengine, iobj) in scene_status.instruments.iteritems():
             ipath = "/scene/instr/%s" % iname
             idata = cbox.GetThings(ipath + "/status", ['outputs', 'aux_offset'], [])
             #attribs = cbox.GetThings("/scene/instr_info", ['engine', 'name'], [i])
@@ -445,7 +445,7 @@ class MainWindow(gtk.Window):
                 y += 1
             if iengine in instr_gui.instrument_window_map:
                 b.pack_start(gtk.HSeparator(), False, False)
-                b.pack_start(instr_gui.instrument_window_map[iengine](iname, "/scene/instr/%s/engine" % iname), True, True)
+                b.pack_start(instr_gui.instrument_window_map[iengine](iname, "%s/engine" % ipath), True, True)
             self.nb.append_page(b, gtk.Label(iname))
         self.update()
         
