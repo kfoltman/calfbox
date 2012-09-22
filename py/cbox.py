@@ -263,6 +263,17 @@ class DocSong(DocObj):
         return self.cmd_makeobj("/load_pattern", name, 1)
     def load_drum_track(self, name):
         return self.cmd_makeobj("/load_track", name, 1)
+    def pattern_from_blob(self, blob, length):
+        return self.cmd_makeobj("/load_blob", buffer(blob), length)
+    def loop_single_pattern(self, loader):
+        self.clear()
+        track = self.add_track()
+        pat = loader()
+        length = pat.status().loop_end
+        track.add_clip(0, 0, length, pat)
+        self.set_loop(0, length)
+        self.update_playback()
+        
     def transform_status(self, status):
         res = DocSongStatus()
         res.tracks = [TrackItem(*t) for t in status.track]

@@ -320,22 +320,10 @@ class MainWindow(gtk.Window):
                 row = d.get_selected_object()
                 if row[1] == 'Pattern':
                     song = cbox.Document().get_song()
-                    song.clear()
-                    track = song.add_track()
-                    pat = song.load_drum_pattern(row[0])
-                    length = pat.status().loop_end
-                    track.add_clip(0, 0, length, pat)
-                    song.set_loop(0, length)
-                    song.update_playback()
+                    song.loop_single_pattern(lambda: song.load_drum_pattern(row[0]))
                 elif row[1] == 'Track':
                     song = cbox.Document().get_song()
-                    song.clear()
-                    track = song.add_track()
-                    pat = song.load_drum_track(row[0])
-                    length = pat.status().loop_end
-                    track.add_clip(0, 0, length, pat)
-                    song.set_loop(0, length)
-                    song.update_playback()
+                    song.loop_single_pattern(lambda: song.load_drum_track(row[0]))
                 elif row[1] == 'Stop':
                     song = cbox.Document().get_song()
                     song.clear()
@@ -366,8 +354,12 @@ class MainWindow(gtk.Window):
                 data += cbox.Pattern.serialize_event(int(i.pos + i.len - 1), 0x80 + ch, int(i.row), int(i.vel))
             else:
                 data += cbox.Pattern.serialize_event(int(i.pos + 1), 0x80 + ch, int(i.row), int(i.vel))
-        cbox.do_cmd("/play_blob", None, [buffer(data), pattern.get_length()])
-        
+
+        length = pattern.get_length()
+
+        song = cbox.Document().get_song()
+        song.loop_single_pattern(lambda: song.pattern_from_blob(data, length))
+
     def on_drum_pattern_editor_destroy(self, w):
         self.drum_pattern_editor = None
 

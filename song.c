@@ -133,6 +133,21 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
         return TRUE;
     }
     else
+    if (!strcmp(cmd->command, "/load_blob") && !strcmp(cmd->arg_types, "bi"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        
+        struct cbox_midi_pattern *pattern = cbox_midi_pattern_new_from_blob(song, CBOX_ARG_B(cmd, 0), CBOX_ARG_I(cmd, 1));
+        if (!cbox_execute_on(fb, NULL, "/uuid", "o", error, pattern))
+        {
+            CBOX_DELETE(pattern);
+            return FALSE;
+        }
+        
+        return TRUE;
+    }
+    else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
 }
