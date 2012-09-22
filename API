@@ -59,7 +59,7 @@
     /gain_linear(float gain),
     /gain(float gain_dB),
     /bus(string output_bus),
-    {add: @moduleslot/status()}
+    {add: @moduleslot/status()} XXXKF ????
 /scene/instr/<name>/aux/<index>/gain(float gain_dB)
 /scene/instr/<name>/aux/<index>/bus(string bus)
 /scene/instr/<name>/aux/<index>/{add: @moduleslot}
@@ -67,6 +67,7 @@
 /scene/layer/<index>/status() ->
     /enable(int),
     /instrument_name(string iname),
+    /instrument_uuid(string uuid),
     /consume(int consume),
     /ignore_scene_transpose(int ignore),
     /disable_aftertouch(int disable),
@@ -87,17 +88,17 @@
 /scene/layer/<index>/high_note(int note)
 /scene/layer/<index>/in_channel(int channel)
 /scene/layer/<index>/out_channel(int channel)
-/scene/aux/<index>/
-/scene/aux/<index>/{add: @module}
+/scene/aux/<name>/status
+/scene/aux/<name>/slot/{add: @module}
 /scene/load_aux(string name)
-/scene/delete_aux(int aux_index)
+/scene/delete_aux(string name)
 /scene/status() ->
     /name(string),
     /title(string),
     /transpose(int semitones),
-    [/layer(int index)],
+    [/layer(string uuid)],
     [/instrument(string instance, string engine)],
-    [/aux(int index, string name)]
+    [/aux(string name, string uuid)]
 
 /rt/
 /rt/status() -> /audio_channels(int inputs, int outputs)

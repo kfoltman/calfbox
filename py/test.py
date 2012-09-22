@@ -9,30 +9,54 @@ sys.argv = [__file__]
 
 import cbox
 
-cbox.Document.dump()
+global Document
+Document = cbox.Document
+
+Document.dump()
 
 class TestCbox(unittest.TestCase):
-    def test_scene(self):
-        scene_uuid = cbox.GetThings("/scene/get_uuid", ['uuid'], []).uuid
-        layer_uuid = cbox.GetThings("/scene/status", ['layer'], []).layer[1]
-        self.assertEquals(cbox.GetThings(cbox.Document.uuid_cmd(scene_uuid, "/status"), ['uuid'], []).uuid, scene_uuid)
-        self.assertEquals(cbox.GetThings(cbox.Document.uuid_cmd(layer_uuid, "/status"), ['uuid'], []).uuid, layer_uuid)
-
-        layers = cbox.GetThings("/scene/status", ['%layer'], []).layer
-        self.assertEquals(len(layers), 1)
-        self.assertEquals(layers[1], layer_uuid)
+    def verify_uuid(self, uuid, path = None):
+        if path is None:
+            self.assertEquals(cbox.GetThings(Document.uuid_cmd(uuid, "/status"), ['uuid'], []).uuid, uuid)
+        else:
+            self.assertEquals(cbox.GetThings(path + "/status", ['uuid'], []).uuid, uuid)
         
-        instr_uuid = cbox.GetThings(cbox.Document.uuid_cmd(layer_uuid, "/status"), ['instrument_uuid'], []).instrument_uuid
-        iname = cbox.GetThings(cbox.Document.uuid_cmd(layer_uuid, "/status"), ['instrument_name'], []).instrument_name
+    def test_scene(self):
+        scene = Document.get_scene()
+        scene_status = scene.status()
+        layer = scene_status.layers[0]
+        self.verify_uuid(scene.uuid)
+        self.verify_uuid(scene.uuid, "/scene")
+        self.verify_uuid(layer.uuid)
+        self.verify_uuid(layer.uuid, "/scene/layer/1")
+
+        layers = scene.status().layers
+        self.assertEquals(len(layers), 1)
+        self.assertEquals(layers[0].uuid, layer.uuid)
+        layers[0].set_consume(0)
+        self.assertEquals(layers[0].status().consume, 0)
+        layers[0].set_consume(1)
+        self.assertEquals(layers[0].status().consume, 1)
+        layers[0].set_enable(0)
+        self.assertEquals(layers[0].status().enable, 0)
+        layers[0].set_enable(1)
+        self.assertEquals(layers[0].status().enable, 1)
+        
+        instr_uuid = layers[0].status().instrument_uuid
+        iname = layers[0].status().instrument_name
         self.assertEquals(cbox.GetThings("/scene/instr/%s/status" % iname, ['uuid'], []).uuid, instr_uuid)
+        
+        scene.load_aux("piano_reverb")
+        scene.delete_aux("piano_reverb")
 
     def test_rt(self):
-        rt_uuid = cbox.GetThings("/rt/get_uuid", ['uuid'], []).uuid
-        self.assertEquals(cbox.GetThings(cbox.Document.uuid_cmd(rt_uuid, "/status"), ['uuid'], []).uuid, rt_uuid)
+        rt = Document.get_rt()
+        self.assertEquals(cbox.GetThings(Document.uuid_cmd(rt.uuid, "/status"), ['uuid'], []).uuid, rt.uuid)
 
     def test_recorder_api(self):
-        layer_uuid = cbox.GetThings("/scene/status", ['layer'], []).layer[1]
-        iname = cbox.GetThings(cbox.Document.uuid_cmd(layer_uuid, "/status"), ['instrument_name'], []).instrument_name
+        scene = Document.get_scene()
+        layer = scene.status().layers[0]
+        iname = layer.status().instrument_name
         self.assertEquals(cbox.GetThings("/scene/instr/%s/output/1/rec_dry/status" % iname, ['*handler'], []).handler, [])
         
         meter_uuid = cbox.GetThings("/new_meter", ['uuid'], []).uuid
@@ -59,7 +83,6 @@ class TestCbox(unittest.TestCase):
         self.assertTrue(os.path.getsize('test.wav') > 512 * 4 * 2)
         
     def test_song(self):
-        Document = cbox.Document
         song = Document.get_song()
         tp = song.status()
         self.assertEqual(tp.tracks, [])

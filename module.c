@@ -190,8 +190,7 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
             return FALSE;
         if (!(cbox_execute_on(fb, NULL, "/insert_engine", "s", error, sm ? sm->engine_name : "") &&
             cbox_execute_on(fb, NULL, "/insert_preset", "s", error, sm ? sm->instance_name : "") &&
-            cbox_execute_on(fb, NULL, "/bypass", "i", error, sm ? sm->bypass : 0)) &&
-            CBOX_OBJECT_DEFAULT_STATUS(sm, fb, error))
+            cbox_execute_on(fb, NULL, "/bypass", "i", error, sm ? sm->bypass : 0)))
             return FALSE;
         return TRUE;
     }

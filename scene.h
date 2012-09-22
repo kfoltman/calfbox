@@ -57,8 +57,7 @@ extern struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int 
 extern void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newpos);
 extern gboolean cbox_scene_load(struct cbox_scene *scene, const char *section, GError **error);
 extern gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument);
-extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, GError **error);
-extern struct cbox_aux_bus *cbox_scene_remove_aux_bus(struct cbox_scene *scene, int pos);
+extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, int allow_load, GError **error);
 extern void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_midi_buffer *midibuf_total, float *output_buffers[]);
 extern void cbox_scene_clear(struct cbox_scene *scene);
 extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *scene, const char *name, gboolean load, GError **error);

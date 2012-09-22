@@ -80,11 +80,11 @@ class SceneLayersModel(gtk.ListStore):
     #    return opath % self[(1 + int(tree_path))]
     def make_row_item(self, opath, tree_path):
         return cbox.Document.uuid_cmd(self[int(tree_path)][-1], opath)
-    def refresh(self, scene):
+    def refresh(self, scene_status):
         self.clear()
-        for lidx, luuid in scene.layer:
-            layer = cbox.GetThings.by_uuid(luuid, "/status", ["enable", "instrument_name", "in_channel", "out_channel", "consume", "low_note", "high_note", "fixed_note", "transpose", "uuid"], [])
-            self.append((layer.instrument_name, layer.enable != 0, layer.in_channel, layer.out_channel, layer.consume != 0, layer.low_note, layer.high_note, layer.fixed_note, layer.transpose, layer.uuid))
+        for layer in scene_status.layers:
+            ls = layer.status()
+            self.append((ls.instrument_name, ls.enable != 0, ls.in_channel, ls.out_channel, ls.consume != 0, ls.low_note, ls.high_note, ls.fixed_note, ls.transpose, layer.uuid))
 
 class SceneLayersView(gtk.TreeView):
     def __init__(self, model):
@@ -119,11 +119,12 @@ class SceneLayersView(gtk.TreeView):
 class SceneAuxBusesModel(gtk.ListStore):
     def __init__(self):
         gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_STRING)
-    def refresh(self, scene):
+    def refresh(self, scene_status):
         self.clear()
-        for l in scene.aux:
-            aux = cbox.GetThings("/scene/aux/%d/status" % l[0], ["insert_engine", "insert_preset"], [])
-            self.append((aux.insert_preset, aux.insert_engine))
+        for aux_name, aux_obj in scene_status.auxes.iteritems():
+            # XXXKF make slots more 1st class
+            slot = aux_obj.get_slot_status()
+            self.append((slot.insert_preset, slot.insert_engine))
 
 class SceneAuxBusesView(gtk.TreeView):
     def __init__(self, model):
@@ -170,13 +171,14 @@ class MainWindow(gtk.Window):
         
         self.vbox.pack_start(self.menu_bar, False, False)
         rt = cbox.GetThings("/rt/status", ['audio_channels'], [])
-        scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])        
+        scene = cbox.Document.get_scene()
         self.nb = gtk.Notebook()
         self.vbox.add(self.nb)
         self.nb.append_page(self.create_master(scene), gtk.Label("Master"))
-        self.create_instrument_pages(scene, rt)
+        self.create_instrument_pages(scene.status(), rt)
 
     def create_master(self, scene):
+        scene_status = scene.status()
         self.master_info = left_label("")
         self.timesig_info = left_label("")
         
@@ -185,10 +187,10 @@ class MainWindow(gtk.Window):
         t.set_row_spacings(5)
         
         t.attach(bold_label("Scene"), 0, 1, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-        self.scene_label = left_label(scene.name)
+        self.scene_label = left_label(scene_status.name)
         t.attach(self.scene_label, 1, 3, 0, 1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
 
-        self.title_label = left_label(scene.title)
+        self.title_label = left_label(scene_status.title)
         t.attach(bold_label("Title"), 0, 1, 1, 2, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         t.attach(self.title_label, 1, 3, 1, 2, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
         
@@ -215,7 +217,7 @@ class MainWindow(gtk.Window):
         t.attach(standard_hslider(self.tempo_adj), 1, 3, 4, 5, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
 
         t.attach(bold_label("Transpose"), 0, 1, 5, 6, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
-        self.transpose_adj = gtk.Adjustment(scene.transpose, -24, 24, 1, 5, 0)
+        self.transpose_adj = gtk.Adjustment(scene_status.transpose, -24, 24, 1, 5, 0)
         self.transpose_adj.connect('value_changed', adjustment_changed_int, '/scene/transpose')
         t.attach(standard_align(gtk.SpinButton(self.transpose_adj), 0, 0, 0, 0), 1, 3, 5, 6, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         
@@ -227,8 +229,8 @@ class MainWindow(gtk.Window):
         self.auxes_view = SceneAuxBusesView(self.auxes_model)
         t.attach(standard_vscroll_window(-1, 80, self.auxes_view), 0, 3, 7, 8, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
         
-        self.layers_model.refresh(scene)
-        self.auxes_model.refresh(scene)
+        self.layers_model.refresh(scene_status)
+        self.auxes_model.refresh(scene_status)
         
         return t
         
@@ -288,7 +290,7 @@ class MainWindow(gtk.Window):
         rowid, row = self.auxes_view.get_current_row()
         if rowid is None:
             return
-        cbox.do_cmd("/scene/delete_aux", None, [rowid])
+        cbox.do_cmd("/scene/delete_aux", None, [row[0]])
         self.refresh_instrument_pages()
         
     def aux_bus_edit(self, w):
@@ -372,14 +374,14 @@ class MainWindow(gtk.Window):
     def refresh_instrument_pages(self):
         self.delete_instrument_pages()
         rt = cbox.GetThings("/rt/status", ['audio_channels'], [])
-        scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
-        self.layers_model.refresh(scene)
-        self.auxes_model.refresh(scene)
-        self.create_instrument_pages(scene, rt)
+        scene_status = cbox.Document.get_scene().status()
+        self.layers_model.refresh(scene_status)
+        self.auxes_model.refresh(scene_status)
+        self.create_instrument_pages(scene_status, rt)
         self.nb.show_all()
-        self.title_label.set_text(scene.title)
+        self.title_label.set_text(scene_status.title)
 
-    def create_instrument_pages(self, scene, rt):
+    def create_instrument_pages(self, scene_status, rt):
         self.path_widgets = {}
         self.path_popups = {}
         self.fx_choosers = {}
@@ -390,17 +392,17 @@ class MainWindow(gtk.Window):
             
         auxbus_ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
         auxbus_ls.append(("", ""))
-        for bus in range(len(scene.aux)):
-            auxbus_ls.append(("Aux: %s" % scene.aux[bus][1], scene.aux[bus][1]))
+        for bus_name in scene_status.auxes.keys():
+            auxbus_ls.append(("Aux: %s" % bus_name, bus_name))
             
-        for i in scene.instrument:
-            ipath = "/scene/instr/%s" % i[0]
+        for iname, iengine in scene_status.instruments.iteritems():
+            ipath = "/scene/instr/%s" % iname
             idata = cbox.GetThings(ipath + "/status", ['outputs', 'aux_offset'], [])
             #attribs = cbox.GetThings("/scene/instr_info", ['engine', 'name'], [i])
             #markup += '<b>Instrument %d:</b> engine %s, name %s\n' % (i, attribs.engine, attribs.name)
             b = gtk.VBox(spacing = 5)
             b.set_border_width(5)
-            b.pack_start(gtk.Label("Engine: %s" % i[1]), False, False)
+            b.pack_start(gtk.Label("Engine: %s" % iengine), False, False)
             b.pack_start(gtk.HSeparator(), False, False)
             t = gtk.Table(1 + idata.outputs, 7)
             t.set_col_spacings(5)
@@ -439,17 +441,17 @@ class MainWindow(gtk.Window):
                 adj.connect('value_changed', adjustment_changed_float, cbox.VarPath(opath + '/gain'))
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
                 
-                chooser = fx_gui.InsertEffectChooser(opath, "%s: %s" % (i[0], output_name), engine, preset, bypass, self)
+                chooser = fx_gui.InsertEffectChooser(opath, "%s: %s" % (iname, output_name), engine, preset, bypass, self)
                 self.fx_choosers[opath] = chooser
                 t.attach(chooser.fx_engine, 3, 4, y, y + 1, 0, gtk.SHRINK)
                 t.attach(chooser.fx_preset, 4, 5, y, y + 1, 0, gtk.SHRINK)
                 t.attach(chooser.fx_edit, 5, 6, y, y + 1, 0, gtk.SHRINK)
                 t.attach(chooser.fx_bypass, 6, 7, y, y + 1, 0, gtk.SHRINK)
                 y += 1
-            if i[1] in instr_gui.instrument_window_map:
+            if iengine in instr_gui.instrument_window_map:
                 b.pack_start(gtk.HSeparator(), False, False)
-                b.pack_start(instr_gui.instrument_window_map[i[1]](i[0], "/scene/instr/%s/engine" % i[0]), True, True)
-            self.nb.append_page(b, gtk.Label(i[0]))
+                b.pack_start(instr_gui.instrument_window_map[iengine](iname, "/scene/instr/%s/engine" % iname), True, True)
+            self.nb.append_page(b, gtk.Label(iname))
         self.update()
         
     def delete_instrument_pages(self):

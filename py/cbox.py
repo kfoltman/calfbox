@@ -139,7 +139,13 @@ class Document:
         return GetThings(Document.uuid_cmd(uuid, "/get_class_name"), ["class_name"], []).class_name
     @staticmethod
     def get_song():
-        return DocSong(Document.get_uuid("/song"))
+        return Document.map_uuid(Document.get_uuid("/song"))
+    @staticmethod
+    def get_scene():
+        return Document.map_uuid(Document.get_uuid("/scene"))
+    @staticmethod
+    def get_rt():
+        return Document.map_uuid(Document.get_uuid("/rt"))
     @staticmethod
     def map_uuid(uuid):
         if uuid in Document.objmap:
@@ -148,10 +154,22 @@ class Document:
         Document.objmap[uuid] = o
         return o
 
+class SetterMaker():
+    def __init__(self, obj, path):
+        self.obj = obj
+        self.path = path
+    def set(self, value):
+        self.obj.cmd(self.path, None, value)
+
 class DocObj(object):
     def __init__(self, uuid, status_field_list):
         self.uuid = uuid
-        self.status_fields = status_field_list
+        self.status_fields = []
+        for sf in status_field_list:
+            if sf.startswith("="):
+                sf = sf[1:]
+                self.__dict__['set_' + sf] = SetterMaker(self, "/" + sf).set
+            self.status_fields.append(sf)
         
     def cmd(self, cmd, fb, *args):
         do_cmd(Document.uuid_cmd(self.uuid, cmd), fb, list(args))
@@ -206,9 +224,7 @@ class DocTrackStatus:
     
 class DocTrack(DocObj):
     def __init__(self, uuid):
-        DocObj.__init__(self, uuid, ["*clip", "name"])
-    def set_name(self, name):
-        self.cmd("/name", None, name)
+        DocObj.__init__(self, uuid, ["*clip", "=name"])
     def add_clip(self, pos, offset, length, pattern):
         return self.cmd_makeobj("/add_clip", pos, offset, length, pattern.uuid)
     def transform_status(self, status):
@@ -255,6 +271,49 @@ class DocSong(DocObj):
     def update_playback(self):
         # XXXKF Maybe make it a song-level API instead of global
         do_cmd("/update_playback", None, [])
-
 Document.classmap['cbox_song'] = DocSong
+
+class DocLayer(DocObj):
+    def __init__(self, uuid):
+        DocObj.__init__(self, uuid, ["name", "instrument_name", "instrument_uuid", "=enable", "=low_note", "=high_note", "=fixed_note", "=in_channel", "=out_channel", "=aftertouch", "=invert_sustain", "=consume", "=ignore_scene_transpose", "=transpose"])
+Document.classmap['cbox_layer'] = DocLayer
+
+#XXXKF not DOMified yet on C side
+#class DocInstrument(DocObj):
+#    def __init__(self, uuid):
+#        DocObj.__init__(self, uuid, ["name"])
+#Document.classmap['cbox_instrument'] = DocInstrument
+
+class DocScene(DocObj):
+    def __init__(self, uuid):
+        DocObj.__init__(self, uuid, ["name", "title", "transpose", "*layer", "%instrument", '*aux'])
+    def load_aux(self, aux):
+        return self.cmd_makeobj("/load_aux", aux)
+    def delete_aux(self, aux):
+        return self.cmd("/delete_aux", None, aux)
+    def transform_status(self, status):
+        status.layers = [Document.map_uuid(i) for i in status.layer]
+        delattr(status, 'layer')
+        status.auxes = dict([(name, Document.map_uuid(uuid)) for name, uuid in status.aux])
+        delattr(status, 'aux')
+        status.instruments = status.instrument
+        delattr(status, 'instrument')
+        return status
+Document.classmap['cbox_scene'] = DocScene
+
+class DocRt(DocObj):
+    def __init__(self, uuid):
+        DocObj.__init__(self, uuid, ["name", "instrument_name", "instrument_uuid", "=enable", "=low_note", "=high_note", "=fixed_note", "=in_channel", "=out_channel", "=aftertouch", "=invert_sustain", "=consume", "=ignore_scene_transpose"])
+Document.classmap['cbox_rt'] = DocRt
+
+class DocAuxBus(DocObj):
+    def __init__(self, uuid):
+        DocObj.__init__(self, uuid, ["name"])
+    def transform_status(self, status):
+        status.slot = Document.map_uuid(status.slot_uuid)
+        return status
+    def get_slot_status(self):
+        return self.get_things("/slot/status", ["insert_preset", "insert_engine"])
+    
+Document.classmap['cbox_aux_bus'] = DocAuxBus
 

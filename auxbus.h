@@ -19,10 +19,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_AUXBUS_H
 #define CBOX_AUXBUS_H
 
+#include "dom.h"
 #include "module.h"
+
+struct cbox_scene;
+
+CBOX_EXTERN_CLASS(cbox_aux_bus)
 
 struct cbox_aux_bus
 {
+    CBOX_OBJECT_HEADER()
+    struct cbox_command_target cmd_target;
+    struct cbox_scene *owner;
+
     gchar *name;
     struct cbox_module *module;
     int refcount;
@@ -31,9 +40,8 @@ struct cbox_aux_bus
     float *output_bufs[2];
 };
 
-extern struct cbox_aux_bus *cbox_aux_bus_load(const char *name, struct cbox_rt *rt, GError **error);
+extern struct cbox_aux_bus *cbox_aux_bus_load(struct cbox_scene *scene, const char *name, struct cbox_rt *rt, GError **error);
 extern void cbox_aux_bus_ref(struct cbox_aux_bus *bus);
 extern void cbox_aux_bus_unref(struct cbox_aux_bus *bus);
-extern void cbox_aux_bus_destroy(struct cbox_aux_bus *bus);
 
 #endif
