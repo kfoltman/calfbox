@@ -286,11 +286,17 @@ class SelectObjectDialog(gtk.Dialog):
         scenes.show()
         scroll.set_size_request(640, 500)
         scroll.show()
-        scenes.grab_focus()
         self.scenes = scenes
+        self.scenes.connect('cursor-changed', lambda w: self.update_default_button())
         self.scenes.connect('row-activated', lambda w, path, column: self.response(gtk.RESPONSE_OK))
+        self.scenes.set_cursor((0,), scenes.get_column(0))
+        self.scenes.grab_focus()
+        self.update_default_button()
+
     def get_selected_object(self):
         return self.scenes.get_model()[self.scenes.get_cursor()[0][0]]
+    def update_default_button(self):
+        self.set_response_sensitive(gtk.RESPONSE_OK, self.scenes.get_cursor()[1] is not None)
 
 #################################################################################################################################
 
