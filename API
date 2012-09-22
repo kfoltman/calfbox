@@ -39,7 +39,7 @@
 /scene/clear()
 /scene/load(string scene_name)
 /scene/add_layer(int layer_pos, string layer_name)
-/scene/add_instrument(int layer_pos, string instrument_name)
+/scene/add_instrument_layer(int layer_pos, string instrument_name)
 /scene/delete_layer(int pos)
 /scene/move_layer(int oldpos, int newpos)
 /scene/instr/

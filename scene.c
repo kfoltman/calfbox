@@ -77,9 +77,14 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             CBOX_DELETE(layer);
             return FALSE;
         }
+        if (fb)
+        {
+            if (!cbox_execute_on(fb, NULL, "/uuid", "o", error, layer))
+                return FALSE;
+        }
         return TRUE;
     }
-    else if (!strcmp(cmd->command, "/add_instrument") && !strcmp(cmd->arg_types, "is"))
+    else if (!strcmp(cmd->command, "/add_instrument_layer") && !strcmp(cmd->arg_types, "is"))
     {
         int pos = CBOX_ARG_I(cmd, 0);
         if (pos < 0 || pos > s->layer_count)
@@ -98,6 +103,11 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         {
             CBOX_DELETE(layer);
             return FALSE;
+        }
+        if (fb)
+        {
+            if (!cbox_execute_on(fb, NULL, "/uuid", "o", error, layer))
+                return FALSE;
         }
         return TRUE;
     }

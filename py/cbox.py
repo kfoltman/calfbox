@@ -298,10 +298,30 @@ Document.classmap['cbox_layer'] = DocLayer
 class DocScene(DocObj):
     def __init__(self, uuid):
         DocObj.__init__(self, uuid, ["name", "title", "transpose", "*layer", "%instrument", '*aux'])
+    def clear(self):
+        self.cmd("/clear", None)
+    def load(self, name):
+        self.cmd("/load", None, name)
     def load_aux(self, aux):
         return self.cmd_makeobj("/load_aux", aux)
     def delete_aux(self, aux):
         return self.cmd("/delete_aux", None, aux)
+    def delete_layer(self, pos):
+        self.cmd("/delete_layer", None, 1 + pos)
+    def move_layer(self, old_pos, new_pos):
+        self.cmd("/move_layer", None, old_pos + 1, new_pos + 1)
+        
+    def add_layer(self, aux, pos = None):
+        if pos is None:
+            return self.cmd_makeobj("/add_layer", 0, aux)
+        else:
+            # Note: The positions in high-level API are zero-based.
+            return self.cmd_makeobj("/add_layer", 1 + pos, aux)
+    def add_instrument_layer(self, aux, pos = None):
+        if pos is None:
+            return self.cmd_makeobj("/add_instrument_layer", 0, aux)
+        else:
+            return self.cmd_makeobj("/add_instrument_layer", 1 + pos, aux)
     def transform_status(self, status):
         status.layers = [Document.map_uuid(i) for i in status.layer]
         delattr(status, 'layer')

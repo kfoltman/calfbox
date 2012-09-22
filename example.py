@@ -112,9 +112,9 @@ class SceneLayersView(gtk.TreeView):
         if dest_row_info is not None:
             dest_row = dest_row_info[0][0]
             #print src_row, dest_row, dest_row_info[1]
-            cbox.do_cmd("/scene/move_layer", None, [src_row + 1, dest_row + 1])
-            scene = cbox.GetThings("/scene/status", ['*layer', '*instrument', '*aux', 'name', 'title', 'transpose'], [])
-            self.get_model().refresh(scene)
+            scene = cbox.Document.get_scene()
+            scene.move_layer(src_row, dest_row)
+            self.get_model().refresh(scene.status())
 
 class SceneAuxBusesModel(gtk.ListStore):
     def __init__(self):
@@ -242,19 +242,20 @@ class MainWindow(gtk.Window):
         response = d.run()
         try:
             if response == gtk.RESPONSE_OK:
-                scene = d.get_selected_object()
-                if scene[1] == 'Scene':
-                    cbox.do_cmd("/scene/load", None, [scene[2][6:]])
-                elif scene[1] == 'Layer':
-                    cbox.do_cmd("/scene/clear", None, [])
-                    cbox.do_cmd("/scene/add_layer", None, [0, scene[2][6:]])
-                elif scene[1] == 'Instrument':
-                    cbox.do_cmd("/scene/clear", None, [])
-                    cbox.do_cmd("/scene/add_instrument", None, [0, scene[2][11:]])
-                scene = cbox.GetThings("/scene/status", ['name', 'title'], [])
-                self.scene_label.set_text(scene.name)
-                self.title_label.set_text(scene.title)
-                self.refresh_instrument_pages()
+                scene = cbox.Document.get_scene()
+                item_name, item_type, item_key, item_label = d.get_selected_object()
+                if item_type == 'Scene':
+                    scene.load(item_name)
+                elif item_type == 'Layer':
+                    scene.clear()
+                    scene.add_layer(item_name)
+                elif item_type == 'Instrument':
+                    scene.clear()
+                    scene.add_instrument_layer(item_name)
+                scene_status = scene.status()
+                self.scene_label.set_text(scene_status.name)
+                self.title_label.set_text(scene_status.title)
+                self.refresh_instrument_pages(scene_status)
         finally:
             d.destroy()
 
@@ -263,11 +264,12 @@ class MainWindow(gtk.Window):
         response = d.run()
         try:
             if response == gtk.RESPONSE_OK:
-                scene = d.get_selected_object()
-                if scene[1] == 'Layer':
-                    cbox.do_cmd("/scene/add_layer", None, [0, scene[2][6:]])
-                elif scene[1] == 'Instrument':
-                    cbox.do_cmd("/scene/add_instrument", None, [0, scene[2][11:]])
+                scene = cbox.Document.get_scene()
+                item_name, item_type, item_key, item_label = d.get_selected_object()
+                if item_type == 'Layer':
+                    scene.add_layer(item_name)
+                elif item_type == 'Instrument':
+                    scene.add_instrument_layer(item_name)
                 self.refresh_instrument_pages()
         finally:
             d.destroy()
@@ -275,7 +277,7 @@ class MainWindow(gtk.Window):
     def layer_remove(self, w):
         if self.layers_view.get_cursor()[0] is not None:
             pos = self.layers_view.get_cursor()[0][0]
-            cbox.do_cmd("/scene/delete_layer", None, [1 + pos])
+            cbox.Document.get_scene().delete_layer(pos)
             self.refresh_instrument_pages()
             
     def aux_bus_add(self, w):
@@ -363,10 +365,11 @@ class MainWindow(gtk.Window):
     def on_drum_pattern_editor_destroy(self, w):
         self.drum_pattern_editor = None
 
-    def refresh_instrument_pages(self):
+    def refresh_instrument_pages(self, scene_status = None):
         self.delete_instrument_pages()
         rt = cbox.GetThings("/rt/status", ['audio_channels'], [])
-        scene_status = cbox.Document.get_scene().status()
+        if scene_status is None:
+            scene_status = cbox.Document.get_scene().status()
         self.layers_model.refresh(scene_status)
         self.auxes_model.refresh(scene_status)
         self.create_instrument_pages(scene_status, rt)
