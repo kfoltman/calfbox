@@ -392,7 +392,7 @@ class MainWindow(gtk.Window):
             
         for iname, (iengine, iobj) in scene_status.instruments.iteritems():
             ipath = "/scene/instr/%s" % iname
-            idata = cbox.GetThings(ipath + "/status", ['outputs', 'aux_offset'], [])
+            idata = iobj.status()
             #attribs = cbox.GetThings("/scene/instr_info", ['engine', 'name'], [i])
             #markup += '<b>Instrument %d:</b> engine %s, name %s\n' % (i, attribs.engine, attribs.name)
             b = gtk.VBox(spacing = 5)

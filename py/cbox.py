@@ -295,10 +295,9 @@ class DocLayer(DocObj):
         DocObj.__init__(self, uuid, ["name", "instrument_name", "instrument_uuid", "=enable", "=low_note", "=high_note", "=fixed_note", "=in_channel", "=out_channel", "=aftertouch", "=invert_sustain", "=consume", "=ignore_scene_transpose", "=transpose"])
 Document.classmap['cbox_layer'] = DocLayer
 
-#XXXKF not DOMified yet on C side
 class DocInstrument(DocObj):
     def __init__(self, uuid):
-        DocObj.__init__(self, uuid, ["name"])
+        DocObj.__init__(self, uuid, ["name", "outputs", "aux_offset"])
 Document.classmap['cbox_instrument'] = DocInstrument
 
 class DocScene(DocObj):
