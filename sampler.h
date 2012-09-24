@@ -86,6 +86,7 @@ struct sampler_layer
     int min_note, max_note, root_note;
     int min_vel, max_vel;
     int transpose;
+    int seq_pos, seq_length;
     float cutoff, resonance, fileg_depth, pitcheg_depth;
     struct cbox_dahdsr amp_env, filter_env, pitch_env;
     struct cbox_envelope_shape amp_env_shape, filter_env_shape, pitch_env_shape;

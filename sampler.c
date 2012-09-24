@@ -297,7 +297,13 @@ int skip_inactive_layers(struct sampler_program *prg, int first, int note, int v
         struct sampler_layer *l = prg->layers[first];
         if (note >= l->min_note && note <= l->max_note && vel >= l->min_vel && vel <= l->max_vel)
         {
-            return first;
+            // note that the positions in memory are 0-based
+            gboolean play = !l->seq_pos;
+            l->seq_pos++;
+            if (l->seq_pos >= l->seq_length)
+                l->seq_pos = 0;
+            if (play)
+                return first;
         }
         first++;
     }
@@ -948,6 +954,8 @@ void sampler_layer_init(struct sampler_layer *l)
     l->resonance = 0.707;
     l->fileg_depth = 0;
     l->pitcheg_depth = 0;
+    l->seq_pos = 0;
+    l->seq_length = 1;
     cbox_dahdsr_init(&l->filter_env);
     cbox_dahdsr_init(&l->pitch_env);
     cbox_dahdsr_init(&l->amp_env);
@@ -1043,6 +1051,8 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->max_note = cbox_config_get_note(cfg_section, "high_note", l->max_note);
     l->min_vel = cbox_config_get_int(cfg_section, "low_vel", l->min_vel);
     l->max_vel = cbox_config_get_int(cfg_section, "high_vel", l->max_vel);
+    l->seq_pos = cbox_config_get_int(cfg_section, "seq_position", l->seq_pos + 1) - 1;
+    l->seq_length = cbox_config_get_int(cfg_section, "seq_length", l->seq_length);
     l->transpose = cbox_config_get_int(cfg_section, "transpose", l->transpose);
     l->tune = cbox_config_get_float(cfg_section, "tune", l->tune);
     cbox_config_get_dahdsr(cfg_section, "amp", &l->amp_env);

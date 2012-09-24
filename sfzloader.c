@@ -142,6 +142,10 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->note_scaling = atof(value);
     else if (!strcmp(key, "key"))
         l->min_note = l->max_note = l->root_note = note_from_string(value);
+    else if (!strcmp(key, "seq_position"))
+        l->seq_pos = atoi(value) - 1;
+    else if (!strcmp(key, "seq_length"))
+        l->seq_length = atoi(value);
     else if (!strcmp(key, "lovel") || !strcmp(key, "lolev"))
         l->min_vel = atoi(value);
     else if (!strcmp(key, "hivel") || !strcmp(key, "hilev"))
