@@ -305,7 +305,8 @@ int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c,
             if (!l->use_keyswitch || 
                 ((l->sw_last == -1 || l->sw_last == l->last_key) &&
                  (l->sw_down == -1 || (c->switchmask[l->sw_down >> 5] & (1 << (l->sw_down & 31)))) &&
-                 (l->sw_up == -1 || !(c->switchmask[l->sw_up >> 5] & (1 << (l->sw_up & 31))))))
+                 (l->sw_up == -1 || !(c->switchmask[l->sw_up >> 5] & (1 << (l->sw_up & 31)))) &&
+                 (l->sw_previous == -1 || l->sw_previous == c->previous_note)))
             {
                 // note that the positions in memory are 0-based
                 gboolean play = !l->seq_pos;
@@ -340,7 +341,10 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
     struct sampler_layer **pl = prg->layers;
     int lidx = skip_inactive_layers(prg, c, 0, note, vel);
     if (lidx < 0)
+    {
+        c->previous_note = note;
         return;
+    }
     
     // this might perhaps be optimized by mapping the group identifiers to flat-array indexes
     // but I'm not going to do that until someone gives me an SFZ worth doing that work ;)
@@ -437,6 +441,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                 break;
         }
     }
+    c->previous_note = note;
     if (exgroupcount)
     {
         for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
@@ -906,6 +911,7 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->modulation = 0;
     c->cutoff_ctl = 0;
     c->resonance_ctl = 0;
+    c->previous_note = -1;
     c->program = m->program_count ? m->programs[0] : NULL;
     memset(c->switchmask, 0, sizeof(c->switchmask));
 }
@@ -976,6 +982,7 @@ void sampler_layer_init(struct sampler_layer *l)
     l->sw_last = -1;
     l->sw_down = -1;
     l->sw_up = -1;
+    l->sw_previous = -1;
     l->last_key = 0;
     cbox_dahdsr_init(&l->filter_env);
     cbox_dahdsr_init(&l->pitch_env);
@@ -1052,7 +1059,7 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
         }
         start = i;
     }
-    l->use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1));
+    l->use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
     l->last_key = l->sw_lokey;
 }
 
@@ -1077,6 +1084,7 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->sw_last = cbox_config_get_note(cfg_section, "sw_last", l->sw_last);
     l->sw_down = cbox_config_get_note(cfg_section, "sw_down", l->sw_down);
     l->sw_up = cbox_config_get_note(cfg_section, "sw_up", l->sw_up);
+    l->sw_previous = cbox_config_get_note(cfg_section, "sw_previous", l->sw_previous);
     l->min_vel = cbox_config_get_int(cfg_section, "low_vel", l->min_vel);
     l->max_vel = cbox_config_get_int(cfg_section, "high_vel", l->max_vel);
     l->seq_pos = cbox_config_get_int(cfg_section, "seq_position", l->seq_pos + 1) - 1;

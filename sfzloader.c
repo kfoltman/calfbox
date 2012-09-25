@@ -180,6 +180,7 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else SFZ_NOTE_ATTRIB(sw_down)
     else SFZ_NOTE_ATTRIB(sw_up)
     else SFZ_NOTE_ATTRIB(sw_last)
+    else SFZ_NOTE_ATTRIB(sw_previous)
     else if (!strcmp(key, "lovel") || !strcmp(key, "lolev"))
         l->min_vel = atoi(value);
     else if (!strcmp(key, "hivel") || !strcmp(key, "hilev"))
