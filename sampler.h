@@ -87,6 +87,8 @@ struct sampler_layer
     int min_vel, max_vel;
     int transpose;
     int seq_pos, seq_length;
+    int use_keyswitch, sw_lokey, sw_hikey;
+    int sw_last, sw_down, sw_up, last_key;
     float cutoff, resonance, fileg_depth, pitcheg_depth;
     struct cbox_dahdsr amp_env, filter_env, pitch_env;
     struct cbox_envelope_shape amp_env_shape, filter_env_shape, pitch_env_shape;
@@ -118,6 +120,7 @@ struct sampler_channel
     float pbrange;
     int sustain, sostenuto;
     int volume, pan, expression, modulation, cutoff_ctl, resonance_ctl;
+    uint32_t switchmask[4];
     struct sampler_program *program;
 };
 

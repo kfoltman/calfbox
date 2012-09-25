@@ -290,20 +290,31 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
     return CBOX_BLOCK_SIZE;
 }
 
-int skip_inactive_layers(struct sampler_program *prg, int first, int note, int vel)
+int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c, int first, int note, int vel)
 {
     while(first < prg->layer_count)
     {
         struct sampler_layer *l = prg->layers[first];
+        if (l->sw_last != -1)
+        {
+            if (note >= l->sw_lokey && note <= l->sw_hikey)
+                l->last_key = note;
+        }
         if (note >= l->min_note && note <= l->max_note && vel >= l->min_vel && vel <= l->max_vel)
         {
-            // note that the positions in memory are 0-based
-            gboolean play = !l->seq_pos;
-            l->seq_pos++;
-            if (l->seq_pos >= l->seq_length)
-                l->seq_pos = 0;
-            if (play)
-                return first;
+            if (!l->use_keyswitch || 
+                ((l->sw_last == -1 || l->sw_last == l->last_key) &&
+                 (l->sw_down == -1 || (c->switchmask[l->sw_down >> 5] & (1 << (l->sw_down & 31)))) &&
+                 (l->sw_up == -1 || !(c->switchmask[l->sw_up >> 5] & (1 << (l->sw_up & 31))))))
+            {
+                // note that the positions in memory are 0-based
+                gboolean play = !l->seq_pos;
+                l->seq_pos++;
+                if (l->seq_pos >= l->seq_length)
+                    l->seq_pos = 0;
+                if (play)
+                    return first;
+            }
         }
         first++;
     }
@@ -322,11 +333,12 @@ static void sampler_voice_release(struct sampler_voice *v);
 
 void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
 {
+    c->switchmask[note >> 5] |= 1 << (note & 31);
     struct sampler_program *prg = c->program;
     if (!prg)
         return;
     struct sampler_layer **pl = prg->layers;
-    int lidx = skip_inactive_layers(prg, 0, note, vel);
+    int lidx = skip_inactive_layers(prg, c, 0, note, vel);
     if (lidx < 0)
         return;
     
@@ -420,7 +432,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             cbox_envelope_reset(&v->amp_env);
             cbox_envelope_reset(&v->filter_env);
             cbox_envelope_reset(&v->pitch_env);
-            lidx = skip_inactive_layers(prg, lidx + 1, note, vel);
+            lidx = skip_inactive_layers(prg, c, lidx + 1, note, vel);
             if (lidx < 0)
                 break;
         }
@@ -461,6 +473,7 @@ void sampler_voice_release(struct sampler_voice *v)
 
 void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
 {
+    c->switchmask[note >> 5] &= ~(1 << (note & 31));
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
@@ -894,6 +907,7 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->cutoff_ctl = 0;
     c->resonance_ctl = 0;
     c->program = m->program_count ? m->programs[0] : NULL;
+    memset(c->switchmask, 0, sizeof(c->switchmask));
 }
 
 static void cbox_config_get_dahdsr(const char *cfg_section, const char *prefix, struct cbox_dahdsr *env)
@@ -956,6 +970,13 @@ void sampler_layer_init(struct sampler_layer *l)
     l->pitcheg_depth = 0;
     l->seq_pos = 0;
     l->seq_length = 1;
+    l->use_keyswitch = 0;
+    l->sw_lokey = 0;
+    l->sw_hikey = 127;
+    l->sw_last = -1;
+    l->sw_down = -1;
+    l->sw_up = -1;
+    l->last_key = 0;
     cbox_dahdsr_init(&l->filter_env);
     cbox_dahdsr_init(&l->pitch_env);
     cbox_dahdsr_init(&l->amp_env);
@@ -1031,6 +1052,8 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
         }
         start = i;
     }
+    l->use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1));
+    l->last_key = l->sw_lokey;
 }
 
 void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section)
@@ -1049,6 +1072,11 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->root_note = cbox_config_get_int(cfg_section, "root_note", l->root_note);
     l->min_note = cbox_config_get_note(cfg_section, "low_note", l->min_note);
     l->max_note = cbox_config_get_note(cfg_section, "high_note", l->max_note);
+    l->sw_lokey = cbox_config_get_note(cfg_section, "sw_lokey", l->sw_lokey);
+    l->sw_hikey = cbox_config_get_note(cfg_section, "sw_hikey", l->sw_hikey);
+    l->sw_last = cbox_config_get_note(cfg_section, "sw_last", l->sw_last);
+    l->sw_down = cbox_config_get_note(cfg_section, "sw_down", l->sw_down);
+    l->sw_up = cbox_config_get_note(cfg_section, "sw_up", l->sw_up);
     l->min_vel = cbox_config_get_int(cfg_section, "low_vel", l->min_vel);
     l->max_vel = cbox_config_get_int(cfg_section, "high_vel", l->max_vel);
     l->seq_pos = cbox_config_get_int(cfg_section, "seq_position", l->seq_pos + 1) - 1;

@@ -98,6 +98,33 @@ static gboolean parse_envelope_param(struct cbox_dahdsr *env, const char *key, c
     return TRUE;
 }
 
+static int sfz_note_from_string(const char *note)
+{
+    static const int semis[] = {9, 11, 0, 2, 4, 5, 7};
+    int pos;
+    int nn = tolower(note[0]);
+    int nv;
+    if (nn >= '0' && nn <= '9')
+        return atoi(note);
+    if (nn < 'a' && nn > 'g')
+        return -1;
+    nv = semis[nn - 'a'];
+    
+    for (pos = 1; tolower(note[pos]) == 'b' || note[pos] == '#'; pos++)
+        nv += (note[pos] != '#') ? -1 : +1;
+    
+    if ((note[pos] == '-' && note[pos + 1] == '1' && note[pos + 2] == '\0') || (note[pos] >= '0' && note[pos] <= '9' && note[pos + 1] == '\0'))
+    {
+        return nv + 12 * (1 + atoi(note + pos));
+    }
+    
+    return -1;
+}
+
+#define SFZ_NOTE_ATTRIB(name) \
+    if (!strcmp(key, #name)) \
+        l->name = sfz_note_from_string(value);
+
 static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char *key, const char *value)
 {
     struct sfz_load_state *ls = client->user_data;
@@ -133,19 +160,26 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
             l->loop_end = l->sample_end;
     }
     else if (!strcmp(key, "lokey"))
-        l->min_note = note_from_string(value);
+        l->min_note = sfz_note_from_string(value);
     else if (!strcmp(key, "hikey"))
-        l->max_note = note_from_string(value);
+        l->max_note = sfz_note_from_string(value);
     else if (!strcmp(key, "pitch_keycenter"))
-        l->root_note = note_from_string(value);
+        l->root_note = sfz_note_from_string(value);
     else if (!strcmp(key, "pitch_keytrack"))
         l->note_scaling = atof(value);
     else if (!strcmp(key, "key"))
-        l->min_note = l->max_note = l->root_note = note_from_string(value);
+        l->min_note = l->max_note = l->root_note = sfz_note_from_string(value);
     else if (!strcmp(key, "seq_position"))
         l->seq_pos = atoi(value) - 1;
     else if (!strcmp(key, "seq_length"))
         l->seq_length = atoi(value);
+    else if (!strcmp(key, "seq_length"))
+        l->seq_length = atoi(value);
+    else SFZ_NOTE_ATTRIB(sw_lokey)
+    else SFZ_NOTE_ATTRIB(sw_hikey)
+    else SFZ_NOTE_ATTRIB(sw_down)
+    else SFZ_NOTE_ATTRIB(sw_up)
+    else SFZ_NOTE_ATTRIB(sw_last)
     else if (!strcmp(key, "lovel") || !strcmp(key, "lolev"))
         l->min_vel = atoi(value);
     else if (!strcmp(key, "hivel") || !strcmp(key, "hilev"))
