@@ -79,7 +79,8 @@ gboolean cbox_layer_load(struct cbox_layer *layer, const char *name, GError **er
     return 1;
 
 error:
-    cbox_instrument_destroy_if_unused(instr);
+    if (instr)
+        cbox_instrument_destroy_if_unused(instr);
 
     g_free(section);
     return 0;
