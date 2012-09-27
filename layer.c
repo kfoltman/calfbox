@@ -102,7 +102,7 @@ static gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cb
 static void cbox_layer_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_layer *layer = CBOX_H2O(objhdr);
-    if (!--(layer->instrument->refcount))
+    if (layer->instrument && !--(layer->instrument->refcount))
     {
         if (layer->instrument->scene)
             cbox_scene_remove_instrument(layer->instrument->scene, layer->instrument);
