@@ -50,6 +50,36 @@ class TestCbox(unittest.TestCase):
         self.verify_uuid(aux.uuid, "cbox_aux_bus", "/scene/aux/piano_reverb")
         scene.delete_aux("piano_reverb")
 
+    def test_aux_scene(self):
+        scene = Document.new_scene(44100, 1024)
+        scene.add_instrument_layer("default")
+        scene_status = scene.status()
+        layer = scene_status.layers[0]
+        self.verify_uuid(scene.uuid, "cbox_scene")
+        self.verify_uuid(layer.uuid, "cbox_layer", scene.make_path("/layer/1"))
+
+        layers = scene.status().layers
+        self.assertEquals(len(layers), 1)
+        self.assertEquals(layers[0].uuid, layer.uuid)
+        layers[0].set_consume(0)
+        self.assertEquals(layers[0].status().consume, 0)
+        layers[0].set_consume(1)
+        self.assertEquals(layers[0].status().consume, 1)
+        layers[0].set_enable(0)
+        self.assertEquals(layers[0].status().enable, 0)
+        layers[0].set_enable(1)
+        self.assertEquals(layers[0].status().enable, 1)
+        
+        layer_status = layers[0].status()
+        instr_uuid = layer_status.instrument_uuid
+        iname = layer_status.instrument_name
+        self.verify_uuid(instr_uuid, "cbox_instrument", scene.make_path("/instr/%s" % iname))
+        
+        aux = scene.load_aux("piano_reverb")
+        module = aux.get_slot_engine()
+        self.verify_uuid(aux.uuid, "cbox_aux_bus", scene.make_path("/aux/piano_reverb"))
+        scene.delete_aux("piano_reverb")
+
     def test_rt(self):
         rt = Document.get_rt()
         self.assertEquals(cbox.GetThings(Document.uuid_cmd(rt.uuid, "/status"), ['uuid'], []).uuid, rt.uuid)

@@ -105,10 +105,10 @@ struct cbox_module_manifest *cbox_module_manifest_get_by_name(const char *name)
     return NULL;
 }
 
-struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, struct cbox_rt *rt, const char *instance_name, GError **error)
+struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manifest *manifest, const char *cfg_section, struct cbox_document *doc, struct cbox_rt *rt, const char *instance_name, GError **error)
 {
     g_clear_error(error);
-    struct cbox_module *module = manifest->create(manifest->user_data, cfg_section, rt, error);
+    struct cbox_module *module = manifest->create(manifest->user_data, cfg_section, doc, rt, error);
     if (!module)
         return NULL;
 
@@ -121,9 +121,9 @@ struct cbox_module *cbox_module_manifest_create_module(struct cbox_module_manife
     return module;
 }
 
-void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler, void (*destroy)(struct cbox_module *module))
+void cbox_module_init(struct cbox_module *module, struct cbox_document *doc, struct cbox_rt *rt, void *user_data, int inputs, int outputs, cbox_process_cmd cmd_handler, void (*destroy)(struct cbox_module *module))
 {
-    CBOX_OBJECT_HEADER_INIT(module, cbox_module, CBOX_GET_DOCUMENT(rt));
+    CBOX_OBJECT_HEADER_INIT(module, cbox_module, doc);
     module->user_data = user_data;
     module->rt = rt;
     module->instance_name = NULL;
@@ -142,7 +142,7 @@ void cbox_module_init(struct cbox_module *module, struct cbox_rt *rt, void *user
     CBOX_OBJECT_REGISTER(module);
 }
 
-struct cbox_module *cbox_module_new_from_fx_preset(const char *name, struct cbox_rt *rt, GError **error)
+struct cbox_module *cbox_module_new_from_fx_preset(const char *name, struct cbox_document *doc, struct cbox_rt *rt, GError **error)
 {
     gchar *section = g_strdup_printf("fxpreset:%s", name);
     const char *engine;
@@ -166,7 +166,7 @@ struct cbox_module *cbox_module_new_from_fx_preset(const char *name, struct cbox
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "FX preset '%s' refers to non-existing engine '%s'", name, engine);
         goto fxpreset_error;
     }
-    effect = cbox_module_manifest_create_module(mptr, section, rt, name, error);
+    effect = cbox_module_manifest_create_module(mptr, section, doc, rt, name, error);
     if (!effect)
     {
         cbox_force_error(error);
@@ -181,7 +181,9 @@ fxpreset_error:
     return NULL;
 }
 
-gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, struct cbox_rt *rt, GError **error)
+gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, 
+        struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd,
+        struct cbox_document *doc, struct cbox_rt *rt, GError **error)
 {
     struct cbox_module *sm = *psm;
     if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
@@ -196,7 +198,7 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
     }
     if (!strcmp(subcmd, "/insert_preset") && !strcmp(cmd->arg_types, "s"))
     {
-        struct cbox_module *effect = cbox_module_new_from_fx_preset(CBOX_ARG_S(cmd, 0), rt, error);
+        struct cbox_module *effect = cbox_module_new_from_fx_preset(CBOX_ARG_S(cmd, 0), doc, rt, error);
         if (!effect)
             return FALSE;
         cbox_rt_swap_pointers(rt, (void **)psm, effect);
@@ -213,7 +215,7 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm, struct cbox_comm
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No effect engine '%s'", CBOX_ARG_S(cmd, 0));
                 return FALSE;
             }
-            effect = cbox_module_manifest_create_module(manifest, NULL, rt, "unnamed", error);
+            effect = cbox_module_manifest_create_module(manifest, NULL, doc, rt, "unnamed", error);
             if (!effect)
                 return FALSE;
         }

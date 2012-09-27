@@ -87,7 +87,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
     {
         if (!subcommand)
             return FALSE;
-        return cbox_module_slot_process_cmd(&m->modules[index - 1], fb, cmd, subcommand, m->module.rt, error);
+        return cbox_module_slot_process_cmd(&m->modules[index - 1], fb, cmd, subcommand, CBOX_GET_DOCUMENT(&m->module), m->module.rt, error);
     }
     else if (!strcmp(cmd->command, "/insert") && !strcmp(cmd->arg_types, "i"))
     {
@@ -167,7 +167,7 @@ static void fxchain_destroyfunc(struct cbox_module *module)
     }
 }
 
-struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, struct cbox_rt *rt, GError **error)
+MODULE_CREATE_FUNCTION(fxchain)
 {
     static int inited = 0;
     if (!inited)
@@ -206,7 +206,7 @@ struct cbox_module *fxchain_create(void *user_data, const char *cfg_section, str
         gchar *name = g_strdup_printf("effect%d", i + 1);
         const char *fx_preset_name = cbox_config_get_string(cfg_section, name);
         g_free(name);
-        m->modules[i] = cbox_module_new_from_fx_preset(fx_preset_name, rt, error);
+        m->modules[i] = cbox_module_new_from_fx_preset(fx_preset_name, doc, rt, error);
         if (!m->modules[i])
             goto failed;
     }

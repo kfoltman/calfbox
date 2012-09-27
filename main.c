@@ -246,7 +246,7 @@ int main(int argc, char *argv[])
     if (scene_name)
     {
         app.current_scene_name = g_strdup_printf("scene:%s", scene_name);
-        scene = cbox_scene_new(app.document);
+        scene = cbox_scene_new(app.document, app.rt, FALSE);
         if (!scene)
             goto fail;
         if (!cbox_scene_load(scene, scene_name, &error))
@@ -255,7 +255,7 @@ int main(int argc, char *argv[])
     else
     {
         app.current_scene_name = g_strdup_printf("instrument:%s", instrument_name);
-        scene = cbox_scene_new(app.document);
+        scene = cbox_scene_new(app.document, app.rt, FALSE);
         if (!scene)
             goto fail;
         layer = cbox_layer_new_with_instrument(scene, instrument_name, &error);
@@ -271,7 +271,7 @@ int main(int argc, char *argv[])
     
     if (effect_preset_name && *effect_preset_name)
     {
-        app.rt->effect = cbox_module_new_from_fx_preset(effect_preset_name, app.rt, &error);
+        app.rt->effect = cbox_module_new_from_fx_preset(effect_preset_name, app.document, app.rt, &error);
         if (!app.rt->effect)
             goto fail;
     }

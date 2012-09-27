@@ -63,34 +63,28 @@ void switch_scene(struct cbox_menu_item_command *item, struct cbox_scene *new_sc
 int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = cbox_scene_new(app.document);
-    if (scene && cbox_scene_load(scene, item->item.item_context, &error))
-        switch_scene(item, scene, "scene");
-    else {
-        if (scene)
-            CBOX_DELETE(scene);
+    struct cbox_scene *scene = app.rt->scene;
+    cbox_scene_clear(scene);
+    if (!cbox_scene_load(scene, item->item.item_context, &error))
         cbox_print_error(error);
-    }
     return 0;
 }
 
 int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = cbox_scene_new(app.document);
+    struct cbox_scene *scene = app.rt->scene;
+    cbox_scene_clear(scene);
     struct cbox_layer *layer = cbox_layer_new_with_instrument(scene, (char *)item->item.item_context, &error);
     
     if (layer)
     {
         if (!cbox_scene_add_layer(scene, layer, &error))
             cbox_print_error(error);
-        else
-            switch_scene(item, scene, "instrument");
     }
     else
     {
         cbox_print_error(error);
-        CBOX_DELETE(scene);
     }
     return 0;
 }
@@ -98,7 +92,8 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = cbox_scene_new(app.document);
+    struct cbox_scene *scene = app.rt->scene;
+    cbox_scene_clear(scene);
     struct cbox_layer *layer = cbox_layer_new_from_config(scene, (char *)item->item.item_context, &error);
     
     if (layer)
@@ -126,12 +121,12 @@ gchar *transport_format_value(const struct cbox_menu_item_static *item, void *co
     // XXXKF
     // struct cbox_bbt bbt;
     // cbox_master_to_bbt(app.rt->master, &bbt);
-    if (app.rt->master->spb == NULL)
+    if (app.rt->scene->spb == NULL)
         return g_strdup("N/A");
     if (!strcmp((const char *)item->item.item_context, "pos"))
-        return g_strdup_printf("%d", (int)app.rt->master->spb->song_pos_samples);
+        return g_strdup_printf("%d", (int)app.rt->scene->spb->song_pos_samples);
     else
-        return g_strdup_printf("%d", (int)app.rt->master->spb->song_pos_ppqn);
+        return g_strdup_printf("%d", (int)app.rt->scene->spb->song_pos_ppqn);
 }
 
 struct cbox_config_section_cb_data
@@ -509,6 +504,18 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             return FALSE;
 
         struct cbox_recorder *rec = cbox_recorder_new_stream(app.rt, CBOX_ARG_S(cmd, 0));
+
+        return cbox_execute_on(fb, NULL, "/uuid", "o", error, rec);
+    }
+    else
+    if (!strcmp(obj, "new_scene") && !strcmp(cmd->arg_types, "ii"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        struct cbox_rt *rt = cbox_rt_new(app.document);
+        cbox_rt_set_offline(rt, CBOX_ARG_I(cmd, 0), CBOX_ARG_I(cmd, 1));
+        struct cbox_scene *rec = cbox_scene_new(app.document, rt, TRUE);
 
         return cbox_execute_on(fb, NULL, "/uuid", "o", error, rec);
     }

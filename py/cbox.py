@@ -147,6 +147,11 @@ class Document:
     def get_rt():
         return Document.map_uuid(Document.get_uuid("/rt"))
     @staticmethod
+    def new_scene(srate, bufsize):
+        fb = GetUUID()
+        do_cmd("/new_scene", fb, [int(srate), int(bufsize)])
+        return Document.map_uuid(fb.uuid)
+    @staticmethod
     def map_uuid(uuid):
         if uuid in Document.objmap:
             return Document.objmap[uuid]
@@ -187,6 +192,9 @@ class DocObj(object):
         
     def get_things(self, cmd, fields, *args):
         return GetThings.by_uuid(self.uuid, cmd, fields, list(args))
+        
+    def make_path(self, path):
+        return Document.uuid_cmd(self.uuid, path)
 
     def status(self):
         return self.transform_status(self.get_things("/status", self.status_fields))

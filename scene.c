@@ -243,7 +243,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        if (s->rt->io)
+        if (s->rt && s->rt->io)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot use render function in real-time mode.");
             return FALSE;
@@ -259,8 +259,8 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             buffers[0][i] = 0.f;
             buffers[1][i] = 0.f;
         }
-        if (s->rt->master->spb)
-            cbox_song_playback_render(s->rt->master->spb, &midibuf_song, nframes);
+        if (s->spb)
+            cbox_song_playback_render(s->spb, &midibuf_song, nframes);
         cbox_scene_render(s, nframes, &midibuf_song, buffers);
         for (int i = 0; i < nframes; i++)
         {
@@ -751,7 +751,7 @@ extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_sce
     
     // cbox_module_manifest_dump(mptr);
     
-    module = cbox_module_manifest_create_module(mptr, instr_section, scene->rt, name, error);
+    module = cbox_module_manifest_create_module(mptr, instr_section, doc, scene->rt, name, error);
     if (!module)
     {
         cbox_force_error(error);
@@ -780,7 +780,7 @@ extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_sce
         
         if (cv)
         {
-            oobj->insert = cbox_module_new_from_fx_preset(cv, module->rt, error);
+            oobj->insert = cbox_module_new_from_fx_preset(cv, CBOX_GET_DOCUMENT(scene), module->rt, error);
             if (!oobj->insert)
             {
                 cbox_force_error(error);
@@ -839,14 +839,14 @@ static void destroy_rec_sources(struct cbox_recording_source *s, int count)
         cbox_recording_source_uninit(&s[i]);
 }
 
-struct cbox_scene *cbox_scene_new(struct cbox_document *document)
+struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_rt *rt, int owns_rt)
 {
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
     if (!s)
         return NULL;
 
     CBOX_OBJECT_HEADER_INIT(s, cbox_scene, document);
-    s->rt = (struct cbox_rt *)cbox_document_get_service(document, "rt");
+    s->rt = rt;
     s->instrument_hash = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     s->name = g_strdup("");
     s->title = g_strdup("");
@@ -858,6 +858,8 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document)
     s->aux_bus_count = 0;
     cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
     s->transpose = 0;
+    s->owns_rt = owns_rt;
+    s->spb = NULL;
 
     if (s->rt && s->rt->io)
     {
@@ -898,5 +900,7 @@ static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
         destroy_rec_sources(scene->rec_mono_outputs, io->output_count);
         destroy_rec_sources(scene->rec_stereo_outputs, io->output_count / 2);
     }
+    if (scene->owns_rt && scene->rt)
+        CBOX_DELETE(scene->rt);
     free(scene);
 }
