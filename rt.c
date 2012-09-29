@@ -318,18 +318,19 @@ static int set_song_command_execute(void *user_data)
 {
     struct set_song_command *cmd = user_data;
     
-    if (cmd->rt->scene->spb &&
+    if (cmd->rt->scene && cmd->rt->scene->spb &&
         cbox_song_playback_active_notes_release(cmd->rt->scene->spb, &cmd->rt->midibuf_aux) < 0)
         return 0;
-    cmd->old_song = cmd->rt->scene->spb;
-    cmd->rt->scene->spb = cmd->new_song;
+    cmd->old_song = cmd->rt->master->spb;
+    if (cmd->rt->scene)
+        cmd->rt->scene->spb = cmd->new_song;
     cmd->rt->master->spb = cmd->new_song;
     if (cmd->new_song)
     {
         if (cmd->new_time_ppqn == -1)
-            cbox_song_playback_seek_samples(cmd->rt->scene->spb, cmd->old_song ? cmd->old_song->song_pos_samples : 0);
+            cbox_song_playback_seek_samples(cmd->rt->master->spb, cmd->old_song ? cmd->old_song->song_pos_samples : 0);
         else
-            cbox_song_playback_seek_ppqn(cmd->rt->scene->spb, cmd->new_time_ppqn, FALSE);
+            cbox_song_playback_seek_ppqn(cmd->rt->master->spb, cmd->new_time_ppqn, FALSE);
     }
     
     return 1;
