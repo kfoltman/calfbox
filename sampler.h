@@ -66,6 +66,48 @@ enum sampler_filter_type
     sft_hp6,
 };
 
+enum sampler_modsrc
+{
+    smsrc_cc0 = 0,
+    smsrc_chanaft = 120,
+
+    // those are per-note, not per-channel
+    smsrc_vel,
+    smsrc_polyaft,
+    smsrc_pitchenv,
+    smsrc_filenv,
+    smsrc_ampenv,
+    smsrc_pitchlfo,
+    smsrc_fillfo,
+    smsrc_amplfo,
+    smsrc_none,
+    
+    smsrccount,
+    smsrc_perchan_offset = 0,
+    smsrc_perchan_count = smsrc_vel,
+    smsrc_pernote_offset = smsrc_vel,
+    smsrc_pernote_count = smsrccount - smsrc_pernote_offset,
+};
+
+enum sampler_moddest
+{
+    smdest_gain,
+    smdest_pitch,
+    smdest_cutoff,
+    smdest_resonance,
+    
+    smdestcount
+};
+
+struct sampler_modulation
+{
+    enum sampler_modsrc src;
+    enum sampler_modsrc src2;
+    enum sampler_moddest dest;
+    float amount;
+    int flags;
+};
+
 struct sampler_layer
 {
     enum sample_player_type mode;
@@ -99,11 +141,13 @@ struct sampler_layer
     int send1bus, send2bus;
     float send1gain, send2gain;
     
-    float amp_lfo_freq, amp_lfo_depth;
-    float filter_lfo_freq, filter_lfo_depth;
-    float pitch_lfo_freq, pitch_lfo_depth;
+    float amp_lfo_freq;
+    float filter_lfo_freq;
+    float pitch_lfo_freq;
     
     int output_pair_no;
+    
+    GSList *modulations;
 };
 
 struct sampler_program
@@ -118,17 +162,15 @@ struct sampler_channel
 {
     float pitchbend;
     float pbrange;
-    int sustain, sostenuto;
-    int volume, pan, expression, modulation, cutoff_ctl, resonance_ctl;
     uint32_t switchmask[4];
     int previous_note;
+    uint8_t cc[smsrc_perchan_count];
     struct sampler_program *program;
 };
 
 struct sampler_lfo
 {
     uint32_t phase, delta;
-    float depth;
 };
 
 struct sampler_voice
@@ -178,7 +220,10 @@ struct sampler_module
 
 extern void sampler_layer_init(struct sampler_layer *l);
 extern void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform);
+extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags);
+extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section);
+extern void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src);
 extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
 extern GQuark cbox_sampler_error_quark();
 

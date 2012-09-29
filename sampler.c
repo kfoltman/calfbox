@@ -322,11 +322,10 @@ int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c,
     return -1;
 }
 
-static void lfo_init(struct sampler_lfo *lfo, float freq, float depth, int srate)
+static void lfo_init(struct sampler_lfo *lfo, float freq, int srate)
 {
     lfo->phase = 0;
     lfo->delta = (uint32_t)(freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE / srate);
-    lfo->depth = depth;
 }
 
 
@@ -394,8 +393,6 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             else
                 v->cutoff = -1;
             v->resonance = l->resonance;
-            v->pitcheg_depth = l->pitcheg_depth;
-            v->fileg_depth = l->fileg_depth;
             v->loop_mode = l->loop_mode;
             v->off_by = l->off_by;
             int auxes = (m->module.outputs - m->module.aux_offset) / 2;
@@ -425,9 +422,9 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                     exgroups[exgroupcount++] = l->exclusive_group;
                 }
             }
-            lfo_init(&v->amp_lfo, l->amp_lfo_freq, l->amp_lfo_depth, m->module.srate);
-            lfo_init(&v->filter_lfo, l->filter_lfo_freq, l->filter_lfo_depth, m->module.srate);
-            lfo_init(&v->pitch_lfo, l->pitch_lfo_freq, l->pitch_lfo_depth, m->module.srate);
+            lfo_init(&v->amp_lfo, l->amp_lfo_freq, m->module.srate);
+            lfo_init(&v->filter_lfo, l->filter_lfo_freq, m->module.srate);
+            lfo_init(&v->pitch_lfo, l->pitch_lfo_freq, m->module.srate);
             
             cbox_biquadf_reset(&v->filter_left);
             cbox_biquadf_reset(&v->filter_right);
@@ -486,7 +483,7 @@ void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int 
         {
             if (v->captured_sostenuto)
                 v->released_with_sostenuto = 1;
-            else if (c->sustain)
+            else if (c->cc[64] >= 64)
                 v->released_with_sustain = 1;
             else
                 sampler_voice_release(v);
@@ -593,12 +590,10 @@ static inline float lfo_run(struct sampler_lfo *lfo)
 {
     const int FRAC_BITS = 32 - 11;
     lfo->phase += lfo->delta;
-    if (lfo->depth == 0)
-        return 0;
     uint32_t iphase = lfo->phase >> FRAC_BITS;
     float frac = (lfo->phase & ((1 << FRAC_BITS) - 1)) * (1.0 / (1 << FRAC_BITS));
     float v = sine_wave[iphase] + (sine_wave[iphase + 1] - sine_wave[iphase]) * frac;
-    return v * lfo->depth;
+    return v;
 }
 
 static inline float clip01(float v)
@@ -637,6 +632,11 @@ static gboolean is_tail_finished(struct sampler_voice *v)
     return TRUE;
 }
 
+static inline int addcc(struct sampler_channel *c, int cc_no)
+{
+    return (((int)c->cc[cc_no]) << 7) + c->cc[cc_no + 32];
+}
+
 void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct sampler_module *m = (struct sampler_module *)module;
@@ -662,13 +662,17 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             vcount++;
             struct sampler_channel *c = v->channel;
             
-            float amp_lfo = lfo_run(&v->amp_lfo);
-            float filter_lfo = lfo_run(&v->filter_lfo);
-            float pitch_lfo = lfo_run(&v->pitch_lfo);
+            float modsrcs[smsrc_pernote_count];
+            modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel;
+            modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0; // XXXKF not supported yet
+            modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released);
+            modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released);
+            modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->amp_env, v->released);
+
+            modsrcs[smsrc_amplfo - smsrc_pernote_offset] = lfo_run(&v->amp_lfo);
+            modsrcs[smsrc_fillfo - smsrc_pernote_offset] = lfo_run(&v->filter_lfo);
+            modsrcs[smsrc_pitchlfo - smsrc_pernote_offset] = lfo_run(&v->pitch_lfo);
             
-            float amp_env = cbox_envelope_get_next(&v->amp_env, v->released);
-            float filter_env = cbox_envelope_get_next(&v->filter_env, v->released);
-            float pitch_env = cbox_envelope_get_next(&v->pitch_env, v->released);
             if (v->amp_env.cur_stage < 0)
             {
                 if (v->cutoff == -1 || 
@@ -679,17 +683,46 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 }
             }            
             
+            float moddests[smdestcount];
+            moddests[smdest_gain] = 0;
+            moddests[smdest_pitch] = c->pitchbend;
+            moddests[smdest_cutoff] = 0;
+            moddests[smdest_resonance] = 0;
+            GSList *mod = v->layer->modulations;
+            static const int modoffset[4] = {0, -1, -1, 1 };
+            static const int modscale[4] = {1, 1, 2, -2 };
+            while(mod)
+            {
+                struct sampler_modulation *sm = mod->data;
+                float value = 0.f, value2 = 1.f;
+                if (sm->src < smsrc_pernote_offset)
+                    value = c->cc[sm->src]  / 127.0;
+                else
+                    value = modsrcs[sm->src - smsrc_pernote_offset];
+                value = modoffset[sm->flags & 3] + value * modscale[sm->flags & 3];
+
+                if (sm->src2 != smsrc_none)
+                {
+                    if (sm->src2 < smsrc_pernote_offset)
+                        value2 = c->cc[sm->src2] / 127.0;
+                    else
+                        value2 = modsrcs[sm->src2 - smsrc_pernote_offset];
+                    
+                    value2 = modoffset[(sm->flags & 12) >> 2] + value2 * modscale[(sm->flags & 12) >> 2];
+                    value *= value2;
+                }
+                moddests[sm->dest] += value * sm->amount;
+                
+                mod = g_slist_next(mod);
+            }
+            
             double maxv = 127 << 7;
-            double freq = v->freq * c->pitchbend;
-            if (pitch_env != 0 || pitch_lfo != 0)
-                freq *= pow(2.0, (v->pitcheg_depth * pitch_env + pitch_lfo) / 1200.0);
+            double freq = v->freq * cent2factor(moddests[smdest_pitch]) ;
             uint64_t freq64 = freq * 65536.0 * 65536.0 / m->module.srate;
             v->delta = freq64 >> 32;
             v->frac_delta = freq64 & 0xFFFFFFFF;
-            float gain = amp_env * v->gain * c->volume * c->expression  / (maxv * maxv);
-            if (amp_lfo != 0)
-                gain *= dB2gain(amp_lfo);
-            float pan = v->layer->pan + (c->pan * 1.0 / maxv - 0.5) * 2;
+            float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * v->gain * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
+            float pan = v->layer->pan + (addcc(c, 10) * 1.0 / maxv - 0.5) * 2;
             if (pan < -1)
                 pan = -1;
             if (pan > 1)
@@ -698,17 +731,18 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             v->rgain = gain * pan / 32768.0;
             if (v->cutoff != -1)
             {
-                float cutoff = v->cutoff*pow(2.0,(filter_env*v->fileg_depth + filter_lfo + c->cutoff_ctl*9600/maxv)/1200);
+                float cutoff = v->cutoff * cent2factor(moddests[smdest_cutoff]);
                 if (cutoff < 20)
                     cutoff = 20;
                 if (cutoff > m->module.srate * 0.45)
                     cutoff = m->module.srate * 0.45;
-                float resonance = v->resonance*pow(32.0,c->resonance_ctl/maxv);
+                //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
+                float resonance = v->resonance * dB2gain(moddests[smdest_resonance]);
                 if (resonance < 0.7)
                     resonance = 0.7;
                 if (resonance > 32)
                     resonance = 32;
-                // XXXKF this is derived experimentally and probably far off from correct formula
+                // XXXKF this is found experimentally and probably far off from correct formula
                 if (is_4pole(v))
                     resonance = sqrt(resonance / 0.707) * 0.5;
                 switch(v->filter)
@@ -790,37 +824,17 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
     int enabled = val;
     switch(cc)
     {
-        case 1:
-            c->modulation = val << 7;
-            break;
-        case 7:
-            c->volume = val << 7;
-            break;
-        case 10:
-            c->pan = val << 7;
-            break;
-        case 11:
-            c->expression = val << 7;
-            break;
-        case 71:
-            c->resonance_ctl = (val << 7) - (64 << 7);
-            break;
-        case 74:
-            c->cutoff_ctl = (val << 7) - (64 << 7);
-            break;
         case 64:
-            if (c->sustain && !enabled)
+            if (c->cc[64] >= 64 && !enabled)
             {
                 sampler_stop_sustained(m, c);
             }
-            c->sustain = enabled;
             break;
         case 66:
-            if (c->sostenuto && !enabled)
+            if (c->cc[66] >= 64 && !enabled)
                 sampler_stop_sostenuto(m, c);
-            if (!c->sostenuto && enabled)
+            if (c->cc[66] < 64 && enabled)
                 sampler_capture_sostenuto(m, c);
-            c->sostenuto = enabled;
             break;
         
         case 120:
@@ -828,14 +842,19 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
             sampler_stop_all(m, c);
             break;
         case 121:
+            // Recommended Practice (RP-015) Response to Reset All Controllers
+            // http://www.midi.org/techspecs/rp15.php
             sampler_process_cc(m, c, 64, 0);
             sampler_process_cc(m, c, 66, 0);
-            c->volume = 100 << 7;
-            c->pan = 64 << 7;
-            c->expression = 127 << 7;
-            c->modulation = 0;
-            break;
+            c->cc[11] = 127;
+            c->cc[1] = 0;
+            c->pitchbend = 0;
+            c->cc[smsrc_chanaft] = 0;
+            // XXXKF reset polyphonic pressure values when supported
+            return;
     }
+    if (cc < 120)
+        c->cc[cc] = val;
 }
 
 void sampler_program_change(struct sampler_module *m, struct sampler_channel *c, int program)
@@ -888,11 +907,11 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 break;
 
             case 13:
-                // ca
+                c->cc[smsrc_chanaft] = data[1];
                 break;
 
             case 14:
-                c->pitchbend = pow(2.0, (data[1] + 128 * data[2] - 8192) * c->pbrange / (1200.0 * 8192.0));
+                c->pitchbend = (data[1] + 128 * data[2] - 8192) * c->pbrange / 8192;
                 break;
 
             }
@@ -901,16 +920,14 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
 
 static void init_channel(struct sampler_module *m, struct sampler_channel *c)
 {
-    c->pitchbend = 1;
+    c->pitchbend = 0;
     c->pbrange = 200; // cents
-    c->sustain = 0;
-    c->sostenuto = 0;
-    c->volume = 100 << 7;
-    c->pan = 64 << 7;
-    c->expression = 127 << 7;
-    c->modulation = 0;
-    c->cutoff_ctl = 0;
-    c->resonance_ctl = 0;
+    memset(c->cc, 0, sizeof(c->cc));
+    c->cc[7] = 100;
+    c->cc[10] = 64;
+    c->cc[11] = 127;
+    c->cc[71] = 64;
+    c->cc[74] = 64;
     c->previous_note = -1;
     c->program = m->program_count ? m->programs[0] : NULL;
     memset(c->switchmask, 0, sizeof(c->switchmask));
@@ -949,6 +966,34 @@ static void cbox_config_get_dahdsr(const char *cfg_section, const char *prefix, 
     g_free(v);
 }
 
+void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags)
+{
+    sampler_layer_set_modulation(l, src, smsrc_none, dest, amount, flags);
+}
+
+void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags)
+{
+    GSList *p = l->modulations;
+    while(p)
+    {
+        struct sampler_modulation *sm = p->data;
+        if (sm->src == src && sm->src2 == src2 && sm->dest == dest)
+        {
+            sm->amount = amount;
+            sm->flags = flags;
+            return;
+        }
+        p = g_slist_next(p);
+    }
+    struct sampler_modulation *sm = g_malloc0(sizeof(struct sampler_modulation));
+    sm->src = src;
+    sm->src2 = src2;
+    sm->dest = dest;
+    sm->amount = amount;
+    sm->flags = flags;
+    l->modulations = g_slist_prepend(l->modulations, sm);
+}
+
 void sampler_layer_init(struct sampler_layer *l)
 {
     l->waveform = NULL;
@@ -972,8 +1017,6 @@ void sampler_layer_init(struct sampler_layer *l)
     l->filter = sft_lp12;
     l->cutoff = 21000;
     l->resonance = 0.707;
-    l->fileg_depth = 0;
-    l->pitcheg_depth = 0;
     l->seq_pos = 0;
     l->seq_length = 1;
     l->use_keyswitch = 0;
@@ -1005,8 +1048,25 @@ void sampler_layer_init(struct sampler_layer *l)
     l->send2bus = 2;
     l->send1gain = 0;
     l->send2gain = 0;
-    l->amp_lfo_depth = l->filter_lfo_depth = l->pitch_lfo_depth = 0;
     l->amp_lfo_freq = l->filter_lfo_freq = l->pitch_lfo_freq = 0;
+    l->modulations = NULL;
+    sampler_layer_set_modulation(l, 74, smsrc_none, smdest_cutoff, 9600, 2);
+    sampler_layer_set_modulation(l, 71, smsrc_none, smdest_resonance, 12, 2);
+    sampler_layer_set_modulation(l, 1, smsrc_pitchlfo, smdest_pitch, 100, 0);
+}
+
+void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src)
+{
+    memcpy(dst, src, sizeof(struct sampler_layer));
+    if (dst->waveform)
+        cbox_waveform_ref(dst->waveform);
+    dst->modulations = g_slist_copy(dst->modulations);
+    for(GSList *mod = dst->modulations; mod; mod = mod->next)
+    {
+        gpointer dst = g_malloc(sizeof(struct sampler_modulation));
+        memcpy(dst, mod->data, sizeof(struct sampler_modulation));
+        mod->data = dst;
+    }
 }
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform)
@@ -1096,8 +1156,8 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     cbox_config_get_dahdsr(cfg_section, "pitch", &l->pitch_env);
     l->cutoff = cbox_config_get_float(cfg_section, "cutoff", l->cutoff);
     l->resonance = cbox_config_get_float(cfg_section, "resonance", l->resonance);
-    l->fileg_depth = cbox_config_get_float(cfg_section, "fileg_depth", l->fileg_depth);
-    l->pitcheg_depth = cbox_config_get_float(cfg_section, "pitcheg_depth", l->pitcheg_depth);
+    // l->fileg_depth = cbox_config_get_float(cfg_section, "fileg_depth", l->fileg_depth);
+    // l->pitcheg_depth = cbox_config_get_float(cfg_section, "pitcheg_depth", l->pitcheg_depth);
     l->fil_veltrack = cbox_config_get_float(cfg_section, "fil_veltrack", l->fil_veltrack);
     l->fil_keytrack = cbox_config_get_float(cfg_section, "fil_keytrack", l->fil_keytrack);
     l->fil_keycenter = cbox_config_get_float(cfg_section, "fil_keycenter", l->fil_keycenter);
@@ -1112,11 +1172,11 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->send2bus = cbox_config_get_int(cfg_section, "aux2_bus", l->send2bus);
     l->send1gain = cbox_config_get_gain(cfg_section, "aux1_gain", l->send1gain);
     l->send2gain = cbox_config_get_gain(cfg_section, "aux2_gain", l->send2gain);
-    l->amp_lfo_depth = cbox_config_get_float(cfg_section, "amp_lfo_depth", l->amp_lfo_depth);
+    // l->amp_lfo_depth = cbox_config_get_float(cfg_section, "amp_lfo_depth", l->amp_lfo_depth);
     l->amp_lfo_freq = cbox_config_get_float(cfg_section, "amp_lfo_freq", l->amp_lfo_freq);
-    l->filter_lfo_depth = cbox_config_get_float(cfg_section, "filter_lfo_depth", l->filter_lfo_depth);
+    // l->filter_lfo_depth = cbox_config_get_float(cfg_section, "filter_lfo_depth", l->filter_lfo_depth);
     l->filter_lfo_freq = cbox_config_get_float(cfg_section, "filter_lfo_freq", l->filter_lfo_freq);
-    l->pitch_lfo_depth = cbox_config_get_float(cfg_section, "pitch_lfo_depth", l->pitch_lfo_depth);
+    // l->pitch_lfo_depth = cbox_config_get_float(cfg_section, "pitch_lfo_depth", l->pitch_lfo_depth);
     l->pitch_lfo_freq = cbox_config_get_float(cfg_section, "pitch_lfo_freq", l->pitch_lfo_freq);
     const char *fil_type = cbox_config_get_string(cfg_section, "fil_type");
     if (fil_type)
@@ -1348,6 +1408,7 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
 
 static void destroy_layer(struct sampler_module *m, struct sampler_layer *l)
 {
+    g_slist_free_full(l->modulations, g_free);
     if (l->waveform)
         cbox_waveform_unref(l->waveform);
     free(l);
@@ -1381,8 +1442,8 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
                 result = cbox_execute_on(fb, NULL, "/patch", "iis", error, i + 1, -1, "");
             if (!result)
                 return FALSE;
-            if (!(cbox_execute_on(fb, NULL, "/volume", "ii", error, i + 1, channel->volume) &&
-                cbox_execute_on(fb, NULL, "/pan", "ii", error, i + 1, channel->pan)))
+            if (!(cbox_execute_on(fb, NULL, "/volume", "ii", error, i + 1, addcc(channel, 7)) &&
+                cbox_execute_on(fb, NULL, "/pan", "ii", error, i + 1, addcc(channel, 10))))
                 return FALSE;
         }
         

@@ -66,11 +66,7 @@ static void load_sfz_region(struct sfz_parser_client *client)
     }
     ls->region = malloc(sizeof(struct sampler_layer));
     if (ls->in_group)
-    {
-        memcpy(ls->region, &ls->group, sizeof(struct sampler_layer));
-        if (ls->region->waveform)
-            cbox_waveform_ref(ls->region->waveform);
-    }
+        sampler_layer_clone(ls->region, &ls->group);
     else
         sampler_layer_init(ls->region);
     // g_warning("-- start region");
@@ -217,9 +213,9 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else if (!strcmp(key, "resonance"))
         l->resonance = dB2gain(atof(value));
     else if (!strcmp(key, "fileg_depth"))
-        l->fileg_depth = atof(value);
+        sampler_layer_set_modulation1(l, smsrc_filenv, smdest_cutoff, atof(value), 0);
     else if (!strcmp(key, "pitcheg_depth"))
-        l->pitcheg_depth = atof(value);
+        sampler_layer_set_modulation1(l, smsrc_pitchenv, smdest_pitch, atof(value), 0);
     else if (!strcmp(key, "tune"))
         l->tune = atof(value);
     else if (!strcmp(key, "transpose"))
@@ -247,15 +243,15 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else if (!strcmp(key, "effect2bus"))
         l->send2bus = atoi(value);
     else if (!strcmp(key, "amplfo_depth"))
-        l->amp_lfo_depth = atof(value);
+        sampler_layer_set_modulation1(l, smsrc_amplfo, smdest_gain, atof(value), 0);
     else if (!strcmp(key, "amplfo_freq"))
         l->amp_lfo_freq = atof(value);
     else if (!strcmp(key, "fillfo_depth"))
-        l->filter_lfo_depth = atof(value);
+        sampler_layer_set_modulation1(l, smsrc_fillfo, smdest_cutoff, atof(value), 0);
     else if (!strcmp(key, "fillfo_freq"))
         l->filter_lfo_freq = atof(value);
     else if (!strcmp(key, "pitchlfo_depth"))
-        l->pitch_lfo_depth = atof(value);
+        sampler_layer_set_modulation1(l, smsrc_pitchlfo, smdest_pitch, atof(value), 0);
     else if (!strcmp(key, "pitchlfo_freq"))
         l->pitch_lfo_freq = atof(value);
     else if (!strcmp(key, "fil_type"))
