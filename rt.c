@@ -252,6 +252,7 @@ void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
         return;
     }
     
+    memset(&cmd, 0, sizeof(cmd));
     cmd.definition = def;
     cmd.user_data = user_data;
     cmd.is_async = 0;
