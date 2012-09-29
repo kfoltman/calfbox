@@ -1,4 +1,4 @@
-INCLUDES = -I$(srcdir)
+AM_CPPFLAGS = -I$(srcdir)
 
 bin_PROGRAMS = calfbox
 
