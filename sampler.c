@@ -1008,7 +1008,7 @@ void sampler_layer_init(struct sampler_layer *l)
     l->gain = 1.0;
     l->pan = 0.5;
     l->mode = spt_mono16;
-    l->root_note = 69;
+    l->root_note = 60;
     l->note_scaling = 100.0;
     l->min_note = 0;
     l->max_note = 127;
