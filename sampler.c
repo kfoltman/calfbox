@@ -356,9 +356,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             struct sampler_voice *v = &m->voices[i];
             struct sampler_layer *l = pl[lidx];
             
-            double freq = l->freq;
-            
-            freq *= pow(2.0, ((note - l->root_note) * l->note_scaling + l->tune + l->transpose * 100) / 1200.0);
+            double pitch = ((note - l->root_note) * l->note_scaling + l->tune + l->transpose * 100);
             
             v->output_pair_no = l->output_pair_no % m->output_pairs;
             v->serial_no = m->serial_no;
@@ -386,7 +384,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->vel = vel;
             v->mode = l->mode;
             v->filter = l->filter;
-            v->freq = freq;
+            v->base_freq = l->freq;
+            v->pitch = pitch;
             v->released = 0;
             v->released_with_sustain = 0;
             v->released_with_sostenuto = 0;
@@ -689,7 +688,8 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             v->delay = 0;
             
             float modsrcs[smsrc_pernote_count];
-            modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel;
+            modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * (1.0 / 127.0);
+            modsrcs[smsrc_pitch - smsrc_pernote_offset] = v->pitch * (1.0 / 100.0);
             modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0; // XXXKF not supported yet
             modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released);
             modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released);
@@ -711,7 +711,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             
             float moddests[smdestcount];
             moddests[smdest_gain] = 0;
-            moddests[smdest_pitch] = c->pitchbend;
+            moddests[smdest_pitch] = v->pitch + c->pitchbend;
             moddests[smdest_cutoff] = 0;
             moddests[smdest_resonance] = 0;
             GSList *mod = v->layer->modulations;
@@ -743,7 +743,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             }
             
             double maxv = 127 << 7;
-            double freq = v->freq * cent2factor(moddests[smdest_pitch]) ;
+            double freq = v->base_freq * cent2factor(moddests[smdest_pitch]) ;
             uint64_t freq64 = freq * 65536.0 * 65536.0 / m->module.srate;
             v->delta = freq64 >> 32;
             v->frac_delta = freq64 & 0xFFFFFFFF;

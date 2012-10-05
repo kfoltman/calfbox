@@ -74,6 +74,7 @@ enum sampler_modsrc
     // those are per-note, not per-channel
     smsrc_vel,
     smsrc_polyaft,
+    smsrc_pitch,
     smsrc_pitchenv,
     smsrc_filenv,
     smsrc_ampenv,
@@ -191,7 +192,7 @@ struct sampler_voice
     int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;
     int off_by;
     int delay;
-    float freq;
+    float base_freq, pitch;
     float gain;
     float lgain, rgain;
     float last_lgain, last_rgain;
