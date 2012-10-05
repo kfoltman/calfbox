@@ -178,6 +178,7 @@ struct sampler_program
 
 struct sampler_channel
 {
+    struct sampler_module *module;
     float pitchbend;
     float pbrange;
     uint32_t switchmask[4];
@@ -222,6 +223,7 @@ struct sampler_voice
     int send1bus, send2bus;
     float send1gain, send2gain;
     int serial_no;
+    struct cbox_envelope_shape dyn_envs[3]; // amp, filter, pitch
 };
 
 struct sampler_module
@@ -248,6 +250,7 @@ extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_modul
 extern GQuark cbox_sampler_error_quark();
 
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 
 extern enum sampler_filter_type sampler_filter_type_from_string(const char *name);
 

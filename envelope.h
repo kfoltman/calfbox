@@ -200,4 +200,23 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[15].break_on_release = 0;
 }
 
+static inline void cbox_envelope_modify_dahdsr(struct cbox_envelope_shape *env, int part, float value, int sr)
+{
+    switch(part)
+    {
+        case 0: // delay
+        case 1: // attack
+        case 2: // hold
+        case 3: // decay
+        case 5: // release
+            env->stages[part].time += value * sr;
+            if (env->stages[part].time < 0)
+                env->stages[part].time = 0;
+            break;
+        case 4: // sustain
+            env->stages[3].end_value = value;
+            env->stages[4].end_value = value;
+            break;
+    }
+}
 #endif

@@ -72,8 +72,21 @@ static void load_sfz_region(struct sfz_parser_client *client)
     // g_warning("-- start region");
 }
 
-static gboolean parse_envelope_param(struct cbox_dahdsr *env, const char *key, const char *value)
+static gboolean parse_envelope_param(struct sampler_layer *layer, int env_type, const char *key, const char *value)
 {
+    struct cbox_dahdsr *env = NULL;
+    switch(env_type)
+    {
+        case 0:
+            env = &layer->amp_env;
+            break;
+        case 1:
+            env = &layer->filter_env;
+            break;
+        case 2:
+            env = &layer->pitch_env;
+            break;
+    }
     float fvalue = atof(value);
     if (!strcmp(key, "start"))
         env->start = fvalue;
@@ -89,6 +102,18 @@ static gboolean parse_envelope_param(struct cbox_dahdsr *env, const char *key, c
         env->sustain = fvalue / 100.0;
     else if (!strcmp(key, "release"))
         env->release = fvalue;
+    else if (!strcmp(key, "vel2delay"))
+        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 0, fvalue);
+    else if (!strcmp(key, "vel2attack"))
+        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 1, fvalue);
+    else if (!strcmp(key, "vel2hold"))
+        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 2, fvalue);
+    else if (!strcmp(key, "vel2decay"))
+        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 3, fvalue);
+    else if (!strcmp(key, "vel2sustain"))
+        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 4, fvalue);
+    else if (!strcmp(key, "vel2release"))
+        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 5, fvalue);
     else
         return FALSE;
     return TRUE;
@@ -272,17 +297,17 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     }
     else if (!strncmp(key, "ampeg_", 6))
     {
-        if (!parse_envelope_param(&l->amp_env, key + 6, value))
+        if (!parse_envelope_param(l, 0, key + 6, value))
             unhandled = 1;
     }
     else if (!strncmp(key, "fileg_", 6))
     {
-        if (!parse_envelope_param(&l->filter_env, key + 6, value))
+        if (!parse_envelope_param(l, 1, key + 6, value))
             unhandled = 1;
     }
     else if (!strncmp(key, "pitcheg_", 7))
     {
-        if (!parse_envelope_param(&l->pitch_env, key + 8, value))
+        if (!parse_envelope_param(l, 2, key + 8, value))
             unhandled = 1;
     }
     else if (!strncmp(key, "amp_velcurve_", 13))

@@ -440,9 +440,6 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             cbox_biquadf_reset(&v->filter_right);
             cbox_biquadf_reset(&v->filter_left2);
             cbox_biquadf_reset(&v->filter_right2);
-            cbox_envelope_reset(&v->amp_env);
-            cbox_envelope_reset(&v->filter_env);
-            cbox_envelope_reset(&v->pitch_env);
             
             GSList *nif = v->layer->nifs;
             while(nif)
@@ -452,6 +449,10 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                 nif = nif->next;
             }
             
+            cbox_envelope_reset(&v->amp_env);
+            cbox_envelope_reset(&v->filter_env);
+            cbox_envelope_reset(&v->pitch_env);
+
             lidx = skip_inactive_layers(prg, c, lidx + 1, note, vel);
             if (lidx < 0)
                 break;
@@ -955,6 +956,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
 
 static void init_channel(struct sampler_module *m, struct sampler_channel *c)
 {
+    c->module = m;
     c->pitchbend = 0;
     c->pbrange = 200; // cents
     memset(c->cc, 0, sizeof(c->cc));
@@ -1712,6 +1714,36 @@ enum sampler_filter_type sampler_filter_type_from_string(const char *name)
 void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
     v->pitch += nif->param * v->vel * (1.0 / 127.0);
+}
+
+void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
+{
+    int env_type = (nif->variant) >> 4;
+    struct cbox_envelope *env = NULL;
+    switch(env_type)
+    {
+        case 0:
+            env = &v->amp_env;
+            break;
+        case 1:
+            env = &v->filter_env;
+            break;
+        case 2:
+            env = &v->pitch_env;
+            break;
+        default:
+            assert(0);
+    }
+    if (env->shape != &v->dyn_envs[env_type])
+    {
+        memcpy(&v->dyn_envs[env_type], env->shape, sizeof(struct cbox_envelope_shape));
+        env->shape = &v->dyn_envs[env_type];
+    }
+    float param = nif->param * v->vel * (1.0 / 127.0);
+    if ((nif->variant & 15) == 4)
+        param *= 0.01;
+    // XXXKF needs to extract the sample rate from something
+    cbox_envelope_modify_dahdsr(env->shape, nif->variant & 15, param, v->channel->module->module.srate / CBOX_BLOCK_SIZE);
 }
 
 //////////////////////////////////////////////////////////////////////////
