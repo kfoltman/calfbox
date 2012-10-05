@@ -443,6 +443,15 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             cbox_envelope_reset(&v->amp_env);
             cbox_envelope_reset(&v->filter_env);
             cbox_envelope_reset(&v->pitch_env);
+            
+            GSList *nif = v->layer->nifs;
+            while(nif)
+            {
+                struct sampler_noteinitfunc *p = nif->data;
+                p->notefunc(p, v);
+                nif = nif->next;
+            }
+            
             lidx = skip_inactive_layers(prg, c, lidx + 1, note, vel);
             if (lidx < 0)
                 break;
@@ -1020,6 +1029,14 @@ void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc s
     l->modulations = g_slist_prepend(l->modulations, sm);
 }
 
+void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, float param)
+{
+    struct sampler_noteinitfunc *nif = malloc(sizeof(struct sampler_noteinitfunc));
+    nif->notefunc = notefunc;
+    nif->param = param;
+    l->nifs = g_slist_prepend(l->nifs, nif);
+}
+
 void sampler_layer_init(struct sampler_layer *l)
 {
     l->waveform = NULL;
@@ -1078,6 +1095,7 @@ void sampler_layer_init(struct sampler_layer *l)
     l->amp_lfo_freq = l->filter_lfo_freq = l->pitch_lfo_freq = 0;
     l->delay = l->delay_random = 0;
     l->modulations = NULL;
+    l->nifs = NULL;
     sampler_layer_set_modulation(l, 74, smsrc_none, smdest_cutoff, 9600, 2);
     sampler_layer_set_modulation(l, 71, smsrc_none, smdest_resonance, 12, 2);
     sampler_layer_set_modulation(l, 1, smsrc_pitchlfo, smdest_pitch, 100, 0);
@@ -1094,6 +1112,13 @@ void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *
         gpointer dst = g_malloc(sizeof(struct sampler_modulation));
         memcpy(dst, mod->data, sizeof(struct sampler_modulation));
         mod->data = dst;
+    }
+    dst->nifs = g_slist_copy(dst->nifs);
+    for(GSList *nif = dst->nifs; nif; nif = nif->next)
+    {
+        gpointer dst = g_malloc(sizeof(struct sampler_noteinitfunc));
+        memcpy(dst, nif->data, sizeof(struct sampler_noteinitfunc));
+        nif->data = dst;
     }
 }
 
@@ -1439,6 +1464,7 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
 
 static void destroy_layer(struct sampler_module *m, struct sampler_layer *l)
 {
+    g_slist_free_full(l->nifs, g_free);
     g_slist_free_full(l->modulations, g_free);
     if (l->waveform)
         cbox_waveform_unref(l->waveform);
@@ -1678,6 +1704,16 @@ enum sampler_filter_type sampler_filter_type_from_string(const char *name)
         return sft_hp6;
     return sft_unknown;
 }
+
+//////////////////////////////////////////////////////////////////////////
+// Note initialisation functions
+
+void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
+{
+    v->pitch += nif->param * v->vel * (1.0 / 127.0);
+}
+
+//////////////////////////////////////////////////////////////////////////
 
 struct cbox_module_livecontroller_metadata sampler_controllers[] = {
 };

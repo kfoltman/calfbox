@@ -109,6 +109,18 @@ struct sampler_modulation
     int flags;
 };
 
+struct sampler_noteinitfunc;
+struct sampler_voice;
+
+typedef void (*SamplerNoteInitFunc)(struct sampler_noteinitfunc *nif, struct sampler_voice *voice);
+
+struct sampler_noteinitfunc
+{
+    SamplerNoteInitFunc notefunc;
+    float param;
+    // XXXKF no destructor for now - might not be necessary
+};
+
 struct sampler_layer
 {
     enum sample_player_type mode;
@@ -152,6 +164,7 @@ struct sampler_layer
     int output_pair_no;
     
     GSList *modulations;
+    GSList *nifs;
 };
 
 struct sampler_program
@@ -227,10 +240,13 @@ extern void sampler_layer_init(struct sampler_layer *l);
 extern void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform);
 extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);
+extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, float param);
 extern void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section);
 extern void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src);
 extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
 extern GQuark cbox_sampler_error_quark();
+
+extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 
 extern enum sampler_filter_type sampler_filter_type_from_string(const char *name);
 
