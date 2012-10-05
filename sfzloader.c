@@ -241,7 +241,7 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else if (!strcmp(key, "fil_keycenter"))
         l->fil_keycenter = atof(value);
     else if (!strcmp(key, "pitch_veltrack"))
-        sampler_layer_add_nif(l, sampler_nif_vel2pitch, atof(value));
+        sampler_layer_add_nif(l, sampler_nif_vel2pitch, 0, atof(value));
     else if (!strcmp(key, "effect1"))
         l->send1gain = atof(value) / 100.0;
     else if (!strcmp(key, "effect2"))

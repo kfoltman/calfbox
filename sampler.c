@@ -1029,10 +1029,11 @@ void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc s
     l->modulations = g_slist_prepend(l->modulations, sm);
 }
 
-void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, float param)
+void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param)
 {
     struct sampler_noteinitfunc *nif = malloc(sizeof(struct sampler_noteinitfunc));
     nif->notefunc = notefunc;
+    nif->variant = variant;
     nif->param = param;
     l->nifs = g_slist_prepend(l->nifs, nif);
 }
