@@ -367,6 +367,13 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                 v->pos += ((uint32_t)(rand() + (rand() << 16))) % l->sample_offset_random;
             if (v->pos >= l->sample_end)
                 v->pos = l->sample_end;
+            float delay = l->delay;
+            if (l->delay_random)
+                delay += rand() * (1.0 / RAND_MAX) * l->delay_random;
+            if (delay > 0)
+                v->delay = (int)(delay * m->module.srate);
+            else
+                v->delay = 0;
             v->frac_pos = 0;
             v->loop_start = l->loop_start;
             v->loop_end = l->loop_end;
@@ -465,6 +472,13 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
 
 void sampler_voice_release(struct sampler_voice *v)
 {
+    if (v->delay >= CBOX_BLOCK_SIZE)
+    {
+        v->released = 1;
+        v->mode = spt_inactive;
+        return;
+    }
+    
     if (v->loop_mode != slm_one_shot)
         v->released = 1;
     else
@@ -666,6 +680,14 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             vcount++;
             struct sampler_channel *c = v->channel;
             
+            if (v->delay >= CBOX_BLOCK_SIZE)
+            {
+                v->delay -= CBOX_BLOCK_SIZE;
+                continue;
+            }
+            // XXXKF I'm sacrificing sample accuracy for delays for now
+            v->delay = 0;
+            
             float modsrcs[smsrc_pernote_count];
             modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel;
             modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0; // XXXKF not supported yet
@@ -685,7 +707,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                     v->mode = spt_inactive;
                     continue;
                 }
-            }            
+            }           
             
             float moddests[smdestcount];
             moddests[smdest_gain] = 0;
@@ -1054,6 +1076,7 @@ void sampler_layer_init(struct sampler_layer *l)
     l->send1gain = 0;
     l->send2gain = 0;
     l->amp_lfo_freq = l->filter_lfo_freq = l->pitch_lfo_freq = 0;
+    l->delay = l->delay_random = 0;
     l->modulations = NULL;
     sampler_layer_set_modulation(l, 74, smsrc_none, smdest_cutoff, 9600, 2);
     sampler_layer_set_modulation(l, 71, smsrc_none, smdest_resonance, 12, 2);
@@ -1194,6 +1217,8 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
             g_warning("Unknown filter type '%s'", fil_type);
     }
     l->pitch_lfo_freq = cbox_config_get_float(cfg_section, "pitch_lfo_freq", l->pitch_lfo_freq);
+    l->delay = cbox_config_get_float(cfg_section, "delay", l->delay);
+    l->delay_random = cbox_config_get_float(cfg_section, "delay_random", l->delay_random);
 }
 
 void sampler_load_layer(struct sampler_module *m, struct sampler_layer *l, const char *cfg_section, struct cbox_waveform *waveform)

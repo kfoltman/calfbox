@@ -145,6 +145,8 @@ struct sampler_layer
     float amp_lfo_freq;
     float filter_lfo_freq;
     float pitch_lfo_freq;
+
+    float delay, delay_random;
     
     int output_pair_no;
     
@@ -188,6 +190,7 @@ struct sampler_voice
     int vel;
     int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;
     int off_by;
+    int delay;
     float freq;
     float gain;
     float lgain, rgain;

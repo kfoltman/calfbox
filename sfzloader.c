@@ -183,6 +183,10 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->sample_offset = atoi(value);
     else if (!strcmp(key, "offset_random"))
         l->sample_offset_random = atoi(value);
+    else if (!strcmp(key, "delay"))
+        l->delay = atof(value);
+    else if (!strcmp(key, "delay_random"))
+        l->delay_random = atof(value);
     else if (!strcmp(key, "loop_start") || !strcmp(key, "loopstart"))
         l->loop_start = atoi(value);
     else if (!strcmp(key, "loop_end") || !strcmp(key, "loopend"))
