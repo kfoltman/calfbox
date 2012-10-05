@@ -169,8 +169,6 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->seq_pos = atoi(value) - 1;
     else if (!strcmp(key, "seq_length"))
         l->seq_length = atoi(value);
-    else if (!strcmp(key, "seq_length"))
-        l->seq_length = atoi(value);
     else SFZ_NOTE_ATTRIB(sw_lokey)
     else SFZ_NOTE_ATTRIB(sw_hikey)
     else SFZ_NOTE_ATTRIB(sw_down)
@@ -181,6 +179,10 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->min_vel = atoi(value);
     else if (!strcmp(key, "hivel") || !strcmp(key, "hilev"))
         l->max_vel = atoi(value);
+    else if (!strcmp(key, "offset"))
+        l->sample_offset = atoi(value);
+    else if (!strcmp(key, "offset_random"))
+        l->sample_offset_random = atoi(value);
     else if (!strcmp(key, "loop_start") || !strcmp(key, "loopstart"))
         l->loop_start = atoi(value);
     else if (!strcmp(key, "loop_end") || !strcmp(key, "loopend"))

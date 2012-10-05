@@ -115,6 +115,7 @@ struct sampler_layer
     struct cbox_waveform *waveform;
     int16_t *sample_data;
     uint32_t sample_offset;
+    uint32_t sample_offset_random;
     uint32_t loop_start;
     uint32_t loop_end;
     uint32_t sample_end;

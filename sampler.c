@@ -363,6 +363,10 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->output_pair_no = l->output_pair_no % m->output_pairs;
             v->serial_no = m->serial_no;
             v->pos = l->sample_offset;
+            if (l->sample_offset_random)
+                v->pos += ((uint32_t)(rand() + (rand() << 16))) % l->sample_offset_random;
+            if (v->pos >= l->sample_end)
+                v->pos = l->sample_end;
             v->frac_pos = 0;
             v->loop_start = l->loop_start;
             v->loop_end = l->loop_end;
@@ -999,6 +1003,7 @@ void sampler_layer_init(struct sampler_layer *l)
     l->waveform = NULL;
     l->sample_data = NULL;
     l->sample_offset = 0;
+    l->sample_offset_random = 0;
     l->sample_end = 0;
     l->freq = 44100;
     l->loop_start = -1;
@@ -1129,6 +1134,7 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     if (imp)
         sampler_load_layer_overrides(l, m, imp);
     l->sample_offset = cbox_config_get_int(cfg_section, "offset", l->sample_offset);
+    l->sample_offset_random = cbox_config_get_int(cfg_section, "offset_random", l->sample_offset_random);
     l->loop_start = cbox_config_get_int(cfg_section, "loop_start", l->loop_start);
     l->loop_end = cbox_config_get_int(cfg_section, "loop_end", l->loop_end);
     l->loop_evolve = cbox_config_get_int(cfg_section, "loop_evolve", l->loop_evolve);
