@@ -241,6 +241,8 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->pan = (atof(value) + 100) / 200.0;
     else if (!strcmp(key, "cutoff"))
         l->cutoff = atof(value);
+    else if (!strcmp(key, "cutoff_chanaft"))
+        sampler_layer_set_modulation1(l, smsrc_chanaft, smdest_cutoff, atof(value), 0);
     else if (!strcmp(key, "resonance"))
         l->resonance = dB2gain(atof(value));
     else if (!strcmp(key, "fileg_depth"))
@@ -315,6 +317,14 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         int ccno = atoi(key + 8);
         if (ccno > 0 && ccno < 120)
             sampler_layer_add_nif(l, sampler_nif_cc2delay, ccno, atof(value));
+        else
+            unhandled = 1;
+    }
+    else if (!strncmp(key, "cutoff_cc", 9))
+    {
+        int ccno = atoi(key + 9);
+        if (ccno > 0 && ccno < 120)
+            sampler_layer_set_modulation1(l, ccno, smdest_cutoff, atof(value), 0);
         else
             unhandled = 1;
     }
