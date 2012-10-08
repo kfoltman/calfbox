@@ -1716,6 +1716,11 @@ void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voic
     v->pitch += nif->param * v->vel * (1.0 / 127.0);
 }
 
+void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
+{
+    v->delay += nif->param * v->channel->cc[nif->variant] / 127.0 * v->channel->module->module.srate;
+}
+
 void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
     int env_type = (nif->variant) >> 4;

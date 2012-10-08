@@ -305,9 +305,17 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         if (!parse_envelope_param(l, 1, key + 6, value))
             unhandled = 1;
     }
-    else if (!strncmp(key, "pitcheg_", 7))
+    else if (!strncmp(key, "pitcheg_", 8))
     {
         if (!parse_envelope_param(l, 2, key + 8, value))
+            unhandled = 1;
+    }
+    else if (!strncmp(key, "delay_cc", 8))
+    {
+        int ccno = atoi(key + 8);
+        if (ccno > 0 && ccno < 128)
+            sampler_layer_add_nif(l, sampler_nif_cc2delay, ccno, atof(value));
+        else
             unhandled = 1;
     }
     else if (!strncmp(key, "amp_velcurve_", 13))
