@@ -313,7 +313,7 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else if (!strncmp(key, "delay_cc", 8))
     {
         int ccno = atoi(key + 8);
-        if (ccno > 0 && ccno < 128)
+        if (ccno > 0 && ccno < 120)
             sampler_layer_add_nif(l, sampler_nif_cc2delay, ccno, atof(value));
         else
             unhandled = 1;
