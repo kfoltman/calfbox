@@ -857,19 +857,20 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
 
 void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int cc, int val)
 {
-    int enabled = val;
+    int was_enabled = c->cc[cc] >= 64;
+    int enabled = val >= 64;
     switch(cc)
     {
         case 64:
-            if (c->cc[64] >= 64 && !enabled)
+            if (was_enabled && !enabled)
             {
                 sampler_stop_sustained(m, c);
             }
             break;
         case 66:
-            if (c->cc[66] >= 64 && !enabled)
+            if (was_enabled && !enabled)
                 sampler_stop_sostenuto(m, c);
-            if (c->cc[66] < 64 && enabled)
+            else if (!was_enabled && enabled)
                 sampler_capture_sostenuto(m, c);
             break;
         
