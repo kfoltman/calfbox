@@ -292,6 +292,7 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
 
 int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c, int first, int note, int vel)
 {
+    int ch = (c - c->module->channels);
     while(first < prg->layer_count)
     {
         struct sampler_layer *l = prg->layers[first];
@@ -300,7 +301,7 @@ int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c,
             if (note >= l->sw_lokey && note <= l->sw_hikey)
                 l->last_key = note;
         }
-        if (note >= l->min_note && note <= l->max_note && vel >= l->min_vel && vel <= l->max_vel)
+        if (note >= l->min_note && note <= l->max_note && vel >= l->min_vel && vel <= l->max_vel && ch >= l->min_chan && ch <= l->max_chan)
         {
             if (!l->use_keyswitch || 
                 ((l->sw_last == -1 || l->sw_last == l->last_key) &&
@@ -1058,6 +1059,8 @@ void sampler_layer_init(struct sampler_layer *l)
     l->mode = spt_mono16;
     l->root_note = 60;
     l->note_scaling = 100.0;
+    l->min_chan = 0;
+    l->max_chan = 15;
     l->min_note = 0;
     l->max_note = 127;
     l->min_vel = 0;

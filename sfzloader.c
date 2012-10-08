@@ -204,6 +204,10 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->min_vel = atoi(value);
     else if (!strcmp(key, "hivel") || !strcmp(key, "hilev"))
         l->max_vel = atoi(value);
+    else if (!strcmp(key, "lochan"))
+        l->min_chan = atoi(value) - 1;
+    else if (!strcmp(key, "hichan"))
+        l->max_chan = atoi(value) - 1;
     else if (!strcmp(key, "offset"))
         l->sample_offset = atoi(value);
     else if (!strcmp(key, "offset_random"))

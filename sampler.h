@@ -140,6 +140,7 @@ struct sampler_layer
     float freq;
     float tune;
     float note_scaling;
+    int min_chan, max_chan;
     int min_note, max_note, root_note;
     int min_vel, max_vel;
     int transpose;
