@@ -119,6 +119,51 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, int env_type, 
     return TRUE;
 }
 
+static gboolean parse_lfo_param(struct sampler_layer *layer, int lfo_type, const char *key, const char *value)
+{
+    float *freq_ptr = NULL;
+    enum sampler_modsrc src;
+    enum sampler_moddest dest;
+    switch(lfo_type)
+    {
+        case 0:
+            freq_ptr = &layer->amp_lfo_freq;
+            src = smsrc_amplfo;
+            dest = smdest_gain;
+            break;
+        case 1:
+            freq_ptr = &layer->filter_lfo_freq;
+            src = smsrc_fillfo;
+            dest = smdest_cutoff;
+            break;
+        case 2:
+            freq_ptr = &layer->pitch_lfo_freq;
+            src = smsrc_pitchlfo;
+            dest = smdest_pitch;
+            break;
+    }
+    float fvalue = atof(value);
+    if (!strcmp(key, "depth"))
+        sampler_layer_set_modulation1(layer, src, dest, fvalue, 0);
+    else if (!strcmp(key, "depthchanaft"))
+        sampler_layer_set_modulation(layer, src, smsrc_chanaft, dest, fvalue, 0);
+    else if (!strcmp(key, "depthpolyaft"))
+        sampler_layer_set_modulation(layer, src, smsrc_polyaft, dest, fvalue, 0);
+    else if (!strcmp(key, "freq"))
+        *freq_ptr = atof(value);
+    else if (!strncmp(key, "depthcc", 7))
+    {
+        int cc = atoi(key + 7);
+        if (cc > 0 && cc < 120)
+            sampler_layer_set_modulation(layer, src, cc, dest, fvalue, 0);
+        else
+            return FALSE;
+    }
+    else 
+        return FALSE;
+    return TRUE;
+}
+
 static int sfz_note_from_string(const char *note)
 {
     static const int semis[] = {9, 11, 0, 2, 4, 5, 7};
@@ -281,18 +326,12 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->send1bus = atoi(value);
     else if (!strcmp(key, "effect2bus"))
         l->send2bus = atoi(value);
-    else if (!strcmp(key, "amplfo_depth"))
-        sampler_layer_set_modulation1(l, smsrc_amplfo, smdest_gain, atof(value), 0);
-    else if (!strcmp(key, "amplfo_freq"))
-        l->amp_lfo_freq = atof(value);
-    else if (!strcmp(key, "fillfo_depth"))
-        sampler_layer_set_modulation1(l, smsrc_fillfo, smdest_cutoff, atof(value), 0);
-    else if (!strcmp(key, "fillfo_freq"))
-        l->filter_lfo_freq = atof(value);
-    else if (!strcmp(key, "pitchlfo_depth"))
-        sampler_layer_set_modulation1(l, smsrc_pitchlfo, smdest_pitch, atof(value), 0);
-    else if (!strcmp(key, "pitchlfo_freq"))
-        l->pitch_lfo_freq = atof(value);
+    else if (!strncmp(key, "amplfo_", 7))
+        unhandled = (!parse_lfo_param(l, 0, key + 7, value));
+    else if (!strncmp(key, "fillfo_", 7))
+        unhandled = (!parse_lfo_param(l, 1, key + 7, value));
+    else if (!strncmp(key, "pitchlfo_", 9))
+        unhandled = (!parse_lfo_param(l, 2, key + 9, value));
     else if (!strcmp(key, "fil_type"))
     {
         enum sampler_filter_type ft = sampler_filter_type_from_string(value);
@@ -302,20 +341,11 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
             l->filter = ft;
     }
     else if (!strncmp(key, "ampeg_", 6))
-    {
-        if (!parse_envelope_param(l, 0, key + 6, value))
-            unhandled = 1;
-    }
+        unhandled = (!parse_envelope_param(l, 0, key + 6, value));
     else if (!strncmp(key, "fileg_", 6))
-    {
-        if (!parse_envelope_param(l, 1, key + 6, value))
-            unhandled = 1;
-    }
+        unhandled = (!parse_envelope_param(l, 1, key + 6, value));
     else if (!strncmp(key, "pitcheg_", 8))
-    {
-        if (!parse_envelope_param(l, 2, key + 8, value))
-            unhandled = 1;
-    }
+        unhandled = (!parse_envelope_param(l, 2, key + 8, value));
     else if (!strncmp(key, "delay_cc", 8))
     {
         int ccno = atoi(key + 8);
