@@ -75,16 +75,24 @@ static void load_sfz_region(struct sfz_parser_client *client)
 static gboolean parse_envelope_param(struct sampler_layer *layer, int env_type, const char *key, const char *value)
 {
     struct cbox_dahdsr *env = NULL;
+    enum sampler_modsrc src;
+    enum sampler_moddest dest;
     switch(env_type)
     {
         case 0:
             env = &layer->amp_env;
+            src = smsrc_ampenv;
+            dest = smdest_gain;
             break;
         case 1:
             env = &layer->filter_env;
+            src = smsrc_filenv;
+            dest = smdest_cutoff;
             break;
         case 2:
             env = &layer->pitch_env;
+            src = smsrc_pitchenv;
+            dest = smdest_pitch;
             break;
     }
     float fvalue = atof(value);
@@ -102,6 +110,8 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, int env_type, 
         env->sustain = fvalue / 100.0;
     else if (!strcmp(key, "release"))
         env->release = fvalue;
+    else if (!strcmp(key, "depth"))
+        sampler_layer_set_modulation1(layer, src, dest, atof(value), 0);
     else if (!strcmp(key, "vel2delay"))
         sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 0, fvalue);
     else if (!strcmp(key, "vel2attack"))
@@ -114,6 +124,8 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, int env_type, 
         sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 4, fvalue);
     else if (!strcmp(key, "vel2release"))
         sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 5, fvalue);
+    else if (!strcmp(key, "vel2depth"))
+        sampler_layer_set_modulation(layer, smsrc_vel, src, dest, atof(value), 0);
     else
         return FALSE;
     return TRUE;
@@ -294,10 +306,6 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         sampler_layer_set_modulation1(l, smsrc_chanaft, smdest_cutoff, atof(value), 0);
     else if (!strcmp(key, "resonance"))
         l->resonance = dB2gain(atof(value));
-    else if (!strcmp(key, "fileg_depth"))
-        sampler_layer_set_modulation1(l, smsrc_filenv, smdest_cutoff, atof(value), 0);
-    else if (!strcmp(key, "pitcheg_depth"))
-        sampler_layer_set_modulation1(l, smsrc_pitchenv, smdest_pitch, atof(value), 0);
     else if (!strcmp(key, "tune"))
         l->tune = atof(value);
     else if (!strcmp(key, "transpose"))
