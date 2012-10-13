@@ -760,8 +760,8 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             v->frac_delta = freq64 & 0xFFFFFFFF;
             float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * v->gain * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
             float pan = v->layer->pan + (addcc(c, 10) * 1.0 / maxv - 0.5) * 2;
-            if (pan < -1)
-                pan = -1;
+            if (pan < 0)
+                pan = 0;
             if (pan > 1)
                 pan = 1;
             v->lgain = gain * (1 - pan)  / 32768.0;
