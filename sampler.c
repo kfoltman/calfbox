@@ -1751,6 +1751,23 @@ void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_voice
     v->delay += nif->param * v->channel->cc[nif->variant] / 127.0 * v->channel->module->module.srate;
 }
 
+void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
+{
+    float rnd = rand() * 1.0 / RAND_MAX;
+    switch(nif->variant)
+    {
+        case 0:
+            v->gain *= dB2gain(rnd * nif->param);
+            break;
+        case 1:
+            v->cutoff *= cent2factor(rnd * nif->param);
+            break;
+        case 2:
+            v->pitch += rnd * nif->param; // this is in cents
+            break;
+    }
+}
+
 void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
     int env_type = (nif->variant) >> 4;

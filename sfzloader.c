@@ -328,6 +328,12 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         l->fil_keytrack = atof(value);
     else if (!strcmp(key, "fil_keycenter"))
         l->fil_keycenter = atof(value);
+    else if (!strcmp(key, "amp_random"))
+        sampler_layer_add_nif(l, sampler_nif_addrandom, 0, atof(value));
+    else if (!strcmp(key, "fil_random"))
+        sampler_layer_add_nif(l, sampler_nif_addrandom, 1, atof(value));
+    else if (!strcmp(key, "pitch_random"))
+        sampler_layer_add_nif(l, sampler_nif_addrandom, 2, atof(value));
     else if (!strcmp(key, "pitch_veltrack"))
         sampler_layer_add_nif(l, sampler_nif_vel2pitch, 0, atof(value));
     else if (!strcmp(key, "effect1"))
