@@ -122,6 +122,13 @@ struct sampler_noteinitfunc
     // XXXKF no destructor for now - might not be necessary
 };
 
+struct sampler_lfo_params
+{
+    float freq;
+    float delay;
+    float fade;
+};
+
 struct sampler_layer
 {
     enum sample_player_type mode;
@@ -157,9 +164,7 @@ struct sampler_layer
     int send1bus, send2bus;
     float send1gain, send2gain;
     
-    float amp_lfo_freq;
-    float filter_lfo_freq;
-    float pitch_lfo_freq;
+    struct sampler_lfo_params amp_lfo_params, filter_lfo_params, pitch_lfo_params;
 
     float delay, delay_random;
     
@@ -191,6 +196,7 @@ struct sampler_channel
 struct sampler_lfo
 {
     uint32_t phase, delta;
+    uint32_t age, delay, fade;
 };
 
 struct sampler_voice
@@ -212,7 +218,7 @@ struct sampler_voice
     float gain;
     float lgain, rgain;
     float last_lgain, last_rgain;
-    float cutoff, resonance, fileg_depth, pitcheg_depth;
+    float cutoff, resonance;
     struct cbox_biquadf_state filter_left, filter_right;
     struct cbox_biquadf_state filter_left2, filter_right2;
     struct cbox_biquadf_coeffs filter_coeffs;

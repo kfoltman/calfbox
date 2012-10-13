@@ -323,10 +323,13 @@ int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c,
     return -1;
 }
 
-static void lfo_init(struct sampler_lfo *lfo, float freq, int srate)
+static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, int srate)
 {
     lfo->phase = 0;
-    lfo->delta = (uint32_t)(freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE / srate);
+    lfo->age = 0;
+    lfo->delta = (uint32_t)(lfop->freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE / srate);
+    lfo->delay = (uint32_t)(lfop->delay * srate);
+    lfo->fade = (uint32_t)(lfop->fade * srate);
 }
 
 
@@ -433,9 +436,9 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                     exgroups[exgroupcount++] = l->exclusive_group;
                 }
             }
-            lfo_init(&v->amp_lfo, l->amp_lfo_freq, m->module.srate);
-            lfo_init(&v->filter_lfo, l->filter_lfo_freq, m->module.srate);
-            lfo_init(&v->pitch_lfo, l->pitch_lfo_freq, m->module.srate);
+            lfo_init(&v->amp_lfo, &l->amp_lfo_params, m->module.srate);
+            lfo_init(&v->filter_lfo, &l->filter_lfo_params, m->module.srate);
+            lfo_init(&v->pitch_lfo, &l->pitch_lfo_params, m->module.srate);
             
             cbox_biquadf_reset(&v->filter_left);
             cbox_biquadf_reset(&v->filter_right);
@@ -616,11 +619,24 @@ static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, f
 
 static inline float lfo_run(struct sampler_lfo *lfo)
 {
+    if (lfo->age < lfo->delay)
+    {
+        lfo->age += CBOX_BLOCK_SIZE;
+        return 0.f;
+    }
+
     const int FRAC_BITS = 32 - 11;
     lfo->phase += lfo->delta;
     uint32_t iphase = lfo->phase >> FRAC_BITS;
     float frac = (lfo->phase & ((1 << FRAC_BITS) - 1)) * (1.0 / (1 << FRAC_BITS));
+
     float v = sine_wave[iphase] + (sine_wave[iphase + 1] - sine_wave[iphase]) * frac;
+    if (lfo->fade && lfo->age < lfo->delay + lfo->fade)
+    {
+        v *= (lfo->age - lfo->delay) * 1.0 / lfo->fade;
+        lfo->age += CBOX_BLOCK_SIZE;
+    }
+
     return v;
 }
 
@@ -1044,6 +1060,13 @@ void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc
     l->nifs = g_slist_prepend(l->nifs, nif);
 }
 
+static void lfo_params_clear(struct sampler_lfo_params *lfop)
+{
+    lfop->freq = 0.f;
+    lfop->delay = 0.f;
+    lfop->fade = 0.f;
+}
+
 void sampler_layer_init(struct sampler_layer *l)
 {
     l->waveform = NULL;
@@ -1101,7 +1124,9 @@ void sampler_layer_init(struct sampler_layer *l)
     l->send2bus = 2;
     l->send1gain = 0;
     l->send2gain = 0;
-    l->amp_lfo_freq = l->filter_lfo_freq = l->pitch_lfo_freq = 0;
+    lfo_params_clear(&l->amp_lfo_params);
+    lfo_params_clear(&l->filter_lfo_params);
+    lfo_params_clear(&l->pitch_lfo_params);
     l->delay = l->delay_random = 0;
     l->modulations = NULL;
     l->nifs = NULL;
@@ -1236,11 +1261,11 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->send1gain = cbox_config_get_gain(cfg_section, "aux1_gain", l->send1gain);
     l->send2gain = cbox_config_get_gain(cfg_section, "aux2_gain", l->send2gain);
     // l->amp_lfo_depth = cbox_config_get_float(cfg_section, "amp_lfo_depth", l->amp_lfo_depth);
-    l->amp_lfo_freq = cbox_config_get_float(cfg_section, "amp_lfo_freq", l->amp_lfo_freq);
+    l->amp_lfo_params.freq = cbox_config_get_float(cfg_section, "amp_lfo_freq", l->amp_lfo_params.freq);
     // l->filter_lfo_depth = cbox_config_get_float(cfg_section, "filter_lfo_depth", l->filter_lfo_depth);
-    l->filter_lfo_freq = cbox_config_get_float(cfg_section, "filter_lfo_freq", l->filter_lfo_freq);
+    l->filter_lfo_params.freq = cbox_config_get_float(cfg_section, "filter_lfo_freq", l->filter_lfo_params.freq);
     // l->pitch_lfo_depth = cbox_config_get_float(cfg_section, "pitch_lfo_depth", l->pitch_lfo_depth);
-    l->pitch_lfo_freq = cbox_config_get_float(cfg_section, "pitch_lfo_freq", l->pitch_lfo_freq);
+    l->pitch_lfo_params.freq = cbox_config_get_float(cfg_section, "pitch_lfo_freq", l->pitch_lfo_params.freq);
     const char *fil_type = cbox_config_get_string(cfg_section, "fil_type");
     if (fil_type)
     {
@@ -1250,7 +1275,6 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
         else
             g_warning("Unknown filter type '%s'", fil_type);
     }
-    l->pitch_lfo_freq = cbox_config_get_float(cfg_section, "pitch_lfo_freq", l->pitch_lfo_freq);
     l->delay = cbox_config_get_float(cfg_section, "delay", l->delay);
     l->delay_random = cbox_config_get_float(cfg_section, "delay_random", l->delay_random);
 }

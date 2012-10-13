@@ -133,23 +133,23 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, int env_type, 
 
 static gboolean parse_lfo_param(struct sampler_layer *layer, int lfo_type, const char *key, const char *value)
 {
-    float *freq_ptr = NULL;
+    struct sampler_lfo_params *params = NULL;
     enum sampler_modsrc src;
     enum sampler_moddest dest;
     switch(lfo_type)
     {
         case 0:
-            freq_ptr = &layer->amp_lfo_freq;
+            params = &layer->amp_lfo_params;
             src = smsrc_amplfo;
             dest = smdest_gain;
             break;
         case 1:
-            freq_ptr = &layer->filter_lfo_freq;
+            params = &layer->filter_lfo_params;
             src = smsrc_fillfo;
             dest = smdest_cutoff;
             break;
         case 2:
-            freq_ptr = &layer->pitch_lfo_freq;
+            params = &layer->pitch_lfo_params;
             src = smsrc_pitchlfo;
             dest = smdest_pitch;
             break;
@@ -162,7 +162,11 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, int lfo_type, const
     else if (!strcmp(key, "depthpolyaft"))
         sampler_layer_set_modulation(layer, src, smsrc_polyaft, dest, fvalue, 0);
     else if (!strcmp(key, "freq"))
-        *freq_ptr = atof(value);
+        params->freq = atof(value);
+    else if (!strcmp(key, "delay"))
+        params->delay = atof(value);
+    else if (!strcmp(key, "fade"))
+        params->fade = atof(value);
     else if (!strncmp(key, "depthcc", 7))
     {
         int cc = atoi(key + 7);
