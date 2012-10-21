@@ -169,9 +169,73 @@ class SamplerWindow(gtk.VBox, WithPatchTable):
         self.voices_widget.set_text(str(attribs.active_voices))
         return True
 
+class TonewheelOrganWindow(gtk.VBox):
+    combos = [
+        (1, 'Upper', 'upper_vibrato', [(0, 'Off'), (1, 'On')]),
+        (1, 'Lower', 'lower_vibrato', [(0, 'Off'), (1, 'On')]),
+        (1, 'Mode', 'vibrato_mode', [(0, '1'), (1, '2'), (2, '3')]),
+        (1, 'Chorus', 'vibrato_chorus', [(0, 'Off'), (1, 'On')]),
+        (2, 'Enable', 'percussion_enable', [(0, 'Off'), (1, 'On')]),
+        (2, 'Harmonic', 'percussion_3rd', [(0, '2nd'), (1, '3rd')]),
+    ]
+    def __init__(self, instrument, path):
+        gtk.VBox.__init__(self)
+        self.path = path
+        panel = gtk.VBox(spacing=10)
+        table = gtk.Table(4, 10)
+        table.props.row_spacing = 10
+        table.set_col_spacings(5)
+        self.drawbars = {}
+        self.hboxes = {}
+        self.hboxes[1] = gtk.HBox(spacing = 10)
+        self.hboxes[1].pack_start(gtk.Label('Vibrato: '), False, False)
+        self.hboxes[2] = gtk.HBox(spacing = 10)
+        self.hboxes[2].pack_start(gtk.Label('Percussion: '), False, False)
+        self.combos = {}
+        for row, name, flag, options in TonewheelOrganWindow.combos:
+            label = gtk.Label(name)
+            self.hboxes[row].pack_start(label, False, False)
+            model = gtk.ListStore(gobject.TYPE_INT, gobject.TYPE_STRING)
+            for oval, oname in options:
+                model.append((oval, oname))
+            combo = standard_combo(model, column = 1)
+            self.hboxes[row].pack_start(combo, False, False)
+            combo.update_handler = combo.connect('changed', lambda w, path: cbox.do_cmd(path, None, [w.get_model()[w.get_active()][0]]), path + '/' + flag)
+            self.combos[flag] = combo
+        panel.pack_start(self.hboxes[1], False, False)
+        panel.pack_start(self.hboxes[2], False, False)
+        table.attach(gtk.Label("Upper"), 0, 1, 0, 1)
+        table.attach(gtk.Label("Lower"), 0, 1, 1, 2)
+        for i in range(9):
+            slider = gtk.VScale(gtk.Adjustment(0, 0, 8, 1, 1))
+            slider.props.digits = 0
+            table.attach(slider, i + 1, i + 2, 0, 1)
+            self.drawbars['u%d' % i] = slider.get_adjustment()
+            slider.get_adjustment().connect('value-changed', lambda adj, path, drawbar: cbox.do_cmd(path + '/upper_drawbar', None, [drawbar, int(adj.get_value())]), self.path, i)
+            slider = gtk.VScale(gtk.Adjustment(0, 0, 8, 1, 1))
+            slider.props.digits = 0
+            table.attach(slider, i + 1, i + 2, 1, 2)
+            self.drawbars['l%d' % i] = slider.get_adjustment()
+            slider.get_adjustment().connect('value-changed', lambda adj, path, drawbar: cbox.do_cmd(path + '/lower_drawbar', None, [drawbar, int(adj.get_value())]), self.path, i)
+        panel.add(table)
+        self.add(panel)
+        self.refresh()
+        
+    def refresh(self):
+        attribs = cbox.GetThings("%s/status" % self.path, ['%upper_drawbar', '%lower_drawbar', '%pedal_drawbar'], [])
+        for i in range(9):
+            self.drawbars['u%d' % i].set_value(attribs.upper_drawbar[i])
+            self.drawbars['l%d' % i].set_value(attribs.lower_drawbar[i])
+        for row, name, flag, options in TonewheelOrganWindow.combos:
+            combo = self.combos[flag]
+            combo.handler_block(combo.update_handler)
+            combo.set_active(ls_index(combo.get_model(), getattr(attribs, flag), 0))
+            combo.handler_unblock(combo.update_handler)
+        
 instrument_window_map = {
     'stream_player' : StreamWindow,
     'fluidsynth' : FluidsynthWindow,
-    'sampler' : SamplerWindow
+    'sampler' : SamplerWindow,
+    'tonewheel_organ' : TonewheelOrganWindow
 }
 

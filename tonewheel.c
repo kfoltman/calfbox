@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config.h"
 #include "config-api.h"
+#include "cmd.h"
 #include "dspmath.h"
 #include "module.h"
 #include "onepole-int.h"
@@ -399,6 +400,73 @@ static void read_drawbars(int *drawbars, int count, const char *registration)
     }
 }
 
+static void tonewheel_organ_destroyfunc(struct cbox_module *module)
+{
+}
+
+#define SINGLE_SETTING(flag, max, field) \
+    else if (!strcmp(cmd->command, flag) && !strcmp(cmd->arg_types, "i")) \
+    { \
+        int setting = CBOX_ARG_I(cmd, 0); \
+        if (setting >= 0 && setting <= max) \
+            m->field = setting; \
+        return TRUE; \
+    } \
+
+gboolean tonewheel_organ_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct tonewheel_organ_module *m = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (int i = 0; i < 9; i++)
+        {
+            if (!cbox_execute_on(fb, NULL, "/upper_drawbar", "ii", error, i, m->upper_manual_drawbar_settings[i]))
+                return FALSE;
+            if (!cbox_execute_on(fb, NULL, "/lower_drawbar", "ii", error, i, m->lower_manual_drawbar_settings[i]))
+                return FALSE;
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            if (!cbox_execute_on(fb, NULL, "/pedal_drawbar", "ii", error, i, m->pedal_drawbar_settings[i]))
+                return FALSE;
+        }
+        return cbox_execute_on(fb, NULL, "/upper_vibrato", "i", error, m->enable_vibrato_upper) &&
+            cbox_execute_on(fb, NULL, "/lower_vibrato", "i", error, m->enable_vibrato_lower) &&
+            cbox_execute_on(fb, NULL, "/vibrato_mode", "i", error, m->vibrato_mode) &&
+            cbox_execute_on(fb, NULL, "/vibrato_chorus", "i", error, m->vibrato_mix) &&
+            cbox_execute_on(fb, NULL, "/percussion_enable", "i", error, m->enable_percussion) &&
+            cbox_execute_on(fb, NULL, "/percussion_3rd", "i", error, m->percussion_3rd) &&
+            CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
+    }
+    else if (!strcmp(cmd->command, "/upper_drawbar") && !strcmp(cmd->arg_types, "ii"))
+    {
+        int drawbar = CBOX_ARG_I(cmd, 0);
+        int setting = CBOX_ARG_I(cmd, 1);
+        if (drawbar >= 0 && drawbar <= 8 && setting >= 0 && setting <= 8)
+            m->upper_manual_drawbar_settings[drawbar] = setting;
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/lower_drawbar") && !strcmp(cmd->arg_types, "ii"))
+    {
+        int drawbar = CBOX_ARG_I(cmd, 0);
+        int setting = CBOX_ARG_I(cmd, 1);
+        if (drawbar >= 0 && drawbar <= 8 && setting >= 0 && setting <= 8)
+            m->lower_manual_drawbar_settings[drawbar] = setting;
+        return TRUE;
+    }
+    SINGLE_SETTING("/upper_vibrato", 1, enable_vibrato_upper)
+    SINGLE_SETTING("/lower_vibrato", 1, enable_vibrato_lower)
+    SINGLE_SETTING("/vibrato_mode", 2, vibrato_mode)
+    SINGLE_SETTING("/vibrato_chorus", 1, vibrato_mix)
+    SINGLE_SETTING("/percussion_enable", 1, enable_percussion)
+    SINGLE_SETTING("/percussion_3rd", 1, percussion_3rd)
+    else
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
+    return TRUE;
+}
+
 MODULE_CREATE_FUNCTION(tonewheel_organ)
 {
     static int inited = 0;
@@ -421,7 +489,7 @@ MODULE_CREATE_FUNCTION(tonewheel_organ)
     }
     
     struct tonewheel_organ_module *m = malloc(sizeof(struct tonewheel_organ_module));
-    CALL_MODULE_INIT_SIMPLE(m, 0, 2);
+    CALL_MODULE_INIT(m, 0, 2, tonewheel_organ);
     srate = m->module.srate;
     m->module.process_event = tonewheel_organ_process_event;
     m->module.process_block = tonewheel_organ_process_block;

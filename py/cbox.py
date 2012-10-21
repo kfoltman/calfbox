@@ -42,6 +42,8 @@ class GetThings:
                     getattr(self, cmd)[args[0]] = args[1]
                 else:
                     getattr(self, cmd)[args[0]] = args[1:]
+            elif len(args) == 1:
+                setattr(self, cmd, args[0])
         do_cmd(cmd, update_callback, args)
     def __str__(self):
         return str(self.seq)
