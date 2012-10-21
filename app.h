@@ -34,7 +34,6 @@ struct cbox_app
     struct cbox_rt *rt;
     struct cbox_command_target cmd_target;
     struct cbox_command_target config_cmd_target;
-    struct cbox_command_target waves_cmd_target;
     gchar *current_scene_name;
 };
 

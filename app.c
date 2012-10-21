@@ -415,7 +415,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             return cbox_execute_sub(&app.rt->master->song->cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "waves/", 6))
-            return cbox_execute_sub(&app.waves_cmd_target, fb, cmd, pos, error);
+            return cbox_execute_sub(&cbox_waves_cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "doc/", 4))
             return cbox_execute_sub(cbox_document_get_cmd_target(app.document), fb, cmd, pos, error);
@@ -631,72 +631,6 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct waves_foreach_data
-{
-    struct cbox_command_target *fb;
-    GError **error;
-    gboolean success;
-};
-
-void wave_list_cb(void *user_data, struct cbox_waveform *waveform)
-{
-    struct waves_foreach_data *wfd = user_data;
-    
-    wfd->success = wfd->success && cbox_execute_on(wfd->fb, NULL, "/waveform", "i", wfd->error, (int)waveform->id);
-}
-
-static gboolean waves_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
-{
-    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
-    {
-        if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
-        
-        // XXXKF this only supports 4GB - not a big deal for now yet?
-        return cbox_execute_on(fb, NULL, "/bytes", "i", error, (int)cbox_wavebank_get_bytes()) &&
-            cbox_execute_on(fb, NULL, "/max_bytes", "i", error, (int)cbox_wavebank_get_maxbytes()) &&
-            cbox_execute_on(fb, NULL, "/count", "i", error, (int)cbox_wavebank_get_count())
-            ;
-    }
-    else if (!strcmp(cmd->command, "/list") && !strcmp(cmd->arg_types, ""))
-    {
-        if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
-        
-        struct waves_foreach_data wfd = { fb, error, TRUE };
-        cbox_wavebank_foreach(wave_list_cb, &wfd);
-        return wfd.success;
-    }
-    else if (!strcmp(cmd->command, "/info") && !strcmp(cmd->arg_types, "i"))
-    {
-        if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
-        
-        int id = CBOX_ARG_I(cmd, 0);
-        struct cbox_waveform *waveform = cbox_wavebank_peek_waveform_by_id(id);
-        if (waveform == NULL)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Waveform %d not found", id);
-            return FALSE;
-        }
-        assert(id == waveform->id);
-        if (!cbox_execute_on(fb, NULL, "/filename", "s", error, waveform->canonical_name)) // XXXKF convert to utf8
-            return FALSE;
-        if (!cbox_execute_on(fb, NULL, "/name", "s", error, waveform->display_name))
-            return FALSE;
-        if (!cbox_execute_on(fb, NULL, "/bytes", "i", error, (int)waveform->bytes))
-            return FALSE;
-        return TRUE;
-    }
-    else
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
-        return FALSE;
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 void cbox_app_on_idle()
 {
     if (app.rt->io)
@@ -732,10 +666,5 @@ struct cbox_app app =
         .process_cmd = config_process_cmd,
         .user_data = &app
     },
-    .waves_cmd_target =
-    {
-        .process_cmd = waves_process_cmd,
-        .user_data = &app
-    }
 };
 

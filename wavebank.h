@@ -40,6 +40,8 @@ struct cbox_waveform
     gchar *display_name;
 };
 
+extern struct cbox_command_target cbox_waves_cmd_target;
+
 extern void cbox_wavebank_init();
 extern struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *filename, GError **error);
 extern struct cbox_waveform *cbox_wavebank_peek_waveform_by_id(int id);
@@ -51,5 +53,6 @@ extern void cbox_wavebank_close();
 
 extern void cbox_waveform_ref(struct cbox_waveform *waveform);
 extern void cbox_waveform_unref(struct cbox_waveform *waveform);
+
 
 #endif
