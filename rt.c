@@ -49,11 +49,32 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         if (rt->io)
+        {
+            const char *error_str = cbox_io_get_disconnect_status(rt->io);
             return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count) &&
+                cbox_execute_on(fb, NULL, "/state", "is", error, error_str ? -1 : 1, error_str ? error_str : "OK") &&
                 CBOX_OBJECT_DEFAULT_STATUS(rt, fb, error);
+        }
         else
             return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, 0, 2) &&
+                cbox_execute_on(fb, NULL, "/state", "is", error, 0, "Offline") &&
                 CBOX_OBJECT_DEFAULT_STATUS(rt, fb, error);
+    }
+    else if (!strcmp(cmd->command, "/cycle") && !strcmp(cmd->arg_types, ""))
+    {
+        if (rt->io && cbox_io_get_disconnect_status(rt->io))
+        {
+            cbox_io_cycle(rt->io);
+            return TRUE;
+        }
+        else
+        {
+            if (rt->io)
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Already connected");
+            else
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot cycle connection in off-line mode");
+            return FALSE;
+        }
     }
     else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
@@ -70,7 +91,8 @@ struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
     rt->io = NULL;
     rt->master = cbox_master_new(rt);
     rt->master->song = cbox_song_new(CBOX_GET_DOCUMENT(rt));
-    rt->started = 0;
+    rt->started = FALSE;
+    rt->disconnected = FALSE;
     rt->srate = 0;
     rt->buffer_size = 0;
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
@@ -87,6 +109,18 @@ struct cbox_objhdr *cbox_rt_newfunc(struct cbox_class *class_ptr, struct cbox_do
 
 void cbox_rt_destroyfunc(struct cbox_objhdr *obj_ptr)
 {
+}
+
+static void cbox_rt_on_disconnected(void *user_data)
+{
+    struct cbox_rt *rt = user_data;
+    rt->disconnected = TRUE;
+}
+
+static void cbox_rt_on_reconnected(void *user_data)
+{
+    struct cbox_rt *rt = user_data;
+    rt->disconnected = FALSE;
 }
 
 static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
@@ -192,6 +226,8 @@ void cbox_rt_start(struct cbox_rt *rt)
         rt->cbs = malloc(sizeof(struct cbox_io_callbacks));
         rt->cbs->user_data = rt;
         rt->cbs->process = cbox_rt_process;
+        rt->cbs->on_disconnected = cbox_rt_on_disconnected;
+        rt->cbs->on_reconnected = cbox_rt_on_reconnected;
 
         cbox_io_start(rt->io, rt->cbs);
     }
@@ -244,7 +280,7 @@ void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
             return;
         
     // No realtime thread - do it all in the main thread
-    if (!rt->started)
+    if (!rt->started || rt->disconnected)
     {
         def->execute(user_data);
         if (def->cleanup)

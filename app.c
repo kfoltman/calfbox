@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 
 int cmd_quit(struct cbox_menu_item_command *item, void *context)
 {
@@ -699,7 +700,20 @@ static gboolean waves_process_cmd(struct cbox_command_target *ct, struct cbox_co
 void cbox_app_on_idle()
 {
     if (app.rt->io)
-        cbox_io_poll_ports(&app.io);
+    {
+        const char *disconnect = cbox_io_get_disconnect_status(&app.io);
+        if (!disconnect)
+            cbox_io_poll_ports(&app.io);
+        else
+        {
+            int auto_reconnect = cbox_config_get_int("io", "auto_reconnect", 0);
+            if (auto_reconnect > 0)
+            {
+                sleep(auto_reconnect);
+                cbox_io_cycle(&app.io);
+            }
+        }
+    }
     if (app.rt)
         cbox_rt_handle_cmd_queue(app.rt);    
 }

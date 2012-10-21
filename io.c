@@ -46,13 +46,15 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
         status = 0;
         io->client = jack_client_open("cbox", 0, &status);
     }
+    if (io->client == NULL)
+        return 0;
+    io->rb_autoconnect = jack_ringbuffer_create(sizeof(jack_port_t *) * 128);
+
     // XXXKF would use a callback instead
     io->buffer_size = jack_get_buffer_size(io->client);
     io->cb = NULL;
+    io->error_str = NULL;
     
-    if (io->client == NULL)
-        return 0;
-
     io->input_count = cbox_config_get_int("io", "inputs", 0);
     io->inputs = malloc(sizeof(jack_port_t *) * io->input_count);
     io->input_buffers = malloc(sizeof(float *) * io->input_count);
@@ -270,12 +272,20 @@ int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *destinati
     return event_count;
 }
 
+static void client_shutdown_cb(jack_status_t code, const char *reason, void *arg)
+{
+    struct cbox_io *io = arg;
+    io->error_str = g_strdup(reason);
+    if (io->cb && io->cb->on_disconnected)
+        (io->cb->on_disconnected)(io->cb->user_data);
+}
+
 int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
 {
     io->cb = cb;
-    io->rb_autoconnect = jack_ringbuffer_create(sizeof(jack_port_t *) * 128);
     jack_set_process_callback(io->client, process_cb, io);
     jack_set_port_registration_callback(io->client, port_connect_cb, io);
+    jack_on_info_shutdown(io->client, client_shutdown_cb, io);
     jack_activate(io->client);
 
     if (cbox_config_has_section(io_section))
@@ -284,9 +294,30 @@ int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
     return 1;
 }
 
+const char *cbox_io_get_disconnect_status(struct cbox_io *io)
+{
+    return io->error_str;
+}
+
+int cbox_io_cycle(struct cbox_io *io)
+{
+    struct cbox_io_callbacks *cb = io->cb;
+    cbox_io_close(io);
+    
+    // XXXKF use params structure some day
+    if (!cbox_io_init(io, NULL))
+        return 0;
+    
+    cbox_io_start(io, cb);
+    if (cb->on_reconnected)
+        (cb->on_reconnected)(cb->user_data);
+    return 1;
+}
+
 int cbox_io_stop(struct cbox_io *io)
 {
-    jack_ringbuffer_free(io->rb_autoconnect);
+    if (io->error_str)
+        return 0;
     jack_deactivate(io->client);
     return 1;
 }
@@ -295,11 +326,20 @@ void cbox_io_close(struct cbox_io *io)
 {
     if (io->client)
     {
-        for (int i = 0; i < io->output_count; i++)
-            jack_port_unregister(io->client, io->outputs[i]);
-        if (io->midi)
-            jack_port_unregister(io->client, io->midi);
+        if (io->error_str)
+        {
+            g_free(io->error_str);
+            io->error_str = NULL;
+        }
+        else
+        {
+            for (int i = 0; i < io->output_count; i++)
+                jack_port_unregister(io->client, io->outputs[i]);
+            if (io->midi)
+                jack_port_unregister(io->client, io->midi);
+        }
         
+        jack_ringbuffer_free(io->rb_autoconnect);
         jack_client_close(io->client);
     }
 }

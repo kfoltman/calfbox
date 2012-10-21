@@ -48,6 +48,7 @@ struct cbox_io
     jack_ringbuffer_t *rb_autoconnect;
     
     struct cbox_io_callbacks *cb;
+    char *error_str; // set to non-NULL if client has been booted out by JACK
 };
 
 struct cbox_io_callbacks
@@ -55,6 +56,8 @@ struct cbox_io_callbacks
     void *user_data;
     
     void (*process)(void *user_data, struct cbox_io *io, uint32_t nframes);
+    void (*on_disconnected)(void *user_data);
+    void (*on_reconnected)(void *user_data);
 };
 
 extern int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params);
@@ -66,6 +69,8 @@ static inline int cbox_io_get_buffer_size(struct cbox_io *io)
     return io->buffer_size;
 }
 extern int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *destination);
+extern const char *cbox_io_get_disconnect_status(struct cbox_io *io);
+extern int cbox_io_cycle(struct cbox_io *io);
 extern void cbox_io_poll_ports(struct cbox_io *io);
 extern void cbox_io_close(struct cbox_io *io);
 

@@ -137,6 +137,20 @@ class SceneAuxBusesView(gtk.TreeView):
         row = self.get_cursor()[0][0]
         return row + 1, self.get_model()[row]
 
+class StatusBar(gtk.Statusbar):
+    def __init__(self):
+        gtk.Statusbar.__init__(self)
+        self.sample_rate_label = gtk.Label("")
+        self.pack_start(self.sample_rate_label, False, False)
+        self.status = self.get_context_id("Status")
+        self.sample_rate = self.get_context_id("Sample rate")
+        self.push(self.status, "")
+        self.push(self.sample_rate, "-")
+    def update(self, status, sample_rate):
+        self.pop(self.status)
+        self.push(self.status, status)
+        self.sample_rate_label.set_text("%s Hz" % sample_rate)
+
 class MainWindow(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
@@ -167,6 +181,7 @@ class MainWindow(gtk.Window):
             ("_Drum Kit Editor", self.tools_drumkit_editor),
             ("_Play Drum Pattern", self.tools_play_drum_pattern),
             ("_Edit Drum Pattern", self.tools_drum_pattern_editor),
+            ("_Un-zombify", self.tools_unzombify),
         ]))
         
         self.vbox.pack_start(self.menu_bar, False, False)
@@ -175,6 +190,8 @@ class MainWindow(gtk.Window):
         self.nb = gtk.Notebook()
         self.vbox.add(self.nb)
         self.nb.append_page(self.create_master(scene), gtk.Label("Master"))
+        self.status_bar = StatusBar()
+        self.vbox.pack_start(self.status_bar, False, False)
         self.create_instrument_pages(scene.status(), rt)
 
     def create_master(self, scene):
@@ -304,6 +321,9 @@ class MainWindow(gtk.Window):
         popup.show_all()
         popup.present()
         
+    def tools_unzombify(self, w):
+        cbox.do_cmd("/rt/cycle", None, [])
+
     def tools_drumkit_editor(self, w):
         if self.drumkit_editor is None:
             self.drumkit_editor = drumkit_editor.EditorDialog(self)
@@ -455,11 +475,13 @@ class MainWindow(gtk.Window):
             
     def update(self):
         cbox.do_cmd("/on_idle", None, [])
-        master = cbox.GetThings("/master/status", ['pos', 'pos_ppqn', 'tempo', 'timesig'], [])
+        master = cbox.GetThings("/master/status", ['pos', 'pos_ppqn', 'tempo', 'timesig', 'sample_rate'], [])
         if master.tempo is not None:
             self.master_info.set_markup('%s (%s)' % (master.pos, master.pos_ppqn))
             self.timesig_info.set_markup("%s/%s" % tuple(master.timesig))
             self.tempo_adj.set_value(master.tempo)
+        state = cbox.GetThings("/rt/status", ['state'], []).state
+        self.status_bar.update(state[1], master.sample_rate)
         return True
 
 def do_quit(window):

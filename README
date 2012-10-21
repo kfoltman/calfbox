@@ -29,6 +29,10 @@ midi=~alsa_pcm:in-.*-(E-MU-XMidi2X2-MIDI-.*|padKONTROL-MIDI-.*|Kurzweil-PC3-.*)
 ;MIDI autoconnect: connect all ports matching a regex
 midi=*alsa_pcm:in-.*-(E-MU-XMidi2X2-MIDI-.*|padKONTROL-MIDI-.*|Kurzweil-PC3-.*)
 
+;if kicked out by JACK, wait N seconds and reconnect; 0 = disable
+;OTOH one can always use /rt/cycle() (Tools/Unzombify)
+auto_reconnect=1
+
 ========================================================================
 
 [master]

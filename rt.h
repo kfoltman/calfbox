@@ -60,7 +60,7 @@ struct cbox_rt
     jack_ringbuffer_t *rb_execute, *rb_cleanup;
     
     struct cbox_command_target cmd_target;
-    int started;
+    int started, disconnected;
     int srate;
     int buffer_size;
 };
