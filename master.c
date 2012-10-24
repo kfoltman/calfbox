@@ -77,13 +77,15 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     else
     if (!strcmp(cmd->command, "/seek_samples") && !strcmp(cmd->arg_types, "i"))
     {
-        cbox_song_playback_seek_samples(m->spb, CBOX_ARG_I(cmd, 0));
+        if (m->spb)
+            cbox_song_playback_seek_samples(m->spb, CBOX_ARG_I(cmd, 0));
         return TRUE;
     }
     else
     if (!strcmp(cmd->command, "/seek_ppqn") && !strcmp(cmd->arg_types, "i"))
     {
-        cbox_song_playback_seek_ppqn(m->spb, CBOX_ARG_I(cmd, 0), FALSE);
+        if (m->spb)
+            cbox_song_playback_seek_ppqn(m->spb, CBOX_ARG_I(cmd, 0), FALSE);
         return TRUE;
     }
     else
