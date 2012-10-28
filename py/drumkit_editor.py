@@ -300,7 +300,7 @@ class FileView(Gtk.TreeView):
         self.set_cursor((0,))
         self.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
         self.drag_source_add_text_targets()
-        self.connect('cursor-changed', self.cursor_changed)
+        self.cursor_changed_handler = self.connect('cursor-changed', self.cursor_changed)
         self.connect('drag-data-get', self.drag_data_get)
         self.connect('row-activated', self.on_row_activated)
 
@@ -328,7 +328,11 @@ class FileView(Gtk.TreeView):
         fn, label = self.files_model[c[0].get_indices()[0]]
         if fn.endswith("/"):
             print "select dir %s" % fn
-            self.get_model().refresh(fn)
+            try:
+                self.handler_block(self.cursor_changed_handler)
+                self.get_model().refresh(fn)
+            finally:
+                self.handler_unblock(self.cursor_changed_handler)                
             return
         
 
