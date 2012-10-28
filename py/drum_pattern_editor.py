@@ -240,7 +240,7 @@ class DrumCanvasCursor(object):
         self.canvas_root = canvas.get_root_item()
         self.frame = GooCanvas.CanvasRect(parent = self.canvas_root, x = -6, y = -6, width = 12, height = 12 , stroke_color = "gray", line_width = 1)
         hide_item(self.frame)
-        self.vel = GooCanvas.CanvasText(parent = self.canvas_root, x = 0, y = 0, fill_color = "blue", stroke_color = "blue", anchor = 1)
+        self.vel = GooCanvas.CanvasText(parent = self.canvas_root, x = 0, y = 0, fill_color = "blue", stroke_color = "blue", anchor = GooCanvas.CanvasAnchorType.S)
         hide_item(self.vel)
         self.rubberband = False
         self.rubberband_origin = None
@@ -368,7 +368,7 @@ class DrumCanvas(GooCanvas.Canvas):
             i.destroy()
         for i in range(0, self.rows):
             #GooCanvas.CanvasText(parent = self.names, text = gui_tools.note_to_name(i), x = self.instr_width - 10, y = (i + 0.5) * self.row_height, anchor = Gtk.AnchorType.E, size_points = 10, font = "Sans", size_set = True)
-            GooCanvas.CanvasText(parent = self.names, text = gui_tools.note_to_name(i), x = self.instr_width - 10, y = (i + 0.5) * self.row_height, anchor = 8, font = "Sans")
+            GooCanvas.CanvasText(parent = self.names, text = gui_tools.note_to_name(i), x = self.instr_width - 10, y = (i + 0.5) * self.row_height, anchor = GooCanvas.CanvasAnchorType.E, font = "Sans")
         
     def update_grid(self):
         for i in self.grid.items:
