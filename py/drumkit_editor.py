@@ -9,9 +9,9 @@ sample_dir = cbox.Config.get("init", "sample_dir")
 
 ####################################################################################################################################################
 
-class SampleDirsModel(gtk.ListStore):
+class SampleDirsModel(Gtk.ListStore):
     def __init__(self):
-        gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_STRING)
+        Gtk.ListStore.__init__(self, GObject.TYPE_STRING, GObject.TYPE_STRING)
         for entry in cbox.Config.keys("sample_dirs"):
             path = cbox.Config.get("sample_dirs", entry)
             self.append((entry, path))
@@ -20,10 +20,10 @@ class SampleDirsModel(gtk.ListStore):
 
 ####################################################################################################################################################
 
-class SampleFilesModel(gtk.ListStore):
+class SampleFilesModel(Gtk.ListStore):
     def __init__(self, dirs_model):
         self.dirs_model = dirs_model
-        gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_STRING)
+        Gtk.ListStore.__init__(self, GObject.TYPE_STRING, GObject.TYPE_STRING)
         
     def refresh(self, sample_dir):
         self.clear()
@@ -108,10 +108,10 @@ class KeySampleModel(object):
 
 ####################################################################################################################################################
 
-class KeyModel(gtk.ListStore):
+class KeyModel(Gtk.ListStore):
     def __init__(self, key):
         self.key = key
-        gtk.ListStore.__init__(self, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+        Gtk.ListStore.__init__(self, GObject.TYPE_STRING, GObject.TYPE_PYOBJECT)
     def to_sfz(self):
         return "".join([ksm.to_sfz() for name, ksm in self])
     def to_markup(self):
@@ -156,16 +156,18 @@ class BankModel(dict):
 
 ####################################################################################################################################################
 
-class LayerListView(gtk.TreeView):
+class LayerListView(Gtk.TreeView):
     def __init__(self, controller):
-        gtk.TreeView.__init__(self, None)
+        Gtk.TreeView.__init__(self, None)
         self.controller = controller
-        self.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=0)
+        self.insert_column_with_attributes(0, "Name", Gtk.CellRendererText(), text=0)
         self.set_cursor((0,))
-        #self.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, [("text/plain", 0, 1)], gtk.gdk.ACTION_COPY)
+        #self.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, [("text/plain", 0, 1)], Gdk.DragAction.COPY)
         self.connect('cursor-changed', self.cursor_changed)
         #self.connect('drag-data-get', self.drag_data_get)
-        self.drag_dest_set(gtk.DEST_DEFAULT_ALL, [("text/plain", 0, 1)], gtk.gdk.ACTION_COPY)
+        self.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
+        self.drag_dest_set_target_list(None)
+        self.drag_dest_add_text_targets()
         self.connect('drag_data_received', self.drag_data_received)
     def cursor_changed(self, w):
         self.controller.on_layer_changed()
@@ -178,20 +180,20 @@ class LayerListView(gtk.TreeView):
 
 ####################################################################################################################################################
 
-class LayerEditor(gtk.VBox):
+class LayerEditor(Gtk.VBox):
     def __init__(self, controller, bank_model):
-        gtk.VBox.__init__(self)
-        self.table = gtk.Table(len(self.fields) + 1, 2)
+        Gtk.VBox.__init__(self)
+        self.table = Gtk.Table(len(self.fields) + 1, 2)
         self.table.set_size_request(240, -1)
         self.controller = controller
         self.bank_model = bank_model
-        self.name_widget = gtk.Label()
+        self.name_widget = Gtk.Label()
         self.table.attach(self.name_widget, 0, 2, 0, 1)
         self.refreshers = []
         for i in range(len(self.fields)):
             self.refreshers.append(self.fields[i].add_row(self.table, i + 1, KeyModelPath(controller), None))
             #self.table.attach(left_label(self.fields[i].label), 0, 1, i + 1, i + 2)
-        self.pack_start(self.table, False, False)
+        self.pack_start(self.table, False, False, 0)
         
     def refresh(self):
         data = self.controller.get_current_layer_model()
@@ -232,16 +234,18 @@ class LayerEditor(gtk.VBox):
     
 ####################################################################################################################################################
 
-class PadButton(gtk.RadioButton):
+class PadButton(Gtk.RadioButton):
     def __init__(self, controller, bank_model, key):
-        gtk.RadioButton.__init__(self, use_underline = False)
+        Gtk.RadioButton.__init__(self, use_underline = False)
         self.set_mode(False)
         self.controller = controller
         self.bank_model = bank_model
         self.key = key
         self.set_size_request(100, 100)
         self.update_label()
-        self.drag_dest_set(gtk.DEST_DEFAULT_ALL, [("text/plain", 0, 1)], gtk.gdk.ACTION_COPY)
+        self.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
+        self.drag_dest_set_target_list(None)
+        self.drag_dest_add_text_targets()
         self.connect('drag_data_received', self.drag_data_received)
         self.connect('toggled', lambda widget: widget.controller.on_pad_selected(widget) if widget.get_active() else None)
         self.connect('pressed', self.on_clicked)
@@ -266,9 +270,9 @@ class PadButton(gtk.RadioButton):
 
 ####################################################################################################################################################
 
-class PadTable(gtk.Table):
+class PadTable(Gtk.Table):
     def __init__(self, controller, bank_model, rows, columns):
-        gtk.Table.__init__(self, rows, columns, True)
+        Gtk.Table.__init__(self, rows, columns, True)
         
         self.keys = {}
         group = None
@@ -276,11 +280,9 @@ class PadTable(gtk.Table):
             for c in range(0, columns):
                 key = 36 + (rows - r - 1) * columns + c
                 b = PadButton(controller, bank_model, key)
-                b.set_group(group)
-                a = gtk.Alignment(0.5, 0.5)
-                a.add(b)
-                group = b
-                self.attach(a, c, c + 1, r, r + 1)
+                if group is not None:
+                    b.set_group(group)
+                self.attach(standard_align(b, 0.5, 0.5, 0, 0), c, c + 1, r, r + 1)
                 self.keys[key] = b
     def refresh(self):
         for pad in self.keys.values():
@@ -288,14 +290,14 @@ class PadTable(gtk.Table):
 
 ####################################################################################################################################################
 
-class FileView(gtk.TreeView):
+class FileView(Gtk.TreeView):
     def __init__(self, dirs_model):
         self.dirs_model = dirs_model
         self.files_model = SampleFilesModel(dirs_model)
-        gtk.TreeView.__init__(self, self.files_model)
-        self.insert_column_with_attributes(0, "Name", gtk.CellRendererText(), text=1)
+        Gtk.TreeView.__init__(self, self.files_model)
+        self.insert_column_with_attributes(0, "Name", Gtk.CellRendererText(), text=1)
         self.set_cursor((0,))
-        self.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, [("text/plain", 0, 1)], gtk.gdk.ACTION_COPY)
+        self.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, [("text/plain", 0, 1)], Gdk.DragAction.COPY)
         self.connect('cursor-changed', self.cursor_changed)
         self.connect('drag-data-get', self.drag_data_get)
         self.connect('row-activated', self.on_row_activated)
@@ -303,7 +305,7 @@ class FileView(gtk.TreeView):
     def cursor_changed(self, w):
         c = self.get_cursor()
         if c[0] is not None:
-            fn = self.files_model[c[0][0]][0]
+            fn = self.files_model[c[0].get_indices()[0]][0]
             if fn.endswith("/"):
                 return
             if fn != "":
@@ -321,7 +323,7 @@ class FileView(gtk.TreeView):
             
     def on_row_activated(self, treeview, path, column):
         c = self.get_cursor()
-        fn, label = self.files_model[c[0][0]]
+        fn, label = self.files_model[c[0].get_indices()[0]]
         if fn.endswith("/"):
             print "select dir %s" % fn
             self.get_model().refresh(fn)
@@ -330,24 +332,24 @@ class FileView(gtk.TreeView):
 
 ####################################################################################################################################################
 
-class EditorDialog(gtk.Dialog):
+class EditorDialog(Gtk.Dialog):
     def __init__(self, parent):
-        gtk.Dialog.__init__(self, "Drum kit editor", parent, gtk.DIALOG_DESTROY_WITH_PARENT, 
+        Gtk.Dialog.__init__(self, "Drum kit editor", parent, Gtk.DialogFlags.DESTROY_WITH_PARENT, 
             ())
 
-        self.menu_bar = gtk.MenuBar()
+        self.menu_bar = Gtk.MenuBar()
         self.menu_bar.append(create_menu("_Kit", [
             ("_New", self.on_kit_new),
             ("_Open...", self.on_kit_open),
             ("_Save as...", self.on_kit_save_as),
-            ("_Close", lambda w: self.response(gtk.RESPONSE_OK)),
+            ("_Close", lambda w: self.response(Gtk.RESPONSE_OK)),
         ]))
         self.menu_bar.append(create_menu("_Layer", [
             ("_Delete", self.on_layer_delete),
         ]))
-        self.vbox.pack_start(self.menu_bar, False, False)
+        self.vbox.pack_start(self.menu_bar, False, False, 0)
         
-        self.hbox = gtk.HBox(spacing = 5)
+        self.hbox = Gtk.HBox(spacing = 5)
         
         self.update_source = None
         self.current_pad = None
@@ -357,40 +359,40 @@ class EditorDialog(gtk.Dialog):
         self.layer_list = LayerListView(self)
         self.layer_editor = LayerEditor(self, self.bank_model)
         
-        combo = gtk.ComboBox(self.dirs_model)
-        cell = gtk.CellRendererText()
+        combo = Gtk.ComboBox(model = self.dirs_model)
+        cell = Gtk.CellRendererText()
         combo.pack_start(cell, True)
         combo.add_attribute(cell, 'text', 0)
         combo.connect('changed', lambda cb: self.tree.files_model.refresh(cb.get_model()[cb.get_active()][1]))
         combo.set_active(0)
-        sw = gtk.ScrolledWindow()
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
+        sw = Gtk.ScrolledWindow()
+        sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.ALWAYS)
         sw.add(self.tree)
         
-        left_box = gtk.VBox(spacing = 5)
-        left_box.pack_start(combo, False, False)
-        left_box.pack_start(sw)
-        self.hbox.pack_start(left_box, True, True)
+        left_box = Gtk.VBox(spacing = 5)
+        left_box.pack_start(combo, False, False, 0)
+        left_box.pack_start(sw, True, True, 5)
+        self.hbox.pack_start(left_box, True, True, 0)
         sw.set_size_request(200, -1)
         
         self.pads = PadTable(self, self.bank_model, 4, 4)
-        self.hbox.pack_start(self.pads, True, True)
+        self.hbox.pack_start(self.pads, True, True, 5)
         
-        right_box = gtk.VBox(spacing = 5)
-        sw = gtk.ScrolledWindow()
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
+        right_box = Gtk.VBox(spacing = 5)
+        sw = Gtk.ScrolledWindow()
+        sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.ALWAYS)
         sw.set_size_request(320, 100)
-        sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        sw.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
         sw.add(self.layer_list)
-        right_box.pack_start(sw, True, True)
-        sw = gtk.ScrolledWindow()
+        right_box.pack_start(sw, True, True, 0)
+        sw = Gtk.ScrolledWindow()
         sw.set_size_request(320, 200)
-        sw.set_policy(gtk.POLICY_NEVER, gtk.POLICY_ALWAYS)
+        sw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.ALWAYS)
         sw.add_with_viewport(self.layer_editor)
-        right_box.pack_start(sw, True, True)
-        self.hbox.pack_start(right_box, True, True)
+        right_box.pack_start(sw, True, True, 0)
+        self.hbox.pack_start(right_box, True, True, 0)
         
-        self.vbox.pack_start(self.hbox)
+        self.vbox.pack_start(self.hbox, False, False, 0)
         self.vbox.show_all()
         widget = self.pads.keys[36]
         widget.set_active(True)
@@ -450,12 +452,12 @@ class EditorDialog(gtk.Dialog):
         self.update_kit()
 
     def on_kit_open(self, widget):
-        dlg = gtk.FileChooserDialog('Open a pad bank', self, gtk.FILE_CHOOSER_ACTION_OPEN,
-            (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_APPLY))
+        dlg = Gtk.FileChooserDialog('Open a pad bank', self, Gtk.FileChooserAction.OPEN,
+            (Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL, Gtk.STOCK_OPEN, Gtk.RESPONSE_APPLY))
         dlg.add_filter(standard_filter(["*.sfz", "*.SFZ"], "SFZ files"))
         dlg.add_filter(standard_filter(["*"], "All files"))
         try:
-            if dlg.run() == gtk.RESPONSE_APPLY:
+            if dlg.run() == Gtk.RESPONSE_APPLY:
                 sfz_data = file(dlg.get_filename(), "r").read()
                 self.bank_model.from_sfz(sfz_data, dlg.get_current_folder())
             self.pads.refresh()
@@ -465,12 +467,12 @@ class EditorDialog(gtk.Dialog):
             dlg.destroy()
 
     def on_kit_save_as(self, widget):
-        dlg = gtk.FileChooserDialog('Save a pad bank', self, gtk.FILE_CHOOSER_ACTION_SAVE, 
-            (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_APPLY))
+        dlg = Gtk.FileChooserDialog('Save a pad bank', self, Gtk.FileChooserAction.SAVE, 
+            (Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL, Gtk.STOCK_SAVE, Gtk.RESPONSE_APPLY))
         dlg.add_filter(standard_filter(["*.sfz", "*.SFZ"], "SFZ files"))
         dlg.add_filter(standard_filter(["*"], "All files"))
         try:
-            if dlg.run() == gtk.RESPONSE_APPLY:
+            if dlg.run() == Gtk.RESPONSE_APPLY:
                 file(dlg.get_filename(), "w").write(self.bank_model.to_sfz())
         finally:
             dlg.destroy()

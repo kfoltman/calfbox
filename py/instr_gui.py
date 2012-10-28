@@ -1,15 +1,15 @@
 import cbox
 from gui_tools import *
 
-class StreamWindow(gtk.VBox):
+class StreamWindow(Gtk.VBox):
     def __init__(self, instrument, path):
-        gtk.Widget.__init__(self)
+        Gtk.Widget.__init__(self)
         self.path = path
         
-        panel = gtk.VBox(spacing=5)
+        panel = Gtk.VBox(spacing=5)
         
-        self.filebutton = gtk.FileChooserButton("Streamed file")
-        self.filebutton.set_action(gtk.FILE_CHOOSER_ACTION_OPEN)
+        self.filebutton = Gtk.FileChooserButton("Streamed file")
+        self.filebutton.set_action(Gtk.FileChooserAction.OPEN)
         self.filebutton.set_local_only(True)
         self.filebutton.set_filename(cbox.GetThings("%s/status" % self.path, ['filename'], []).filename)
         self.filebutton.add_filter(standard_filter(["*.wav", "*.WAV", "*.ogg", "*.OGG", "*.flac", "*.FLAC"], "All loadable audio files"))
@@ -18,21 +18,21 @@ class StreamWindow(gtk.VBox):
         self.filebutton.add_filter(standard_filter(["*.flac", "*.FLAC"], "FLAC files"))
         self.filebutton.add_filter(standard_filter(["*"], "All files"))
         self.filebutton.connect('file-set', self.file_set)
-        panel.pack_start(self.filebutton, False, False)
+        panel.pack_start(self.filebutton, False, False, 5)
 
-        self.adjustment = gtk.Adjustment()
+        self.adjustment = Gtk.Adjustment()
         self.adjustment_handler = self.adjustment.connect('value-changed', self.pos_slider_moved)
         self.progress = standard_hslider(self.adjustment)
-        panel.pack_start(self.progress, False, False)
+        panel.pack_start(self.progress, False, False, 5)
 
-        self.play_button = gtk.Button(label = "_Play")
-        self.rewind_button = gtk.Button(label = "_Rewind")
-        self.stop_button = gtk.Button(label = "_Stop")
-        buttons = gtk.HBox(spacing = 5)
+        self.play_button = Gtk.Button.new_with_mnemonic("_Play")
+        self.rewind_button = Gtk.Button.new_with_mnemonic("_Rewind")
+        self.stop_button = Gtk.Button.new_with_mnemonic("_Stop")
+        buttons = Gtk.HBox(spacing = 5)
         buttons.add(self.play_button)
         buttons.add(self.rewind_button)
         buttons.add(self.stop_button)
-        panel.pack_start(buttons, False, False)
+        panel.pack_start(buttons, False, False, 5)
         
         self.add(panel)
         self.play_button.connect('clicked', lambda x: cbox.do_cmd("%s/play" % self.path, None, []))
@@ -43,10 +43,11 @@ class StreamWindow(gtk.VBox):
     def update(self):
         attribs = cbox.GetThings("%s/status" % self.path, ['filename', 'pos', 'length', 'playing'], [])
         self.progress.set_sensitive(attribs.length is not None)
-        self.adjustment.handler_block(self.adjustment_handler)
         if attribs.length is not None:
             try:
-                self.adjustment.set_all(attribs.pos, 0, attribs.length, 44100, 44100 * 10, 0)
+                self.adjustment.handler_block(self.adjustment_handler)
+                self.adjustment.set_properties(value = attribs.pos, lower = 0, upper = attribs.length)
+                #self.adjustment.set_all(attribs.pos, 0, attribs.length, 44100, 44100 * 10, 0)
             finally:
                 self.adjustment.handler_unblock(self.adjustment_handler)
         return True
@@ -60,17 +61,17 @@ class StreamWindow(gtk.VBox):
 
 class WithPatchTable:
     def __init__(self, attribs):
-        self.patches = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
+        self.patches = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_INT)
         self.patch_combos = []
         
-        self.table = gtk.Table(2, 16)
+        self.table = Gtk.Table(2, 16)
         self.table.set_col_spacings(5)
 
         for i in range(16):
-            self.table.attach(bold_label("Channel %s" % (1 + i)), 0, 1, i, i + 1, gtk.SHRINK, gtk.SHRINK)
+            self.table.attach(bold_label("Channel %s" % (1 + i)), 0, 1, i, i + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
             cb = standard_combo(self.patches, None)
             cb.connect('changed', self.patch_combo_changed, i + 1)
-            self.table.attach(cb, 1, 2, i, i + 1, gtk.SHRINK, gtk.SHRINK)
+            self.table.attach(cb, 1, 2, i, i + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
             self.patch_combos.append(cb)
 
         self.update_model()
@@ -102,20 +103,20 @@ class WithPatchTable:
         #self.status_label.set_markup(s)
         return True
         
-class FluidsynthWindow(gtk.VBox, WithPatchTable):
+class FluidsynthWindow(Gtk.VBox, WithPatchTable):
     def __init__(self, instrument, path):
-        gtk.VBox.__init__(self)
+        Gtk.VBox.__init__(self)
         self.path = path
         
         attribs = cbox.GetThings("%s/status" % self.path, ['%patch', 'polyphony'], [])
 
-        panel = gtk.VBox(spacing=5)
-        table = gtk.Table(2, 1)
+        panel = Gtk.VBox(spacing=5)
+        table = Gtk.Table(2, 1)
         IntSliderRow("Polyphony", "polyphony", 2, 256).add_row(table, 0, cbox.VarPath(self.path), attribs)
-        panel.pack_start(table, False, False)
+        panel.pack_start(table, False, False, 5)
         
         WithPatchTable.__init__(self, attribs)
-        panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True)
+        panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True, 5)
         self.add(panel)
 
 class LoadProgramDialog(SelectObjectDialog):
@@ -130,33 +131,33 @@ class LoadProgramDialog(SelectObjectDialog):
             else:
                 model.append((s.name[5:], "SFZ", s.name, title))    
 
-class SamplerWindow(gtk.VBox, WithPatchTable):
+class SamplerWindow(Gtk.VBox, WithPatchTable):
     def __init__(self, instrument, path):
-        gtk.VBox.__init__(self)
+        Gtk.VBox.__init__(self)
         self.path = path
         
         attribs = cbox.GetThings("%s/status" % self.path, ['%patch', 'polyphony', 'active_voices'], [])
 
-        panel = gtk.VBox(spacing=5)
-        table = gtk.Table(2, 2)
+        panel = Gtk.VBox(spacing=5)
+        table = Gtk.Table(2, 2)
         table.set_col_spacings(5)
         IntSliderRow("Polyphony", "polyphony", 1, 128).add_row(table, 0, cbox.VarPath(self.path), attribs)
         self.voices_widget = add_display_row(table, 1, "Voices in use", cbox.VarPath(self.path), attribs, "active_voices")
-        panel.pack_start(table, False, False)
+        panel.pack_start(table, False, False, 5)
         
         WithPatchTable.__init__(self, attribs)
-        panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True)
+        panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True, 5)
         self.add(panel)
-        load_button = gtk.Button("_Load")
+        load_button = Gtk.Button("_Load")
         load_button.connect('clicked', self.load)
-        panel.pack_start(load_button, False, True)
+        panel.pack_start(load_button, False, True, 5)
         set_timer(self, 200, self.voices_update)
         
     def load(self, event):
         d = LoadProgramDialog(self.get_toplevel())
         response = d.run()
         try:
-            if response == gtk.RESPONSE_OK:
+            if response == Gtk.RESPONSE_OK:
                 scene = d.get_selected_object()
                 pgm_id = cbox.GetThings("%s/get_unused_program" % self.path, ['program_no'], []).program_no
                 cbox.do_cmd("%s/load_patch" % self.path, None, [pgm_id, scene[2], scene[2][5:]])
@@ -169,7 +170,7 @@ class SamplerWindow(gtk.VBox, WithPatchTable):
         self.voices_widget.set_text(str(attribs.active_voices))
         return True
 
-class TonewheelOrganWindow(gtk.VBox):
+class TonewheelOrganWindow(Gtk.VBox):
     combos = [
         (1, 'Upper', 'upper_vibrato', [(0, 'Off'), (1, 'On')]),
         (1, 'Lower', 'lower_vibrato', [(0, 'Off'), (1, 'On')]),
@@ -179,40 +180,40 @@ class TonewheelOrganWindow(gtk.VBox):
         (2, 'Harmonic', 'percussion_3rd', [(0, '2nd'), (1, '3rd')]),
     ]
     def __init__(self, instrument, path):
-        gtk.VBox.__init__(self)
+        Gtk.VBox.__init__(self)
         self.path = path
-        panel = gtk.VBox(spacing=10)
-        table = gtk.Table(4, 10)
+        panel = Gtk.VBox(spacing=10)
+        table = Gtk.Table(4, 10)
         table.props.row_spacing = 10
         table.set_col_spacings(5)
         self.drawbars = {}
         self.hboxes = {}
-        self.hboxes[1] = gtk.HBox(spacing = 10)
-        self.hboxes[1].pack_start(gtk.Label('Vibrato: '), False, False)
-        self.hboxes[2] = gtk.HBox(spacing = 10)
-        self.hboxes[2].pack_start(gtk.Label('Percussion: '), False, False)
+        self.hboxes[1] = Gtk.HBox(spacing = 10)
+        self.hboxes[1].pack_start(Gtk.Label('Vibrato: '), False, False, 5)
+        self.hboxes[2] = Gtk.HBox(spacing = 10)
+        self.hboxes[2].pack_start(Gtk.Label('Percussion: '), False, False, 5)
         self.combos = {}
         for row, name, flag, options in TonewheelOrganWindow.combos:
-            label = gtk.Label(name)
-            self.hboxes[row].pack_start(label, False, False)
-            model = gtk.ListStore(gobject.TYPE_INT, gobject.TYPE_STRING)
+            label = Gtk.Label(name)
+            self.hboxes[row].pack_start(label, False, False, 5)
+            model = Gtk.ListStore(GObject.TYPE_INT, GObject.TYPE_STRING)
             for oval, oname in options:
                 model.append((oval, oname))
             combo = standard_combo(model, column = 1)
-            self.hboxes[row].pack_start(combo, False, False)
+            self.hboxes[row].pack_start(combo, False, False, 5)
             combo.update_handler = combo.connect('changed', lambda w, path: cbox.do_cmd(path, None, [w.get_model()[w.get_active()][0]]), path + '/' + flag)
             self.combos[flag] = combo
-        panel.pack_start(self.hboxes[1], False, False)
-        panel.pack_start(self.hboxes[2], False, False)
-        table.attach(gtk.Label("Upper"), 0, 1, 0, 1)
-        table.attach(gtk.Label("Lower"), 0, 1, 1, 2)
+        panel.pack_start(self.hboxes[1], False, False, 5)
+        panel.pack_start(self.hboxes[2], False, False, 5)
+        table.attach(Gtk.Label("Upper"), 0, 1, 0, 1)
+        table.attach(Gtk.Label("Lower"), 0, 1, 1, 2)
         for i in range(9):
-            slider = gtk.VScale(gtk.Adjustment(0, 0, 8, 1, 1))
+            slider = Gtk.VScale(Gtk.Adjustment(0, 0, 8, 1, 1))
             slider.props.digits = 0
             table.attach(slider, i + 1, i + 2, 0, 1)
             self.drawbars['u%d' % i] = slider.get_adjustment()
             slider.get_adjustment().connect('value-changed', lambda adj, path, drawbar: cbox.do_cmd(path + '/upper_drawbar', None, [drawbar, int(adj.get_value())]), self.path, i)
-            slider = gtk.VScale(gtk.Adjustment(0, 0, 8, 1, 1))
+            slider = Gtk.VScale(Gtk.Adjustment(0, 0, 8, 1, 1))
             slider.props.digits = 0
             table.attach(slider, i + 1, i + 2, 1, 2)
             self.drawbars['l%d' % i] = slider.get_adjustment()

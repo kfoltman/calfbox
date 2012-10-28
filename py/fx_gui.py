@@ -3,48 +3,48 @@ from gui_tools import *
 
 #################################################################################################################################
 
-class EffectWindow(gtk.Window):
+class EffectWindow(Gtk.Window):
     engine_name = None
     
     def __init__(self, location, main_window, path):
-        gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
-        self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_UTILITY)
+        Gtk.Window.__init__(self, Gtk.WindowType.TOPLEVEL)
+        self.set_type_hint(Gdk.WindowTypeHint.UTILITY)
         self.set_transient_for(main_window)
         self.main_window = main_window
         self.path = path
         self.vpath = cbox.VarPath(path)
         self.set_title("%s - %s" % (self.effect_name, location))
-        self.vbox = gtk.VBox()
-        menu_bar = gtk.MenuBar()
+        self.vbox = Gtk.VBox()
+        menu_bar = Gtk.MenuBar()
         menu_bar.append(create_menu("_Effect", [
             ("_Save as...", self.on_effect_save_as if self.engine_name is not None else None),
             ("_Close", lambda w: self.destroy()),
         ]))
-        self.vbox.pack_start(menu_bar, False, False)
+        self.vbox.pack_start(menu_bar, False, False, 0)
         if hasattr(self, 'params'):
             values = cbox.GetThings(self.path + "/status", [p.name for p in self.params], [])
             self.refreshers = []
-            t = gtk.Table(2, len(self.params))
+            t = Gtk.Table(2, len(self.params))
             for i in range(len(self.params)):
                 p = self.params[i]
-                t.attach(p.create_label(), 0, 1, i, i+1, gtk.SHRINK | gtk.FILL, gtk.SHRINK)
+                t.attach(p.create_label(), 0, 1, i, i+1, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
                 widget, refresher = p.create_widget(self.vpath)
                 refresher(values)
-                t.attach(widget, 1, 2, i, i+1, gtk.EXPAND | gtk.FILL, gtk.SHRINK)
+                t.attach(widget, 1, 2, i, i+1, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
                 self.refreshers.append(refresher)
-            self.vbox.pack_start(t, True, True)
+            self.vbox.pack_start(t, True, True, 5)
         self.add(self.vbox)
         
     def create_param_table(self, cols, rows, values, extra_rows = 0):
-        t = gtk.Table(4, rows + 1 + extra_rows)
+        t = Gtk.Table(4, rows + 1 + extra_rows)
         self.cols = cols
         self.table_refreshers = []
         for i in range(len(self.cols)):
             par = self.cols[i]
-            t.attach(par.create_label(), i, i + 1, 0, 1, gtk.SHRINK | gtk.FILL)
+            t.attach(par.create_label(), i, i + 1, 0, 1, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL)
             for j in range(rows):
                 widget, refresher = par.create_widget(self.vpath.plus(None, j))
-                t.attach(widget, i, i + 1, j + 1, j + 2, gtk.EXPAND | gtk.FILL)
+                t.attach(widget, i, i + 1, j + 1, j + 2, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL)
                 refresher(values)
                 self.table_refreshers.append(refresher)
         return t
@@ -72,7 +72,7 @@ class EffectWindow(gtk.Window):
             
         dlg = SaveConfigObjectDialog(self, "Select name for effect preset")
         try:
-            if dlg.run() == gtk.RESPONSE_OK and dlg.get_name() != "":
+            if dlg.run() == Gtk.RESPONSE_OK and dlg.get_name() != "":
                 cs = cbox.CfgSection("fxpreset:" + dlg.get_name())
                 for name in sorted(data.keys()):
                     cs[name] = data[name]
@@ -216,10 +216,10 @@ class FBRWindow(EffectWindow, EQCommon):
         values = cbox.GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
         t = self.create_param_table(self.columns, 16, values, 1)        
         self.vbox.add(t)
-        self.ready_label = gtk.Label("-")
+        self.ready_label = Gtk.Label("-")
         t.attach(self.ready_label, 0, 2, 17, 18)
         set_timer(self, 100, self.update)
-        sbutton = gtk.Button("_Start")
+        sbutton = Gtk.Button.new_with_mnemonic("_Start")
         sbutton.connect("clicked", lambda button, path: cbox.do_cmd(path + "/start", None, []), self.path)
         t.attach(sbutton, 2, 4, 17, 18)
         
@@ -256,17 +256,17 @@ class FXChainWindow(EffectWindow):
         values = res.module
         bypass = res.bypass
         fx_count = len(values)
-        t = gtk.Table(fx_count + 2, 9)
+        t = Gtk.Table(fx_count + 2, 9)
         for c in self.choosers:
             c.close_popup()
         self.choosers = []
         for i in range(1, fx_count + 1):
             engine, preset = values[i - 1]
             chooser = InsertEffectChooser("%s/module/%s" % (self.path, i), "%s: slot %s" % (self.get_title(), i), engine, preset, bypass[i], self.main_window)
-            t.attach(chooser.fx_engine, 0, 1, i, i + 1, 0, gtk.SHRINK)
-            t.attach(chooser.fx_preset, 1, 2, i, i + 1, 0, gtk.SHRINK)
-            t.attach(chooser.fx_edit, 2, 3, i, i + 1, 0, gtk.SHRINK)
-            t.attach(chooser.fx_bypass, 3, 4, i, i + 1, 0, gtk.SHRINK)
+            t.attach(chooser.fx_engine, 0, 1, i, i + 1, 0, Gtk.AttachOptions.SHRINK)
+            t.attach(chooser.fx_preset, 1, 2, i, i + 1, 0, Gtk.AttachOptions.SHRINK)
+            t.attach(chooser.fx_edit, 2, 3, i, i + 1, 0, Gtk.AttachOptions.SHRINK)
+            t.attach(chooser.fx_bypass, 3, 4, i, i + 1, 0, Gtk.AttachOptions.SHRINK)
             buttons = [
                 ("+", self.on_add_clicked, lambda pos: True),
                 ("-", self.on_delete_clicked, lambda pos: True),
@@ -277,16 +277,16 @@ class FXChainWindow(EffectWindow):
                 label, method, cond = buttons[j]
                 if not cond(i):
                     continue
-                button = gtk.Button(label)
+                button = Gtk.Button(label)
                 button.connect('clicked', lambda button, method, pos: method(pos), method, i)
-                t.attach(button, 4 + j, 5 + j, i, i + 1, 0, gtk.SHRINK)
+                t.attach(button, 4 + j, 5 + j, i, i + 1, 0, Gtk.AttachOptions.SHRINK)
             self.choosers.append(chooser)
-        button = gtk.Button("+")
+        button = Gtk.Button("+")
         button.connect('clicked', lambda button, pos: self.on_add_clicked(pos), fx_count + 1)
-        t.attach(button, 3, 4, fx_count + 1, fx_count + 2, 0, gtk.SHRINK)
+        t.attach(button, 3, 4, fx_count + 1, fx_count + 2, 0, Gtk.AttachOptions.SHRINK)
         if self.fx_table is not None:
             self.vbox.remove(self.fx_table)
-        self.vbox.pack_start(t, True, True)
+        self.vbox.pack_start(t, True, True, 5)
         t.show_all()
         self.fx_table = t
     def on_add_clicked(self, pos):
@@ -323,12 +323,12 @@ effect_window_map = {
 
 #################################################################################################################################
 
-class EffectListModel(gtk.ListStore):
+class EffectListModel(Gtk.ListStore):
     def __init__(self):
         self.presets = {}
-        gtk.ListStore.__init__(self, gobject.TYPE_STRING)
+        Gtk.ListStore.__init__(self, GObject.TYPE_STRING)
         for engine in effect_engines:
-            self.presets[engine] = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+            self.presets[engine] = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_STRING)
             self.append((engine,))
             
         for preset in cbox.Config.sections("fxpreset:"):
@@ -361,11 +361,11 @@ class InsertEffectChooser(object):
             self.fx_preset = standard_combo(None, active_item = 0, column = 1, width = 120)
         self.fx_preset.connect('changed', self.fx_preset_changed)
 
-        self.fx_edit = gtk.Button("_Edit")
+        self.fx_edit = Gtk.Button.new_with_mnemonic("_Edit")
         self.fx_edit.connect("clicked", self.edit_effect_clicked)
         self.fx_edit.set_sensitive(engine in effect_window_map)
         
-        self.fx_bypass = gtk.ToggleButton("_Bypass")
+        self.fx_bypass = Gtk.ToggleButton("_Bypass")
         self.fx_bypass.set_active(bypass > 0)
         self.fx_bypass.connect("clicked", self.bypass_effect_clicked)
         
