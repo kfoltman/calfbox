@@ -172,7 +172,7 @@ class LayerListView(Gtk.TreeView):
     def cursor_changed(self, w):
         self.controller.on_layer_changed()
     def drag_data_received(self, widget, context, x, y, selection, info, etime):
-        sample, filename = selection.data.split("|")
+        sample, filename = selection.get_text().split("|")
         pad_model = self.controller.get_current_pad_model()
         pad_model.append((sample, KeySampleModel(pad_model.key, sample, filename)))
         self.controller.current_pad.update_label()
@@ -247,12 +247,12 @@ class PadButton(Gtk.RadioButton):
         self.drag_dest_set_target_list(None)
         self.drag_dest_add_text_targets()
         self.connect('drag_data_received', self.drag_data_received)
-        self.connect('toggled', lambda widget: widget.controller.on_pad_selected(widget) if widget.get_active() else None)
+        #self.connect('toggled', lambda widget: widget.controller.on_pad_selected(widget) if widget.get_active() else None)
         self.connect('pressed', self.on_clicked)
     def get_key_model(self):
         return self.bank_model[self.key]
     def drag_data_received(self, widget, context, x, y, selection, info, etime):
-        sample, filename = selection.data.split("|")
+        sample, filename = selection.get_text().split("|")
         self.get_key_model().clear()
         self.get_key_model().append((sample, KeySampleModel(self.key, sample, filename)))
         self.update_label()
@@ -267,6 +267,7 @@ class PadButton(Gtk.RadioButton):
             self.get_child().set_line_wrap(True)
     def on_clicked(self, w):
         cbox.do_cmd('/play_note', None, [1, self.key, 127])
+        w.controller.on_pad_selected(w)
 
 ####################################################################################################################################################
 
@@ -297,7 +298,8 @@ class FileView(Gtk.TreeView):
         Gtk.TreeView.__init__(self, self.files_model)
         self.insert_column_with_attributes(0, "Name", Gtk.CellRendererText(), text=1)
         self.set_cursor((0,))
-        self.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, [("text/plain", 0, 1)], Gdk.DragAction.COPY)
+        self.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
+        self.drag_source_add_text_targets()
         self.connect('cursor-changed', self.cursor_changed)
         self.connect('drag-data-get', self.drag_data_get)
         self.connect('row-activated', self.on_row_activated)
@@ -317,9 +319,9 @@ class FileView(Gtk.TreeView):
     def drag_data_get(self, treeview, context, selection, target_id, etime):
         cursor = treeview.get_cursor()
         if cursor is not None:
-            c = cursor[0][0]
+            c = cursor[0].get_indices()[0]
             fr = self.files_model[c]
-            selection.set('text/plain', 8, str(fr[1]+"|"+fr[0]))
+            selection.set_text(str(fr[1]+"|"+fr[0]), -1)
             
     def on_row_activated(self, treeview, path, column):
         c = self.get_cursor()
