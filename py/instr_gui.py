@@ -97,7 +97,8 @@ class WithPatchTable:
         for i in range(16):
             cb = self.patch_combos[i]
             old_patch_index = cb.get_active() if cb.get_active() >= 0 else -1
-            current_patch_index = self.mapping[patch[i + 1][0]] if patch[i + 1][0] >= 0 else -1
+            patch_id = patch[i + 1][0]
+            current_patch_index = self.mapping[patch_id] if (patch_id >= 0 and patch_id in self.mapping) else -1
             if old_patch_index != current_patch_index:
                 cb.set_active(current_patch_index)
         #self.status_label.set_markup(s)
