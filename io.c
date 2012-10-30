@@ -89,7 +89,9 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
     
     if (!io->midi)
         return 0;
-    
+
+    cbox_io_poll_ports(io);
+
     return 1;
 };
 
@@ -234,12 +236,11 @@ static void do_autoconnect(struct cbox_io *io, jack_port_t *portobj)
 
 void cbox_io_poll_ports(struct cbox_io *io)
 {
-    if (jack_ringbuffer_read_space(io->rb_autoconnect) >= sizeof(jack_port_t *))
+    while (jack_ringbuffer_read_space(io->rb_autoconnect) >= sizeof(jack_port_t *))
     {
         jack_port_t *portobj;
         jack_ringbuffer_read(io->rb_autoconnect, (uint8_t *)&portobj, sizeof(portobj));
         do_autoconnect(io, portobj);
-        
     }
 }
 
