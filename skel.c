@@ -73,7 +73,9 @@ void {name}_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     }
 }
 
-struct cbox_module *{name}_create(void *user_data, const char *cfg_section, int srate, GError **error)
+MODULE_SIMPLE_DESTROY_FUNCTION({name})
+
+MODULE_CREATE_FUNCTION({name})
 {
     static int inited = 0;
     if (!inited)
@@ -82,7 +84,7 @@ struct cbox_module *{name}_create(void *user_data, const char *cfg_section, int 
     }
     
     struct {name}_module *m = malloc(sizeof(struct {name}_module));
-    cbox_module_init(&m->module, m, 0, 2, {name}_process_cmd);
+    CALL_MODULE_INIT(&m->module, m, 0, 2, {name}_process_cmd);
     m->module.process_event = {name}_process_event;
     m->module.process_block = {name}_process_block;
     struct {name}_params *p = malloc(sizeof(struct {name}_params));
