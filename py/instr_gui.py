@@ -114,7 +114,6 @@ class FluidsynthWindow(Gtk.VBox, WithPatchTable):
         panel = Gtk.VBox(spacing=5)
         table = Gtk.Table(2, 1)
         IntSliderRow("Polyphony", "polyphony", 2, 256).add_row(table, 0, cbox.VarPath(self.path), attribs)
-        panel.pack_start(table, False, False, 5)
         
         WithPatchTable.__init__(self, attribs)
         panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True, 5)

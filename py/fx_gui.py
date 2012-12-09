@@ -365,7 +365,7 @@ class InsertEffectChooser(object):
         self.fx_edit.connect("clicked", self.edit_effect_clicked)
         self.fx_edit.set_sensitive(engine in effect_window_map)
         
-        self.fx_bypass = Gtk.ToggleButton("_Bypass")
+        self.fx_bypass = Gtk.ToggleButton.new_with_mnemonic("_Bypass")
         self.fx_bypass.set_active(bypass > 0)
         self.fx_bypass.connect("clicked", self.bypass_effect_clicked)
         
