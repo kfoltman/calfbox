@@ -233,7 +233,7 @@ class MainWindow(Gtk.Window):
 
         t.attach(bold_label("Transpose"), 0, 1, 5, 6, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
         self.transpose_adj = Gtk.Adjustment(scene_status.transpose, -24, 24, 1, 5, 0)
-        self.transpose_adj.connect('value_changed', adjustment_changed_int, '/scene/transpose')
+        self.transpose_adj.connect('value_changed', adjustment_changed_int, cbox.VarPath('/scene/transpose'))
         t.attach(standard_align(Gtk.SpinButton(adjustment = self.transpose_adj), 0, 0, 0, 0), 1, 3, 5, 6, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
         
         self.layers_model = SceneLayersModel()
