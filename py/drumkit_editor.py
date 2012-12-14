@@ -348,7 +348,7 @@ class EditorDialog(Gtk.Dialog):
             ("_New", self.on_kit_new),
             ("_Open...", self.on_kit_open),
             ("_Save as...", self.on_kit_save_as),
-            ("_Close", lambda w: self.response(Gtk.RESPONSE_OK)),
+            ("_Close", lambda w: self.response(Gtk.ResponseType.OK)),
         ]))
         self.menu_bar.append(create_menu("_Layer", [
             ("_Delete", self.on_layer_delete),
@@ -459,11 +459,11 @@ class EditorDialog(Gtk.Dialog):
 
     def on_kit_open(self, widget):
         dlg = Gtk.FileChooserDialog('Open a pad bank', self, Gtk.FileChooserAction.OPEN,
-            (Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL, Gtk.STOCK_OPEN, Gtk.RESPONSE_APPLY))
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.Cancel, Gtk.STOCK_OPEN, Gtk.ResponseType.APPLY))
         dlg.add_filter(standard_filter(["*.sfz", "*.SFZ"], "SFZ files"))
         dlg.add_filter(standard_filter(["*"], "All files"))
         try:
-            if dlg.run() == Gtk.RESPONSE_APPLY:
+            if dlg.run() == Gtk.ResponseType.APPLY:
                 sfz_data = file(dlg.get_filename(), "r").read()
                 self.bank_model.from_sfz(sfz_data, dlg.get_current_folder())
             self.pads.refresh()
@@ -474,11 +474,11 @@ class EditorDialog(Gtk.Dialog):
 
     def on_kit_save_as(self, widget):
         dlg = Gtk.FileChooserDialog('Save a pad bank', self, Gtk.FileChooserAction.SAVE, 
-            (Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL, Gtk.STOCK_SAVE, Gtk.RESPONSE_APPLY))
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.APPLY))
         dlg.add_filter(standard_filter(["*.sfz", "*.SFZ"], "SFZ files"))
         dlg.add_filter(standard_filter(["*"], "All files"))
         try:
-            if dlg.run() == Gtk.RESPONSE_APPLY:
+            if dlg.run() == Gtk.ResponseType.APPLY:
                 file(dlg.get_filename(), "w").write(self.bank_model.to_sfz())
         finally:
             dlg.destroy()

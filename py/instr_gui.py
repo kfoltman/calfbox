@@ -148,7 +148,7 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         WithPatchTable.__init__(self, attribs)
         panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True, 5)
         self.add(panel)
-        load_button = Gtk.Button("_Load")
+        load_button = Gtk.Button.new_with_mnemonic("_Load")
         load_button.connect('clicked', self.load)
         panel.pack_start(load_button, False, True, 5)
         set_timer(self, 200, self.voices_update)
@@ -157,7 +157,7 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         d = LoadProgramDialog(self.get_toplevel())
         response = d.run()
         try:
-            if response == Gtk.RESPONSE_OK:
+            if response == Gtk.ResponseType.OK:
                 scene = d.get_selected_object()
                 pgm_id = cbox.GetThings("%s/get_unused_program" % self.path, ['program_no'], []).program_no
                 cbox.do_cmd("%s/load_patch" % self.path, None, [pgm_id, scene[2], scene[2][5:]])

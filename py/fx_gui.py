@@ -72,7 +72,7 @@ class EffectWindow(Gtk.Window):
             
         dlg = SaveConfigObjectDialog(self, "Select name for effect preset")
         try:
-            if dlg.run() == Gtk.RESPONSE_OK and dlg.get_name() != "":
+            if dlg.run() == Gtk.ResponseType.OK and dlg.get_name() != "":
                 cs = cbox.CfgSection("fxpreset:" + dlg.get_name())
                 for name in sorted(data.keys()):
                     cs[name] = data[name]

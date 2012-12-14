@@ -180,7 +180,7 @@ class DrumEditorToolbox(Gtk.HBox):
 
     def load_pattern(self, w):
         dlg = Gtk.FileChooserDialog('Open a drum pattern', self.get_toplevel(), Gtk.FileChooserAction.OPEN,
-            (Gtk.StockItem.CANCEL, Gtk.ResponseType.CANCEL, Gtk.StockItem.OPEN, Gtk.ResponseType.APPLY))
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.APPLY))
         dlg.add_filter(standard_filter(["*.cbdp"], "Drum patterns"))
         dlg.add_filter(standard_filter(["*"], "All files"))
         try:
@@ -207,7 +207,7 @@ class DrumEditorToolbox(Gtk.HBox):
             dlg.destroy()
     def save_pattern(self, w):
         dlg = Gtk.FileChooserDialog('Save a drum pattern', self.get_toplevel(), Gtk.FileChooserAction.SAVE, 
-            (Gtk.StockItem.CANCEL, Gtk.ResponseType.CANCEL, Gtk.StockItem.SAVE, Gtk.ResponseType.APPLY))
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.APPLY))
         dlg.add_filter(standard_filter(["*.cbdp"], "Drum patterns"))
         dlg.add_filter(standard_filter(["*"], "All files"))
         dlg.set_current_name("pattern.cbdp")
