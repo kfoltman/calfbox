@@ -340,6 +340,7 @@ class DrumCanvas(GooCanvas.Canvas):
         self.add_events(Gdk.EventMask.POINTER_MOTION_HINT_MASK)
 
         self.grab_focus(self.grid)
+        self.update_notes()
 
     def set_edit_mode(self, mode):
         self.edit_mode = mode
