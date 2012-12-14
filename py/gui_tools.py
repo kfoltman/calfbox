@@ -303,7 +303,7 @@ class SelectObjectDialog(Gtk.Dialog):
 
 class SaveConfigObjectDialog(Gtk.Dialog):
     def __init__(self, parent, title):
-        Gtk.Dialog.__init__(self, title, parent, Gtk.DIALOG_MODAL, 
+        Gtk.Dialog.__init__(self, title, parent, Gtk.DialogFlags.MODAL, 
             (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK))
         self.set_default_response(Gtk.ResponseType.OK)
         
