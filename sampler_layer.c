@@ -214,8 +214,8 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->pan = cbox_config_get_float(cfg_section, "pan", l->pan);
     l->pitch_keytrack = cbox_config_get_float(cfg_section, "note_scaling", l->pitch_keytrack);
     l->pitch_keycenter = cbox_config_get_int(cfg_section, "root_note", l->pitch_keycenter);
-    l->min_note = cbox_config_get_note(cfg_section, "low_note", l->min_note);
-    l->max_note = cbox_config_get_note(cfg_section, "high_note", l->max_note);
+    l->lokey = cbox_config_get_note(cfg_section, "low_note", l->lokey);
+    l->hikey = cbox_config_get_note(cfg_section, "high_note", l->hikey);
     l->sw_lokey = cbox_config_get_note(cfg_section, "sw_lokey", l->sw_lokey);
     l->sw_hikey = cbox_config_get_note(cfg_section, "sw_hikey", l->sw_hikey);
     l->sw_last = cbox_config_get_note(cfg_section, "sw_last", l->sw_last);
@@ -274,3 +274,35 @@ void sampler_layer_load(struct sampler_layer *l, struct sampler_module *m, const
     sampler_layer_finalize(l, m);
 }
 
+#define LV_EPS(value) ((value) / 8388608.0)
+
+#define TYPE_PRINTF_uint32_t(name, def_value) \
+    if (l->name != def_value) \
+        fprintf(f, " %s=%u", #name, (unsigned)(l->name));
+#define TYPE_PRINTF_int(name, def_value) \
+    if (l->name != def_value) \
+        fprintf(f, " %s=%d", #name, (int)(l->name));
+#define TYPE_PRINTF_midi_note_t(name, def_value) \
+    if (l->name != def_value) {\
+        int val = l->name; \
+        if (val == -1) \
+            fprintf(f, " %s=-1", #name); \
+        else \
+            fprintf(f, " %s=%c%s%d", #name, "ccddeffggaab"[val%12], "\000#\000#\000\000#\000#\000#\000#\000"+(val%12), (val/12-1)); \
+    } else {}
+#define TYPE_PRINTF_float(name, def_value) \
+    if (fabs(l->name-def_value) > LV_EPS(def_value)) \
+        fprintf(f, " %s=%f", #name, (float)(l->name));
+
+#define PROC_FIELDS_TO_FILEPTR(type, name, def_value) \
+    TYPE_PRINTF_##type(name, def_value)
+#define PROC_FIELDS_TO_FILEPTR_dBamp(type, name, def_value) \
+    if (fabs(l->name-def_value) > LV_EPS(def_value)) \
+        fprintf(f, " %s=%f", #name, (float)(l->name));
+
+void sampler_layer_dump(struct sampler_layer *l, FILE *f)
+{
+    fprintf(f, "sample=%s", l->waveform->display_name);
+    SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
+    fprintf(f, "\n");
+}

@@ -242,15 +242,15 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
             l->loop_end = l->sample_end;
     }
     else if (!strcmp(key, "lokey"))
-        l->min_note = sfz_note_from_string(value);
+        l->lokey = sfz_note_from_string(value);
     else if (!strcmp(key, "hikey"))
-        l->max_note = sfz_note_from_string(value);
+        l->hikey = sfz_note_from_string(value);
     else if (!strcmp(key, "pitch_keycenter"))
         l->pitch_keycenter = sfz_note_from_string(value);
     else if (!strcmp(key, "pitch_keytrack"))
         l->pitch_keytrack = atoi(value);
     else if (!strcmp(key, "key"))
-        l->min_note = l->max_note = l->pitch_keycenter = sfz_note_from_string(value);
+        l->lokey = l->hikey = l->pitch_keycenter = sfz_note_from_string(value);
     else if (!strcmp(key, "seq_position"))
         l->seq_pos = atoi(value) - 1;
     else if (!strcmp(key, "seq_length"))

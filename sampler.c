@@ -301,7 +301,7 @@ int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c,
             if (note >= l->sw_lokey && note <= l->sw_hikey)
                 l->last_key = note;
         }
-        if (note >= l->min_note && note <= l->max_note && vel >= l->min_vel && vel <= l->max_vel && ch >= l->min_chan && ch <= l->max_chan)
+        if (note >= l->lokey && note <= l->hikey && vel >= l->min_vel && vel <= l->max_vel && ch >= l->min_chan && ch <= l->max_chan)
         {
             if (!l->use_keyswitch || 
                 ((l->sw_last == -1 || l->sw_last == l->last_key) &&

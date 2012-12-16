@@ -19,6 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_SAMPLER_LAYER_H
 #define CBOX_SAMPLER_LAYER_H
 
+#include <stdio.h>
+#include <stdint.h>
+
 struct sampler_voice;
 struct sampler_noteinitfunc;
 struct sampler_module;
@@ -134,8 +137,8 @@ typedef int midi_note_t;
     MACRO(int, transpose, 0) \
     MACRO(int, min_chan, 1) \
     MACRO(int, max_chan, 16) \
-    MACRO(midi_note_t, min_note, 0) \
-    MACRO(midi_note_t, max_note, 127) \
+    MACRO(midi_note_t, lokey, 0) \
+    MACRO(midi_note_t, hikey, 127) \
     MACRO(midi_note_t, pitch_keycenter, 60) \
     MACRO(int, pitch_keytrack, 100) \
     MACRO(midi_note_t, fil_keycenter, 60) \
@@ -203,6 +206,7 @@ extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc n
 extern void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section);
 extern void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src);
 extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
+extern void sampler_layer_dump(struct sampler_layer *l, FILE *f);
 
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
