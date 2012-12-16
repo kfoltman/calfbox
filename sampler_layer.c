@@ -82,6 +82,10 @@ static void lfo_params_clear(struct sampler_lfo_params *lfop)
 #define PROC_FIELDS_INITIALISER_dBamp(type, name, def_value) \
     l->name = def_value; \
     l->name##_linearized = -1;
+#define PROC_FIELDS_INITIALISER_dahdsr(name, parname) \
+    cbox_dahdsr_init(&l->name);
+#define PROC_FIELDS_INITIALISER_lfo(name, parname) \
+    lfo_params_clear(&l->name##_params);
 
 void sampler_layer_init(struct sampler_layer *l)
 {
@@ -96,21 +100,11 @@ void sampler_layer_init(struct sampler_layer *l)
     l->filter = sft_lp12;
     l->use_keyswitch = 0;
     l->last_key = 0;
-    cbox_dahdsr_init(&l->filter_env);
-    cbox_dahdsr_init(&l->pitch_env);
-    cbox_dahdsr_init(&l->amp_env);
     l->loop_mode = slm_unknown;
     l->velcurve[0] = 0;
     l->velcurve[127] = 1;
     for (int i = 1; i < 127; i++)
         l->velcurve[i] = -1;
-    l->velcurve_quadratic = -1; // not known yet
-    l->fil_veltrack = 0;
-    l->exclusive_group = 0;
-    l->off_by = 0;
-    lfo_params_clear(&l->amp_lfo_params);
-    lfo_params_clear(&l->filter_lfo_params);
-    lfo_params_clear(&l->pitch_lfo_params);
     l->modulations = NULL;
     l->nifs = NULL;
     sampler_layer_set_modulation(l, 74, smsrc_none, smdest_cutoff, 9600, 2);
@@ -152,14 +146,13 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *w
 #define PROC_FIELDS_FINALISER(type, name, def_value) 
 #define PROC_FIELDS_FINALISER_dBamp(type, name, def_value) \
     l->name##_linearized = dB2gain(l->name);
+#define PROC_FIELDS_FINALISER_dahdsr(name, parname) \
+    cbox_envelope_init_dahdsr(&l->name##_shape, &l->name, m->module.srate / CBOX_BLOCK_SIZE);
+#define PROC_FIELDS_FINALISER_lfo(name, parname) /* no finaliser required */
 
 void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
 {
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_FINALISER)
-
-    cbox_envelope_init_dahdsr(&l->amp_env_shape, &l->amp_env, m->module.srate / CBOX_BLOCK_SIZE);
-    cbox_envelope_init_dahdsr(&l->filter_env_shape, &l->filter_env,  m->module.srate / CBOX_BLOCK_SIZE);
-    cbox_envelope_init_dahdsr(&l->pitch_env_shape, &l->pitch_env,  m->module.srate / CBOX_BLOCK_SIZE);
 
     if (l->loop_mode == slm_unknown)
         l->loop_mode = l->loop_start == -1 ? slm_no_loop : slm_loop_continuous;
@@ -197,6 +190,10 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
     }
     l->use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
     l->last_key = l->sw_lokey;
+
+#if 0
+    sampler_layer_dump(l, stdout);
+#endif
 }
 
 void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section)
@@ -299,6 +296,22 @@ void sampler_layer_load(struct sampler_layer *l, struct sampler_module *m, const
 #define PROC_FIELDS_TO_FILEPTR_dBamp(type, name, def_value) \
     if (fabs(l->name-def_value) > LV_EPS(def_value)) \
         fprintf(f, " %s=%f", #name, (float)(l->name));
+
+#define ENV_PARAM_OUTPUT(env, envname, param, def_value) \
+    if (fabs(env.param - def_value) > LV_EPS(def_value)) \
+        fprintf(f, " " #envname "_" #param "=%f", env.param);
+#define PROC_FIELDS_TO_FILEPTR_dahdsr(name, parname) \
+    ENV_PARAM_OUTPUT(l->name, parname, start, 0) \
+    ENV_PARAM_OUTPUT(l->name, parname, delay, 0) \
+    ENV_PARAM_OUTPUT(l->name, parname, hold, 0) \
+    ENV_PARAM_OUTPUT(l->name, parname, decay, 0) \
+    ENV_PARAM_OUTPUT(l->name, parname, sustain, 1) \
+    ENV_PARAM_OUTPUT(l->name, parname, release, 0.05) \
+
+#define PROC_FIELDS_TO_FILEPTR_lfo(name, parname) \
+    ENV_PARAM_OUTPUT(l->name##_params, parname, freq, 0) \
+    ENV_PARAM_OUTPUT(l->name##_params, parname, delay, 0) \
+    ENV_PARAM_OUTPUT(l->name##_params, parname, fade, 0) \
 
 void sampler_layer_dump(struct sampler_layer *l, FILE *f)
 {

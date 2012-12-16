@@ -143,8 +143,10 @@ typedef int midi_note_t;
     MACRO(int, pitch_keytrack, 100) \
     MACRO(midi_note_t, fil_keycenter, 60) \
     MACRO(int, fil_keytrack, 0) \
+    MACRO(int, fil_veltrack, 0) \
     MACRO(int, min_vel, 0) \
     MACRO(int, max_vel, 127) \
+    MACRO(int, velcurve_quadratic, -1) \
     MACRO(float, cutoff, 21000) \
     MACRO(float, resonance, 0.707) \
     MACRO(midi_note_t, sw_lokey, 0) \
@@ -164,6 +166,12 @@ typedef int midi_note_t;
     MACRO(int, output, 0) \
     MACRO(int, exclusive_group, 0) \
     MACRO(int, off_by, 0) \
+    MACRO##_dahdsr(amp_env, ampeg) \
+    MACRO##_dahdsr(filter_env, fileg) \
+    MACRO##_dahdsr(pitch_env, pitcheg) \
+    MACRO##_lfo(amp_lfo, amplfo) \
+    MACRO##_lfo(filter_lfo, fillfo) \
+    MACRO##_lfo(pitch_lfo, pitchlfo) \
 
 // XXXKF: consider making send1gain the dBamp type
 
@@ -172,6 +180,11 @@ typedef int midi_note_t;
 #define PROC_FIELDS_TO_STRUCT_dBamp(type, name, def_value) \
     type name; \
     type name##_linearized;
+#define PROC_FIELDS_TO_STRUCT_dahdsr(name, parname) \
+    struct cbox_dahdsr name; \
+    struct cbox_envelope_shape name##_shape;
+#define PROC_FIELDS_TO_STRUCT_lfo(name, parname) \
+    struct sampler_lfo_params name##_params; \
 
 struct sampler_layer
 {
@@ -185,14 +198,9 @@ struct sampler_layer
     float freq;
     int use_keyswitch;
     int last_key;
-    struct cbox_dahdsr amp_env, filter_env, pitch_env;
-    struct cbox_envelope_shape amp_env_shape, filter_env_shape, pitch_env_shape;
     enum sample_loop_mode loop_mode;
     float velcurve[128];
-    int velcurve_quadratic, fil_veltrack;
     
-    struct sampler_lfo_params amp_lfo_params, filter_lfo_params, pitch_lfo_params;
-
     GSList *modulations;
     GSList *nifs;
 };
