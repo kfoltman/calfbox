@@ -1,0 +1,177 @@
+/*
+Calf Box, an open source musical instrument.
+Copyright (C) 2010-2011 Krzysztof Foltman
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef CBOX_SAMPLER_LAYER_H
+#define CBOX_SAMPLER_LAYER_H
+
+struct sampler_voice;
+struct sampler_noteinitfunc;
+struct sampler_module;
+
+enum sample_player_type
+{
+    spt_inactive,
+    spt_mono16,
+    spt_stereo16
+};
+
+enum sample_loop_mode
+{
+    slm_unknown,
+    slm_no_loop,
+    slm_one_shot,
+    slm_loop_continuous,
+    slm_loop_sustain, // unsupported
+};
+
+enum sampler_filter_type
+{
+    sft_unknown,
+    sft_lp12,
+    sft_hp12,
+    sft_bp6,
+    sft_lp24,
+    sft_hp24,
+    sft_bp12,
+    sft_lp6,
+    sft_hp6,
+};
+
+enum sampler_modsrc
+{
+    smsrc_cc0 = 0,
+    smsrc_chanaft = 120,
+
+    // those are per-note, not per-channel
+    smsrc_vel,
+    smsrc_polyaft,
+    smsrc_pitch,
+    smsrc_pitchenv,
+    smsrc_filenv,
+    smsrc_ampenv,
+    smsrc_pitchlfo,
+    smsrc_fillfo,
+    smsrc_amplfo,
+    smsrc_none,
+    
+    smsrccount,
+    smsrc_perchan_offset = 0,
+    smsrc_perchan_count = smsrc_vel,
+    smsrc_pernote_offset = smsrc_vel,
+    smsrc_pernote_count = smsrccount - smsrc_pernote_offset,
+};
+
+enum sampler_moddest
+{
+    smdest_gain,
+    smdest_pitch,
+    smdest_cutoff,
+    smdest_resonance,
+    
+    smdestcount
+};
+
+struct sampler_modulation
+{
+    enum sampler_modsrc src;
+    enum sampler_modsrc src2;
+    enum sampler_moddest dest;
+    float amount;
+    int flags;
+};
+
+typedef void (*SamplerNoteInitFunc)(struct sampler_noteinitfunc *nif, struct sampler_voice *voice);
+
+struct sampler_noteinitfunc
+{
+    SamplerNoteInitFunc notefunc;
+    int variant;
+    float param;
+    // XXXKF no destructor for now - might not be necessary
+};
+
+struct sampler_lfo_params
+{
+    float freq;
+    float delay;
+    float fade;
+};
+
+struct sampler_layer
+{
+    enum sample_player_type mode;
+    enum sampler_filter_type filter;
+    struct cbox_waveform *waveform;
+    int16_t *sample_data;
+    uint32_t sample_offset;
+    uint32_t sample_offset_random;
+    uint32_t loop_start;
+    uint32_t loop_end;
+    uint32_t sample_end;
+    uint32_t loop_evolve;
+    uint32_t loop_overlap;
+    float gain;
+    float pan;
+    float freq;
+    float tune;
+    float note_scaling;
+    int min_chan, max_chan;
+    int min_note, max_note, root_note;
+    int min_vel, max_vel;
+    int transpose;
+    int seq_pos, seq_length;
+    int use_keyswitch, sw_lokey, sw_hikey;
+    int sw_last, sw_down, sw_up, sw_previous, last_key;
+    float cutoff, resonance, fileg_depth, pitcheg_depth;
+    struct cbox_dahdsr amp_env, filter_env, pitch_env;
+    struct cbox_envelope_shape amp_env_shape, filter_env_shape, pitch_env_shape;
+    enum sample_loop_mode loop_mode;
+    float velcurve[128];
+    int velcurve_quadratic, fil_veltrack, fil_keytrack, fil_keycenter;
+    int exclusive_group, off_by;
+    int send1bus, send2bus;
+    float send1gain, send2gain;
+    
+    struct sampler_lfo_params amp_lfo_params, filter_lfo_params, pitch_lfo_params;
+
+    float delay, delay_random;
+    
+    int output_pair_no;
+    
+    GSList *modulations;
+    GSList *nifs;
+};
+
+extern void sampler_layer_init(struct sampler_layer *l);
+extern void sampler_layer_load(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section, struct cbox_waveform *waveform);
+extern void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform);
+extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags);
+extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);
+extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param);
+extern void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section);
+extern void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src);
+extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
+
+extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+
+extern enum sampler_filter_type sampler_filter_type_from_string(const char *name);
+
+#endif
