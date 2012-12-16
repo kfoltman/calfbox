@@ -77,47 +77,28 @@ static void lfo_params_clear(struct sampler_lfo_params *lfop)
     lfop->fade = 0.f;
 }
 
+#define PROC_FIELDS_INITIALISER(type, name, def_value) \
+    l->name = def_value;
+#define PROC_FIELDS_INITIALISER_dBamp(type, name, def_value) \
+    l->name = def_value; \
+    l->name##_linearized = -1;
+
 void sampler_layer_init(struct sampler_layer *l)
 {
     l->waveform = NULL;
     l->sample_data = NULL;
-    l->sample_offset = 0;
-    l->sample_offset_random = 0;
+    
+    SAMPLER_FIXED_FIELDS(PROC_FIELDS_INITIALISER)
+    
     l->sample_end = 0;
     l->freq = 44100;
-    l->loop_start = -1;
-    l->loop_end = 0;
-    l->loop_evolve = 0;
-    l->loop_overlap = 0;
-    l->gain = 1.0;
-    l->pan = 0.5;
     l->mode = spt_mono16;
-    l->root_note = 60;
-    l->note_scaling = 100.0;
-    l->min_chan = 0;
-    l->max_chan = 15;
-    l->min_note = 0;
-    l->max_note = 127;
-    l->min_vel = 0;
-    l->max_vel = 127;
     l->filter = sft_lp12;
-    l->cutoff = 21000;
-    l->resonance = 0.707;
-    l->seq_pos = 0;
-    l->seq_length = 1;
     l->use_keyswitch = 0;
-    l->sw_lokey = 0;
-    l->sw_hikey = 127;
-    l->sw_last = -1;
-    l->sw_down = -1;
-    l->sw_up = -1;
-    l->sw_previous = -1;
     l->last_key = 0;
     cbox_dahdsr_init(&l->filter_env);
     cbox_dahdsr_init(&l->pitch_env);
     cbox_dahdsr_init(&l->amp_env);
-    l->tune = 0;
-    l->transpose = 0;
     l->loop_mode = slm_unknown;
     l->velcurve[0] = 0;
     l->velcurve[127] = 1;
@@ -125,19 +106,11 @@ void sampler_layer_init(struct sampler_layer *l)
         l->velcurve[i] = -1;
     l->velcurve_quadratic = -1; // not known yet
     l->fil_veltrack = 0;
-    l->fil_keytrack = 0;
-    l->fil_keycenter = 60;
     l->exclusive_group = 0;
     l->off_by = 0;
-    l->output_pair_no = 0;
-    l->send1bus = 1;
-    l->send2bus = 2;
-    l->send1gain = 0;
-    l->send2gain = 0;
     lfo_params_clear(&l->amp_lfo_params);
     lfo_params_clear(&l->filter_lfo_params);
     lfo_params_clear(&l->pitch_lfo_params);
-    l->delay = l->delay_random = 0;
     l->modulations = NULL;
     l->nifs = NULL;
     sampler_layer_set_modulation(l, 74, smsrc_none, smdest_cutoff, 9600, 2);
@@ -176,8 +149,14 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *w
     l->mode = waveform && waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
 }
 
+#define PROC_FIELDS_FINALISER(type, name, def_value) 
+#define PROC_FIELDS_FINALISER_dBamp(type, name, def_value) \
+    l->name##_linearized = dB2gain(l->name);
+
 void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
 {
+    SAMPLER_FIXED_FIELDS(PROC_FIELDS_FINALISER)
+
     cbox_envelope_init_dahdsr(&l->amp_env_shape, &l->amp_env, m->module.srate / CBOX_BLOCK_SIZE);
     cbox_envelope_init_dahdsr(&l->filter_env_shape, &l->filter_env,  m->module.srate / CBOX_BLOCK_SIZE);
     cbox_envelope_init_dahdsr(&l->pitch_env_shape, &l->pitch_env,  m->module.srate / CBOX_BLOCK_SIZE);
@@ -231,10 +210,10 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     l->loop_end = cbox_config_get_int(cfg_section, "loop_end", l->loop_end);
     l->loop_evolve = cbox_config_get_int(cfg_section, "loop_evolve", l->loop_evolve);
     l->loop_overlap = cbox_config_get_int(cfg_section, "loop_overlap", l->loop_overlap);
-    l->gain = cbox_config_get_gain(cfg_section, "gain", l->gain);
+    l->volume = cbox_config_get_float(cfg_section, "volume", l->volume);
     l->pan = cbox_config_get_float(cfg_section, "pan", l->pan);
-    l->note_scaling = cbox_config_get_float(cfg_section, "note_scaling", l->note_scaling);
-    l->root_note = cbox_config_get_int(cfg_section, "root_note", l->root_note);
+    l->pitch_keytrack = cbox_config_get_float(cfg_section, "note_scaling", l->pitch_keytrack);
+    l->pitch_keycenter = cbox_config_get_int(cfg_section, "root_note", l->pitch_keycenter);
     l->min_note = cbox_config_get_note(cfg_section, "low_note", l->min_note);
     l->max_note = cbox_config_get_note(cfg_section, "high_note", l->max_note);
     l->sw_lokey = cbox_config_get_note(cfg_section, "sw_lokey", l->sw_lokey);
@@ -254,8 +233,6 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
     cbox_config_get_dahdsr(cfg_section, "pitch", &l->pitch_env);
     l->cutoff = cbox_config_get_float(cfg_section, "cutoff", l->cutoff);
     l->resonance = cbox_config_get_float(cfg_section, "resonance", l->resonance);
-    // l->fileg_depth = cbox_config_get_float(cfg_section, "fileg_depth", l->fileg_depth);
-    // l->pitcheg_depth = cbox_config_get_float(cfg_section, "pitcheg_depth", l->pitcheg_depth);
     l->fil_veltrack = cbox_config_get_float(cfg_section, "fil_veltrack", l->fil_veltrack);
     l->fil_keytrack = cbox_config_get_float(cfg_section, "fil_keytrack", l->fil_keytrack);
     l->fil_keycenter = cbox_config_get_float(cfg_section, "fil_keycenter", l->fil_keycenter);
@@ -265,7 +242,7 @@ void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module
         l->loop_mode = slm_loop_sustain;
     l->exclusive_group = cbox_config_get_int(cfg_section, "group", l->exclusive_group);
     l->off_by = cbox_config_get_int(cfg_section, "off_by", l->off_by);
-    l->output_pair_no = cbox_config_get_int(cfg_section, "output_pair_no", l->output_pair_no);
+    l->output = cbox_config_get_int(cfg_section, "output_pair_no", l->output);
     l->send1bus = cbox_config_get_int(cfg_section, "aux1_bus", l->send1bus);
     l->send2bus = cbox_config_get_int(cfg_section, "aux2_bus", l->send2bus);
     l->send1gain = cbox_config_get_gain(cfg_section, "aux1_gain", l->send1gain);

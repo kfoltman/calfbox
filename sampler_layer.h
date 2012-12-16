@@ -112,47 +112,84 @@ struct sampler_lfo_params
     float fade;
 };
 
+typedef int midi_note_t;
+
+/*
+ * Transforms:
+ * notransform - self-explanatory
+ * dBamp - amplitude/gain stored as dB
+ */
+
+#define SAMPLER_FIXED_FIELDS(MACRO) \
+    MACRO(uint32_t, sample_offset, 0) \
+    MACRO(uint32_t, sample_offset_random, 0) \
+    MACRO(uint32_t, loop_start, -1) \
+    MACRO(uint32_t, loop_end, -1) \
+    MACRO(uint32_t, sample_end, -1) \
+    MACRO(uint32_t, loop_evolve, -1) \
+    MACRO(uint32_t, loop_overlap, -1) \
+    MACRO##_dBamp(float, volume, 0) \
+    MACRO(float, pan, 0) \
+    MACRO(float, tune, 0) \
+    MACRO(int, transpose, 0) \
+    MACRO(int, min_chan, 1) \
+    MACRO(int, max_chan, 16) \
+    MACRO(midi_note_t, min_note, 0) \
+    MACRO(midi_note_t, max_note, 127) \
+    MACRO(midi_note_t, pitch_keycenter, 60) \
+    MACRO(int, pitch_keytrack, 100) \
+    MACRO(midi_note_t, fil_keycenter, 60) \
+    MACRO(int, fil_keytrack, 0) \
+    MACRO(int, min_vel, 0) \
+    MACRO(int, max_vel, 127) \
+    MACRO(float, cutoff, 21000) \
+    MACRO(float, resonance, 0.707) \
+    MACRO(midi_note_t, sw_lokey, 0) \
+    MACRO(midi_note_t, sw_hikey, 127) \
+    MACRO(midi_note_t, sw_last, -1) \
+    MACRO(midi_note_t, sw_down, -1) \
+    MACRO(midi_note_t, sw_up, -1) \
+    MACRO(midi_note_t, sw_previous, -1) \
+    MACRO(int, seq_pos, 0) \
+    MACRO(int, seq_length, 1) \
+    MACRO(int, send1bus, 1) \
+    MACRO(int, send2bus, 2) \
+    MACRO(float, send1gain, 0) \
+    MACRO(float, send2gain, 0) \
+    MACRO(float, delay, 0) \
+    MACRO(float, delay_random, 0) \
+    MACRO(int, output, 0) \
+    MACRO(int, exclusive_group, 0) \
+    MACRO(int, off_by, 0) \
+
+// XXXKF: consider making send1gain the dBamp type
+
+#define PROC_FIELDS_TO_STRUCT(type, name, def_value) \
+    type name;
+#define PROC_FIELDS_TO_STRUCT_dBamp(type, name, def_value) \
+    type name; \
+    type name##_linearized;
+
 struct sampler_layer
 {
     enum sample_player_type mode;
     enum sampler_filter_type filter;
     struct cbox_waveform *waveform;
     int16_t *sample_data;
-    uint32_t sample_offset;
-    uint32_t sample_offset_random;
-    uint32_t loop_start;
-    uint32_t loop_end;
-    uint32_t sample_end;
-    uint32_t loop_evolve;
-    uint32_t loop_overlap;
-    float gain;
-    float pan;
+
+    SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
+
     float freq;
-    float tune;
-    float note_scaling;
-    int min_chan, max_chan;
-    int min_note, max_note, root_note;
-    int min_vel, max_vel;
-    int transpose;
-    int seq_pos, seq_length;
-    int use_keyswitch, sw_lokey, sw_hikey;
-    int sw_last, sw_down, sw_up, sw_previous, last_key;
-    float cutoff, resonance, fileg_depth, pitcheg_depth;
+    int use_keyswitch;
+    int last_key;
     struct cbox_dahdsr amp_env, filter_env, pitch_env;
     struct cbox_envelope_shape amp_env_shape, filter_env_shape, pitch_env_shape;
     enum sample_loop_mode loop_mode;
     float velcurve[128];
-    int velcurve_quadratic, fil_veltrack, fil_keytrack, fil_keycenter;
-    int exclusive_group, off_by;
-    int send1bus, send2bus;
-    float send1gain, send2gain;
+    int velcurve_quadratic, fil_veltrack;
     
     struct sampler_lfo_params amp_lfo_params, filter_lfo_params, pitch_lfo_params;
 
-    float delay, delay_random;
-    
-    int output_pair_no;
-    
     GSList *modulations;
     GSList *nifs;
 };

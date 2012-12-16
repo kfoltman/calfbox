@@ -246,11 +246,11 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else if (!strcmp(key, "hikey"))
         l->max_note = sfz_note_from_string(value);
     else if (!strcmp(key, "pitch_keycenter"))
-        l->root_note = sfz_note_from_string(value);
+        l->pitch_keycenter = sfz_note_from_string(value);
     else if (!strcmp(key, "pitch_keytrack"))
-        l->note_scaling = atof(value);
+        l->pitch_keytrack = atoi(value);
     else if (!strcmp(key, "key"))
-        l->min_note = l->max_note = l->root_note = sfz_note_from_string(value);
+        l->min_note = l->max_note = l->pitch_keycenter = sfz_note_from_string(value);
     else if (!strcmp(key, "seq_position"))
         l->seq_pos = atoi(value) - 1;
     else if (!strcmp(key, "seq_length"))
@@ -266,9 +266,9 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else if (!strcmp(key, "hivel") || !strcmp(key, "hilev"))
         l->max_vel = atoi(value);
     else if (!strcmp(key, "lochan"))
-        l->min_chan = atoi(value) - 1;
+        l->min_chan = atoi(value);
     else if (!strcmp(key, "hichan"))
-        l->max_chan = atoi(value) - 1;
+        l->max_chan = atoi(value);
     else if (!strcmp(key, "offset"))
         l->sample_offset = atoi(value);
     else if (!strcmp(key, "offset_random"))
@@ -301,9 +301,12 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         }
     }
     else if (!strcmp(key, "volume"))
-        l->gain = dB2gain(atof(value));
+    {
+        l->volume = atof(value);
+        l->volume_linearized = -1;
+    }
     else if (!strcmp(key, "pan"))
-        l->pan = (atof(value) + 100) / 200.0;
+        l->pan = atof(value);
     else if (!strcmp(key, "cutoff"))
         l->cutoff = atof(value);
     else if (!strcmp(key, "cutoff_chanaft"))
@@ -319,7 +322,7 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     else if (!strcmp(key, "off_by"))
         l->off_by = atoi(value);
     else if (!strcmp(key, "output"))
-        l->output_pair_no = atoi(value);
+        l->output = atoi(value);
     else if (!strcmp(key, "velcurve_quadratic"))
         l->velcurve_quadratic = atoi(value);
     else if (!strcmp(key, "fil_veltrack"))

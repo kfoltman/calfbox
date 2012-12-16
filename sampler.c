@@ -292,7 +292,7 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
 
 int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c, int first, int note, int vel)
 {
-    int ch = (c - c->module->channels);
+    int ch = (c - c->module->channels) + 1;
     while(first < prg->layer_count)
     {
         struct sampler_layer *l = prg->layers[first];
@@ -360,9 +360,9 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             struct sampler_voice *v = &m->voices[i];
             struct sampler_layer *l = pl[lidx];
             
-            double pitch = ((note - l->root_note) * l->note_scaling + l->tune + l->transpose * 100);
+            double pitch = ((note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100);
             
-            v->output_pair_no = l->output_pair_no % m->output_pairs;
+            v->output_pair_no = l->output % m->output_pairs;
             v->serial_no = m->serial_no;
             v->pos = l->sample_offset;
             if (l->sample_offset_random)
@@ -383,7 +383,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->loop_overlap = l->loop_overlap;
             v->loop_overlap_step = 1.0 / l->loop_overlap;
             v->sample_end = l->sample_end;
-            v->gain = l->gain * l->velcurve[vel];
+            v->gain = l->volume_linearized * l->velcurve[vel];
             v->note = note;
             v->vel = vel;
             v->mode = l->mode;
@@ -777,7 +777,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * v->gain * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
             if (moddests[smdest_gain] != 0.0)
                 gain *= dB2gain(moddests[smdest_gain]);
-            float pan = v->layer->pan + (addcc(c, 10) * 1.0 / maxv - 0.5) * 2;
+            float pan = (v->layer->pan + 100) * (1.0 / 200.0) + (addcc(c, 10) * 1.0 / maxv - 0.5) * 2;
             if (pan < 0)
                 pan = 0;
             if (pan > 1)
