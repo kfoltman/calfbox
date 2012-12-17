@@ -990,12 +990,30 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     memset(c->switchmask, 0, sizeof(c->switchmask));
 }
 
+static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct sampler_program *program = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        if (!(CBOX_OBJECT_DEFAULT_STATUS(program, fb, error)))
+            return FALSE;
+        return TRUE;
+    }
+    else // otherwise, treat just like an command on normal (non-aux) output
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
+    
+}
+
 static struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_no, const char *name, const char *sample_dir)
 {
     struct cbox_document *doc = CBOX_GET_DOCUMENT(&m->module);
     struct sampler_program *prg = malloc(sizeof(struct sampler_program));
     memset(prg, 0, sizeof(*prg));
     CBOX_OBJECT_HEADER_INIT(prg, sampler_program, doc);
+    cbox_command_target_init(&prg->cmd_target, sampler_program_process_cmd, prg);
     
     prg->prog_no = prog_no;
     prg->name = g_strdup(name);

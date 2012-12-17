@@ -79,6 +79,24 @@ static void lfo_params_clear(struct sampler_lfo_params *lfop)
     lfop->fade = 0.f;
 }
 
+static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct sampler_layer *layer = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        if (!(CBOX_OBJECT_DEFAULT_STATUS(layer, fb, error)))
+            return FALSE;
+        return TRUE;
+    }
+    else // otherwise, treat just like an command on normal (non-aux) output
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
+    
+}
+
+
 #define PROC_FIELDS_INITIALISER(type, name, def_value) \
     l->name = def_value; \
     l->has_##name = 0;
@@ -100,6 +118,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     struct cbox_document *doc = CBOX_GET_DOCUMENT(parent_program);
     memset(l, 0, sizeof(struct sampler_layer));
     CBOX_OBJECT_HEADER_INIT(l, sampler_layer, doc);
+    cbox_command_target_init(&l->cmd_target, sampler_layer_process_cmd, l);
     
     if (parent_group)
     {
