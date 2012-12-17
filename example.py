@@ -180,6 +180,7 @@ class MainWindow(Gtk.Window):
             ("_Play Drum Pattern", self.tools_play_drum_pattern),
             ("_Edit Drum Pattern", self.tools_drum_pattern_editor),
             ("_Un-zombify", self.tools_unzombify),
+            ("_Object list", self.tools_object_list),
         ]))
         
         self.vbox.pack_start(self.menu_bar, False, False, 0)
@@ -332,6 +333,9 @@ class MainWindow(Gtk.Window):
     def on_drumkit_editor_destroy(self, w):
         self.drumkit_editor = None
         
+    def tools_object_list(self, w):
+        cbox.Document.dump()
+
     def tools_play_drum_pattern(self, w):
         d = PlayPatternDialog(self)
         response = d.run()
