@@ -301,7 +301,7 @@ int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c,
             if (note >= l->sw_lokey && note <= l->sw_hikey)
                 l->last_key = note;
         }
-        if (note >= l->lokey && note <= l->hikey && vel >= l->min_vel && vel <= l->max_vel && ch >= l->min_chan && ch <= l->max_chan)
+        if (note >= l->lokey && note <= l->hikey && vel >= l->lovel && vel <= l->hivel && ch >= l->lochan && ch <= l->hichan)
         {
             if (!l->use_keyswitch || 
                 ((l->sw_last == -1 || l->sw_last == l->last_key) &&
@@ -310,10 +310,10 @@ int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c,
                  (l->sw_previous == -1 || l->sw_previous == c->previous_note)))
             {
                 // note that the positions in memory are 0-based
-                gboolean play = !l->seq_pos;
-                l->seq_pos++;
-                if (l->seq_pos >= l->seq_length)
-                    l->seq_pos = 0;
+                gboolean play = !l->seq_position;
+                l->seq_position++;
+                if (l->seq_position >= l->seq_length)
+                    l->seq_position = 0;
                 if (play)
                     return first;
             }
@@ -406,7 +406,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                 v->cutoff = l->cutoff * pow(2.0, (vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack) / 1200.0);
             else
                 v->cutoff = -1;
-            v->resonance = l->resonance;
+            v->resonance = l->resonance_linearized;
             v->loop_mode = l->loop_mode;
             v->off_by = l->off_by;
             int auxes = (m->module.outputs - m->module.aux_offset) / 2;
@@ -420,12 +420,12 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                 v->send2bus = 0;
             v->send1gain = l->send1gain;
             v->send2gain = l->send2gain;
-            if (l->exclusive_group >= 1 && exgroupcount < MAX_RELEASED_GROUPS)
+            if (l->group >= 1 && exgroupcount < MAX_RELEASED_GROUPS)
             {
                 gboolean found = FALSE;
                 for (int j = 0; j < exgroupcount; j++)
                 {
-                    if (exgroups[j] == l->exclusive_group)
+                    if (exgroups[j] == l->group)
                     {
                         found = TRUE;
                         break;
@@ -433,7 +433,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                 }
                 if (!found)
                 {
-                    exgroups[exgroupcount++] = l->exclusive_group;
+                    exgroups[exgroupcount++] = l->group;
                 }
             }
             lfo_init(&v->amp_lfo, &l->amp_lfo_params, m->module.srate);

@@ -135,8 +135,9 @@ typedef int midi_note_t;
     MACRO(float, pan, 0) \
     MACRO(float, tune, 0) \
     MACRO(int, transpose, 0) \
-    MACRO(int, min_chan, 1) \
-    MACRO(int, max_chan, 16) \
+    MACRO(int, lochan, 1) \
+    MACRO(int, hichan, 16) \
+    MACRO(midi_note_t, key, -1) \
     MACRO(midi_note_t, lokey, 0) \
     MACRO(midi_note_t, hikey, 127) \
     MACRO(midi_note_t, pitch_keycenter, 60) \
@@ -144,18 +145,18 @@ typedef int midi_note_t;
     MACRO(midi_note_t, fil_keycenter, 60) \
     MACRO(int, fil_keytrack, 0) \
     MACRO(int, fil_veltrack, 0) \
-    MACRO(int, min_vel, 0) \
-    MACRO(int, max_vel, 127) \
+    MACRO(int, lovel, 0) \
+    MACRO(int, hivel, 127) \
     MACRO(int, velcurve_quadratic, -1) \
     MACRO(float, cutoff, 21000) \
-    MACRO(float, resonance, 0.707) \
+    MACRO##_dBamp(float, resonance, 0) \
     MACRO(midi_note_t, sw_lokey, 0) \
     MACRO(midi_note_t, sw_hikey, 127) \
     MACRO(midi_note_t, sw_last, -1) \
     MACRO(midi_note_t, sw_down, -1) \
     MACRO(midi_note_t, sw_up, -1) \
     MACRO(midi_note_t, sw_previous, -1) \
-    MACRO(int, seq_pos, 0) \
+    MACRO(int, seq_position, 0) \
     MACRO(int, seq_length, 1) \
     MACRO(int, send1bus, 1) \
     MACRO(int, send2bus, 2) \
@@ -164,7 +165,7 @@ typedef int midi_note_t;
     MACRO(float, delay, 0) \
     MACRO(float, delay_random, 0) \
     MACRO(int, output, 0) \
-    MACRO(int, exclusive_group, 0) \
+    MACRO(int, group, 0) \
     MACRO(int, off_by, 0) \
     MACRO##_dahdsr(amp_env, ampeg) \
     MACRO##_dahdsr(filter_env, fileg) \
@@ -173,7 +174,8 @@ typedef int midi_note_t;
     MACRO##_lfo(filter_lfo, fillfo) \
     MACRO##_lfo(pitch_lfo, pitchlfo) \
 
-// XXXKF: consider making send1gain the dBamp type
+// XXXKF: consider making send1gain the dBamp type... except it's
+// a linear percentage value in SFZ spec - bit weird!
 
 #define PROC_FIELDS_TO_STRUCT(type, name, def_value) \
     type name;
@@ -186,6 +188,23 @@ typedef int midi_note_t;
 #define PROC_FIELDS_TO_STRUCT_lfo(name, parname) \
     struct sampler_lfo_params name##_params; \
 
+#define PROC_HAS_FIELD(type, name, def_value) \
+    unsigned int has_##name:1;
+#define PROC_HAS_FIELD_dBamp(type, name, def_value) \
+    PROC_HAS_FIELD(type, name, def_value)
+#define PROC_HAS_FIELD_dahdsr(name, parname) \
+    unsigned int has_##name##_start:1; \
+    unsigned int has_##name##_delay:1; \
+    unsigned int has_##name##_attack:1; \
+    unsigned int has_##name##_hold:1; \
+    unsigned int has_##name##_decay:1; \
+    unsigned int has_##name##_sustain:1; \
+    unsigned int has_##name##_release:1;
+#define PROC_HAS_FIELD_lfo(name, parname) \
+    unsigned int has_##name##_freq:1; \
+    unsigned int has_##name##_delay:1; \
+    unsigned int has_##name##_fade:1; \
+
 struct sampler_layer
 {
     enum sample_player_type mode;
@@ -194,6 +213,7 @@ struct sampler_layer
     int16_t *sample_data;
 
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
+    SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)
 
     float freq;
     int use_keyswitch;
@@ -212,8 +232,9 @@ extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_m
 extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param);
 extern void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section);
-extern void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src);
+extern void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src, int reset_hasfields);
 extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
+extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value);
 extern void sampler_layer_dump(struct sampler_layer *l, FILE *f);
 
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
