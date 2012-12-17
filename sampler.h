@@ -45,8 +45,7 @@ struct sampler_program
 {
     gchar *name;
     int prog_no;
-    struct sampler_layer **layers;
-    int layer_count;
+    GSList *layers;
 };
 
 struct sampler_channel

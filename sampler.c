@@ -290,12 +290,12 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
     return CBOX_BLOCK_SIZE;
 }
 
-int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c, int first, int note, int vel)
+GSList *skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel)
 {
     int ch = (c - c->module->channels) + 1;
-    while(first < prg->layer_count)
+    while(next_layer)
     {
-        struct sampler_layer *l = prg->layers[first];
+        struct sampler_layer *l = next_layer->data;
         if (l->sw_last != -1)
         {
             if (note >= l->sw_lokey && note <= l->sw_hikey)
@@ -315,12 +315,12 @@ int skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c,
                 if (l->seq_position >= l->seq_length)
                     l->seq_position = 0;
                 if (play)
-                    return first;
+                    return next_layer;
             }
         }
-        first++;
+        next_layer = g_slist_next(next_layer);
     }
-    return -1;
+    return NULL;
 }
 
 static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, int srate)
@@ -341,9 +341,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
     struct sampler_program *prg = c->program;
     if (!prg)
         return;
-    struct sampler_layer **pl = prg->layers;
-    int lidx = skip_inactive_layers(prg, c, 0, note, vel);
-    if (lidx < 0)
+    GSList *next_layer = skip_inactive_layers(prg, c, prg->layers, note, vel);
+    if (!next_layer)
     {
         c->previous_note = note;
         return;
@@ -358,7 +357,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
         if (m->voices[i].mode == spt_inactive)
         {
             struct sampler_voice *v = &m->voices[i];
-            struct sampler_layer *l = pl[lidx];
+            struct sampler_layer *l = next_layer->data;
             
             double pitch = ((note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100);
             
@@ -457,8 +456,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             cbox_envelope_reset(&v->filter_env);
             cbox_envelope_reset(&v->pitch_env);
 
-            lidx = skip_inactive_layers(prg, c, lidx + 1, note, vel);
-            if (lidx < 0)
+            next_layer = skip_inactive_layers(prg, c, g_slist_next(next_layer), note, vel);
+            if (!next_layer)
                 break;
         }
     }
@@ -1026,30 +1025,17 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
             return sampler_module_load_program_sfz(m, prg, sfz, spath, FALSE, error);
     }
     
-    int layer_count = 0;
+    prg->layers = NULL;
     for (i = 0; ; i++)
     {
-        gchar *s = g_strdup_printf("layer%d", i + 1);
-        char *p = cbox_config_get_string(cfg_section, s);
-        g_free(s);
-        
-        if (!p)
-        {
-            layer_count = i;
-            break;
-        }
-    }
-
-    prg->layer_count = layer_count ? layer_count : 1;
-    prg->layers = malloc(sizeof(struct sampler_layer *) * prg->layer_count);
-    for (i = 0; i < prg->layer_count; i++)
-    {
         char *where = NULL;
-        if (layer_count)
         {
             gchar *s = g_strdup_printf("layer%d", 1 + i);
-            where = g_strdup_printf("slayer:%s", cbox_config_get_string(cfg_section, s));
+            const char *layer_section = cbox_config_get_string(cfg_section, s);
             g_free(s);
+            if (!layer_section)
+                break;
+            where = g_strdup_printf("slayer:%s", layer_section);
         }
         const char *sample_file = cbox_config_get_string(where ? where : cfg_section, "file");
         
@@ -1059,10 +1045,11 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
         
         if (!waveform)
             return FALSE;
-        prg->layers[i] = sampler_layer_new_from_section(m, where, waveform);
-        prg->layers[i]->parent_program = prg;
-        if (where)
-            g_free(where);
+        
+        struct sampler_layer *l = sampler_layer_new_from_section(m, where, waveform);
+        prg->layers = g_slist_append(prg->layers, l);
+        l->parent_program = prg;
+        g_free(where);
     }
     return TRUE;
 }
@@ -1200,11 +1187,11 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
 
 static void destroy_program(struct sampler_module *m, struct sampler_program *prg)
 {
-    for (int i = 0; i < prg->layer_count; i++)
-        sampler_layer_destroy(prg->layers[i]);
+    for (GSList *p = prg->layers; p; p = g_slist_next(p))
+        sampler_layer_destroy(p->data);
 
     g_free(prg->name);
-    free(prg->layers);
+    g_slist_free(prg->layers);
     free(prg);
 }
 
