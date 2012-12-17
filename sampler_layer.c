@@ -85,7 +85,7 @@ static void lfo_params_clear(struct sampler_lfo_params *lfop)
     l->name##_linearized = -1; \
     l->has_##name = 0;
 #define PROC_FIELDS_INITIALISER_dahdsr(name, parname, index) \
-    cbox_dahdsr_init(&l->name); \
+    cbox_dahdsr_init(&l->name, 100.f); \
     DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name)
 #define PROC_FIELDS_INITIALISER_lfo(name, parname, index) \
     lfo_params_clear(&l->name##_params);

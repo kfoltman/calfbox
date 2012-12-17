@@ -139,14 +139,14 @@ struct cbox_dahdsr
     float release;
 };
 
-static inline void cbox_dahdsr_init(struct cbox_dahdsr *dahdsr)
+static inline void cbox_dahdsr_init(struct cbox_dahdsr *dahdsr, float top_value)
 {
     dahdsr->start = 0.f;
     dahdsr->delay = 0.f;
     dahdsr->attack = 0.f;
     dahdsr->hold = 0.f;
     dahdsr->decay = 0.f;
-    dahdsr->sustain = 1.f;
+    dahdsr->sustain = top_value;
     dahdsr->release = 0.05f;
 }
 
