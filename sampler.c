@@ -1044,7 +1044,6 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
     prg->layers = malloc(sizeof(struct sampler_layer *) * prg->layer_count);
     for (i = 0; i < prg->layer_count; i++)
     {
-        prg->layers[i] = malloc(sizeof(struct sampler_layer));
         char *where = NULL;
         if (layer_count)
         {
@@ -1060,7 +1059,8 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
         
         if (!waveform)
             return FALSE;
-        sampler_layer_load(prg->layers[i], m, where, waveform);
+        prg->layers[i] = sampler_layer_new_from_section(m, where, waveform);
+        prg->layers[i]->parent_program = prg;
         if (where)
             g_free(where);
     }
@@ -1198,19 +1198,10 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
     return TRUE;
 }
 
-static void destroy_layer(struct sampler_module *m, struct sampler_layer *l)
-{
-    g_slist_free_full(l->nifs, g_free);
-    g_slist_free_full(l->modulations, g_free);
-    if (l->waveform)
-        cbox_waveform_unref(l->waveform);
-    free(l);
-}
-
 static void destroy_program(struct sampler_module *m, struct sampler_program *prg)
 {
     for (int i = 0; i < prg->layer_count; i++)
-        destroy_layer(m, prg->layers[i]);
+        sampler_layer_destroy(prg->layers[i]);
 
     g_free(prg->name);
     free(prg->layers);

@@ -26,8 +26,8 @@ struct sfz_load_state
     struct sampler_module *m;
     const char *filename;
     const char *sample_path;
-    int in_group;
-    struct sampler_layer group;
+    struct sampler_program *program;
+    struct sampler_layer *group;
     struct sampler_layer *region;
     GList *layers;
     GError **error;
@@ -51,16 +51,15 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
 static void load_sfz_group(struct sfz_parser_client *client)
 {
     struct sfz_load_state *ls = client->user_data;
-    if (ls->group.waveform)
+    if (ls->group && ls->group->waveform)
     {
-        cbox_waveform_unref(ls->group.waveform);
-        ls->group.waveform = NULL;
+        cbox_waveform_unref(ls->group->waveform);
+        ls->group->waveform = NULL;
     }
     if (ls->region)
         load_sfz_end_region(client);
     // printf("-- start group\n");
-    sampler_layer_init(&ls->group);
-    ls->in_group = 1;
+    ls->group = sampler_layer_new(NULL);
 }
 
 static void load_sfz_region(struct sfz_parser_client *client)
@@ -78,20 +77,16 @@ static void load_sfz_region(struct sfz_parser_client *client)
         sampler_layer_dump(&ls->group, stdout);
 #endif
     }
-    ls->region = malloc(sizeof(struct sampler_layer));
-    if (ls->in_group)
-        sampler_layer_clone(ls->region, &ls->group, TRUE);
-    else
-        sampler_layer_init(ls->region);
+    ls->region = sampler_layer_new(ls->group);
     // g_warning("-- start region");
 }
 
 static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char *key, const char *value)
 {
     struct sfz_load_state *ls = client->user_data;
-    struct sampler_layer *l = ls->region ? ls->region : &ls->group;
+    struct sampler_layer *l = ls->region ? ls->region : ls->group;
     int unhandled = 0;
-    if (!ls->region && !ls->in_group)
+    if (!ls->region && !ls->group)
     {
         g_warning("Cannot use parameter '%s' outside of region or group", key);
         return TRUE;
@@ -132,7 +127,7 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
 
 gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, const char *sample_path, int is_from_string, GError **error)
 {
-    struct sfz_load_state ls = { .in_group = 0, .m = m, .filename = sfz, .layers = NULL, .region = NULL, .error = error, .sample_path = sample_path };
+    struct sfz_load_state ls = { .group = NULL, .m = m, .filename = sfz, .layers = NULL, .region = NULL, .error = error, .sample_path = sample_path, .program = prg };
     struct sfz_parser_client c = { .user_data = &ls, .region = load_sfz_region, .group = load_sfz_group, .key_value = load_sfz_key_value };
     g_clear_error(error);
 
@@ -142,10 +137,10 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
 
     if (ls.region)
         load_sfz_end_region(&c);
-    if (ls.group.waveform)
+    if (ls.group && ls.group->waveform)
     {
-        cbox_waveform_unref(ls.group.waveform);
-        ls.group.waveform = NULL;
+        cbox_waveform_unref(ls.group->waveform);
+        ls.group->waveform = NULL;
     }
     
     prg->layer_count = g_list_length(ls.layers);
@@ -154,6 +149,7 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
     for(int i = 0; p; i++)
     {
         prg->layers[i] = p->data;
+        prg->layers[i]->parent_program = prg;
         p = g_list_next(p);
     }
     g_list_free(ls.layers);

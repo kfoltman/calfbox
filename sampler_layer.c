@@ -33,6 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 
+static void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src, int reset_hasfields);
+
 void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags)
 {
     sampler_layer_set_modulation(l, src, smsrc_none, dest, amount, flags);
@@ -90,8 +92,22 @@ static void lfo_params_clear(struct sampler_lfo_params *lfop)
 #define PROC_FIELDS_INITIALISER_lfo(name, parname, index) \
     lfo_params_clear(&l->name##_params);
 
-void sampler_layer_init(struct sampler_layer *l)
+struct sampler_layer *sampler_layer_new(struct sampler_layer *parent_group)
 {
+    struct sampler_layer *l = malloc(sizeof(struct sampler_layer));
+    memset(l, 0, sizeof(struct sampler_layer));
+    
+    if (parent_group)
+    {
+        sampler_layer_clone(l, parent_group, TRUE);
+        l->parent_program = NULL;
+        l->parent_group = parent_group;
+        l->child_count = 0;
+        parent_group->child_count++;
+        return l;
+    }
+    l->parent_program = NULL;
+    l->child_count = 0;
     l->waveform = NULL;
     l->sample_data = NULL;
     
@@ -112,6 +128,7 @@ void sampler_layer_init(struct sampler_layer *l)
     sampler_layer_set_modulation1(l, 74, smdest_cutoff, 9600, 2);
     sampler_layer_set_modulation1(l, 71, smdest_resonance, 12, 2);
     sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
+    return l;
 }
 
 #define PROC_RESET_HASFIELDS(type, name, def_value) \
@@ -248,12 +265,13 @@ void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_secti
     cbox_config_foreach_key(layer_foreach_func, cfg_section, &lfs);
 }
 
-void sampler_layer_load(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section, struct cbox_waveform *waveform)
+struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, const char *cfg_section, struct cbox_waveform *waveform)
 {
-    sampler_layer_init(l);
+    struct sampler_layer *l = sampler_layer_new(NULL);
     sampler_layer_set_waveform(l, waveform);
     sampler_layer_load_overrides(l, cfg_section);
     sampler_layer_finalize(l, m);
+    return l;
 }
 
 static int sfz_note_from_string(const char *note)
@@ -600,4 +618,20 @@ void sampler_layer_dump(struct sampler_layer *l, FILE *f)
 {
     gchar *str = sampler_layer_to_string(l);
     fprintf(f, "%s\n", str);
+}
+
+void sampler_layer_destroy(struct sampler_layer *l)
+{
+    assert(l->child_count == 0);
+    if (l->parent_group)
+    {
+        if (!--l->parent_group->child_count)
+            sampler_layer_destroy(l->parent_group);
+        l->parent_group = NULL;
+    }
+    g_slist_free_full(l->nifs, g_free);
+    g_slist_free_full(l->modulations, g_free);
+    if (l->waveform)
+        cbox_waveform_unref(l->waveform);
+    free(l);
 }
