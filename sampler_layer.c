@@ -470,41 +470,42 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
 
 #define TYPE_PRINTF_uint32_t(name, def_value) \
     if (l->has_##name) \
-        fprintf(f, " %s=%u", #name, (unsigned)(l->name));
+        g_string_append_printf(outstr, " %s=%u", #name, (unsigned)(l->name));
 #define TYPE_PRINTF_int(name, def_value) \
     if (l->has_##name) \
-        fprintf(f, " %s=%d", #name, (int)(l->name));
+        g_string_append_printf(outstr, " %s=%d", #name, (int)(l->name));
 #define TYPE_PRINTF_midi_note_t(name, def_value) \
     if (l->has_##name) { \
         int val = l->name; \
         if (val == -1) \
-            fprintf(f, " %s=-1", #name); \
+            g_string_append_printf(outstr, " %s=-1", #name); \
         else \
-            fprintf(f, " %s=%c%s%d", #name, "ccddeffggaab"[val%12], "\000#\000#\000\000#\000#\000#\000#\000"+(val%12), (val/12-1)); \
+            g_string_append_printf(outstr, " %s=%c%s%d", #name, "ccddeffggaab"[val%12], "\000#\000#\000\000#\000#\000#\000#\000"+(val%12), (val/12-1)); \
     } else {}
 #define TYPE_PRINTF_float(name, def_value) \
     if (l->has_##name) \
-        fprintf(f, " %s=%g", #name, (float)(l->name));
+        g_string_append_printf(outstr, " %s=%g", #name, (float)(l->name));
 
 #define PROC_FIELDS_TO_FILEPTR(type, name, def_value) \
     TYPE_PRINTF_##type(name, def_value)
 #define PROC_FIELDS_TO_FILEPTR_dBamp(type, name, def_value) \
     if (l->has_##name) \
-        fprintf(f, " %s=%g", #name, (float)(l->name));
+        g_string_append_printf(outstr, " %s=%g", #name, (float)(l->name));
 
 #define ENV_PARAM_OUTPUT(param, index, env, envfield, envname) \
     if (l->has_##envfield.param) \
-        fprintf(f, " " #envname "_" #param "=%g", env.param);
+        g_string_append_printf(outstr, " " #envname "_" #param "=%g", env.param);
 
 #define PROC_FIELDS_TO_FILEPTR_dahdsr(name, parname, index) \
     DAHDSR_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
 #define PROC_FIELDS_TO_FILEPTR_lfo(name, parname, index) \
     LFO_FIELDS(ENV_PARAM_OUTPUT, l->name##_params, name, parname)
 
-void sampler_layer_dump(struct sampler_layer *l, FILE *f)
+gchar *sampler_layer_to_string(struct sampler_layer *l)
 {
+    GString *outstr = g_string_sized_new(200);
     if (l->waveform && l->waveform->display_name)
-        fprintf(f, " sample=%s", l->waveform->display_name);
+        g_string_append_printf(outstr, " sample=%s", l->waveform->display_name);
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
     
     for(GSList *nif = l->nifs; nif; nif = nif->next)
@@ -516,14 +517,22 @@ void sampler_layer_dump(struct sampler_layer *l, FILE *f)
         int v = nd->variant;
         
         if (nd->notefunc == sampler_nif_addrandom && v >= 0 && v <= 2)
-            fprintf(f, " %s_random=%g", addrandom_variants[nd->variant], nd->param);
+            g_string_append_printf(outstr, " %s_random=%g", addrandom_variants[nd->variant], nd->param);
         else if (nd->notefunc == sampler_nif_vel2pitch)
-            fprintf(f, " pitch_veltrack=%g", nd->param);
+            g_string_append_printf(outstr, " pitch_veltrack=%g", nd->param);
         else if (nd->notefunc == sampler_nif_cc2delay && v >= 0 && v < 120)
-            fprintf(f, " delay_cc%d=%g", nd->variant, nd->param);
+            g_string_append_printf(outstr, " delay_cc%d=%g", nd->variant, nd->param);
         else if (nd->notefunc == sampler_nif_vel2env && v >= 0 && (v & 15) < 6 && (v >> 4) < 3)
-            fprintf(f, " %seg_vel2%s=%g", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], nd->param);
+            g_string_append_printf(outstr, " %seg_vel2%s=%g", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], nd->param);
     }
     
-    fprintf(f, "\n");
+    gchar *res = outstr->str;
+    g_string_free(outstr, FALSE);
+    return res;
+}
+
+void sampler_layer_dump(struct sampler_layer *l, FILE *f)
+{
+    gchar *str = sampler_layer_to_string(l);
+    fprintf(f, "%s\n", str);
 }

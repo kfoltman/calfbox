@@ -257,6 +257,7 @@ extern void sampler_layer_load_overrides(struct sampler_layer *l, const char *cf
 extern void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src, int reset_hasfields);
 extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
 extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value);
+extern gchar *sampler_layer_to_string(struct sampler_layer *l);
 extern void sampler_layer_dump(struct sampler_layer *l, FILE *f);
 
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
