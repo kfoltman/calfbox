@@ -40,7 +40,10 @@ enum sample_loop_mode
     slm_one_shot,
     slm_loop_continuous,
     slm_loop_sustain, // unsupported
+    slmcount
 };
+
+typedef enum sample_loop_mode sample_loop_mode_t;
 
 enum sampler_filter_type
 {
@@ -131,6 +134,7 @@ typedef int midi_note_t;
     MACRO(uint32_t, sample_end, -1) \
     MACRO(uint32_t, loop_evolve, -1) \
     MACRO(uint32_t, loop_overlap, -1) \
+    MACRO(sample_loop_mode_t, loop_mode, slm_unknown) \
     MACRO##_dBamp(float, volume, 0) \
     MACRO(float, pan, 0) \
     MACRO(float, tune, 0) \
@@ -240,7 +244,6 @@ struct sampler_layer
     float freq;
     int use_keyswitch;
     int last_key;
-    enum sample_loop_mode loop_mode;
     float velcurve[128];
     
     GSList *modulations;
