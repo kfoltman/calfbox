@@ -110,9 +110,9 @@ void sampler_layer_init(struct sampler_layer *l)
         l->velcurve[i] = -1;
     l->modulations = NULL;
     l->nifs = NULL;
-    sampler_layer_set_modulation(l, 74, smsrc_none, smdest_cutoff, 9600, 2);
-    sampler_layer_set_modulation(l, 71, smsrc_none, smdest_resonance, 12, 2);
-    sampler_layer_set_modulation(l, 1, smsrc_pitchlfo, smdest_pitch, 100, 0);
+    sampler_layer_set_modulation1(l, 74, smdest_cutoff, 9600, 2);
+    sampler_layer_set_modulation1(l, 71, smdest_resonance, 12, 2);
+    sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
 }
 
 #define PROC_RESET_HASFIELDS(type, name, def_value) \
@@ -312,7 +312,7 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_da
     else if (!strcmp(key, "vel2release"))
         sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 5, fvalue);
     else if (!strcmp(key, "vel2depth"))
-        sampler_layer_set_modulation(layer, smsrc_vel, src, dest, atof(value), 0);
+        sampler_layer_set_modulation(layer, src, smsrc_vel, dest, atof(value), 0);
     else
         return FALSE;
     return TRUE;
@@ -508,10 +508,12 @@ gchar *sampler_layer_to_string(struct sampler_layer *l)
         g_string_append_printf(outstr, " sample=%s", l->waveform->display_name);
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
     
+    static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
+    static const char *modsrc_names[] = { "chanaft", "vel", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
+    static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance" };
     for(GSList *nif = l->nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;
-        static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
         #define PROC_ENVSTAGE_NAME(name, index) #name, 
         static const char *env_stages[] = { DAHDSR_FIELDS(PROC_ENVSTAGE_NAME) };
         int v = nd->variant;
@@ -524,6 +526,55 @@ gchar *sampler_layer_to_string(struct sampler_layer *l)
             g_string_append_printf(outstr, " delay_cc%d=%g", nd->variant, nd->param);
         else if (nd->notefunc == sampler_nif_vel2env && v >= 0 && (v & 15) < 6 && (v >> 4) < 3)
             g_string_append_printf(outstr, " %seg_vel2%s=%g", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], nd->param);
+    }
+    for(GSList *mod = l->modulations; mod; mod = mod->next)
+    {
+        struct sampler_modulation *md = mod->data;
+
+        if (md->src2 == smsrc_none)
+        {
+            if (md->src < 120)
+            {
+                g_string_append_printf(outstr, " %s_cc%d=%g", moddest_names[md->dest], md->src, md->amount);
+                continue;
+            }
+            if (md->src < 120 + sizeof(modsrc_names) / sizeof(modsrc_names[0]))
+            {
+                g_string_append_printf(outstr, " %s_%s=%g", moddest_names[md->dest], modsrc_names[md->src - 120], md->amount);
+                continue;
+            }
+        }
+        if ((md->src == smsrc_amplfo && md->dest == smdest_gain) ||
+            (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
+            (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
+        {
+            switch(md->src2)
+            {
+            case smsrc_chanaft:
+            case smsrc_polyaft:
+                g_string_append_printf(outstr, " %slfo_depth%s=%g", moddest_names[md->dest], modsrc_names[md->src2 - 120], md->amount);
+                continue;
+            default:
+                if (md->src2 < 120)
+                {
+                    g_string_append_printf(outstr, " %slfo_depthcc%d=%g", moddest_names[md->dest], md->src2, md->amount);
+                    continue;
+                }
+                break;
+            }
+            break;
+        }
+        if ((md->src == smsrc_ampenv && md->dest == smdest_gain) ||
+            (md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
+            (md->src == smsrc_pitchenv && md->dest == smdest_pitch))
+        {
+            if (md->src2 == smsrc_vel)
+            {
+                g_string_append_printf(outstr, " %seg_vel2depth=%g", moddest_names[md->dest], md->amount);
+                continue;
+            }
+        }
+        g_string_append_printf(outstr, " genericmod_from_%d_and_%d_to_%d=%g", md->src, md->src2, md->dest, md->amount);
     }
     
     gchar *res = outstr->str;
