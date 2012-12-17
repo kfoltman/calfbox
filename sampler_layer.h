@@ -254,15 +254,15 @@ struct sampler_layer
     GSList *nifs;
 };
 
-extern struct sampler_layer *sampler_layer_new(struct sampler_layer *parent_group);
-extern struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, const char *cfg_section, struct cbox_waveform *waveform);
+extern struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, struct sampler_layer *parent_group);
+extern struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, const char *cfg_section);
 extern void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform);
 extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param);
 extern void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_section);
 extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
-extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value);
+extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error);
 extern gchar *sampler_layer_to_string(struct sampler_layer *l);
 extern void sampler_layer_dump(struct sampler_layer *l, FILE *f);
 extern void sampler_layer_destroy(struct sampler_layer *l);

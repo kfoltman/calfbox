@@ -92,7 +92,7 @@ static void lfo_params_clear(struct sampler_lfo_params *lfop)
 #define PROC_FIELDS_INITIALISER_lfo(name, parname, index) \
     lfo_params_clear(&l->name##_params);
 
-struct sampler_layer *sampler_layer_new(struct sampler_layer *parent_group)
+struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, struct sampler_layer *parent_group)
 {
     struct sampler_layer *l = malloc(sizeof(struct sampler_layer));
     memset(l, 0, sizeof(struct sampler_layer));
@@ -100,13 +100,13 @@ struct sampler_layer *sampler_layer_new(struct sampler_layer *parent_group)
     if (parent_group)
     {
         sampler_layer_clone(l, parent_group, TRUE);
-        l->parent_program = NULL;
+        l->parent_program = parent_program;
         l->parent_group = parent_group;
         l->child_count = 0;
         parent_group->child_count++;
         return l;
     }
-    l->parent_program = NULL;
+    l->parent_program = parent_program;
     l->child_count = 0;
     l->waveform = NULL;
     l->sample_data = NULL;
@@ -240,16 +240,21 @@ struct layer_foreach_struct
 
 static void layer_foreach_func(void *user_data, const char *key)
 {
-    // file loading is handled in load_program
     if (!strcmp(key, "file"))
-        return;
+        key = "sample";
     // import is handled in sampler_load_layer_overrides
     if (!strcmp(key, "import"))
         return;
     struct layer_foreach_struct *lfs = user_data;
     const char *value = cbox_config_get_string(lfs->cfg_section, key);
-    if (!sampler_layer_apply_param(lfs->layer, key, value))
-        g_warning("Unknown sample layer parameter: %s in section %s", key, lfs->cfg_section);
+    GError *error = NULL;
+    if (!sampler_layer_apply_param(lfs->layer, key, value, &error))
+    {
+        if (error)
+            g_warning("Error '%s', context: %s in section %s", error->message, key, lfs->cfg_section);
+        else
+            g_warning("Unknown sample layer parameter: %s in section %s", key, lfs->cfg_section);
+    }
 }
 
 void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_section)
@@ -265,10 +270,9 @@ void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_secti
     cbox_config_foreach_key(layer_foreach_func, cfg_section, &lfs);
 }
 
-struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, const char *cfg_section, struct cbox_waveform *waveform)
+struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, const char *cfg_section)
 {
-    struct sampler_layer *l = sampler_layer_new(NULL);
-    sampler_layer_set_waveform(l, waveform);
+    struct sampler_layer *l = sampler_layer_new(parent_program, NULL);
     sampler_layer_load_overrides(l, cfg_section);
     sampler_layer_finalize(l, m);
     return l;
@@ -411,7 +415,7 @@ static sample_loop_mode_t parse_loop_mode(const char *value)
     if (!strncmp(key, #parname "_", sizeof(#parname))) \
         return parse_lfo_param(l, &l->name##_params, &l->has_##name, index, key + sizeof(#parname), value);
 
-gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value)
+gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error)
 {
     // XXXKF: this is seriously stupid code, this should use a hash table for
     // fixed strings, or something else that doesn't explode O(N**2) with
@@ -422,7 +426,29 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
     // XXXKF: to make things worse, some attributes have names different from
     // C field names, or have multiple names, or don't map 1:1 to internal model
     
-    if (!strcmp(key, "lolev"))
+    if (!strcmp(key, "sample"))
+    {
+        struct cbox_waveform *old_waveform = l->waveform;
+        gchar *value_copy = g_strdup(value);
+        for (int i = 0; value_copy[i]; i++)
+        {
+            if (value_copy[i] == '\\')
+                value_copy[i] = '/';
+        }
+        gchar *filename = g_build_filename(l->parent_program->sample_dir, value_copy, NULL);
+        g_free(value_copy);
+        struct cbox_waveform *wf = cbox_wavebank_get_waveform(l->parent_program->source_file, filename, error);
+        g_free(filename);
+        if (!wf)
+            return FALSE;
+        sampler_layer_set_waveform(l, wf);
+        if (l->loop_end == 0)
+            l->loop_end = l->sample_end;
+        if (old_waveform != NULL)
+            cbox_waveform_unref(old_waveform);
+        return TRUE;
+    }
+    else if (!strcmp(key, "lolev"))
         l->lovel = atoi(value), l->has_lovel = 1;
     else if (!strcmp(key, "hilev"))
         l->hivel = atoi(value), l->has_hivel = 1;

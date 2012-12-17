@@ -46,6 +46,8 @@ struct sampler_program
     gchar *name;
     int prog_no;
     GSList *layers;
+    gchar *sample_dir; // can be empty, cannot be NULL
+    gchar *source_file; // can be empty, cannot be NULL
 };
 
 struct sampler_channel

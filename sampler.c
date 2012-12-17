@@ -1009,6 +1009,7 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
         prg->name = g_strdup(name);
     char *sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
     char *spath = cbox_config_get_string(cfg_section, "sample_path");
+    prg->sample_dir = g_strdup(spath ? spath : (sfz_path ? sfz_path : ""));
     char *sfz = cbox_config_get_string(cfg_section, "sfz");
     if (sfz)
     {
@@ -1017,12 +1018,16 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
             if (!spath)
                 spath = sfz_path;
             sfz = g_build_filename(sfz_path, sfz, NULL);
-            gboolean result = sampler_module_load_program_sfz(m, prg, sfz, spath, FALSE, error);
+            prg->source_file = g_strdup(sfz);
+            gboolean result = sampler_module_load_program_sfz(m, prg, sfz, FALSE, error);
             g_free(sfz);
             return result;
         }
         else
-            return sampler_module_load_program_sfz(m, prg, sfz, spath, FALSE, error);
+        {
+            prg->source_file = g_strdup(sfz);
+            return sampler_module_load_program_sfz(m, prg, sfz, FALSE, error);
+        }
     }
     
     prg->layers = NULL;
@@ -1037,20 +1042,15 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
                 break;
             where = g_strdup_printf("slayer:%s", layer_section);
         }
-        const char *sample_file = cbox_config_get_string(where ? where : cfg_section, "file");
         
-        gchar *sample_pathname = g_build_filename(spath ? spath : "", sample_file, NULL);
-        struct cbox_waveform *waveform = cbox_wavebank_get_waveform(where ? where : cfg_section, sample_pathname, error);
-        g_free(sample_pathname);
-        
-        if (!waveform)
+        prg->source_file = g_strdup_printf("config:%s", cfg_section);
+        struct sampler_layer *l = sampler_layer_new_from_section(m, prg, where);
+        if (!l->waveform)
             return FALSE;
-        
-        struct sampler_layer *l = sampler_layer_new_from_section(m, where, waveform);
-        prg->layers = g_slist_append(prg->layers, l);
-        l->parent_program = prg;
+        prg->layers = g_slist_prepend(prg->layers, l);
         g_free(where);
     }
+    prg->layers = g_slist_reverse(prg->layers);
     return TRUE;
 }
 
@@ -1166,7 +1166,8 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
     struct sampler_program *pgm = malloc(sizeof(struct sampler_program));    
     pgm->prog_no = prog_no;
     pgm->name = g_strdup(name);
-    if (!sampler_module_load_program_sfz(m, pgm, sfz_data, sample_dir, TRUE, error))
+    pgm->sample_dir = g_strdup(sample_dir);
+    if (!sampler_module_load_program_sfz(m, pgm, sfz_data, TRUE, error))
     {
         free(pgm);
         return FALSE;
@@ -1191,6 +1192,8 @@ static void destroy_program(struct sampler_module *m, struct sampler_program *pr
         sampler_layer_destroy(p->data);
 
     g_free(prg->name);
+    g_free(prg->sample_dir);
+    g_free(prg->source_file);
     g_slist_free(prg->layers);
     free(prg);
 }
@@ -1475,7 +1478,6 @@ void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice 
     float param = nif->param * v->vel * (1.0 / 127.0);
     if ((nif->variant & 15) == 4)
         param *= 0.01;
-    // XXXKF needs to extract the sample rate from something
     cbox_envelope_modify_dahdsr(env->shape, nif->variant & 15, param, v->channel->module->module.srate / CBOX_BLOCK_SIZE);
 }
 
