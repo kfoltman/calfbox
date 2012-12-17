@@ -718,9 +718,9 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * (1.0 / 127.0);
             modsrcs[smsrc_pitch - smsrc_pernote_offset] = v->pitch * (1.0 / 100.0);
             modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0; // XXXKF not supported yet
-            modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released);
-            modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released);
-            modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->amp_env, v->released);
+            modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released) * 0.01f;
+            modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released) * 0.01f;
+            modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->amp_env, v->released) * 0.01f;
 
             modsrcs[smsrc_amplfo - smsrc_pernote_offset] = lfo_run(&v->amp_lfo);
             modsrcs[smsrc_fillfo - smsrc_pernote_offset] = lfo_run(&v->filter_lfo);

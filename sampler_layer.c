@@ -167,7 +167,7 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *w
 #define PROC_FIELDS_FINALISER_dBamp(type, name, def_value) \
     l->name##_linearized = dB2gain(l->name);
 #define PROC_FIELDS_FINALISER_dahdsr(name, parname, index) \
-    cbox_envelope_init_dahdsr(&l->name##_shape, &l->name, m->module.srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_init_dahdsr(&l->name##_shape, &l->name, m->module.srate / CBOX_BLOCK_SIZE, 100.f);
 #define PROC_FIELDS_FINALISER_lfo(name, parname, index) /* no finaliser required */
 
 void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
@@ -287,8 +287,6 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_da
     enum sampler_modsrc src = srcs[env_type];
     enum sampler_moddest dest = dests[env_type];
     float fvalue = atof(value);
-    if (!strcmp(key, "sustain"))
-        fvalue /= 100.0;
     
 #define PROC_SET_ENV_FIELD(name, index) \
         if (!strcmp(key, #name)) {\

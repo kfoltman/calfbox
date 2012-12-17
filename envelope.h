@@ -150,7 +150,7 @@ static inline void cbox_dahdsr_init(struct cbox_dahdsr *dahdsr)
     dahdsr->release = 0.05f;
 }
 
-static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, const struct cbox_dahdsr *dahdsr, int sr)
+static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, const struct cbox_dahdsr *dahdsr, int sr, float top_value)
 {
     env->start_value = 0;
     env->stages[0].end_value = 0;
@@ -160,14 +160,14 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[0].keep_last_value = 1;
     env->stages[0].break_on_release = 0;
 
-    env->stages[1].end_value = 1;
+    env->stages[1].end_value = top_value;
     env->stages[1].time = dahdsr->attack * sr;
     env->stages[1].next_if_pressed = 2;
     env->stages[1].next_if_released = 2;
     env->stages[1].keep_last_value = 1;
     env->stages[1].break_on_release = 0;
 
-    env->stages[2].end_value = 1;
+    env->stages[2].end_value = top_value;
     env->stages[2].time = dahdsr->hold * sr;
     env->stages[2].next_if_pressed = 3;
     env->stages[2].next_if_released = 3;
