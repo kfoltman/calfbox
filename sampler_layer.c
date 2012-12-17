@@ -392,10 +392,6 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
         l->lovel = atoi(value), l->has_lovel = 1;
     else if (!strcmp(key, "hilev"))
         l->hivel = atoi(value), l->has_hivel = 1;
-    else if (!strcmp(key, "offset"))
-        l->sample_offset = atoi(value), l->has_sample_offset = 1;
-    else if (!strcmp(key, "offset_random"))
-        l->sample_offset_random = atoi(value), l->has_sample_offset_random = 1;
     else if (!strcmp(key, "loopstart"))
         l->loop_start = atoi(value), l->has_loop_start = 1;
     else if (!strcmp(key, "loopend"))
@@ -425,14 +421,6 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
         sampler_layer_add_nif(l, sampler_nif_addrandom, 2, atof(value));
     else if (!strcmp(key, "pitch_veltrack"))
         sampler_layer_add_nif(l, sampler_nif_vel2pitch, 0, atof(value));
-    else if (!strcmp(key, "effect1"))
-        return (l->send1gain = atof(value) / 100.0, l->has_send1gain = 1);
-    else if (!strcmp(key, "effect2"))
-        return (l->send2gain = atof(value) / 100.0, l->has_send2gain = 1);
-    else if (!strcmp(key, "effect1bus"))
-        return (l->send1bus = atoi(value), l->has_send1bus = 1);
-    else if (!strcmp(key, "effect2bus"))
-        return (l->send2bus = atoi(value), l->has_send2bus = 1);
     else if (!strcmp(key, "fil_type"))
     {
         enum sampler_filter_type ft = sampler_filter_type_from_string(value);

@@ -124,8 +124,8 @@ typedef int midi_note_t;
  */
 
 #define SAMPLER_FIXED_FIELDS(MACRO) \
-    MACRO(uint32_t, sample_offset, 0) \
-    MACRO(uint32_t, sample_offset_random, 0) \
+    MACRO(uint32_t, offset, 0) \
+    MACRO(uint32_t, offset_random, 0) \
     MACRO(uint32_t, loop_start, -1) \
     MACRO(uint32_t, loop_end, -1) \
     MACRO(uint32_t, sample_end, -1) \
@@ -158,10 +158,10 @@ typedef int midi_note_t;
     MACRO(midi_note_t, sw_previous, -1) \
     MACRO(int, seq_position, 0) \
     MACRO(int, seq_length, 1) \
-    MACRO(int, send1bus, 1) \
-    MACRO(int, send2bus, 2) \
-    MACRO(float, send1gain, 0) \
-    MACRO(float, send2gain, 0) \
+    MACRO(int, effect1bus, 1) \
+    MACRO(int, effect2bus, 2) \
+    MACRO(float, effect1, 0) \
+    MACRO(float, effect2, 0) \
     MACRO(float, delay, 0) \
     MACRO(float, delay_random, 0) \
     MACRO(int, output, 0) \

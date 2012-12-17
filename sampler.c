@@ -364,9 +364,9 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             
             v->output_pair_no = l->output % m->output_pairs;
             v->serial_no = m->serial_no;
-            v->pos = l->sample_offset;
-            if (l->sample_offset_random)
-                v->pos += ((uint32_t)(rand() + (rand() << 16))) % l->sample_offset_random;
+            v->pos = l->offset;
+            if (l->offset_random)
+                v->pos += ((uint32_t)(rand() + (rand() << 16))) % l->offset_random;
             if (v->pos >= l->sample_end)
                 v->pos = l->sample_end;
             float delay = l->delay;
@@ -410,16 +410,16 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             v->loop_mode = l->loop_mode;
             v->off_by = l->off_by;
             int auxes = (m->module.outputs - m->module.aux_offset) / 2;
-            if (l->send1bus >= 1 && l->send1bus < 1 + auxes)
-                v->send1bus = l->send1bus;
+            if (l->effect1bus >= 1 && l->effect1bus < 1 + auxes)
+                v->send1bus = l->effect1bus;
             else
                 v->send1bus = 0;
-            if (l->send2bus >= 1 && l->send2bus < 1 + auxes)
-                v->send2bus = l->send2bus;
+            if (l->effect2bus >= 1 && l->effect2bus < 1 + auxes)
+                v->send2bus = l->effect2bus;
             else
                 v->send2bus = 0;
-            v->send1gain = l->send1gain;
-            v->send2gain = l->send2gain;
+            v->send1gain = l->effect1 * 0.01;
+            v->send2gain = l->effect2 * 0.01;
             if (l->group >= 1 && exgroupcount < MAX_RELEASED_GROUPS)
             {
                 gboolean found = FALSE;
