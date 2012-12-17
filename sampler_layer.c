@@ -84,9 +84,10 @@ static void lfo_params_clear(struct sampler_lfo_params *lfop)
     l->name = def_value; \
     l->name##_linearized = -1; \
     l->has_##name = 0;
-#define PROC_FIELDS_INITIALISER_dahdsr(name, parname) \
-    cbox_dahdsr_init(&l->name);
-#define PROC_FIELDS_INITIALISER_lfo(name, parname) \
+#define PROC_FIELDS_INITIALISER_dahdsr(name, parname, index) \
+    cbox_dahdsr_init(&l->name); \
+    DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name)
+#define PROC_FIELDS_INITIALISER_lfo(name, parname, index) \
     lfo_params_clear(&l->name##_params);
 
 void sampler_layer_init(struct sampler_layer *l)
@@ -118,9 +119,14 @@ void sampler_layer_init(struct sampler_layer *l)
     dst->has_##name = 0;
 #define PROC_RESET_HASFIELDS_dBamp(type, name, def_value) \
     dst->has_##name = 0;
-// XXXKF: not implemented yet - still thinking about best way to store it
-#define PROC_RESET_HASFIELDS_dahdsr(name, parname) 
-#define PROC_RESET_HASFIELDS_lfo(name, parname)
+#define PROC_RESET_HASFIELDS_dahdsr(name, parname, index) {\
+        struct sampler_layer *l = dst; \
+        DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name) \
+    }
+#define PROC_RESET_HASFIELDS_lfo(name, parname, index)  {\
+        struct sampler_layer *l = dst; \
+        LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name) \
+    }
 
 void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src, int reset_hasfields)
 {
@@ -160,9 +166,9 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *w
 #define PROC_FIELDS_FINALISER(type, name, def_value) 
 #define PROC_FIELDS_FINALISER_dBamp(type, name, def_value) \
     l->name##_linearized = dB2gain(l->name);
-#define PROC_FIELDS_FINALISER_dahdsr(name, parname) \
+#define PROC_FIELDS_FINALISER_dahdsr(name, parname, index) \
     cbox_envelope_init_dahdsr(&l->name##_shape, &l->name, m->module.srate / CBOX_BLOCK_SIZE);
-#define PROC_FIELDS_FINALISER_lfo(name, parname) /* no finaliser required */
+#define PROC_FIELDS_FINALISER_lfo(name, parname, index) /* no finaliser required */
 
 void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
 {
@@ -274,45 +280,24 @@ static int sfz_note_from_string(const char *note)
     return -1;
 }
 
-static gboolean parse_envelope_param(struct sampler_layer *layer, int env_type, const char *key, const char *value)
+static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_dahdsr *env, struct sampler_dahdsr_has_fields *has_fields, int env_type, const char *key, const char *value)
 {
-    struct cbox_dahdsr *env = NULL;
-    enum sampler_modsrc src;
-    enum sampler_moddest dest;
-    switch(env_type)
-    {
-        case 0:
-            env = &layer->amp_env;
-            src = smsrc_ampenv;
-            dest = smdest_gain;
-            break;
-        case 1:
-            env = &layer->filter_env;
-            src = smsrc_filenv;
-            dest = smdest_cutoff;
-            break;
-        case 2:
-            env = &layer->pitch_env;
-            src = smsrc_pitchenv;
-            dest = smdest_pitch;
-            break;
-    }
+    static const enum sampler_modsrc srcs[] = { smsrc_ampenv, smsrc_filenv, smsrc_pitchenv };
+    static const enum sampler_moddest dests[] = { smdest_gain, smdest_cutoff, smdest_pitch };
+    enum sampler_modsrc src = srcs[env_type];
+    enum sampler_moddest dest = dests[env_type];
     float fvalue = atof(value);
-    if (!strcmp(key, "start"))
-        env->start = fvalue;
-    else if (!strcmp(key, "delay"))
-        env->delay = fvalue;
-    else if (!strcmp(key, "attack"))
-        env->attack = fvalue;
-    else if (!strcmp(key, "hold"))
-        env->hold = fvalue;
-    else if (!strcmp(key, "decay"))
-        env->decay = fvalue;
-    else if (!strcmp(key, "sustain"))
-        env->sustain = fvalue / 100.0;
-    else if (!strcmp(key, "release"))
-        env->release = fvalue;
-    else if (!strcmp(key, "depth"))
+    if (!strcmp(key, "sustain"))
+        fvalue /= 100.0;
+    
+#define PROC_SET_ENV_FIELD(name, index, param) \
+        if (!strcmp(key, #name)) {\
+            env->name = fvalue; \
+            has_fields->name = 1; \
+            return TRUE; \
+        }
+    DAHDSR_FIELDS(PROC_SET_ENV_FIELD, ignore)
+    if (!strcmp(key, "depth"))
         sampler_layer_set_modulation1(layer, src, dest, atof(value), 0);
     else if (!strcmp(key, "vel2delay"))
         sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 0, fvalue);
@@ -333,29 +318,13 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, int env_type, 
     return TRUE;
 }
 
-static gboolean parse_lfo_param(struct sampler_layer *layer, int lfo_type, const char *key, const char *value)
+static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_params *params, struct sampler_lfo_has_fields *has_fields, int lfo_type, const char *key, const char *value)
 {
-    struct sampler_lfo_params *params = NULL;
-    enum sampler_modsrc src;
-    enum sampler_moddest dest;
-    switch(lfo_type)
-    {
-        case 0:
-            params = &layer->amp_lfo_params;
-            src = smsrc_amplfo;
-            dest = smdest_gain;
-            break;
-        case 1:
-            params = &layer->filter_lfo_params;
-            src = smsrc_fillfo;
-            dest = smdest_cutoff;
-            break;
-        case 2:
-            params = &layer->pitch_lfo_params;
-            src = smsrc_pitchlfo;
-            dest = smdest_pitch;
-            break;
-    }
+    static const enum sampler_modsrc srcs[] = { smsrc_amplfo, smsrc_fillfo, smsrc_pitchlfo };
+    static const enum sampler_moddest dests[] = { smdest_gain, smdest_cutoff, smdest_pitch };
+    enum sampler_modsrc src = srcs[lfo_type];
+    enum sampler_moddest dest = dests[lfo_type];
+
     float fvalue = atof(value);
     if (!strcmp(key, "depth"))
         sampler_layer_set_modulation1(layer, src, dest, fvalue, 0);
@@ -400,10 +369,12 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, int lfo_type, const
         return ((l->name = atof(value)), (l->has_##name = 1)); \
     }
 // LFO and envelope need special handling now
-// XXXKF: Neither support the 'has' bit flags - mostly because the format
-// is not finalised yet.
-#define PROC_APPLY_PARAM_dahdsr(name, parname) 
-#define PROC_APPLY_PARAM_lfo(name, parname) 
+#define PROC_APPLY_PARAM_dahdsr(name, parname, index) \
+    if (!strncmp(key, #parname "_", sizeof(#parname))) \
+        return parse_envelope_param(l, &l->name, &l->has_##name, index, key + sizeof(#parname), value);
+#define PROC_APPLY_PARAM_lfo(name, parname, index) \
+    if (!strncmp(key, #parname "_", sizeof(#parname))) \
+        return parse_lfo_param(l, &l->name##_params, &l->has_##name, index, key + sizeof(#parname), value);
 
 gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value)
 {
@@ -461,12 +432,6 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
         return (l->send1bus = atoi(value), l->has_send1bus = 1);
     else if (!strcmp(key, "effect2bus"))
         return (l->send2bus = atoi(value), l->has_send2bus = 1);
-    else if (!strncmp(key, "amplfo_", 7))
-        return parse_lfo_param(l, 0, key + 7, value);
-    else if (!strncmp(key, "fillfo_", 7))
-        return parse_lfo_param(l, 1, key + 7, value);
-    else if (!strncmp(key, "pitchlfo_", 9))
-        return parse_lfo_param(l, 2, key + 9, value);
     else if (!strcmp(key, "fil_type"))
     {
         enum sampler_filter_type ft = sampler_filter_type_from_string(value);
@@ -475,12 +440,6 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
         else
             l->filter = ft;
     }
-    else if (!strncmp(key, "ampeg_", 6))
-        return parse_envelope_param(l, 0, key + 6, value);
-    else if (!strncmp(key, "fileg_", 6))
-        return parse_envelope_param(l, 1, key + 6, value);
-    else if (!strncmp(key, "pitcheg_", 8))
-        return parse_envelope_param(l, 2, key + 8, value);
     else if (!strncmp(key, "delay_cc", 8))
     {
         int ccno = atoi(key + 8);
@@ -544,21 +503,21 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
     if (l->has_##name) \
         fprintf(f, " %s=%g", #name, (float)(l->name));
 
-#define ENV_PARAM_OUTPUT(env, envfield, envname, param, def_value) \
-    if (l->has_##envfield##_##param) \
+#define ENV_PARAM_OUTPUT(env, envfield, envname, param) \
+    if (l->has_##envfield.param) \
         fprintf(f, " " #envname "_" #param "=%g", env.param);
-#define PROC_FIELDS_TO_FILEPTR_dahdsr(name, parname) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, start, 0) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, delay, 0) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, hold, 0) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, decay, 0) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, sustain, 1) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, release, 0.05) \
+#define PROC_FIELDS_TO_FILEPTR_dahdsr(name, parname, index) \
+    ENV_PARAM_OUTPUT(l->name, name, parname, start) \
+    ENV_PARAM_OUTPUT(l->name, name, parname, delay) \
+    ENV_PARAM_OUTPUT(l->name, name, parname, hold) \
+    ENV_PARAM_OUTPUT(l->name, name, parname, decay) \
+    ENV_PARAM_OUTPUT(l->name, name, parname, sustain) \
+    ENV_PARAM_OUTPUT(l->name, name, parname, release) \
 
-#define PROC_FIELDS_TO_FILEPTR_lfo(name, parname) \
-    ENV_PARAM_OUTPUT(l->name##_params, name, parname, freq, 0) \
-    ENV_PARAM_OUTPUT(l->name##_params, name, parname, delay, 0) \
-    ENV_PARAM_OUTPUT(l->name##_params, name, parname, fade, 0) \
+#define PROC_FIELDS_TO_FILEPTR_lfo(name, parname, index) \
+    ENV_PARAM_OUTPUT(l->name##_params, name, parname, freq) \
+    ENV_PARAM_OUTPUT(l->name##_params, name, parname, delay) \
+    ENV_PARAM_OUTPUT(l->name##_params, name, parname, fade) \
 
 void sampler_layer_dump(struct sampler_layer *l, FILE *f)
 {

@@ -167,43 +167,65 @@ typedef int midi_note_t;
     MACRO(int, output, 0) \
     MACRO(int, group, 0) \
     MACRO(int, off_by, 0) \
-    MACRO##_dahdsr(amp_env, ampeg) \
-    MACRO##_dahdsr(filter_env, fileg) \
-    MACRO##_dahdsr(pitch_env, pitcheg) \
-    MACRO##_lfo(amp_lfo, amplfo) \
-    MACRO##_lfo(filter_lfo, fillfo) \
-    MACRO##_lfo(pitch_lfo, pitchlfo) \
+    MACRO##_dahdsr(amp_env, ampeg, 0) \
+    MACRO##_dahdsr(filter_env, fileg, 1) \
+    MACRO##_dahdsr(pitch_env, pitcheg, 2) \
+    MACRO##_lfo(amp_lfo, amplfo, 0) \
+    MACRO##_lfo(filter_lfo, fillfo, 1) \
+    MACRO##_lfo(pitch_lfo, pitchlfo, 2) \
 
 // XXXKF: consider making send1gain the dBamp type... except it's
 // a linear percentage value in SFZ spec - bit weird!
+
+#define DAHDSR_FIELDS(MACRO, param) \
+    MACRO(start, 0, param) \
+    MACRO(delay, 1, param) \
+    MACRO(attack, 2, param) \
+    MACRO(hold, 3, param) \
+    MACRO(decay, 4, param) \
+    MACRO(sustain, 5, param) \
+    MACRO(release, 6, param) \
+    
+#define LFO_FIELDS(MACRO, param) \
+    MACRO(freq, 0, param) \
+    MACRO(delay, 1, param) \
+    MACRO(fade, 2, param) \
+    
+#define PROC_SUBSTRUCT_HAS_FIELD(name, index, param) \
+    unsigned int name:1;
+#define PROC_SUBSTRUCT_RESET_HAS_FIELD(name, index, param) \
+    l->has_##param.name = 0;
+struct sampler_dahdsr_has_fields
+{
+    DAHDSR_FIELDS(PROC_SUBSTRUCT_HAS_FIELD, name)
+};
+
+struct sampler_lfo_has_fields
+{
+    LFO_FIELDS(PROC_SUBSTRUCT_HAS_FIELD, name)
+};
 
 #define PROC_FIELDS_TO_STRUCT(type, name, def_value) \
     type name;
 #define PROC_FIELDS_TO_STRUCT_dBamp(type, name, def_value) \
     type name; \
     type name##_linearized;
-#define PROC_FIELDS_TO_STRUCT_dahdsr(name, parname) \
+#define PROC_FIELDS_TO_STRUCT_dahdsr(name, parname, index) \
     struct cbox_dahdsr name; \
     struct cbox_envelope_shape name##_shape;
-#define PROC_FIELDS_TO_STRUCT_lfo(name, parname) \
+#define PROC_FIELDS_TO_STRUCT_lfo(name, parname, index) \
     struct sampler_lfo_params name##_params; \
 
 #define PROC_HAS_FIELD(type, name, def_value) \
     unsigned int has_##name:1;
 #define PROC_HAS_FIELD_dBamp(type, name, def_value) \
     PROC_HAS_FIELD(type, name, def_value)
-#define PROC_HAS_FIELD_dahdsr(name, parname) \
-    unsigned int has_##name##_start:1; \
-    unsigned int has_##name##_delay:1; \
-    unsigned int has_##name##_attack:1; \
-    unsigned int has_##name##_hold:1; \
-    unsigned int has_##name##_decay:1; \
-    unsigned int has_##name##_sustain:1; \
-    unsigned int has_##name##_release:1;
-#define PROC_HAS_FIELD_lfo(name, parname) \
-    unsigned int has_##name##_freq:1; \
-    unsigned int has_##name##_delay:1; \
-    unsigned int has_##name##_fade:1; \
+
+#define PROC_HAS_FIELD_dahdsr(name, parname, index) \
+    struct sampler_dahdsr_has_fields has_##name;
+
+#define PROC_HAS_FIELD_lfo(name, parname, index) \
+    struct sampler_lfo_has_fields has_##name;
 
 struct sampler_layer
 {
