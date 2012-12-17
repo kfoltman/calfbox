@@ -92,10 +92,14 @@ static void lfo_params_clear(struct sampler_lfo_params *lfop)
 #define PROC_FIELDS_INITIALISER_lfo(name, parname, index) \
     lfo_params_clear(&l->name##_params);
 
+CBOX_CLASS_DEFINITION_ROOT(sampler_layer)
+
 struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, struct sampler_layer *parent_group)
 {
     struct sampler_layer *l = malloc(sizeof(struct sampler_layer));
+    struct cbox_document *doc = CBOX_GET_DOCUMENT(parent_program);
     memset(l, 0, sizeof(struct sampler_layer));
+    CBOX_OBJECT_HEADER_INIT(l, sampler_layer, doc);
     
     if (parent_group)
     {
@@ -104,6 +108,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
         l->parent_group = parent_group;
         l->child_count = 0;
         parent_group->child_count++;
+        CBOX_OBJECT_REGISTER(l);
         return l;
     }
     l->parent_program = parent_program;
@@ -128,6 +133,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     sampler_layer_set_modulation1(l, 74, smdest_cutoff, 9600, 2);
     sampler_layer_set_modulation1(l, 71, smdest_resonance, 12, 2);
     sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
+    CBOX_OBJECT_REGISTER(l);
     return l;
 }
 
@@ -646,13 +652,14 @@ void sampler_layer_dump(struct sampler_layer *l, FILE *f)
     fprintf(f, "%s\n", str);
 }
 
-void sampler_layer_destroy(struct sampler_layer *l)
+void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
 {
+    struct sampler_layer *l = CBOX_H2O(objhdr);
     assert(l->child_count == 0);
     if (l->parent_group)
     {
         if (!--l->parent_group->child_count)
-            sampler_layer_destroy(l->parent_group);
+            CBOX_DELETE(l->parent_group);
         l->parent_group = NULL;
     }
     g_slist_free_full(l->nifs, g_free);

@@ -42,6 +42,8 @@ GQuark cbox_sampler_error_quark()
     return g_quark_from_string("cbox-sampler-error-quark");
 }
 
+CBOX_CLASS_DEFINITION_ROOT(sampler_program)
+
 static void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void sampler_destroyfunc(struct cbox_module *module);
@@ -988,27 +990,40 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     memset(c->switchmask, 0, sizeof(c->switchmask));
 }
 
+static struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_no, const char *name, const char *sample_dir)
+{
+    struct cbox_document *doc = CBOX_GET_DOCUMENT(&m->module);
+    struct sampler_program *prg = malloc(sizeof(struct sampler_program));
+    memset(prg, 0, sizeof(*prg));
+    CBOX_OBJECT_HEADER_INIT(prg, sampler_program, doc);
+    
+    prg->prog_no = prog_no;
+    prg->name = g_strdup(name);
+    prg->sample_dir = g_strdup(sample_dir);
+    prg->source_file = NULL;
+    prg->layers = NULL;
+    CBOX_OBJECT_REGISTER(prg);
+    return prg;
+}
+
 static struct sampler_program *load_program(struct sampler_module *m, const char *cfg_section, const char *name, int pgm_id, GError **error)
 {
     int i;
 
     g_clear_error(error);
     
-    struct sampler_program *prg = malloc(sizeof(struct sampler_program));
-    memset(prg, 0, sizeof(*prg));
-    
-    prg->prog_no = cbox_config_get_int(cfg_section, "program", 0);
-    if (pgm_id != -1)
-        prg->prog_no = pgm_id;
-
     char *name2 = cbox_config_get_string(cfg_section, "name");
-    if (name2)
-        prg->name = g_strdup(name2);
-    else
-        prg->name = g_strdup(name);
+
     char *sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
     char *spath = cbox_config_get_string(cfg_section, "sample_path");
-    prg->sample_dir = g_strdup(spath ? spath : (sfz_path ? sfz_path : ""));
+
+    struct sampler_program *prg = sampler_program_new(
+        m,
+        pgm_id != -1 ? pgm_id : cbox_config_get_int(cfg_section, "program", 0),
+        name2 ? name2 : name,
+        spath ? spath : (sfz_path ? sfz_path : "")
+    );
+    
     char *sfz = cbox_config_get_string(cfg_section, "sfz");
     if (sfz)
     {
@@ -1019,11 +1034,10 @@ static struct sampler_program *load_program(struct sampler_module *m, const char
 
         if (sampler_module_load_program_sfz(m, prg, prg->source_file, FALSE, error))
             return prg;
-        sampler_program_destroy(prg);
+        CBOX_DELETE(prg);
         return NULL;
     }
     
-    prg->layers = NULL;
     for (i = 0; ; i++)
     {
         char *where = NULL;
@@ -1131,7 +1145,7 @@ void swap_program(struct sampler_module *m, int index, struct sampler_program *p
 
     cbox_rt_execute_cmd_sync(m->module.rt, &release_program_voices, &data);
     
-    sampler_program_destroy(old_program);
+    CBOX_DELETE(old_program);
 }
 
 static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, GError **error)
@@ -1158,10 +1172,7 @@ static gboolean load_program_at(struct sampler_module *m, const char *cfg_sectio
 static gboolean load_from_string(struct sampler_module *m, const char *sample_dir, const char *sfz_data, const char *name, int prog_no, GError **error)
 {
     int index = find_program(m, prog_no);
-    struct sampler_program *pgm = malloc(sizeof(struct sampler_program));    
-    pgm->prog_no = prog_no;
-    pgm->name = g_strdup(name);
-    pgm->sample_dir = g_strdup(sample_dir);
+    struct sampler_program *pgm = sampler_program_new(m, prog_no, name, sample_dir);
     pgm->source_file = g_strdup("string");
     if (!sampler_module_load_program_sfz(m, pgm, sfz_data, TRUE, error))
     {
@@ -1182,10 +1193,11 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
     return TRUE;
 }
 
-void sampler_program_destroy(struct sampler_program *prg)
+void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
 {
+    struct sampler_program *prg = CBOX_H2O(hdr_ptr);
     for (GSList *p = prg->layers; p; p = g_slist_next(p))
-        sampler_layer_destroy(p->data);
+        CBOX_DELETE((struct sampler_layer *)p->data);
 
     g_free(prg->name);
     g_free(prg->sample_dir);
@@ -1393,7 +1405,7 @@ void sampler_destroyfunc(struct cbox_module *module)
     struct sampler_module *m = (struct sampler_module *)module;
     
     for (int i = 0; i < m->program_count; i++)
-        sampler_program_destroy(m->programs[i]);
+        CBOX_DELETE(m->programs[i]);
     free(m->programs);
 }
 

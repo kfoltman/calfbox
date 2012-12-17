@@ -41,8 +41,13 @@ enum CboxSamplerError
 struct sampler_noteinitfunc;
 struct sampler_voice;
 
+CBOX_EXTERN_CLASS(sampler_program)
+
 struct sampler_program
 {
+    CBOX_OBJECT_HEADER()
+    struct cbox_command_target cmd_target;
+
     gchar *name;
     int prog_no;
     GSList *layers;
@@ -115,7 +120,5 @@ struct sampler_module
 };
 
 extern GQuark cbox_sampler_error_quark();
-
-extern void sampler_program_destroy(struct sampler_program *prg);
 
 #endif

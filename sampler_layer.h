@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_SAMPLER_LAYER_H
 #define CBOX_SAMPLER_LAYER_H
 
+#include "dom.h"
 #include <stdio.h>
 #include <stdint.h>
 
@@ -232,8 +233,13 @@ struct sampler_lfo_has_fields
 #define PROC_HAS_FIELD_lfo(name, parname, index) \
     struct sampler_lfo_has_fields has_##name;
 
+CBOX_EXTERN_CLASS(sampler_layer)
+
 struct sampler_layer
 {
+    CBOX_OBJECT_HEADER()
+    struct cbox_command_target cmd_target;
+
     struct sampler_program *parent_program;
     struct sampler_layer *parent_group;
     int child_count;
@@ -265,7 +271,6 @@ extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_modul
 extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error);
 extern gchar *sampler_layer_to_string(struct sampler_layer *l);
 extern void sampler_layer_dump(struct sampler_layer *l, FILE *f);
-extern void sampler_layer_destroy(struct sampler_layer *l);
 
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
