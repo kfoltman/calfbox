@@ -325,19 +325,20 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     enum sampler_modsrc src = srcs[lfo_type];
     enum sampler_moddest dest = dests[lfo_type];
 
+#define PROC_SET_LFO_FIELD(name, index, param) \
+        if (!strcmp(key, #name)) {\
+            params->name = fvalue; \
+            has_fields->name = 1; \
+            return TRUE; \
+        }
     float fvalue = atof(value);
+    LFO_FIELDS(PROC_SET_LFO_FIELD, ignore)
     if (!strcmp(key, "depth"))
         sampler_layer_set_modulation1(layer, src, dest, fvalue, 0);
     else if (!strcmp(key, "depthchanaft"))
         sampler_layer_set_modulation(layer, src, smsrc_chanaft, dest, fvalue, 0);
     else if (!strcmp(key, "depthpolyaft"))
         sampler_layer_set_modulation(layer, src, smsrc_polyaft, dest, fvalue, 0);
-    else if (!strcmp(key, "freq"))
-        params->freq = atof(value);
-    else if (!strcmp(key, "delay"))
-        params->delay = atof(value);
-    else if (!strcmp(key, "fade"))
-        params->fade = atof(value);
     else if (!strncmp(key, "depthcc", 7))
     {
         int cc = atoi(key + 7);
