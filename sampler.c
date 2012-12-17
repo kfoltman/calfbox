@@ -44,7 +44,6 @@ GQuark cbox_sampler_error_quark()
 
 static void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
-static void destroy_program(struct sampler_module *m, struct sampler_program *prg);
 static void sampler_destroyfunc(struct cbox_module *module);
 
 static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
@@ -989,14 +988,14 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     memset(c->switchmask, 0, sizeof(c->switchmask));
 }
 
-static gboolean load_program(struct sampler_module *m, struct sampler_program **pprg, const char *cfg_section, const char *name, int pgm_id, GError **error)
+static struct sampler_program *load_program(struct sampler_module *m, const char *cfg_section, const char *name, int pgm_id, GError **error)
 {
     int i;
 
     g_clear_error(error);
     
     struct sampler_program *prg = malloc(sizeof(struct sampler_program));
-    *pprg = prg;
+    memset(prg, 0, sizeof(*prg));
     
     prg->prog_no = cbox_config_get_int(cfg_section, "program", 0);
     if (pgm_id != -1)
@@ -1014,44 +1013,39 @@ static gboolean load_program(struct sampler_module *m, struct sampler_program **
     if (sfz)
     {
         if (sfz_path)
-        {
-            if (!spath)
-                spath = sfz_path;
-            sfz = g_build_filename(sfz_path, sfz, NULL);
-            prg->source_file = g_strdup(sfz);
-            gboolean result = sampler_module_load_program_sfz(m, prg, sfz, FALSE, error);
-            g_free(sfz);
-            return result;
-        }
+            prg->source_file = g_build_filename(sfz_path, sfz, NULL);
         else
-        {
             prg->source_file = g_strdup(sfz);
-            return sampler_module_load_program_sfz(m, prg, sfz, FALSE, error);
-        }
+
+        if (sampler_module_load_program_sfz(m, prg, prg->source_file, FALSE, error))
+            return prg;
+        sampler_program_destroy(prg);
+        return NULL;
     }
     
     prg->layers = NULL;
     for (i = 0; ; i++)
     {
         char *where = NULL;
-        {
-            gchar *s = g_strdup_printf("layer%d", 1 + i);
-            const char *layer_section = cbox_config_get_string(cfg_section, s);
-            g_free(s);
-            if (!layer_section)
-                break;
-            where = g_strdup_printf("slayer:%s", layer_section);
-        }
+        gchar *s = g_strdup_printf("layer%d", 1 + i);
+        const char *layer_section = cbox_config_get_string(cfg_section, s);
+        g_free(s);
+        if (!layer_section)
+            break;
+        where = g_strdup_printf("slayer:%s", layer_section);
         
         prg->source_file = g_strdup_printf("config:%s", cfg_section);
         struct sampler_layer *l = sampler_layer_new_from_section(m, prg, where);
-        if (!l->waveform)
-            return FALSE;
-        prg->layers = g_slist_prepend(prg->layers, l);
+        if (!l)
+            g_warning("Sample layer '%s' cannot be created - skipping", layer_section);
+        else if (!l->waveform)
+            g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
+        else
+            prg->layers = g_slist_prepend(prg->layers, l);
         g_free(where);
     }
     prg->layers = g_slist_reverse(prg->layers);
-    return TRUE;
+    return prg;
 }
 
 static int get_first_free_program_no(struct sampler_module *m)
@@ -1137,14 +1131,15 @@ void swap_program(struct sampler_module *m, int index, struct sampler_program *p
 
     cbox_rt_execute_cmd_sync(m->module.rt, &release_program_voices, &data);
     
-    destroy_program(m, old_program);
+    sampler_program_destroy(old_program);
 }
 
 static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, GError **error)
 {
     struct sampler_program *pgm = NULL;
     int index = find_program(m, prog_no);
-    if (!load_program(m, &pgm, cfg_section, name, prog_no, error))
+    pgm = load_program(m, cfg_section, name, prog_no, error);
+    if (!pgm)
         return FALSE;
     
     if (index != -1)
@@ -1167,6 +1162,7 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
     pgm->prog_no = prog_no;
     pgm->name = g_strdup(name);
     pgm->sample_dir = g_strdup(sample_dir);
+    pgm->source_file = g_strdup("string");
     if (!sampler_module_load_program_sfz(m, pgm, sfz_data, TRUE, error))
     {
         free(pgm);
@@ -1186,7 +1182,7 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
     return TRUE;
 }
 
-static void destroy_program(struct sampler_module *m, struct sampler_program *prg)
+void sampler_program_destroy(struct sampler_program *prg)
 {
     for (GSList *p = prg->layers; p; p = g_slist_next(p))
         sampler_layer_destroy(p->data);
@@ -1367,13 +1363,13 @@ MODULE_CREATE_FUNCTION(sampler)
             pgm_section = g_strdup_printf("spgm:%s", pgm_name);
         }
         
-        if (!load_program(m, &m->programs[i], pgm_section, pgm_section + 5, pgm_id, error))
+        m->programs[i] = load_program(m, pgm_section, pgm_section + 5, pgm_id, error);
+        g_free(pgm_section);
+        if (!m->programs[i])
         {
-            g_free(pgm_section);
             success = 0;
             break;
         }
-        g_free(pgm_section);
     }
     if (!success)
     {
@@ -1397,7 +1393,7 @@ void sampler_destroyfunc(struct cbox_module *module)
     struct sampler_module *m = (struct sampler_module *)module;
     
     for (int i = 0; i < m->program_count; i++)
-        destroy_program(m, m->programs[i]);
+        sampler_program_destroy(m->programs[i]);
     free(m->programs);
 }
 

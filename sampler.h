@@ -116,4 +116,6 @@ struct sampler_module
 
 extern GQuark cbox_sampler_error_quark();
 
+extern void sampler_program_destroy(struct sampler_program *prg);
+
 #endif
