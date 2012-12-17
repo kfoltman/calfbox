@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "sampler.h"
 #include "sfzparser.h"
 
-#define DUMP_LAYER_ATTRIBS 0
+#define DUMP_LAYER_ATTRIBS 1
 
 struct sfz_load_state
 {

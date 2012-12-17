@@ -506,5 +506,24 @@ void sampler_layer_dump(struct sampler_layer *l, FILE *f)
     if (l->waveform && l->waveform->display_name)
         fprintf(f, " sample=%s", l->waveform->display_name);
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
+    
+    for(GSList *nif = l->nifs; nif; nif = nif->next)
+    {
+        struct sampler_noteinitfunc *nd = nif->data;
+        static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
+        #define PROC_ENVSTAGE_NAME(name, index) #name, 
+        static const char *env_stages[] = { DAHDSR_FIELDS(PROC_ENVSTAGE_NAME) };
+        int v = nd->variant;
+        
+        if (nd->notefunc == sampler_nif_addrandom && v >= 0 && v <= 2)
+            fprintf(f, " %s_random=%g", addrandom_variants[nd->variant], nd->param);
+        else if (nd->notefunc == sampler_nif_vel2pitch)
+            fprintf(f, " pitch_veltrack=%g", nd->param);
+        else if (nd->notefunc == sampler_nif_cc2delay && v >= 0 && v < 120)
+            fprintf(f, " delay_cc%d=%g", nd->variant, nd->param);
+        else if (nd->notefunc == sampler_nif_vel2env && v >= 0 && (v & 15) < 6 && (v >> 4) < 3)
+            fprintf(f, " %seg_vel2%s=%g", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], nd->param);
+    }
+    
     fprintf(f, "\n");
 }
