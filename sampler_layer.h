@@ -177,19 +177,19 @@ typedef int midi_note_t;
 // XXXKF: consider making send1gain the dBamp type... except it's
 // a linear percentage value in SFZ spec - bit weird!
 
-#define DAHDSR_FIELDS(MACRO, param) \
-    MACRO(start, 0, param) \
-    MACRO(delay, 1, param) \
-    MACRO(attack, 2, param) \
-    MACRO(hold, 3, param) \
-    MACRO(decay, 4, param) \
-    MACRO(sustain, 5, param) \
-    MACRO(release, 6, param) \
+#define DAHDSR_FIELDS(MACRO, ...) \
+    MACRO(start, 0, ## __VA_ARGS__) \
+    MACRO(delay, 1, ## __VA_ARGS__) \
+    MACRO(attack, 2, ## __VA_ARGS__) \
+    MACRO(hold, 3, ## __VA_ARGS__) \
+    MACRO(decay, 4, ## __VA_ARGS__) \
+    MACRO(sustain, 5, ## __VA_ARGS__) \
+    MACRO(release, 6, ## __VA_ARGS__) \
     
-#define LFO_FIELDS(MACRO, param) \
-    MACRO(freq, 0, param) \
-    MACRO(delay, 1, param) \
-    MACRO(fade, 2, param) \
+#define LFO_FIELDS(MACRO, ...) \
+    MACRO(freq, 0, ## __VA_ARGS__) \
+    MACRO(delay, 1, ## __VA_ARGS__) \
+    MACRO(fade, 2, ## __VA_ARGS__) \
     
 #define PROC_SUBSTRUCT_HAS_FIELD(name, index, param) \
     unsigned int name:1;

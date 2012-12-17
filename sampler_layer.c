@@ -290,13 +290,13 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_da
     if (!strcmp(key, "sustain"))
         fvalue /= 100.0;
     
-#define PROC_SET_ENV_FIELD(name, index, param) \
+#define PROC_SET_ENV_FIELD(name, index) \
         if (!strcmp(key, #name)) {\
             env->name = fvalue; \
             has_fields->name = 1; \
             return TRUE; \
         }
-    DAHDSR_FIELDS(PROC_SET_ENV_FIELD, ignore)
+    DAHDSR_FIELDS(PROC_SET_ENV_FIELD)
     if (!strcmp(key, "depth"))
         sampler_layer_set_modulation1(layer, src, dest, atof(value), 0);
     else if (!strcmp(key, "vel2delay"))
@@ -325,14 +325,14 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     enum sampler_modsrc src = srcs[lfo_type];
     enum sampler_moddest dest = dests[lfo_type];
 
-#define PROC_SET_LFO_FIELD(name, index, param) \
+#define PROC_SET_LFO_FIELD(name, index) \
         if (!strcmp(key, #name)) {\
             params->name = fvalue; \
             has_fields->name = 1; \
             return TRUE; \
         }
     float fvalue = atof(value);
-    LFO_FIELDS(PROC_SET_LFO_FIELD, ignore)
+    LFO_FIELDS(PROC_SET_LFO_FIELD)
     if (!strcmp(key, "depth"))
         sampler_layer_set_modulation1(layer, src, dest, fvalue, 0);
     else if (!strcmp(key, "depthchanaft"))
@@ -504,21 +504,14 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
     if (l->has_##name) \
         fprintf(f, " %s=%g", #name, (float)(l->name));
 
-#define ENV_PARAM_OUTPUT(env, envfield, envname, param) \
+#define ENV_PARAM_OUTPUT(param, index, env, envfield, envname) \
     if (l->has_##envfield.param) \
         fprintf(f, " " #envname "_" #param "=%g", env.param);
-#define PROC_FIELDS_TO_FILEPTR_dahdsr(name, parname, index) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, start) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, delay) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, hold) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, decay) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, sustain) \
-    ENV_PARAM_OUTPUT(l->name, name, parname, release) \
 
+#define PROC_FIELDS_TO_FILEPTR_dahdsr(name, parname, index) \
+    DAHDSR_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
 #define PROC_FIELDS_TO_FILEPTR_lfo(name, parname, index) \
-    ENV_PARAM_OUTPUT(l->name##_params, name, parname, freq) \
-    ENV_PARAM_OUTPUT(l->name##_params, name, parname, delay) \
-    ENV_PARAM_OUTPUT(l->name##_params, name, parname, fade) \
+    LFO_FIELDS(ENV_PARAM_OUTPUT, l->name##_params, name, parname)
 
 void sampler_layer_dump(struct sampler_layer *l, FILE *f)
 {
