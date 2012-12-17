@@ -231,7 +231,7 @@ extern void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_wave
 extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param);
-extern void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section);
+extern void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_section);
 extern void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src, int reset_hasfields);
 extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
 extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value);

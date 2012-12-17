@@ -210,78 +210,44 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
     l->last_key = l->sw_lokey;
 }
 
-void sampler_load_layer_overrides(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section)
+struct layer_foreach_struct
+{
+    struct sampler_layer *layer;
+    const char *cfg_section;
+};
+
+static void layer_foreach_func(void *user_data, const char *key)
+{
+    // file loading is handled in load_program
+    if (!strcmp(key, "file"))
+        return;
+    // import is handled in sampler_load_layer_overrides
+    if (!strcmp(key, "import"))
+        return;
+    struct layer_foreach_struct *lfs = user_data;
+    const char *value = cbox_config_get_string(lfs->cfg_section, key);
+    if (!sampler_layer_apply_param(lfs->layer, key, value))
+        g_warning("Unknown sample layer parameter: %s in section %s", key, lfs->cfg_section);
+}
+
+void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_section)
 {
     char *imp = cbox_config_get_string(cfg_section, "import");
     if (imp)
-        sampler_load_layer_overrides(l, m, imp);
-    l->sample_offset = cbox_config_get_int(cfg_section, "offset", l->sample_offset);
-    l->sample_offset_random = cbox_config_get_int(cfg_section, "offset_random", l->sample_offset_random);
-    l->loop_start = cbox_config_get_int(cfg_section, "loop_start", l->loop_start);
-    l->loop_end = cbox_config_get_int(cfg_section, "loop_end", l->loop_end);
-    l->loop_evolve = cbox_config_get_int(cfg_section, "loop_evolve", l->loop_evolve);
-    l->loop_overlap = cbox_config_get_int(cfg_section, "loop_overlap", l->loop_overlap);
-    l->volume = cbox_config_get_float(cfg_section, "volume", l->volume);
-    l->pan = cbox_config_get_float(cfg_section, "pan", l->pan);
-    l->pitch_keytrack = cbox_config_get_float(cfg_section, "note_scaling", l->pitch_keytrack);
-    l->pitch_keycenter = cbox_config_get_int(cfg_section, "root_note", l->pitch_keycenter);
-    l->lokey = cbox_config_get_note(cfg_section, "low_note", l->lokey);
-    l->hikey = cbox_config_get_note(cfg_section, "high_note", l->hikey);
-    l->sw_lokey = cbox_config_get_note(cfg_section, "sw_lokey", l->sw_lokey);
-    l->sw_hikey = cbox_config_get_note(cfg_section, "sw_hikey", l->sw_hikey);
-    l->sw_last = cbox_config_get_note(cfg_section, "sw_last", l->sw_last);
-    l->sw_down = cbox_config_get_note(cfg_section, "sw_down", l->sw_down);
-    l->sw_up = cbox_config_get_note(cfg_section, "sw_up", l->sw_up);
-    l->sw_previous = cbox_config_get_note(cfg_section, "sw_previous", l->sw_previous);
-    l->lovel = cbox_config_get_int(cfg_section, "low_vel", l->lovel);
-    l->hivel = cbox_config_get_int(cfg_section, "high_vel", l->hivel);
-    l->seq_position = cbox_config_get_int(cfg_section, "seq_position", l->seq_position + 1) - 1;
-    l->seq_length = cbox_config_get_int(cfg_section, "seq_length", l->seq_length);
-    l->transpose = cbox_config_get_int(cfg_section, "transpose", l->transpose);
-    l->tune = cbox_config_get_float(cfg_section, "tune", l->tune);
-    cbox_config_get_dahdsr(cfg_section, "amp", &l->amp_env);
-    cbox_config_get_dahdsr(cfg_section, "filter", &l->filter_env);
-    cbox_config_get_dahdsr(cfg_section, "pitch", &l->pitch_env);
-    l->cutoff = cbox_config_get_float(cfg_section, "cutoff", l->cutoff);
-    l->resonance = cbox_config_get_float(cfg_section, "resonance", l->resonance);
-    l->fil_veltrack = cbox_config_get_float(cfg_section, "fil_veltrack", l->fil_veltrack);
-    l->fil_keytrack = cbox_config_get_float(cfg_section, "fil_keytrack", l->fil_keytrack);
-    l->fil_keycenter = cbox_config_get_float(cfg_section, "fil_keycenter", l->fil_keycenter);
-    if (cbox_config_get_int(cfg_section, "one_shot", 0))
-        l->loop_mode = slm_one_shot;
-    if (cbox_config_get_int(cfg_section, "loop_sustain", 0))
-        l->loop_mode = slm_loop_sustain;
-    l->group = cbox_config_get_int(cfg_section, "group", l->group);
-    l->off_by = cbox_config_get_int(cfg_section, "off_by", l->off_by);
-    l->output = cbox_config_get_int(cfg_section, "output_pair_no", l->output);
-    l->send1bus = cbox_config_get_int(cfg_section, "aux1_bus", l->send1bus);
-    l->send2bus = cbox_config_get_int(cfg_section, "aux2_bus", l->send2bus);
-    l->send1gain = cbox_config_get_gain(cfg_section, "aux1_gain", l->send1gain);
-    l->send2gain = cbox_config_get_gain(cfg_section, "aux2_gain", l->send2gain);
-    // l->amp_lfo_depth = cbox_config_get_float(cfg_section, "amp_lfo_depth", l->amp_lfo_depth);
-    l->amp_lfo_params.freq = cbox_config_get_float(cfg_section, "amp_lfo_freq", l->amp_lfo_params.freq);
-    // l->filter_lfo_depth = cbox_config_get_float(cfg_section, "filter_lfo_depth", l->filter_lfo_depth);
-    l->filter_lfo_params.freq = cbox_config_get_float(cfg_section, "filter_lfo_freq", l->filter_lfo_params.freq);
-    // l->pitch_lfo_depth = cbox_config_get_float(cfg_section, "pitch_lfo_depth", l->pitch_lfo_depth);
-    l->pitch_lfo_params.freq = cbox_config_get_float(cfg_section, "pitch_lfo_freq", l->pitch_lfo_params.freq);
-    const char *fil_type = cbox_config_get_string(cfg_section, "fil_type");
-    if (fil_type)
-    {
-        enum sampler_filter_type ft = sampler_filter_type_from_string(fil_type);
-        if (ft != sft_unknown)
-            l->filter = ft;
-        else
-            g_warning("Unknown filter type '%s'", fil_type);
-    }
-    l->delay = cbox_config_get_float(cfg_section, "delay", l->delay);
-    l->delay_random = cbox_config_get_float(cfg_section, "delay_random", l->delay_random);
+        sampler_layer_load_overrides(l, imp);
+    
+    struct layer_foreach_struct lfs = {
+        .layer = l,
+        .cfg_section = cfg_section
+    };
+    cbox_config_foreach_key(layer_foreach_func, cfg_section, &lfs);
 }
 
 void sampler_layer_load(struct sampler_layer *l, struct sampler_module *m, const char *cfg_section, struct cbox_waveform *waveform)
 {
     sampler_layer_init(l);
     sampler_layer_set_waveform(l, waveform);
-    sampler_load_layer_overrides(l, m, cfg_section);
+    sampler_layer_load_overrides(l, cfg_section);
     sampler_layer_finalize(l, m);
 }
 
