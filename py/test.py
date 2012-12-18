@@ -95,7 +95,7 @@ class TestCbox(unittest.TestCase):
         # XXXKF: this lack of stable Python representation of engines is annoying
         # XXXKF: this looks like proper SFZ but doesn't parse correctly - needs investigation
         #instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav <region> key=37 sample=impulse.wav', 'test_sampler_api')
-        instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav\n<region> key=37 sample=impulse.wav', 'test_sampler_api')
+        instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav cutoff=1000\n<region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
         patches = instrument.get_things("/engine/patches", ["*patch"]).patch
         patches_dict = {}
         for patch in patches:
@@ -106,6 +106,16 @@ class TestCbox(unittest.TestCase):
             self.assertEquals(program.uuid, patchuuid)
             regions = program.get_things("/regions", ["*region"]).region
             patches_dict[patchid] = (patchname, len(regions))
+            for region_uuid in regions:
+                region_str = Document.map_uuid(region_uuid).as_string()
+                print region_uuid, region_str
+                if patchname == 'test_sampler_api':
+                    self.assertTrue('impulse.wav' in region_str)
+                    self.assertTrue('key=c' in region_str)
+                    if 'key=c2' in region_str:
+                        self.assertTrue('cutoff=1000' in region_str)
+                    else:
+                        self.assertTrue('cutoff=2000' in region_str)
         self.assertEquals(patches_dict, {0 : ('vintage', 122), 1 : ('test_sampler_api', 2)})
         
     def test_rt(self):

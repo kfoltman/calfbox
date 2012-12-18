@@ -91,6 +91,15 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
             return FALSE;
         return TRUE;
     }
+    if (!strcmp(cmd->command, "/as_string") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        gchar *res = sampler_layer_to_string(layer);
+        gboolean result = cbox_execute_on(fb, NULL, "/value", "s", error, res);
+        g_free(res);
+        return result;
+    }
     else // otherwise, treat just like an command on normal (non-aux) output
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
     

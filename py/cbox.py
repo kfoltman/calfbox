@@ -376,3 +376,10 @@ class SamplerProgram(DocObj):
         DocObj.__init__(self, uuid, [])
 Document.classmap['sampler_program'] = SamplerProgram
 
+class SamplerLayer(DocObj):
+    def __init__(self, uuid):
+        DocObj.__init__(self, uuid, [])
+    def as_string(self):
+        return self.get_things("/as_string", ['value']).value
+Document.classmap['sampler_layer'] = SamplerLayer
+
