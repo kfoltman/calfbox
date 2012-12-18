@@ -100,7 +100,7 @@ static void scan_for_value(struct sfz_parser_state *state)
     while(1)
     {
         int ch = state->buf[state->pos];
-        if (ch == 0 || ch == '\r' || ch == '\n')
+        if (ch == 0 || ch == '\r' || ch == '\n' || ch == '<')
         {
             state->value_end = state->pos;
             // remove spaces before next key
