@@ -93,9 +93,8 @@ class TestCbox(unittest.TestCase):
         self.assertEquals(instrument.status().engine, "sampler")
         
         # XXXKF: this lack of stable Python representation of engines is annoying
-        # XXXKF: this looks like proper SFZ but doesn't parse correctly - needs investigation
-        #instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav <region> key=37 sample=impulse.wav', 'test_sampler_api')
-        instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav cutoff=1000\n<region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
+        #instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
+        instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<group> resonance=3 <region> key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
         patches = instrument.get_things("/engine/patches", ["*patch"]).patch
         patches_dict = {}
         for patch in patches:
@@ -108,7 +107,7 @@ class TestCbox(unittest.TestCase):
             patches_dict[patchid] = (patchname, len(regions))
             for region_uuid in regions:
                 region_str = Document.map_uuid(region_uuid).as_string()
-                print region_uuid, region_str
+                print patchname, region_uuid, region_str
                 if patchname == 'test_sampler_api':
                     self.assertTrue('impulse.wav' in region_str)
                     self.assertTrue('key=c' in region_str)
@@ -118,12 +117,16 @@ class TestCbox(unittest.TestCase):
                         self.assertTrue('cutoff=2000' in region_str)
         self.assertEquals(patches_dict, {0 : ('vintage', 122), 1 : ('test_sampler_api', 2)})
         region = Document.map_uuid(region_uuid)
+        group = Document.map_uuid(region.status().parent_group)
+        self.assertTrue("resonance=3" in group.as_string())
         region.set_param("cutoff", 9000)
         self.assertTrue('cutoff=9000' in region.as_string())
         region.set_param("sample", 'test.wav')
         self.assertTrue('test.wav' in region.as_string())
         region.set_param("key", '12')
         self.assertTrue('key=c0' in region.as_string())
+        print region.status()
+        print group.as_string()
         print region.as_string()
         
     def test_rt(self):

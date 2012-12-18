@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 
-static void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src, int reset_hasfields);
+static void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src);
 
 void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags)
 {
@@ -87,7 +87,9 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
 
-        if (!(CBOX_OBJECT_DEFAULT_STATUS(layer, fb, error)))
+        if (!((!layer->parent_program || cbox_execute_on(fb, NULL, "/parent_program", "o", error, layer->parent_program)) && 
+            (!layer->parent_group || cbox_execute_on(fb, NULL, "/parent_group", "o", error, layer->parent_group)) && 
+            CBOX_OBJECT_DEFAULT_STATUS(layer, fb, error)))
             return FALSE;
         return TRUE;
     }
@@ -121,9 +123,10 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     l->has_##name = 0;
 #define PROC_FIELDS_INITIALISER_dahdsr(name, parname, index) \
     cbox_dahdsr_init(&l->name, 100.f); \
-    DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name)
+    DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, l)
 #define PROC_FIELDS_INITIALISER_lfo(name, parname, index) \
-    lfo_params_clear(&l->name##_params);
+    lfo_params_clear(&l->name##_params); \
+    LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, l)
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_layer)
 
@@ -137,10 +140,9 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     
     if (parent_group)
     {
-        sampler_layer_clone(l, parent_group, TRUE);
+        sampler_layer_clone(l, parent_group);
         l->parent_program = parent_program;
         l->parent_group = parent_group;
-        l->child_count = 0;
         parent_group->child_count++;
         CBOX_OBJECT_REGISTER(l);
         return l;
@@ -168,24 +170,30 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     return l;
 }
 
-#define PROC_RESET_HASFIELDS(type, name, def_value) \
+#define PROC_FIELDS_CLONE(type, name, def_value) \
+    dst->name = src->name; \
     dst->has_##name = 0;
-#define PROC_RESET_HASFIELDS_dBamp(type, name, def_value) \
-    dst->has_##name = 0;
-#define PROC_RESET_HASFIELDS_dahdsr(name, parname, index) {\
-        struct sampler_layer *l = dst; \
-        DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name) \
-    }
-#define PROC_RESET_HASFIELDS_lfo(name, parname, index)  {\
-        struct sampler_layer *l = dst; \
-        LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name) \
-    }
+#define PROC_FIELDS_CLONE_dBamp PROC_FIELDS_CLONE
+#define PROC_FIELDS_CLONE_dahdsr(name, parname, index) \
+        DAHDSR_FIELDS(PROC_SUBSTRUCT_CLONE, name, dst, src) \
+        DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst) 
+#define PROC_FIELDS_CLONE_lfo(name, parname, index) \
+        LFO_FIELDS(PROC_SUBSTRUCT_CLONE, name##_params, dst, src) \
+        LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst)
 
-void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src, int reset_hasfields)
+void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src)
 {
-    memcpy(dst, src, sizeof(struct sampler_layer));
+    dst->waveform = src->waveform;
     if (dst->waveform)
         cbox_waveform_ref(dst->waveform);
+    SAMPLER_FIXED_FIELDS(PROC_FIELDS_CLONE)
+    dst->parent_program = src->parent_program;
+    dst->child_count = 0;
+    dst->freq = src->freq;
+    dst->filter = src->filter;
+    dst->use_keyswitch = src->use_keyswitch;
+    dst->last_key = src->last_key;
+    memcpy(dst->velcurve, src->velcurve, 128 * sizeof(float));
     dst->modulations = g_slist_copy(dst->modulations);
     for(GSList *mod = dst->modulations; mod; mod = mod->next)
     {
@@ -199,10 +207,6 @@ void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *
         gpointer dst = g_malloc(sizeof(struct sampler_noteinitfunc));
         memcpy(dst, nif->data, sizeof(struct sampler_noteinitfunc));
         nif->data = dst;
-    }
-    if (reset_hasfields)
-    {
-        SAMPLER_FIXED_FIELDS(PROC_RESET_HASFIELDS)
     }
 }
 

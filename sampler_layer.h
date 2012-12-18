@@ -198,8 +198,10 @@ typedef int midi_note_t;
     
 #define PROC_SUBSTRUCT_HAS_FIELD(name, index, param) \
     unsigned int name:1;
-#define PROC_SUBSTRUCT_RESET_HAS_FIELD(name, index, param) \
-    l->has_##param.name = 0;
+#define PROC_SUBSTRUCT_RESET_HAS_FIELD(name, index, param, dst) \
+    dst->has_##param.name = 0;
+#define PROC_SUBSTRUCT_CLONE(name, index, param, dst, src) \
+    dst->param.name = src->param.name;
 struct sampler_dahdsr_has_fields
 {
     DAHDSR_FIELDS(PROC_SUBSTRUCT_HAS_FIELD, name)
