@@ -80,6 +80,34 @@ class TestCbox(unittest.TestCase):
         self.verify_uuid(aux.uuid, "cbox_aux_bus", scene.make_path("/aux/piano_reverb"))
         scene.delete_aux("piano_reverb")
 
+    def test_sampler_api(self):
+        scene = Document.new_scene(44100, 1024)
+        # XXXKF: I should add a method to add a layer using engine name alone, without
+        # having to add a scene, layer or instrument in the INI
+        scene.add_instrument_layer("vintage")
+        scene_status = scene.status()
+        layer = scene_status.layers[0]
+        self.verify_uuid(scene.uuid, "cbox_scene")
+        self.verify_uuid(layer.uuid, "cbox_layer", scene.make_path("/layer/1"))
+        instrument = layer.get_instrument()
+        self.assertEquals(instrument.status().engine, "sampler")
+        
+        # XXXKF: this lack of stable Python representation of engines is annoying
+        # XXXKF: this looks like proper SFZ but doesn't parse correctly - needs investigation
+        #instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav <region> key=37 sample=impulse.wav', 'test_sampler_api')
+        instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav\n<region> key=37 sample=impulse.wav', 'test_sampler_api')
+        patches = instrument.get_things("/engine/patches", ["*patch"]).patch
+        patches_dict = {}
+        for patch in patches:
+            patchid, patchname, patchuuid = patch
+            self.verify_uuid(patchuuid, 'sampler_program')
+            program = Document.map_uuid(patchuuid)
+            self.verify_uuid(program.uuid, 'sampler_program')
+            self.assertEquals(program.uuid, patchuuid)
+            regions = program.get_things("/regions", ["*region"]).region
+            patches_dict[patchid] = (patchname, len(regions))
+        self.assertEquals(patches_dict, {0 : ('vintage', 122), 1 : ('test_sampler_api', 2)})
+        
     def test_rt(self):
         rt = Document.get_rt()
         self.assertEquals(cbox.GetThings(Document.uuid_cmd(rt.uuid, "/status"), ['uuid'], []).uuid, rt.uuid)

@@ -1002,6 +1002,17 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
             return FALSE;
         return TRUE;
     }
+    if (!strcmp(cmd->command, "/regions") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (GSList *p = program->layers; p; p = g_slist_next(p))
+        {
+            if (!cbox_execute_on(fb, NULL, "/region", "o", error, p->data))
+                return FALSE;
+        }
+        return TRUE;
+    }
     else // otherwise, treat just like an command on normal (non-aux) output
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
     
@@ -1260,7 +1271,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         {
             struct sampler_program *prog = m->programs[i];
             gboolean result;
-            if (!cbox_execute_on(fb, NULL, "/patch", "is", error, prog->prog_no, prog->name))
+            if (!cbox_execute_on(fb, NULL, "/patch", "iso", error, prog->prog_no, prog->name, prog))
                 return FALSE;
         }
         return TRUE;
