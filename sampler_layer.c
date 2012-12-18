@@ -100,6 +100,14 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         g_free(res);
         return result;
     }
+    if (!strcmp(cmd->command, "/set_param") && !strcmp(cmd->arg_types, "ss"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        const char *key = CBOX_ARG_S(cmd, 0);
+        const char *value = CBOX_ARG_S(cmd, 1);
+        return sampler_layer_apply_param(layer, key, value, error);
+    }
     else // otherwise, treat just like an command on normal (non-aux) output
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
     
@@ -142,13 +150,10 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     l->parent_program = parent_program;
     l->child_count = 0;
     l->waveform = NULL;
-    l->sample_data = NULL;
     
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_INITIALISER)
     
-    l->sample_end = 0;
     l->freq = 44100;
-    l->mode = spt_mono16;
     l->filter = sft_lp12;
     l->use_keyswitch = 0;
     l->last_key = 0;
@@ -206,11 +211,7 @@ void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *
 void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform)
 {
     l->waveform = waveform;
-    l->sample_data = waveform ? waveform->data : NULL;
     l->freq = (waveform && waveform->info.samplerate) ? waveform->info.samplerate : 44100;
-    l->loop_end = waveform ? waveform->info.frames : 0;
-    l->sample_end = waveform ? waveform->info.frames : 0;
-    l->mode = waveform && waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
 }
 
 #define PROC_FIELDS_FINALISER(type, name, def_value) 
@@ -476,8 +477,6 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
         if (!wf)
             return FALSE;
         sampler_layer_set_waveform(l, wf);
-        if (l->loop_end == 0)
-            l->loop_end = l->sample_end;
         if (old_waveform != NULL)
             cbox_waveform_unref(old_waveform);
         return TRUE;

@@ -53,6 +53,7 @@ struct sampler_program
     GSList *layers;
     gchar *sample_dir; // can be empty, cannot be NULL
     gchar *source_file; // can be empty, cannot be NULL
+    int in_use;
 };
 
 struct sampler_channel
@@ -78,9 +79,10 @@ struct sampler_voice
     enum sampler_filter_type filter;
     struct sampler_layer *layer;
     struct sampler_program *program;
-    uint32_t pos, delta, loop_start, loop_end, sample_end;
+    struct cbox_waveform *last_waveform;
+    uint32_t pos, delta, loop_start, cur_sample_end;
     uint32_t frac_pos, frac_delta;
-    uint32_t loop_evolve, loop_overlap;
+    uint32_t loop_overlap;
     float loop_overlap_step;
     int note;
     int vel;

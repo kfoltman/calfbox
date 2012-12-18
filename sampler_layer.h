@@ -131,10 +131,9 @@ typedef int midi_note_t;
 #define SAMPLER_FIXED_FIELDS(MACRO) \
     MACRO(uint32_t, offset, 0) \
     MACRO(uint32_t, offset_random, 0) \
-    MACRO(uint32_t, loop_start, -1) \
-    MACRO(uint32_t, loop_end, -1) \
-    MACRO(uint32_t, sample_end, -1) \
-    MACRO(uint32_t, loop_evolve, -1) \
+    MACRO(uint32_t, loop_start, 0) \
+    MACRO(uint32_t, loop_end, 0) \
+    MACRO(uint32_t, end, 0) \
     MACRO(uint32_t, loop_overlap, -1) \
     MACRO(sample_loop_mode_t, loop_mode, slm_unknown) \
     MACRO##_dBamp(float, volume, 0) \
@@ -243,10 +242,8 @@ struct sampler_layer
     struct sampler_program *parent_program;
     struct sampler_layer *parent_group;
     int child_count;
-    enum sample_player_type mode;
     enum sampler_filter_type filter;
     struct cbox_waveform *waveform;
-    int16_t *sample_data;
 
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
     SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)

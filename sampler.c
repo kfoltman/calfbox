@@ -48,31 +48,41 @@ static void sampler_process_block(struct cbox_module *module, cbox_sample_t **in
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void sampler_destroyfunc(struct cbox_module *module);
 
+#define PREPARE_LOOP \
+    uint32_t loop_end = v->layer->loop_end ? v->layer->loop_end : v->cur_sample_end; \
+    gboolean post_sustain = v->released && v->loop_mode == slm_loop_sustain; \
+    if (post_sustain) \
+        loop_end = v->cur_sample_end; \
+
+#define IS_LOOP_FINISHED \
+    v->loop_mode == slm_no_loop || v->loop_mode == slm_one_shot || post_sustain
+
 static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
 {
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
+    PREPARE_LOOP
     
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
-        if (v->pos >= v->loop_end)
+        if (v->pos >= loop_end)
         {
-            if (v->loop_start == (uint32_t)-1)
+            if (IS_LOOP_FINISHED)
             {
                 v->mode = spt_inactive;
                 return i;
             }
-            v->pos = v->pos - v->loop_end + v->loop_start;
+            v->pos = v->pos - loop_end + v->loop_start;
         }
         
         float fr = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
         uint32_t nextsample = v->pos + 1;
-        if (nextsample >= v->loop_end && v->loop_start != (uint32_t)-1)
+        if (nextsample >= loop_end && v->loop_start != (uint32_t)-1)
             nextsample -= v->loop_start;
         
-        float sample = fr * v->layer->sample_data[nextsample] + (1 - fr) * v->layer->sample_data[v->pos];
+        float sample = fr * v->layer->waveform->data[nextsample] + (1 - fr) * v->layer->waveform->data[v->pos];
         
         if (v->frac_pos > ~v->frac_delta)
             v->pos++;
@@ -93,30 +103,26 @@ static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
+    PREPARE_LOOP
     
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
-        if (v->pos >= v->loop_end)
+        if (v->pos >= loop_end)
         {
-            if (v->loop_start == (uint32_t)-1)
+            if (IS_LOOP_FINISHED)
             {
                 v->mode = spt_inactive;
                 return i;
             }
-            v->pos = v->pos - v->loop_end + v->loop_start;
-            if (v->loop_end + v->loop_evolve < v->sample_end && ((int32_t) v->loop_start + (int32_t) v->loop_evolve) > 0)
-            {
-                v->loop_end += v->loop_evolve;
-                v->loop_start += v->loop_evolve;
-            }
+            v->pos = v->pos - loop_end + v->loop_start;
         }
         
         float t = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
         
         float idata[4];
-        if (v->pos + 4 < v->loop_end)
+        if (v->pos + 4 < loop_end)
         {
-            int16_t *p = &v->layer->sample_data[v->pos];
+            int16_t *p = &v->layer->waveform->data[v->pos];
             for (int s = 0; s < 4; s++)
                 idata[s] = p[s];
         }
@@ -126,26 +132,26 @@ static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
             int s;
             for (s = 0; s < 4; s++)
             {
-                if (nextsample >= v->loop_end)
+                if (nextsample >= loop_end)
                 {
-                    if (v->loop_start == (uint32_t)-1)
+                    if (v->loop_start == (uint32_t)-1 || post_sustain)
                         break;
-                    nextsample -= v->loop_end - v->loop_start;
+                    nextsample -= loop_end - v->loop_start;
                 }
-                idata[s] = v->layer->sample_data[nextsample];
+                idata[s] = v->layer->waveform->data[nextsample];
                 nextsample++;
             }
             while(s < 4)
                 idata[s++] = 0.f;
         }
         
-        if (v->loop_start != (uint32_t)-1 && v->pos >= v->loop_end - v->loop_overlap && v->loop_start > v->loop_overlap)
+        if (v->loop_start != (uint32_t)-1 && v->pos >= loop_end - v->loop_overlap && v->loop_start > v->loop_overlap)
         {
-            uint32_t nextsample = v->pos - (v->loop_end - v->loop_start);
-            float xfade = (v->pos - (v->loop_end - v->loop_overlap)) * v->loop_overlap_step;
+            uint32_t nextsample = v->pos - (loop_end - v->loop_start);
+            float xfade = (v->pos - (loop_end - v->loop_overlap)) * v->loop_overlap_step;
             for (int s = 0; s < 4 && xfade < 1; s++)
             {
-                idata[s] += (v->layer->sample_data[nextsample] - idata[s]) * xfade;
+                idata[s] += (v->layer->waveform->data[nextsample] - idata[s]) * xfade;
                 nextsample++;
                 xfade += v->loop_overlap_step;
             }
@@ -171,26 +177,27 @@ static uint32_t process_voice_stereo_lerp(struct sampler_voice *v, float **outpu
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
+    PREPARE_LOOP
 
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
-        if (v->pos >= v->loop_end)
+        if (v->pos >= loop_end)
         {
-            if (v->loop_start == (uint32_t)-1)
+            if (IS_LOOP_FINISHED)
             {
                 v->mode = spt_inactive;
                 return i;
             }
-            v->pos = v->pos - v->loop_end + v->loop_start;
+            v->pos = v->pos - loop_end + v->loop_start;
         }
         
         float fr = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
         uint32_t nextsample = v->pos + 1;
-        if (nextsample >= v->loop_end && v->loop_start != (uint32_t)-1)
+        if (nextsample >= loop_end && v->loop_start != (uint32_t)-1)
             nextsample -= v->loop_start;
         
-        float lsample = fr * v->layer->sample_data[nextsample << 1] + (1 - fr) * v->layer->sample_data[v->pos << 1];
-        float rsample = fr * v->layer->sample_data[1 + (nextsample << 1)] + (1 - fr) * v->layer->sample_data[1 + (v->pos << 1)];
+        float lsample = fr * v->layer->waveform->data[nextsample << 1] + (1 - fr) * v->layer->waveform->data[v->pos << 1];
+        float rsample = fr * v->layer->waveform->data[1 + (nextsample << 1)] + (1 - fr) * v->layer->waveform->data[1 + (v->pos << 1)];
         
         if (v->frac_pos > ~v->frac_delta)
             v->pos++;
@@ -211,28 +218,24 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
+    PREPARE_LOOP
 
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
-        if (v->pos >= v->loop_end)
+        if (v->pos >= loop_end)
         {
-            if (v->loop_start == (uint32_t)-1)
+            if (IS_LOOP_FINISHED)
             {
                 v->mode = spt_inactive;
                 return i;
             }
-            v->pos = v->pos - v->loop_end + v->loop_start;
-            if (v->loop_end + v->loop_evolve < v->sample_end && ((int32_t) v->loop_start + (int32_t) v->loop_evolve) > 0)
-            {
-                v->loop_end += v->loop_evolve;
-                v->loop_start += v->loop_evolve;
-            }
+            v->pos = v->pos - loop_end + v->loop_start;
         }
         
         float idata[2][4];
-        if (v->pos + 4 < v->loop_end)
+        if (v->pos + 4 < loop_end)
         {
-            int16_t *p = &v->layer->sample_data[v->pos << 1];
+            int16_t *p = &v->layer->waveform->data[v->pos << 1];
             for (int s = 0; s < 4; s++, p += 2)
             {
                 idata[0][s] = p[0];
@@ -245,27 +248,27 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
             int s;
             for (s = 0; s < 4; s++)
             {
-                if (nextsample >= v->loop_end)
+                if (nextsample >= loop_end)
                 {
                     if (v->loop_start == (uint32_t)-1)
                         break;
-                    nextsample -= v->loop_end - v->loop_start;
+                    nextsample -= loop_end - v->loop_start;
                 }
-                idata[0][s] = v->layer->sample_data[nextsample << 1];
-                idata[1][s] = v->layer->sample_data[1 + (nextsample << 1)];
+                idata[0][s] = v->layer->waveform->data[nextsample << 1];
+                idata[1][s] = v->layer->waveform->data[1 + (nextsample << 1)];
                 nextsample++;
             }
             for(; s < 4; s++)
                 idata[0][s] = idata[1][s] = 0;
         }
-        if (v->loop_start != (uint32_t)-1 && v->pos >= v->loop_end - v->loop_overlap && v->loop_start > v->loop_overlap)
+        if (v->loop_start != (uint32_t)-1 && v->pos >= loop_end - v->loop_overlap && v->loop_start > v->loop_overlap)
         {
-            uint32_t nextsample = v->pos - (v->loop_end - v->loop_start);
-            float xfade = (v->pos - (v->loop_end - v->loop_overlap)) * v->loop_overlap_step;
+            uint32_t nextsample = v->pos - (loop_end - v->loop_start);
+            float xfade = (v->pos - (loop_end - v->loop_overlap)) * v->loop_overlap_step;
             for (int s = 0; s < 4 && xfade < 1; s++)
             {
-                idata[0][s] += (v->layer->sample_data[nextsample << 1] - idata[0][s]) * xfade;
-                idata[1][s] += (v->layer->sample_data[1 + (nextsample << 1)] - idata[1][s]) * xfade;
+                idata[0][s] += (v->layer->waveform->data[nextsample << 1] - idata[0][s]) * xfade;
+                idata[1][s] += (v->layer->waveform->data[1 + (nextsample << 1)] - idata[1][s]) * xfade;
                 nextsample++;
                 xfade += v->loop_overlap_step;
             }
@@ -294,9 +297,11 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
 GSList *skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel)
 {
     int ch = (c - c->module->channels) + 1;
-    while(next_layer)
+    for(;next_layer;next_layer = g_slist_next(next_layer))
     {
         struct sampler_layer *l = next_layer->data;
+        if (!l->waveform)
+            continue;
         if (l->sw_last != -1)
         {
             if (note >= l->sw_lokey && note <= l->sw_hikey)
@@ -319,7 +324,6 @@ GSList *skip_inactive_layers(struct sampler_program *prg, struct sampler_channel
                     return next_layer;
             }
         }
-        next_layer = g_slist_next(next_layer);
     }
     return NULL;
 }
@@ -335,6 +339,112 @@ static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, i
 
 
 static void sampler_voice_release(struct sampler_voice *v);
+
+static void sampler_start_voice(struct sampler_module *m, struct sampler_channel *c, struct sampler_voice *v, struct sampler_layer *l, int note, int vel, int *exgroups, int *pexgroupcount)
+{
+    uint32_t end = l->waveform->info.frames;
+    if (l->end != 0)
+        end = (l->end == -1) ? 0 : l->end;
+    v->last_waveform = l->waveform;
+    v->cur_sample_end = end;
+    if (end > l->waveform->info.frames)
+        end = l->waveform->info.frames;
+    
+    double pitch = ((note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100);
+    
+    v->output_pair_no = l->output % m->output_pairs;
+    v->serial_no = m->serial_no;
+    v->pos = l->offset;
+    if (l->offset_random)
+        v->pos += ((uint32_t)(rand() + (rand() << 16))) % l->offset_random;
+    if (v->pos >= end)
+        v->pos = end;
+    float delay = l->delay;
+    if (l->delay_random)
+        delay += rand() * (1.0 / RAND_MAX) * l->delay_random;
+    if (delay > 0)
+        v->delay = (int)(delay * m->module.srate);
+    else
+        v->delay = 0;
+    v->frac_pos = 0;
+    v->loop_start = l->loop_start;
+    v->loop_overlap = l->loop_overlap;
+    v->loop_overlap_step = 1.0 / l->loop_overlap;
+    v->gain = l->volume_linearized * l->velcurve[vel];
+    v->note = note;
+    v->vel = vel;
+    v->mode = l->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+    v->filter = l->filter;
+    v->base_freq = l->freq;
+    v->pitch = pitch;
+    v->released = 0;
+    v->released_with_sustain = 0;
+    v->released_with_sostenuto = 0;
+    v->captured_sostenuto = 0;
+    v->channel = c;
+    v->layer = l;
+    v->program = c->program;
+    v->amp_env.shape = &l->amp_env_shape;
+    v->filter_env.shape = &l->filter_env_shape;
+    v->pitch_env.shape = &l->pitch_env_shape;
+    v->last_lgain = 0;
+    v->last_rgain = 0;
+    if (l->cutoff != -1)
+        v->cutoff = l->cutoff * pow(2.0, (vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack) / 1200.0);
+    else
+        v->cutoff = -1;
+    v->resonance = l->resonance_linearized;
+    v->loop_mode = l->loop_mode;
+    v->off_by = l->off_by;
+    int auxes = (m->module.outputs - m->module.aux_offset) / 2;
+    if (l->effect1bus >= 1 && l->effect1bus < 1 + auxes)
+        v->send1bus = l->effect1bus;
+    else
+        v->send1bus = 0;
+    if (l->effect2bus >= 1 && l->effect2bus < 1 + auxes)
+        v->send2bus = l->effect2bus;
+    else
+        v->send2bus = 0;
+    v->send1gain = l->effect1 * 0.01;
+    v->send2gain = l->effect2 * 0.01;
+    if (l->group >= 1 && *pexgroupcount < MAX_RELEASED_GROUPS)
+    {
+        gboolean found = FALSE;
+        for (int j = 0; j < *pexgroupcount; j++)
+        {
+            if (exgroups[j] == l->group)
+            {
+                found = TRUE;
+                break;
+            }
+        }
+        if (!found)
+        {
+            exgroups[(*pexgroupcount)++] = l->group;
+        }
+    }
+    lfo_init(&v->amp_lfo, &l->amp_lfo_params, m->module.srate);
+    lfo_init(&v->filter_lfo, &l->filter_lfo_params, m->module.srate);
+    lfo_init(&v->pitch_lfo, &l->pitch_lfo_params, m->module.srate);
+    
+    cbox_biquadf_reset(&v->filter_left);
+    cbox_biquadf_reset(&v->filter_right);
+    cbox_biquadf_reset(&v->filter_left2);
+    cbox_biquadf_reset(&v->filter_right2);
+    
+    GSList *nif = v->layer->nifs;
+    while(nif)
+    {
+        struct sampler_noteinitfunc *p = nif->data;
+        p->notefunc(p, v);
+        nif = nif->next;
+    }
+    
+    cbox_envelope_reset(&v->amp_env);
+    cbox_envelope_reset(&v->filter_env);
+    cbox_envelope_reset(&v->pitch_env);
+
+}
 
 void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
 {
@@ -359,104 +469,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
         {
             struct sampler_voice *v = &m->voices[i];
             struct sampler_layer *l = next_layer->data;
-            
-            double pitch = ((note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100);
-            
-            v->output_pair_no = l->output % m->output_pairs;
-            v->serial_no = m->serial_no;
-            v->pos = l->offset;
-            if (l->offset_random)
-                v->pos += ((uint32_t)(rand() + (rand() << 16))) % l->offset_random;
-            if (v->pos >= l->sample_end)
-                v->pos = l->sample_end;
-            float delay = l->delay;
-            if (l->delay_random)
-                delay += rand() * (1.0 / RAND_MAX) * l->delay_random;
-            if (delay > 0)
-                v->delay = (int)(delay * m->module.srate);
-            else
-                v->delay = 0;
-            v->frac_pos = 0;
-            v->loop_start = l->loop_start;
-            v->loop_end = l->loop_end;
-            v->loop_evolve = l->loop_evolve;
-            v->loop_overlap = l->loop_overlap;
-            v->loop_overlap_step = 1.0 / l->loop_overlap;
-            v->sample_end = l->sample_end;
-            v->gain = l->volume_linearized * l->velcurve[vel];
-            v->note = note;
-            v->vel = vel;
-            v->mode = l->mode;
-            v->filter = l->filter;
-            v->base_freq = l->freq;
-            v->pitch = pitch;
-            v->released = 0;
-            v->released_with_sustain = 0;
-            v->released_with_sostenuto = 0;
-            v->captured_sostenuto = 0;
-            v->channel = c;
-            v->layer = l;
-            v->program = c->program;
-            v->amp_env.shape = &l->amp_env_shape;
-            v->filter_env.shape = &l->filter_env_shape;
-            v->pitch_env.shape = &l->pitch_env_shape;
-            v->last_lgain = 0;
-            v->last_rgain = 0;
-            if (l->cutoff != -1)
-                v->cutoff = l->cutoff * pow(2.0, (vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack) / 1200.0);
-            else
-                v->cutoff = -1;
-            v->resonance = l->resonance_linearized;
-            v->loop_mode = l->loop_mode;
-            v->off_by = l->off_by;
-            int auxes = (m->module.outputs - m->module.aux_offset) / 2;
-            if (l->effect1bus >= 1 && l->effect1bus < 1 + auxes)
-                v->send1bus = l->effect1bus;
-            else
-                v->send1bus = 0;
-            if (l->effect2bus >= 1 && l->effect2bus < 1 + auxes)
-                v->send2bus = l->effect2bus;
-            else
-                v->send2bus = 0;
-            v->send1gain = l->effect1 * 0.01;
-            v->send2gain = l->effect2 * 0.01;
-            if (l->group >= 1 && exgroupcount < MAX_RELEASED_GROUPS)
-            {
-                gboolean found = FALSE;
-                for (int j = 0; j < exgroupcount; j++)
-                {
-                    if (exgroups[j] == l->group)
-                    {
-                        found = TRUE;
-                        break;
-                    }
-                }
-                if (!found)
-                {
-                    exgroups[exgroupcount++] = l->group;
-                }
-            }
-            lfo_init(&v->amp_lfo, &l->amp_lfo_params, m->module.srate);
-            lfo_init(&v->filter_lfo, &l->filter_lfo_params, m->module.srate);
-            lfo_init(&v->pitch_lfo, &l->pitch_lfo_params, m->module.srate);
-            
-            cbox_biquadf_reset(&v->filter_left);
-            cbox_biquadf_reset(&v->filter_right);
-            cbox_biquadf_reset(&v->filter_left2);
-            cbox_biquadf_reset(&v->filter_right2);
-            
-            GSList *nif = v->layer->nifs;
-            while(nif)
-            {
-                struct sampler_noteinitfunc *p = nif->data;
-                p->notefunc(p, v);
-                nif = nif->next;
-            }
-            
-            cbox_envelope_reset(&v->amp_env);
-            cbox_envelope_reset(&v->filter_env);
-            cbox_envelope_reset(&v->pitch_env);
-
+            sampler_start_voice(m, c, v, l, note, vel, exgroups, &exgroupcount);
             next_layer = skip_inactive_layers(prg, c, g_slist_next(next_layer), note, vel);
             if (!next_layer)
                 break;
@@ -496,12 +509,6 @@ void sampler_voice_release(struct sampler_voice *v)
         v->released = 1;
     else
         v->loop_start = -1; // should be guaranteed by layer settings anyway
-    
-    if (v->loop_mode == slm_loop_sustain)
-    {
-        v->loop_end = v->sample_end;
-        v->loop_start = -1;
-    }
 }
 
 void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
@@ -589,7 +596,7 @@ void sampler_steal_voice(struct sampler_module *m)
             continue;
         int age = m->serial_no - v->serial_no;
         if (v->loop_start == -1)
-            age += (int)(v->pos * 100.0 / v->loop_end);
+            age += (int)(v->pos * 100.0 / v->cur_sample_end);
         else
         if (v->released)
             age += 10;
@@ -834,6 +841,21 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
             float *tmp_outputs[2] = {left, right};
             uint32_t samples = 0;
+            if (v->last_waveform != v->layer->waveform)
+            {
+                v->last_waveform = v->layer->waveform;
+                if (v->layer->waveform)
+                {
+                    v->mode = v->layer->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+                    v->cur_sample_end = v->layer->waveform->info.frames;
+                }
+                else
+                {
+                    v->mode = spt_inactive;
+                    continue;
+                }
+                
+            }
             if (v->mode == spt_stereo16)
                 samples = process_voice_stereo(v, tmp_outputs);
             else
@@ -915,6 +937,8 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
 
 void sampler_program_change(struct sampler_module *m, struct sampler_channel *c, int program)
 {
+    if (c->program)
+        c->program->in_use--;
     // XXXKF replace with something more efficient
     for (int i = 0; i < m->program_count; i++)
     {
@@ -927,6 +951,7 @@ void sampler_program_change(struct sampler_module *m, struct sampler_channel *c,
     }
     g_warning("Unknown program %d", program);
     c->program = m->programs[0];
+    c->program->in_use++;
 }
 
 void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
@@ -987,6 +1012,8 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->cc[74] = 64;
     c->previous_note = -1;
     c->program = m->program_count ? m->programs[0] : NULL;
+    if (c->program)
+        c->program->in_use++;
     memset(c->switchmask, 0, sizeof(c->switchmask));
 }
 
@@ -1271,7 +1298,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         {
             struct sampler_program *prog = m->programs[i];
             gboolean result;
-            if (!cbox_execute_on(fb, NULL, "/patch", "iso", error, prog->prog_no, prog->name, prog))
+            if (!cbox_execute_on(fb, NULL, "/patch", "isoi", error, prog->prog_no, prog->name, prog, prog->in_use))
                 return FALSE;
         }
         return TRUE;
