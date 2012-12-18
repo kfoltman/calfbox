@@ -99,7 +99,7 @@ class TestCbox(unittest.TestCase):
         patches = instrument.get_things("/engine/patches", ["*patch"]).patch
         patches_dict = {}
         for patch in patches:
-            patchid, patchname, patchuuid = patch
+            patchid, patchname, patchuuid, patchchannelcount = patch
             self.verify_uuid(patchuuid, 'sampler_program')
             program = Document.map_uuid(patchuuid)
             self.verify_uuid(program.uuid, 'sampler_program')
@@ -117,6 +117,14 @@ class TestCbox(unittest.TestCase):
                     else:
                         self.assertTrue('cutoff=2000' in region_str)
         self.assertEquals(patches_dict, {0 : ('vintage', 122), 1 : ('test_sampler_api', 2)})
+        region = Document.map_uuid(region_uuid)
+        region.set_param("cutoff", 9000)
+        self.assertTrue('cutoff=9000' in region.as_string())
+        region.set_param("sample", 'test.wav')
+        self.assertTrue('test.wav' in region.as_string())
+        region.set_param("key", '12')
+        self.assertTrue('key=c0' in region.as_string())
+        print region.as_string()
         
     def test_rt(self):
         rt = Document.get_rt()
