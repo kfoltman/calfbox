@@ -102,8 +102,6 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     }
     if (!strcmp(cmd->command, "/set_param") && !strcmp(cmd->arg_types, "ss"))
     {
-        if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
         const char *key = CBOX_ARG_S(cmd, 0);
         const char *value = CBOX_ARG_S(cmd, 1);
         return sampler_layer_apply_param(layer, key, value, error);
