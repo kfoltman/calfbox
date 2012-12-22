@@ -39,6 +39,7 @@ class USBMIDI:
         intf = None
         for cfgo in dev:
             if cfgo.bConfigurationValue == midicfg.cfg:
+                cfgo.set()
                 intf = cfgo[(midicfg.ifno, midicfg.ifalt)]
         if not intf:
             raise ValueError, "Configuration %d not found" % midicfg.cfg
@@ -57,7 +58,7 @@ class USBMIDI:
             
     def read(self):
         try:
-            data = self.epIn.read(64)
+            data = self.epIn.read(self.epIn.wMaxPacketSize)
             if data is None:
                 return None
             return array.array('B', data)
@@ -114,26 +115,32 @@ class USBMIDI:
                             
         #print devices
 
-class KeyRig25(USBMIDI):
-    def __init__(self):
-        devlist = USBMIDI.findall(vendorID = 0x763, productID = 0x115)
+class KnownUSBMIDI(USBMIDI):
+    def __init__(self, vendorID, productID):
+        devlist = USBMIDI.findall(vendorID, productID, debug = False)
         if not devlist:
             raise ValueError
         USBMIDI.__init__(self, devlist[0], devlist[0].interfaces[0])
+
+class KeyRig25(KnownUSBMIDI):
+    def __init__(self):
+        KnownUSBMIDI.__init__(self, vendorID = 0x763, productID = 0x115)
     
-class XMidi2x2(USBMIDI):
+class XMidi2x2(KnownUSBMIDI):
     def __init__(self):
-        devlist = USBMIDI.findall(vendorID = 0x41e, productID = 0x3f08)
-        if not devlist:
-            raise ValueError
-        USBMIDI.__init__(self, devlist[0], devlist[0].interfaces[0])
+        KnownUSBMIDI.__init__(self, vendorID = 0x41e, productID = 0x3f08)
+
+class LexiconOmega(KnownUSBMIDI):
+    def __init__(self):
+        KnownUSBMIDI.__init__(self, vendorID = 0x1210, productID = 2)
 
 print USBMIDI.findall()
 xmidi = XMidi2x2()
 xmidi.write(xmidi.encode(1, [0x90, 36, 100]))
 xmidi.write(xmidi.encode(1, [0x80, 36, 100]))
 
-krig = KeyRig25()
+#krig = KeyRig25()
+krig = LexiconOmega()
 while True:
     data = krig.read()
     if data is not None:
