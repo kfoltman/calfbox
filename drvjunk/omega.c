@@ -12,9 +12,11 @@
 // interface 1 altsetting 1 endpoint 01 (out) bits 16 channels 2 mps 192
 // interface 2 altsetting 1 endpoint 83 (in)  bits 16 channels 2 mps 192
 
+int samples_captured = 0;
+int samples_played = 0;
 
 static struct libusb_context *usbctx;
-static int multimix_timeout = 1000;
+static int omega_timeout = 1000;
 
 int epOUT = 0x01, epIN = 0x83;
 
@@ -24,20 +26,9 @@ void init_usb()
     libusb_set_debug(usbctx, 3);
 }
 
-struct libusb_device_handle *open_multimix()
+struct libusb_device_handle *open_omega()
 {
     struct libusb_device_handle *handle;
-#if 0
-    handle = libusb_open_device_with_vid_pid(usbctx, 0x1210, 0x0002);
-    if (!handle)
-    {
-        printf("Lexicon Omega not found.\n");
-        return NULL;
-    }
-    libusb_reset_device(handle);
-    libusb_close(handle);
-    sleep(1);
-#endif
     handle = libusb_open_device_with_vid_pid(usbctx, 0x1210, 0x0002);
     if (!handle)
     {
@@ -84,60 +75,19 @@ error:
 #define GET_MEM 0x85
 #define GET_STAT 0xFF
 
-#if 0
-int configure_omega(struct libusb_device_handle *h)
-{
-    uint8_t buffer[3] = {0,0,0};
-    uint8_t controlSelector = SAMPLING_FREQ_CONTROL;
-    uint8_t value = 0;
-    uint8_t intf_or_endpt = 0x83;
-    uint8_t entity_id = 0;
-    int res = libusb_control_transfer(h, 0x40, 0x49, 0, 0, NULL, 0, multimix_timeout);
-    printf("res = %d\n", res);
-    res = libusb_control_transfer(h, 0xA2, GET_CUR, 256, intf_or_endpt, buffer, sizeof(buffer), multimix_timeout);
-    if (res < 0)
-    {
-        printf("res = %d errno = %d\n", res, errno);
-        return -1;
-    }
-    printf("min_sample_rate = %d\n", buffer[0] + 256 * buffer[1] + 65536 * buffer[2]);
-    return 0;
-}
-#endif
-
 int configure_omega(struct libusb_device_handle *h, int sample_rate)
 {
     uint8_t freq_data[3];
     freq_data[0] = sample_rate & 0xFF;
     freq_data[1] = (sample_rate & 0xFF00) >> 8;
     freq_data[2] = (sample_rate & 0xFF0000) >> 16;
-    if (libusb_control_transfer(h, 0x22, 0x01, 256, epOUT, freq_data, 3, multimix_timeout) != 3)
+    if (libusb_control_transfer(h, 0x22, 0x01, 256, epOUT, freq_data, 3, omega_timeout) != 3)
         return -1;
-    if (libusb_control_transfer(h, 0x22, 0x01, 256, epIN, freq_data, 3, multimix_timeout) != 3)
+    if (libusb_control_transfer(h, 0x22, 0x01, 256, epIN, freq_data, 3, omega_timeout) != 3)
         return -1;
 //    libusb_control_transfer(dev, 0x22, 0x01, 
     return 0;
 }
-
-#if 0
-
-int get_multimix_config(struct libusb_device_handle *h)
-{
-    uint8_t bufsize;
-    uint8_t freq_data[3];
-    if (libusb_control_transfer(h, 0xC0, 0x49, 0, 0, &bufsize, 1, multimix_timeout) != 1)
-        return -1;
-    printf("Bufsize = %d\n", (int)bufsize);
-    if (libusb_control_transfer(h, 0xA2, 0x81, 256, 0x02, freq_data, 3, multimix_timeout) != 3)
-        return -1;
-    printf("Freq1 = %d\n", freq_data[0] | (freq_data[1] << 8) | (freq_data[2] << 16));
-    if (libusb_control_transfer(h, 0xA2, 0x81, 256, 0x86, freq_data, 3, multimix_timeout) != 3)
-        return -1;
-    printf("Freq2 = %d\n", freq_data[0] | (freq_data[1] << 8) | (freq_data[2] << 16));
-    return 0;
-}
-
-#endif
 
 // 192 bytes = 1ms@48000 (48 samples)
 
@@ -158,6 +108,7 @@ void play_callback(struct libusb_transfer *transfer)
     int i;
     //printf("Play Callback! %d %p status %d\n", (int)transfer->length, transfer->buffer, (int)transfer->status);
 
+    samples_played += transfer->length / 4;
     int nsamps = srate / 1000;
     if (desync >= 1000 * transfer->num_iso_packets && nsamps < PLAY_PACKET_SIZE/4)
         nsamps++;
@@ -225,6 +176,7 @@ void record_callback(struct libusb_transfer *transfer)
 {
     int i;
     // printf("Record callback! %p index %d len %d\n", transfer, (int)transfer->user_data, transfer->length);
+    samples_captured += transfer->length / 4;
     
     float avg = 0;
     int16_t *bufz = (int16_t*)transfer->buffer;
@@ -280,10 +232,10 @@ int main(int argc, char *argv[])
     int i;
     
     init_usb();
-    h = open_multimix();
+    h = open_omega();
     if (!h)
     {
-        printf("Alesis MultiMix 8 could not be opened.\n");
+        printf("Lexicon Omega could not be opened.\n");
         return 2;
     }
     
