@@ -54,19 +54,11 @@ struct libusb_device_handle *open_multimix()
         goto error;
     if (libusb_claim_interface(handle, 2))
         goto error;
-    if (libusb_claim_interface(handle, 4))
-        goto error;
-    if (libusb_claim_interface(handle, 5))
-        goto error;
     if (libusb_claim_interface(handle, 7))
         goto error;
     if (libusb_set_interface_alt_setting(handle, 1, 1))
         goto error;
     if (libusb_set_interface_alt_setting(handle, 2, 1))
-        goto error;
-    if (libusb_set_interface_alt_setting(handle, 4, 1))
-        goto error;
-    if (libusb_set_interface_alt_setting(handle, 5, 1))
         goto error;
     
     return handle;
@@ -159,37 +151,32 @@ static int phase2 = 0;
 static int desync = 0;
 static int samples_sent = 0;
 
-static int srate = 44100;
-
-static int calc_packet_lengths(struct libusb_transfer *t, int packets)
-{
-    int tsize = 0;
-    int i;
-    // printf("sync_freq = %d\n", sync_freq);
-    // printf("desync %d\n", desync);
-    int lag = desync / 1000;
-    int nsamps = srate/1000;
-    if (lag >= packets && nsamps < PLAY_PACKET_SIZE/4) {
-        nsamps++;
-        lag -= packets;
-    }
-    for (i = 0; i < packets; i++)
-    {
-        int v = (nsamps) * 4;
-        t->iso_packet_desc[i].length = v;
-        tsize += v;
-    }
-    // printf("tsize = %d\n", tsize);
-    return tsize;
-}
+static int srate = 48000;
 
 void play_callback(struct libusb_transfer *transfer)
 {
     int i;
     //printf("Play Callback! %d %p status %d\n", (int)transfer->length, transfer->buffer, (int)transfer->status);
-    transfer->length = calc_packet_lengths(transfer, transfer->num_iso_packets);
+
+    int nsamps = srate / 1000;
+    if (desync >= 1000 * transfer->num_iso_packets && nsamps < PLAY_PACKET_SIZE/4)
+        nsamps++;
+    // printf("desync = %d nsamps = %d!\n", desync, nsamps);
+    int tlen = 0;
+    for (i = 0; i < transfer->num_iso_packets; i++)
+    {
+        tlen += transfer->iso_packet_desc[i].actual_length;
+        if (transfer->iso_packet_desc[i].status)
+            printf("ISO error: index = %d i = %d status = %d\n", (int)transfer->user_data, i, transfer->iso_packet_desc[i].status);
+    }
+    // printf("actual length = %d!\n", tlen);
+
+    transfer->length = nsamps * transfer->num_iso_packets * 4;
+    libusb_set_iso_packet_lengths(transfer, nsamps * 4);
+
     desync += transfer->num_iso_packets * srate;
-    desync -= transfer->length / 4 * 1000;
+    desync -= tlen / 4 * 1000;
+
     int16_t *data = (int16_t*)transfer->buffer;
     for (i = 0; i < transfer->length / 4; i ++)
     {
@@ -245,10 +232,13 @@ void record_callback(struct libusb_transfer *transfer)
     for (i = 0; i < items; i ++)
     {
         int16_t *buf = &bufz[i * 2];
-        avg += fabs(buf[0]) + fabs(buf[1]);
+        if (fabs(buf[0]) > avg)
+            avg = fabs(buf[0]);
+        if (fabs(buf[1]) > avg)
+            avg = fabs(buf[1]);
     }
     if (avg)
-        printf("%10.6f dB\r", 6 * log(avg / 32767 / items) / log(2.0));
+        printf("%12.6f dBFS\r", 6 * log(avg / 32767 / items) / log(2.0));
     libusb_submit_transfer(transfer);
 }
 
@@ -302,13 +292,11 @@ int main(int argc, char *argv[])
     // 50: 4 3 3 
     // 70: 2 2 1 2 2 2 1
     printf("Error = %d\n", configure_omega(h, srate));
-    for (i = 0; i < NUM_RECORD_BUFS; i++)
-        record_stuff(h, i);
-    //for (i = 0; i < NUM_SYNC_BUFS; i++)
-    //    sync_stuff(h, i);
+    usleep(1);
     for (i = 0; i < NUM_PLAY_BUFS; i++)
         play_stuff(h, i);
-    //play_stuff(h, 0);
+    for (i = 0; i < NUM_RECORD_BUFS; i++)
+        record_stuff(h, i);
     usb_main_loop();
     return 0;
 }
