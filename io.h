@@ -19,10 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_IO_H
 #define CBOX_IO_H
 
+#include <glib.h>
 #include <jack/jack.h>
 #include <jack/ringbuffer.h>
 #include "master.h"
 
+struct cbox_io;
 struct cbox_io_callbacks;
 struct cbox_recording_source;
 struct cbox_meter;
@@ -33,22 +35,43 @@ struct cbox_open_params
 {
 };
 
-struct cbox_io
+struct cbox_io_impl
 {
+    struct cbox_io *pio;
+
+    int (*getsampleratefunc)(struct cbox_io_impl *ioi);
+    gboolean (*startfunc)(struct cbox_io_impl *ioi, GError **error);
+    gboolean (*stopfunc)(struct cbox_io_impl *ioi, GError **error);
+    gboolean (*getstatusfunc)(struct cbox_io_impl *ioi, GError **error);
+    void (*pollfunc)(struct cbox_io_impl *ioi);
+    int (*getmidifunc)(struct cbox_io_impl *ioi, struct cbox_midi_buffer *destination);
+    void (*destroyfunc)(struct cbox_io_impl *ioi);
+};
+
+struct cbox_jack_io_impl
+{
+    struct cbox_io_impl ioi;
+
     jack_client_t *client;
     jack_port_t **inputs;
+    jack_port_t **outputs;
+    jack_port_t *midi;
+    char *error_str; // set to non-NULL if client has been booted out by JACK
+
+    jack_ringbuffer_t *rb_autoconnect;    
+};
+
+struct cbox_io
+{
+    struct cbox_io_impl *impl;
+
     int input_count;
     float **input_buffers; // only valid inside jack_rt_process
-    jack_port_t **outputs;
     int output_count;
     float **output_buffers; // only valid inside jack_rt_process
-    jack_port_t *midi;
     int buffer_size;
     
-    jack_ringbuffer_t *rb_autoconnect;
-    
     struct cbox_io_callbacks *cb;
-    char *error_str; // set to non-NULL if client has been booted out by JACK
 };
 
 struct cbox_io_callbacks
@@ -69,7 +92,7 @@ static inline int cbox_io_get_buffer_size(struct cbox_io *io)
     return io->buffer_size;
 }
 extern int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *destination);
-extern const char *cbox_io_get_disconnect_status(struct cbox_io *io);
+extern gboolean cbox_io_get_disconnect_status(struct cbox_io *io, GError **error);
 extern int cbox_io_cycle(struct cbox_io *io);
 extern void cbox_io_poll_ports(struct cbox_io *io);
 extern void cbox_io_close(struct cbox_io *io);

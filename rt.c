@@ -50,10 +50,19 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
             return FALSE;
         if (rt->io)
         {
-            const char *error_str = cbox_io_get_disconnect_status(rt->io);
-            return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count) &&
-                cbox_execute_on(fb, NULL, "/state", "is", error, error_str ? -1 : 1, error_str ? error_str : "OK") &&
-                CBOX_OBJECT_DEFAULT_STATUS(rt, fb, error);
+            GError *cerror = NULL;
+            if (cbox_io_get_disconnect_status(rt->io, &cerror))
+            {
+                return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count) &&
+                    cbox_execute_on(fb, NULL, "/state", "is", error, 1, "OK") &&
+                    CBOX_OBJECT_DEFAULT_STATUS(rt, fb, error);
+            }
+            else
+            {
+                return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count) &&
+                    cbox_execute_on(fb, NULL, "/state", "is", error, -1, cerror ? cerror->message : "Unknown error") &&
+                    CBOX_OBJECT_DEFAULT_STATUS(rt, fb, error);
+            }
         }
         else
             return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, 0, 2) &&
@@ -62,7 +71,7 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
     }
     else if (!strcmp(cmd->command, "/cycle") && !strcmp(cmd->arg_types, ""))
     {
-        if (rt->io && cbox_io_get_disconnect_status(rt->io))
+        if (rt->io && !cbox_io_get_disconnect_status(rt->io, NULL))
         {
             cbox_io_cycle(rt->io);
             return TRUE;

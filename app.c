@@ -635,11 +635,13 @@ void cbox_app_on_idle()
 {
     if (app.rt->io)
     {
-        const char *disconnect = cbox_io_get_disconnect_status(&app.io);
-        if (!disconnect)
+        GError *error = NULL;
+        if (cbox_io_get_disconnect_status(&app.io, &error))
             cbox_io_poll_ports(&app.io);
         else
         {
+            if (error)
+                g_error_free(error);
             int auto_reconnect = cbox_config_get_int("io", "auto_reconnect", 0);
             if (auto_reconnect > 0)
             {
