@@ -56,19 +56,9 @@ gboolean cbox_io_get_disconnect_status(struct cbox_io *io, GError **error)
     return io->impl->getstatusfunc(io->impl, error);
 }
 
-int cbox_io_cycle(struct cbox_io *io)
+gboolean cbox_io_cycle(struct cbox_io *io, GError **error)
 {
-    struct cbox_io_callbacks *cb = io->cb;
-    cbox_io_close(io);
-    
-    // XXXKF use params structure some day
-    if (!cbox_io_init(io, NULL))
-        return 0;
-    
-    cbox_io_start(io, cb);
-    if (cb->on_reconnected)
-        (cb->on_reconnected)(cb->user_data);
-    return 1;
+    return io->impl->cyclefunc(io->impl, error);
 }
 
 int cbox_io_stop(struct cbox_io *io)

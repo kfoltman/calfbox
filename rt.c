@@ -73,8 +73,7 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
     {
         if (rt->io && !cbox_io_get_disconnect_status(rt->io, NULL))
         {
-            cbox_io_cycle(rt->io);
-            return TRUE;
+            return cbox_io_cycle(rt->io, error);
         }
         else
         {

@@ -646,7 +646,9 @@ void cbox_app_on_idle()
             if (auto_reconnect > 0)
             {
                 sleep(auto_reconnect);
-                cbox_io_cycle(&app.io);
+                GError *error = NULL;
+                if (!cbox_io_cycle(&app.io, &error))
+                    g_warning("Cannot cycle the I/O: %s", (error && error->message) ? error->message : "Unknown error");
             }
         }
     }

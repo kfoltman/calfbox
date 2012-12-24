@@ -292,9 +292,27 @@ void cbox_jackio_destroy(struct cbox_io_impl *impl)
     }
 }
 
+gboolean cbox_jackio_cycle(struct cbox_io_impl *impl, GError **error)
+{
+    struct cbox_io *io = impl->pio;
+    struct cbox_io_callbacks *cb = io->cb;
+    cbox_io_close(io);
+    
+    // XXXKF use params structure some day
+    if (!cbox_io_init_jack(io, NULL, error))
+        return FALSE;
+    
+    cbox_io_start(io, cb);
+    if (cb->on_reconnected)
+        (cb->on_reconnected)(cb->user_data);
+    return TRUE;
+}
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
 
-int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
+gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
 {
     jack_client_t *client = NULL;
     jack_status_t status = 0;
@@ -302,13 +320,19 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
     if (client == NULL)
     {
         if (!cbox_hwcfg_setup_jack())
-            return 0;
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set up JACK server configuration based on current hardware");
+            return FALSE;
+        }
         
         status = 0;
         client = jack_client_open("cbox", 0, &status);
     }
     if (client == NULL)
-        return 0;
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create JACK instance");
+        return FALSE;
+    }
     
     // XXXKF would use a callback instead
     io->buffer_size = jack_get_buffer_size(client);
@@ -327,6 +351,7 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
     jii->ioi.stopfunc = cbox_jackio_stop;
     jii->ioi.getstatusfunc = cbox_jackio_get_status;
     jii->ioi.pollfunc = cbox_jackio_poll_ports;
+    jii->ioi.cyclefunc = cbox_jackio_cycle;
     jii->ioi.getmidifunc = cbox_jackio_get_midi_data;
     jii->ioi.destroyfunc = cbox_jackio_destroy;
     
@@ -335,38 +360,63 @@ int cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params)
     jii->error_str = NULL;
     
     jii->inputs = malloc(sizeof(jack_port_t *) * io->input_count);
+    jii->outputs = malloc(sizeof(jack_port_t *) * io->output_count);
+    for (int i = 0; i < io->input_count; i++)
+        jii->inputs[i] = NULL;
+    for (int i = 0; i < io->output_count; i++)
+        jii->outputs[i] = NULL;
     for (int i = 0; i < io->input_count; i++)
     {
         gchar *name = g_strdup_printf("in_%d", 1 + i);
         jii->inputs[i] = jack_port_register(jii->client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
         if (!jii->inputs[i])
         {
-            // XXXKF switch to glib style error reporting, though this condition will probably rarely happen in real life
-            g_error("Cannot create input port %d", i);
-            return 0;
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create input port %d (%s)", i, name);
+            g_free(name);
+            goto cleanup;
         }
         g_free(name);
     }
-    jii->outputs = malloc(sizeof(jack_port_t *) * io->output_count);
     for (int i = 0; i < io->output_count; i++)
     {
         gchar *name = g_strdup_printf("out_%d", 1 + i);
         jii->outputs[i] = jack_port_register(jii->client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
         if (!jii->outputs[i])
         {
-            // XXXKF switch to glib style error reporting, though this condition will probably rarely happen in real life
-            g_error("Cannot create output port %d", i);
-            return 0;
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create output port %d (%s)", i, name);
+            g_free(name);
+            goto cleanup;
         }
         g_free(name);
     }
     jii->midi = jack_port_register(jii->client, "midi", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
     
     if (!jii->midi)
-        return 0;
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create MIDI port");
+        return FALSE;
+    }
 
     cbox_io_poll_ports(io);
 
-    return 1;
+    return TRUE;
+
+cleanup:
+    if (jii->inputs)
+    {
+        for (int i = 0; i < io->input_count; i++)
+            free(jii->inputs[i]);
+        free(jii->inputs);
+    }
+    if (jii->outputs)
+    {
+        for (int i = 0; i < io->output_count; i++)
+            free(jii->outputs[i]);
+        free(jii->outputs);
+    }
+    jack_client_close(jii->client);
+    free(jii);
+    io->impl = NULL;
+    return FALSE;
 };
 

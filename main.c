@@ -215,9 +215,10 @@ int main(int argc, char *argv[])
     }
     else
     {
-        if (!cbox_io_init(&app.io, &params))
+        GError *error = NULL;
+        if (!cbox_io_init_jack(&app.io, &params, &error))
         {
-            fprintf(stderr, "Cannot initialise sound I/O\n");
+            fprintf(stderr, "Cannot initialise sound I/O: %s\n", (error && error->message) ? error->message : "Unknown error");
             return 1;
         }
         cbox_rt_set_io(app.rt, &app.io);
