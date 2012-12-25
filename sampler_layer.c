@@ -228,7 +228,7 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_FINALISER)
 
     if (l->loop_mode == slm_unknown)
-        l->loop_mode = l->loop_start == -1 ? slm_no_loop : slm_loop_continuous;
+        l->loop_mode = l->loop_end == 0 ? slm_no_loop : slm_loop_continuous;
     
     if (l->loop_mode == slm_one_shot || l->loop_mode == slm_no_loop)
         l->loop_start = -1;
