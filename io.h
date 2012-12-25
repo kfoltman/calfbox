@@ -49,19 +49,6 @@ struct cbox_io_impl
     void (*destroyfunc)(struct cbox_io_impl *ioi);
 };
 
-struct cbox_jack_io_impl
-{
-    struct cbox_io_impl ioi;
-
-    jack_client_t *client;
-    jack_port_t **inputs;
-    jack_port_t **outputs;
-    jack_port_t *midi;
-    char *error_str; // set to non-NULL if client has been booted out by JACK
-
-    jack_ringbuffer_t *rb_autoconnect;    
-};
-
 struct cbox_io
 {
     struct cbox_io_impl *impl;
@@ -84,7 +71,9 @@ struct cbox_io_callbacks
     void (*on_reconnected)(void *user_data);
 };
 
+extern gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, GError **error);
 extern gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, GError **error);
+
 extern int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb);
 extern int cbox_io_stop(struct cbox_io *io);
 extern int cbox_io_get_sample_rate(struct cbox_io *io);
@@ -97,5 +86,7 @@ extern gboolean cbox_io_get_disconnect_status(struct cbox_io *io, GError **error
 extern gboolean cbox_io_cycle(struct cbox_io *io, GError **error);
 extern void cbox_io_poll_ports(struct cbox_io *io);
 extern void cbox_io_close(struct cbox_io *io);
+
+extern const char *cbox_io_section;
 
 #endif

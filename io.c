@@ -30,6 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <glib.h>
 
+const char *cbox_io_section = "io";
+
+gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
+{
+    return cbox_io_init_jack(io, params, error);
+}
+
 int cbox_io_get_sample_rate(struct cbox_io *io)
 {
     return io->impl->getsampleratefunc(io->impl);

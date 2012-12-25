@@ -33,7 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <jack/types.h>
 #include <jack/midiport.h>
 
-static const char *io_section = "io";
+struct cbox_jack_io_impl
+{
+    struct cbox_io_impl ioi;
+
+    jack_client_t *client;
+    jack_port_t **inputs;
+    jack_port_t **outputs;
+    jack_port_t *midi;
+    char *error_str; // set to non-NULL if client has been booted out by JACK
+
+    jack_ringbuffer_t *rb_autoconnect;    
+};
 
 static int process_cb(jack_nframes_t nframes, void *arg)
 {
@@ -81,7 +92,7 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
     char *name, *orig_name, *dpos;
     const char *use_name;
     
-    orig_name = cbox_config_get_string(io_section, config_var);
+    orig_name = cbox_config_get_string(cbox_io_section, config_var);
     if (orig_name)
     {
         name = orig_name;
@@ -206,7 +217,7 @@ gboolean cbox_jackio_start(struct cbox_io_impl *impl, GError **error)
     jack_on_info_shutdown(jii->client, client_shutdown_cb, jii);
     jack_activate(jii->client);
 
-    if (cbox_config_has_section(io_section))
+    if (cbox_config_has_section(cbox_io_section))
         port_autoconnect(jii, NULL);
     
     return TRUE;
