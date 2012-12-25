@@ -71,6 +71,9 @@ struct cbox_usb_io_impl
     int playback_counter;
     struct libusb_transfer **playback_transfers;
     int read_ptr;
+    struct cbox_midi_buffer midi_buffer;
+    
+    uint8_t midi_recv_data[16];
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -91,7 +94,7 @@ gboolean cbox_usbio_get_status(struct cbox_io_impl *impl, GError **error)
 
 static struct libusb_transfer *play_stuff(struct cbox_usb_io_impl *uii, int index);
 
-void play_callback(struct libusb_transfer *transfer)
+static void play_callback(struct libusb_transfer *transfer)
 {
     struct cbox_usb_io_impl *uii = transfer->user_data;
     
@@ -149,6 +152,7 @@ void play_callback(struct libusb_transfer *transfer)
                 memset(io->output_buffers[0], 0, io->buffer_size * sizeof(float));
                 memset(io->output_buffers[1], 0, io->buffer_size * sizeof(float));
                 io->cb->process(io->cb->user_data, io, io->buffer_size);
+                cbox_midi_buffer_clear(&uii->midi_buffer);
                 rptr = 0;
             }
             int left1 = nframes - i;
@@ -204,6 +208,30 @@ struct libusb_transfer *play_stuff(struct cbox_usb_io_impl *uii, int index)
     return t;
 }
 
+static void midi_transfer_cb(struct libusb_transfer *transfer)
+{
+    struct cbox_usb_io_impl *uii = transfer->user_data;
+
+    if (transfer->status == LIBUSB_TRANSFER_CANCELLED)
+    {
+        uii->cancel_confirm = 1;
+        return;
+    }
+    for (int i = 0; i + 3 < transfer->actual_length; i += 4)
+    {
+        uint8_t *data = &transfer->buffer[i];
+        if ((data[0] & 15) >= 0x08)
+        {
+            // normalise: note on with vel 0 -> note off
+            if ((data[1] & 0x90) == 0x90 && data[3] == 0)
+                cbox_midi_buffer_write_inline(&uii->midi_buffer, 0, data[1] - 0x10, data[2], data[3]);
+            else
+                cbox_midi_buffer_write_event(&uii->midi_buffer, 0, data + 1, midi_cmd_size(data[1]));
+        }
+    }
+    libusb_submit_transfer(transfer);
+}
+
 static void *engine_thread(void *user_data)
 {
     struct cbox_usb_io_impl *uii = user_data;
@@ -211,6 +239,11 @@ static void *engine_thread(void *user_data)
     struct sched_param p;
     p.sched_priority = 10;
     sched_setscheduler(0, SCHED_FIFO, &p);
+
+    cbox_midi_buffer_init(&uii->midi_buffer);
+    struct libusb_transfer *midi_transfer = libusb_alloc_transfer(0);
+    libusb_fill_bulk_transfer(midi_transfer, uii->handle_omega, OMEGA_EP_MIDI_CAPTURE, uii->midi_recv_data, sizeof(uii->midi_recv_data), midi_transfer_cb, uii, 1000);
+    libusb_submit_transfer(midi_transfer);
     
     uii->desync = 0;
     uii->samples_played = 0;
@@ -239,6 +272,11 @@ static void *engine_thread(void *user_data)
             libusb_handle_events(uii->usbctx);
         libusb_free_transfer(uii->playback_transfers[i]);
     }
+    uii->cancel_confirm = FALSE;
+    libusb_cancel_transfer(midi_transfer);
+    while (!uii->cancel_confirm)
+        libusb_handle_events(uii->usbctx);
+    libusb_free_transfer(midi_transfer);
     
 }
 
@@ -289,9 +327,9 @@ gboolean cbox_usbio_cycle(struct cbox_io_impl *impl, GError **error)
 
 int cbox_usbio_get_midi_data(struct cbox_io_impl *impl, struct cbox_midi_buffer *destination)
 {
-    // XXXKF: read the incoming events from the MIDI endpoint (interface 7 on Omega?)
-    // and translate them into cbox_midi_buffer
+    struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
     cbox_midi_buffer_clear(destination);
+    cbox_midi_buffer_copy(destination, &uii->midi_buffer);
     return 0;
 }
 
