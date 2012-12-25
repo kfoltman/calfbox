@@ -73,6 +73,7 @@ struct cbox_io_callbacks
 
 extern gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, GError **error);
 extern gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, GError **error);
+extern gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, GError **error);
 
 extern int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb);
 extern int cbox_io_stop(struct cbox_io *io);
