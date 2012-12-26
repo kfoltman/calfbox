@@ -589,7 +589,8 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     uii->sample_rate = 44100;
     uii->buffers = cbox_config_get_int(cbox_io_section, "usb_buffers", 2);
     // shouldn't be more than 4, otherwise it will crackle due to limitations of
-    // 
+    // the packet length adjustment. It might work better if adjustment
+    // was per-packet and not per-transfer.
     uii->iso_packets = cbox_config_get_int(cbox_io_section, "iso_packets", 1);
     
     if (!open_omega(uii, error))
