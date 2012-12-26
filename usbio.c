@@ -356,35 +356,45 @@ static gboolean set_endpoint_sample_rate(struct libusb_device_handle *h, int sam
     return TRUE;
 }
 
-static gboolean claim_omega_interfaces(struct libusb_device_handle *handle)
+static gboolean claim_omega_interfaces(struct libusb_device_handle *handle, GError **error)
 {
-    if (libusb_claim_interface(handle, 1))
-        return FALSE;
-    if (libusb_claim_interface(handle, 2))
-        return FALSE;
-    if (libusb_claim_interface(handle, 7))
-        return FALSE;
-    if (libusb_set_interface_alt_setting(handle, 1, 1))
-        return FALSE;
-    if (libusb_set_interface_alt_setting(handle, 2, 1))
-        return FALSE;
+    static int interfaces[] = { 1, 2, 7 };
+    for (int i = 0; i < sizeof(interfaces) / sizeof(int); i++)
+    {
+        int ifno = interfaces[i];
+        int err = libusb_kernel_driver_active(handle, ifno);
+        if (err)
+        {
+            if (libusb_detach_kernel_driver(handle, ifno))
+            {
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot detach kernel driver from Lexicon Omega interface %d: %s. Please rmmod snd-usb-audio as root.", ifno, libusb_error_name(err));
+                return FALSE;
+            }            
+        }
+        err = libusb_claim_interface(handle, ifno);
+        if (err)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot claim interface %d on Lexicon Omega: %s", ifno, libusb_error_name(err));
+            return FALSE;
+        }
+        if (ifno != 7)
+        {
+            err = libusb_set_interface_alt_setting(handle, ifno, 1);
+            if (err)
+            {
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot claim interface %d on Lexicon Omega: %s", ifno, libusb_error_name(err));
+                return FALSE;
+            }
+        }
+    }
     return TRUE;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
+static gboolean open_omega(struct cbox_usb_io_impl *uii, GError **error)
 {
-    struct cbox_usb_io_impl *uii = malloc(sizeof(struct cbox_usb_io_impl));
-    libusb_init(&uii->usbctx);
-    libusb_set_debug(uii->usbctx, 3);
-
     uii->handle_omega = libusb_open_device_with_vid_pid(uii->usbctx, 0x1210, 0x0002);
-    uii->sample_rate = 44100;
-    uii->buffers = cbox_config_get_int(cbox_io_section, "usb_buffers", 2);
-    // shouldn't be more than 4, otherwise it will crackle due to limitations of
-    // 
-    uii->iso_packets = cbox_config_get_int(cbox_io_section, "iso_packets", 1);
     
     if (!uii->handle_omega)
     {
@@ -393,8 +403,14 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
         free(uii);
         return FALSE;
     }
-    if (!set_endpoint_sample_rate(uii->handle_omega, uii->sample_rate) ||
-        !claim_omega_interfaces(uii->handle_omega))
+    if (!claim_omega_interfaces(uii->handle_omega, error))
+    {
+        libusb_close(uii->handle_omega);
+        libusb_exit(uii->usbctx);
+        free(uii);
+        return FALSE;
+    }
+    if (!set_endpoint_sample_rate(uii->handle_omega, uii->sample_rate))
     {
         libusb_close(uii->handle_omega);
         libusb_exit(uii->usbctx);
@@ -402,7 +418,24 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
         free(uii);
         return FALSE;
     }
+    return TRUE;
+}
+
+gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
+{
+    struct cbox_usb_io_impl *uii = malloc(sizeof(struct cbox_usb_io_impl));
+    libusb_init(&uii->usbctx);
+    libusb_set_debug(uii->usbctx, 3);
+
+    uii->sample_rate = 44100;
+    uii->buffers = cbox_config_get_int(cbox_io_section, "usb_buffers", 2);
+    // shouldn't be more than 4, otherwise it will crackle due to limitations of
+    // 
+    uii->iso_packets = cbox_config_get_int(cbox_io_section, "iso_packets", 1);
     
+    if (!open_omega(uii, error))
+        return FALSE;
+
     // fixed processing buffer size, as we have to deal with packetisation anyway
     io->buffer_size = 64;
     io->cb = NULL;
