@@ -239,7 +239,7 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
         if ((data[0] & 15) >= 0x08)
         {
             // normalise: note on with vel 0 -> note off
-            if ((data[1] & 0x90) == 0x90 && data[3] == 0)
+            if ((data[1] & 0xF0) == 0x90 && data[3] == 0)
                 cbox_midi_buffer_write_inline(&umi->midi_buffer, 0, data[1] - 0x10, data[2], data[3]);
             else
                 cbox_midi_buffer_write_event(&umi->midi_buffer, 0, data + 1, midi_cmd_size(data[1]));
