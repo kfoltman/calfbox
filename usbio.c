@@ -71,8 +71,20 @@ struct cbox_usb_io_impl
     int playback_counter;
     struct libusb_transfer **playback_transfers;
     int read_ptr;
-    struct cbox_midi_buffer midi_buffer;
     
+    GList *midi_input_ports;
+    struct cbox_midi_buffer **midi_input_port_buffers;
+    int *midi_input_port_pos;
+    int midi_input_port_count;
+};
+
+struct cbox_usb_midi_input
+{
+    struct cbox_usb_io_impl *uii;
+    struct libusb_device_handle *handle;
+    int endpoint;
+    struct libusb_transfer *transfer;
+    struct cbox_midi_buffer midi_buffer;
     uint8_t midi_recv_data[16];
 };
 
@@ -152,7 +164,11 @@ static void play_callback(struct libusb_transfer *transfer)
                 memset(io->output_buffers[0], 0, io->buffer_size * sizeof(float));
                 memset(io->output_buffers[1], 0, io->buffer_size * sizeof(float));
                 io->cb->process(io->cb->user_data, io, io->buffer_size);
-                cbox_midi_buffer_clear(&uii->midi_buffer);
+                for (GList *p = uii->midi_input_ports; p; p = p->next)
+                {
+                    struct cbox_usb_midi_input *umi = p->data;
+                    cbox_midi_buffer_clear(&umi->midi_buffer);
+                }
                 rptr = 0;
             }
             int left1 = nframes - i;
@@ -210,11 +226,11 @@ struct libusb_transfer *play_stuff(struct cbox_usb_io_impl *uii, int index)
 
 static void midi_transfer_cb(struct libusb_transfer *transfer)
 {
-    struct cbox_usb_io_impl *uii = transfer->user_data;
+    struct cbox_usb_midi_input *umi = transfer->user_data;
 
     if (transfer->status == LIBUSB_TRANSFER_CANCELLED)
     {
-        uii->cancel_confirm = 1;
+        umi->uii->cancel_confirm = 1;
         return;
     }
     for (int i = 0; i + 3 < transfer->actual_length; i += 4)
@@ -224,9 +240,9 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
         {
             // normalise: note on with vel 0 -> note off
             if ((data[1] & 0x90) == 0x90 && data[3] == 0)
-                cbox_midi_buffer_write_inline(&uii->midi_buffer, 0, data[1] - 0x10, data[2], data[3]);
+                cbox_midi_buffer_write_inline(&umi->midi_buffer, 0, data[1] - 0x10, data[2], data[3]);
             else
-                cbox_midi_buffer_write_event(&uii->midi_buffer, 0, data + 1, midi_cmd_size(data[1]));
+                cbox_midi_buffer_write_event(&umi->midi_buffer, 0, data + 1, midi_cmd_size(data[1]));
         }
     }
     libusb_submit_transfer(transfer);
@@ -239,11 +255,25 @@ static void *engine_thread(void *user_data)
     struct sched_param p;
     p.sched_priority = 10;
     sched_setscheduler(0, SCHED_FIFO, &p);
+    
+    uii->midi_input_port_count = 0;
+    uii->midi_input_port_buffers = calloc(uii->midi_input_port_count, sizeof(struct cbox_midi_buffer *));
+    uii->midi_input_port_pos = calloc(uii->midi_input_port_count, sizeof(int));
 
-    cbox_midi_buffer_init(&uii->midi_buffer);
-    struct libusb_transfer *midi_transfer = libusb_alloc_transfer(0);
-    libusb_fill_bulk_transfer(midi_transfer, uii->handle_omega, OMEGA_EP_MIDI_CAPTURE, uii->midi_recv_data, sizeof(uii->midi_recv_data), midi_transfer_cb, uii, 1000);
-    libusb_submit_transfer(midi_transfer);
+    for(GList *p = uii->midi_input_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_input *umi = p->data;
+        cbox_midi_buffer_clear(&umi->midi_buffer);
+        umi->transfer = libusb_alloc_transfer(0);
+        libusb_fill_bulk_transfer(umi->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, sizeof(umi->midi_recv_data), midi_transfer_cb, umi, 1000);
+        uii->midi_input_port_buffers[uii->midi_input_port_count] = &umi->midi_buffer;
+        uii->midi_input_port_count++;
+    }
+    for(GList *p = uii->midi_input_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_input *umi = p->data;
+        libusb_submit_transfer(umi->transfer);
+    }
     
     uii->desync = 0;
     uii->samples_played = 0;
@@ -272,12 +302,20 @@ static void *engine_thread(void *user_data)
             libusb_handle_events(uii->usbctx);
         libusb_free_transfer(uii->playback_transfers[i]);
     }
-    uii->cancel_confirm = FALSE;
-    libusb_cancel_transfer(midi_transfer);
-    while (!uii->cancel_confirm)
-        libusb_handle_events(uii->usbctx);
-    libusb_free_transfer(midi_transfer);
-    
+
+    for(GList *p = uii->midi_input_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_input *umi = p->data;
+
+        uii->cancel_confirm = FALSE;
+        libusb_cancel_transfer(umi->transfer);
+        while (!uii->cancel_confirm)
+            libusb_handle_events(uii->usbctx);
+        libusb_free_transfer(umi->transfer);
+        cbox_midi_buffer_clear(&umi->midi_buffer);
+        libusb_close(umi->handle);
+        free(umi);
+    }
 }
 
 gboolean cbox_usbio_start(struct cbox_io_impl *impl, GError **error)
@@ -328,8 +366,11 @@ gboolean cbox_usbio_cycle(struct cbox_io_impl *impl, GError **error)
 int cbox_usbio_get_midi_data(struct cbox_io_impl *impl, struct cbox_midi_buffer *destination)
 {
     struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
+
     cbox_midi_buffer_clear(destination);
-    cbox_midi_buffer_copy(destination, &uii->midi_buffer);
+    memset(uii->midi_input_port_pos, 0, sizeof(int) * uii->midi_input_port_count);
+
+    cbox_midi_buffer_merge(destination, uii->midi_input_port_buffers, uii->midi_input_port_count, uii->midi_input_port_pos);
     return 0;
 }
 
@@ -358,7 +399,7 @@ static gboolean set_endpoint_sample_rate(struct libusb_device_handle *h, int sam
 
 static gboolean claim_omega_interfaces(struct libusb_device_handle *handle, GError **error)
 {
-    static int interfaces[] = { 1, 2, 7 };
+    static int interfaces[] = { 1, 2 };
     for (int i = 0; i < sizeof(interfaces) / sizeof(int); i++)
     {
         int ifno = interfaces[i];
@@ -377,20 +418,15 @@ static gboolean claim_omega_interfaces(struct libusb_device_handle *handle, GErr
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot claim interface %d on Lexicon Omega: %s", ifno, libusb_error_name(err));
             return FALSE;
         }
-        if (ifno != 7)
+        err = libusb_set_interface_alt_setting(handle, ifno, 1);
+        if (err)
         {
-            err = libusb_set_interface_alt_setting(handle, ifno, 1);
-            if (err)
-            {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set alternate setting on interface %d on Lexicon Omega: %s", ifno, libusb_error_name(err));
-                return FALSE;
-            }
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set alternate setting on interface %d on Lexicon Omega: %s", ifno, libusb_error_name(err));
+            return FALSE;
         }
     }
     return TRUE;
 }
-
-///////////////////////////////////////////////////////////////////////////////
 
 static gboolean open_omega(struct cbox_usb_io_impl *uii, GError **error)
 {
@@ -420,6 +456,122 @@ static gboolean open_omega(struct cbox_usb_io_impl *uii, GError **error)
     }
     return TRUE;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+static void get_midi_device_list(struct cbox_usb_io_impl *uii)
+{
+    struct libusb_device **dev_list;
+    size_t i, num_devices;
+    
+    num_devices = libusb_get_device_list(uii->usbctx, &dev_list);
+    
+    for (i = 0; i < num_devices; i++)
+    {
+        struct libusb_device *dev = dev_list[i];
+        struct libusb_device_descriptor dev_descr;
+        int bus = libusb_get_bus_number(dev);
+        int devadr = libusb_get_device_address(dev);
+        if (0 == libusb_get_device_descriptor(dev, &dev_descr))
+        {
+            struct libusb_config_descriptor *cfg_descr;
+            // printf("%03d:%03d Device %04X:%04X\n", bus, devadr, dev_descr.idVendor, dev_descr.idProduct);
+            for (int ci = 0; ci < (int)dev_descr.bNumConfigurations; ci++)
+            {
+                if (0 == libusb_get_config_descriptor(dev, ci, &cfg_descr))
+                {
+                    for (int ii = 0; ii < cfg_descr->bNumInterfaces; ii++)
+                    {
+                        const struct libusb_interface *idescr = &cfg_descr->interface[ii];
+                        for (int as = 0; as < idescr->num_altsetting; as++)
+                        {
+                            const struct libusb_interface_descriptor *asdescr = &idescr->altsetting[as];
+                            // printf("bInterfaceNumber=%d bAlternateSetting=%d bInterfaceClass=%d bInterfaceSubClass=%d\n", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, asdescr->bInterfaceClass, asdescr->bInterfaceSubClass);
+                            if (asdescr->bInterfaceClass == 1 && asdescr->bInterfaceSubClass == 3)
+                            {
+                                // printf("Has MIDI port\n");
+                                for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
+                                {
+                                    const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
+                                    if (ep->bEndpointAddress >= 0x80)
+                                    {
+                                        // printf("Output endpoint address = %02x\n", ep->bEndpointAddress);
+                                        
+                                        struct libusb_device_handle *handle = NULL;
+                                        int err = libusb_open(dev, &handle);
+                                        if (!err)
+                                        {
+                                            int ifno = asdescr->bInterfaceNumber;
+                                            if (libusb_kernel_driver_active(handle, ifno))
+                                            {
+                                                if (libusb_detach_kernel_driver(handle, ifno))
+                                                {
+                                                    g_warning("Cannot detach kernel driver from Lexicon Omega interface %d: %s. Please rmmod snd-usb-audio as root.", ifno, libusb_error_name(err));
+                                                    goto error;
+                                                }            
+                                            }
+                                            err = libusb_claim_interface(handle, ifno);
+                                            if (err)
+                                            {
+                                                g_warning("Cannot claim interface %d on device %03d:%03d for MIDI input: %s", ifno, bus, devadr, libusb_error_name(err));
+                                                goto error;
+                                            }
+                                            if (as != 0)
+                                            {
+                                                err = libusb_set_interface_alt_setting(handle, ifno, asdescr->bAlternateSetting);
+                                                if (err)
+                                                {
+                                                    g_warning("Cannot claim interface %d on device %03d:%03d for MIDI input: %s", ifno, bus, devadr, libusb_error_name(err));
+                                                    goto error;
+                                                }
+                                            }
+                                            
+                                            struct cbox_usb_midi_input *mi = malloc(sizeof(struct cbox_usb_midi_input));
+                                            mi->uii = uii;
+                                            mi->handle = handle;
+                                            mi->endpoint = ep->bEndpointAddress;
+                                            cbox_midi_buffer_init(&mi->midi_buffer);
+                                            uii->midi_input_ports = g_list_prepend(uii->midi_input_ports, mi);
+                                            
+                                            // Drain the output buffer of the device - otherwise playing a few notes and running the program will cause
+                                            // those notes to play.
+                                            char flushbuf[256];
+                                            int transferred = 0;
+                                            int len = ep->wMaxPacketSize;
+                                            if (len > 256)
+                                                len = 256;
+                                            while(0 == libusb_bulk_transfer(handle, mi->endpoint, flushbuf, len, &transferred, 100) && transferred > 0)
+                                                usleep(1);
+                                        }
+                                        else
+                                            g_warning("Cannot open device %03d:%03d for MIDI input: %s", bus, devadr, libusb_error_name(err));
+                                        
+                                        // We have a limitation of single endpoint per device. I think
+                                        // this is fine for now.
+                                        goto next_device;
+                                    error:
+                                        libusb_close(handle);
+                                        goto next_device;
+                                    }   
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                    g_warning("%03d:%03d - cannot get configuration descriptor \n", bus, devadr);
+            }
+        }
+        else
+            g_warning("%03d:%03d - cannot get device descriptor\n", bus, devadr);
+    next_device:
+        ;
+    }
+    
+    libusb_free_device_list(dev_list, 0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
 {
@@ -460,6 +612,9 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     uii->ioi.cyclefunc = cbox_usbio_cycle;
     uii->ioi.getmidifunc = cbox_usbio_get_midi_data;
     uii->ioi.destroyfunc = cbox_usbio_destroy;
+    uii->midi_input_ports = NULL;
+    
+    get_midi_device_list(uii);
 
     return TRUE;
     
