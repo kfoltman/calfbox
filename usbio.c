@@ -586,7 +586,7 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     libusb_init(&uii->usbctx);
     libusb_set_debug(uii->usbctx, 3);
 
-    uii->sample_rate = 44100;
+    uii->sample_rate = cbox_config_get_int(cbox_io_section, "sample_rate", 44100);
     uii->buffers = cbox_config_get_int(cbox_io_section, "usb_buffers", 2);
     // shouldn't be more than 4, otherwise it will crackle due to limitations of
     // the packet length adjustment. It might work better if adjustment
