@@ -33,10 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "meter.h"
 #include "midi.h"
 #include "recsrc.h"
-#include <libusb-1.0/libusb.h>
 
 #include <errno.h>
 #include <glib.h>
+#include <libusb.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
