@@ -382,7 +382,7 @@ static gboolean claim_omega_interfaces(struct libusb_device_handle *handle, GErr
             err = libusb_set_interface_alt_setting(handle, ifno, 1);
             if (err)
             {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot claim interface %d on Lexicon Omega: %s", ifno, libusb_error_name(err));
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set alternate setting on interface %d on Lexicon Omega: %s", ifno, libusb_error_name(err));
                 return FALSE;
             }
         }
