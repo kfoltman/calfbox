@@ -313,9 +313,9 @@ static void *engine_thread(void *user_data)
             libusb_handle_events(uii->usbctx);
         libusb_free_transfer(umi->transfer);
         cbox_midi_buffer_clear(&umi->midi_buffer);
-        libusb_close(umi->handle);
-        free(umi);
     }
+    free(uii->midi_input_port_buffers);
+    free(uii->midi_input_port_pos);
 }
 
 gboolean cbox_usbio_start(struct cbox_io_impl *impl, GError **error)
@@ -377,6 +377,13 @@ int cbox_usbio_get_midi_data(struct cbox_io_impl *impl, struct cbox_midi_buffer 
 void cbox_usbio_destroy(struct cbox_io_impl *impl)
 {
     struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
+    for (GList *p = uii->midi_input_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_input *umi = p->data;
+        libusb_close(umi->handle);
+        free(p->data);
+    }
+    g_list_free(uii->midi_input_ports);
     if (uii->handle_omega)
         libusb_close(uii->handle_omega);
     libusb_exit(uii->usbctx);
