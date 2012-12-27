@@ -45,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <unistd.h>
 
-// wMaxPacketSize from the Omega audio endpoints
-#define MAX_EP_PACKET_SIZE_BYTES 192
+// wMaxPacketSize from the Omega audio endpoints, divided by bytes per frame
+#define MAX_EP_PACKET_SIZE_FRAMES 48
 
 #define OMEGA_TIMEOUT 2000
 
@@ -65,7 +65,7 @@ struct cbox_usb_io_impl
     GHashTable *device_table;
     
     struct libusb_device_handle *handle_omega;
-    int sample_rate, buffer_size;
+    int sample_rate, buffer_size, output_resolution;
     unsigned int buffers, iso_packets;
 
     pthread_t thr_engine;
@@ -121,6 +121,9 @@ static void play_callback(struct libusb_transfer *transfer)
 {
     struct cbox_usb_io_impl *uii = transfer->user_data;
     
+    // Only supporting stereo for now - for multi-channel access
+    int oc = 2;
+    int resolution = uii->output_resolution;
     int i, j, b;
     if (transfer->status == LIBUSB_TRANSFER_CANCELLED)
     {
@@ -144,18 +147,18 @@ static void play_callback(struct libusb_transfer *transfer)
         if (transfer->iso_packet_desc[i].status)
             printf("ISO error: index = %d i = %d status = %d\n", (int)transfer->user_data, i, transfer->iso_packet_desc[i].status);
     }
-    uii->samples_played += transfer->length / 4;
+    uii->samples_played += transfer->length / (oc * resolution);
     int nsamps = uii->sample_rate / 1000;
     // If time elapsed is greater than 
     int lag = uii->desync / (1000 * transfer->num_iso_packets);
-    if (lag > 0 && nsamps < MAX_EP_PACKET_SIZE_BYTES / 4)
+    if (lag > 0 && nsamps < MAX_EP_PACKET_SIZE_FRAMES)
     {
         nsamps++;
         lag--;
     }
 
-    transfer->length = nsamps * transfer->num_iso_packets * 4;
-    libusb_set_iso_packet_lengths(transfer, nsamps * 4);
+    transfer->length = nsamps * transfer->num_iso_packets * oc * resolution;
+    libusb_set_iso_packet_lengths(transfer, nsamps * oc * resolution);
 
     //printf("desync %d num_iso_packets %d srate %d tlen %d\n", uii->desync, transfer->num_iso_packets, uii->sample_rate, tlen);
     //printf("+ %d - %d ptlen %d\n", transfer->num_iso_packets * uii->sample_rate, tlen / 4 * 1000, transfer->length / 4);
@@ -165,15 +168,16 @@ static void play_callback(struct libusb_transfer *transfer)
         static double phase = 0;
         static int phase2 = 0;
         struct cbox_io *io = uii->ioi.pio;
+        uint8_t *data8 = (uint8_t*)transfer->buffer;
         int16_t *data = (int16_t*)transfer->buffer;
         int rptr = uii->read_ptr;
-        int nframes = transfer->length / 4;
+        int nframes = transfer->length / (resolution * oc);
         for (i = 0; i < nframes; )
         {
             if (rptr == io->buffer_size)
             {
-                memset(io->output_buffers[0], 0, io->buffer_size * sizeof(float));
-                memset(io->output_buffers[1], 0, io->buffer_size * sizeof(float));
+                for (b = 0; b < oc; b++)
+                    memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
                 io->cb->process(io->cb->user_data, io, io->buffer_size);
                 for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
                 {
@@ -187,18 +191,39 @@ static void play_callback(struct libusb_transfer *transfer)
             if (left1 > left2)
                 left1 = left2;
 
-            for (b = 0; b < 2; b++)
+            for (b = 0; b < oc; b++)
             {
                 float *obuf = io->output_buffers[b] + rptr;
-                int16_t *tbuf = data + 2 * i + b;
-                for (j = 0; j < left1; j++)
+                if (resolution == 2)
                 {
-                    float v = 32767 * obuf[j];
-                    if (v < -32768)
-                        v = -32768;
-                    if (v > +32767)
-                        v = +32767;
-                    tbuf[2 * j] = (int16_t)v;
+                    int16_t *tbuf = data + oc * i + b;
+                    for (j = 0; j < left1; j++)
+                    {
+                        float v = 32767 * obuf[j];
+                        if (v < -32768)
+                            v = -32768;
+                        if (v > +32767)
+                            v = +32767;
+                        *tbuf = (int16_t)v;
+                        tbuf += oc;
+                    }
+                }
+                if (resolution == 3)
+                {
+                    uint8_t *tbuf = data8 + (oc * i + b) * 3;
+                    for (j = 0; j < left1; j++)
+                    {
+                        float v = 0x7FFFFF * obuf[j];
+                        if (v < -0x800000)
+                            v = -0x800000;
+                        if (v > +0x7FFFFF)
+                            v = +0x7FFFFF;
+                        int vi = (int)v;
+                        tbuf[0] = vi & 255;
+                        tbuf[1] = (vi >> 8) & 255;
+                        tbuf[2] = (vi >> 16) & 255;
+                        tbuf += oc * 3;
+                    }
                 }
             }
             i += left1;
@@ -222,13 +247,10 @@ struct libusb_transfer *play_stuff(struct cbox_usb_io_impl *uii, int index)
     struct libusb_transfer *t;
     int i;
     t = libusb_alloc_transfer(uii->iso_packets);
-    int tsize = uii->sample_rate * 4 / 1000;
-    uint8_t *buf = (uint8_t *)malloc(MAX_EP_PACKET_SIZE_BYTES * uii->iso_packets);
-    //int ssf = 0;
+    int tsize = uii->sample_rate * 2 * uii->output_resolution / 1000;
+    int bufsize = MAX_EP_PACKET_SIZE_FRAMES * 2 * uii->output_resolution * uii->iso_packets;
+    uint8_t *buf = (uint8_t *)calloc(1, bufsize);
     
-    for (i = 0; i < MAX_EP_PACKET_SIZE_BYTES * uii->iso_packets; i++)
-        buf[i] = 0;
-
     libusb_fill_iso_transfer(t, uii->handle_omega, OMEGA_EP_PLAYBACK, buf, tsize * uii->iso_packets, uii->iso_packets, play_callback, uii, 20000);
     libusb_set_iso_packet_lengths(t, tsize);
     libusb_submit_transfer(t);
@@ -443,9 +465,11 @@ static gboolean set_endpoint_sample_rate(struct libusb_device_handle *h, int sam
     return TRUE;
 }
 
-static gboolean claim_omega_interfaces(struct libusb_device_handle *handle, GError **error)
+static gboolean claim_omega_interfaces(struct cbox_usb_io_impl *uii, GError **error)
 {
+    struct libusb_device_handle *handle = uii->handle_omega;
     static int interfaces[] = { 1, 2 };
+    int altsets[] = { uii->output_resolution == 3 ? 2 : 1, 1 };
     for (int i = 0; i < sizeof(interfaces) / sizeof(int); i++)
     {
         int ifno = interfaces[i];
@@ -464,10 +488,10 @@ static gboolean claim_omega_interfaces(struct libusb_device_handle *handle, GErr
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot claim interface %d on Lexicon Omega: %s", ifno, libusb_error_name(err));
             return FALSE;
         }
-        err = libusb_set_interface_alt_setting(handle, ifno, 1);
+        err = libusb_set_interface_alt_setting(handle, ifno, altsets[i]);
         if (err)
         {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set alternate setting on interface %d on Lexicon Omega: %s", ifno, libusb_error_name(err));
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set alternate setting %d on interface %d on Lexicon Omega: %s", altsets[i], ifno, libusb_error_name(err));
             return FALSE;
         }
     }
@@ -476,6 +500,11 @@ static gboolean claim_omega_interfaces(struct libusb_device_handle *handle, GErr
 
 static gboolean open_omega(struct cbox_usb_io_impl *uii, GError **error)
 {
+    if (uii->output_resolution != 2 && uii->output_resolution != 3)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Only 16-bit or 24-bit output resolution is supported.");
+        return FALSE;
+    }
     uii->handle_omega = libusb_open_device_with_vid_pid(uii->usbctx, 0x1210, 0x0002);
     
     if (!uii->handle_omega)
@@ -483,7 +512,7 @@ static gboolean open_omega(struct cbox_usb_io_impl *uii, GError **error)
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Lexicon Omega not found or cannot be opened.");
         return FALSE;
     }
-    if (!claim_omega_interfaces(uii->handle_omega, error))
+    if (!claim_omega_interfaces(uii, error))
     {
         libusb_close(uii->handle_omega);
         return FALSE;
@@ -743,6 +772,7 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     // the packet length adjustment. It might work better if adjustment
     // was per-packet and not per-transfer.
     uii->iso_packets = cbox_config_get_int(cbox_io_section, "iso_packets", 1);
+    uii->output_resolution = cbox_config_get_int(cbox_io_section, "output_resolution", 16) / 8;
     
     if (!open_omega(uii, error))
     {
