@@ -58,6 +58,9 @@ struct cbox_usb_io_impl
     struct cbox_io_impl ioi;
 
     struct libusb_context *usbctx;
+    
+    GHashTable *device_table;
+    
     struct libusb_device_handle *handle_omega;
     int sample_rate, buffer_size;
     unsigned int buffers, iso_packets;
@@ -73,6 +76,7 @@ struct cbox_usb_io_impl
     int read_ptr;
     
     GList *midi_input_ports;
+    GList *rt_midi_input_ports;
     struct cbox_midi_buffer **midi_input_port_buffers;
     int *midi_input_port_pos;
     int midi_input_port_count;
@@ -82,11 +86,14 @@ struct cbox_usb_midi_input
 {
     struct cbox_usb_io_impl *uii;
     struct libusb_device_handle *handle;
+    int busdevadr;
     int endpoint;
     struct libusb_transfer *transfer;
     struct cbox_midi_buffer midi_buffer;
     uint8_t midi_recv_data[16];
 };
+
+static gboolean scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only);
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -164,7 +171,7 @@ static void play_callback(struct libusb_transfer *transfer)
                 memset(io->output_buffers[0], 0, io->buffer_size * sizeof(float));
                 memset(io->output_buffers[1], 0, io->buffer_size * sizeof(float));
                 io->cb->process(io->cb->user_data, io, io->buffer_size);
-                for (GList *p = uii->midi_input_ports; p; p = p->next)
+                for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
                 {
                     struct cbox_usb_midi_input *umi = p->data;
                     cbox_midi_buffer_clear(&umi->midi_buffer);
@@ -233,6 +240,19 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
         umi->uii->cancel_confirm = 1;
         return;
     }
+    if (transfer->status == LIBUSB_TRANSFER_TIMED_OUT)
+    {
+        libusb_submit_transfer(transfer);
+        return;
+    }
+    if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE)
+    {
+        g_warning("No device: unlinking");
+        umi->uii->rt_midi_input_ports = g_list_remove(umi->uii->rt_midi_input_ports, umi);
+        return;
+    }
+    if (transfer->status != 0)
+        g_warning("Transfer status %d", transfer->status);
     for (int i = 0; i + 3 < transfer->actual_length; i += 4)
     {
         uint8_t *data = &transfer->buffer[i];
@@ -256,11 +276,12 @@ static void *engine_thread(void *user_data)
     p.sched_priority = 10;
     sched_setscheduler(0, SCHED_FIFO, &p);
     
+    uii->rt_midi_input_ports = g_list_copy(uii->midi_input_ports);
     uii->midi_input_port_count = 0;
     uii->midi_input_port_buffers = calloc(uii->midi_input_port_count, sizeof(struct cbox_midi_buffer *));
     uii->midi_input_port_pos = calloc(uii->midi_input_port_count, sizeof(int));
 
-    for(GList *p = uii->midi_input_ports; p; p = p->next)
+    for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
         struct cbox_usb_midi_input *umi = p->data;
         cbox_midi_buffer_clear(&umi->midi_buffer);
@@ -269,7 +290,7 @@ static void *engine_thread(void *user_data)
         uii->midi_input_port_buffers[uii->midi_input_port_count] = &umi->midi_buffer;
         uii->midi_input_port_count++;
     }
-    for(GList *p = uii->midi_input_ports; p; p = p->next)
+    for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
         struct cbox_usb_midi_input *umi = p->data;
         libusb_submit_transfer(umi->transfer);
@@ -303,7 +324,7 @@ static void *engine_thread(void *user_data)
         libusb_free_transfer(uii->playback_transfers[i]);
     }
 
-    for(GList *p = uii->midi_input_ports; p; p = p->next)
+    for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
         struct cbox_usb_midi_input *umi = p->data;
 
@@ -316,6 +337,7 @@ static void *engine_thread(void *user_data)
     }
     free(uii->midi_input_port_buffers);
     free(uii->midi_input_port_pos);
+    g_list_free(uii->rt_midi_input_ports);
 }
 
 gboolean cbox_usbio_start(struct cbox_io_impl *impl, GError **error)
@@ -325,12 +347,15 @@ gboolean cbox_usbio_start(struct cbox_io_impl *impl, GError **error)
     // XXXKF: needs to queue the playback and capture transfers
 
     uii->stop_engine = FALSE;
+    uii->playback_counter = 0;
     
     if (pthread_create(&uii->thr_engine, NULL, engine_thread, uii))
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "cannot create engine thread: %s", strerror(errno));
         return FALSE;
     }
+    while(uii->playback_counter < uii->buffers)
+        usleep(10000);
 
     return TRUE;
 }
@@ -349,9 +374,16 @@ gboolean cbox_usbio_stop(struct cbox_io_impl *impl, GError **error)
 
 void cbox_usbio_poll_ports(struct cbox_io_impl *impl)
 {
-    struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
-    // XXXKF: this is for autodetection of newly connected devices,
-    // not that I plan any at the moment.
+    struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
+
+    // Dry run, just to detect if anything changed
+    if (scan_devices(uii, TRUE))
+    {
+        cbox_usbio_stop(&uii->ioi, NULL);
+        // Re-scan, this time actually create the MIDI inputs
+        scan_devices(uii, FALSE);
+        cbox_usbio_start(&uii->ioi, NULL);
+    }
 }
 
 gboolean cbox_usbio_cycle(struct cbox_io_impl *impl, GError **error)
@@ -466,21 +498,72 @@ static gboolean open_omega(struct cbox_usb_io_impl *uii, GError **error)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void get_midi_device_list(struct cbox_usb_io_impl *uii)
+static void forget_device(struct cbox_usb_io_impl *uii, int busdevadr)
+{
+    g_hash_table_remove(uii->device_table, GINT_TO_POINTER(busdevadr));
+    for (GList *p = uii->midi_input_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_input *umi = p->data;
+        if (umi->busdevadr == busdevadr)
+        {
+            uii->midi_input_ports = g_list_delete_link(uii->midi_input_ports, p);
+            return;
+        }
+    }
+}
+
+static gboolean scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only)
 {
     struct libusb_device **dev_list;
     size_t i, num_devices;
+    gboolean added = FALSE;
+    gboolean removed = FALSE;
     
     num_devices = libusb_get_device_list(uii->usbctx, &dev_list);
+
+    GList *prev_keys = g_hash_table_get_keys(uii->device_table);
+    uint16_t *busdevadrs = malloc(sizeof(uint16_t) * num_devices);
+    for (i = 0; i < num_devices; i++)
+    {
+        struct libusb_device *dev = dev_list[i];
+        int bus = libusb_get_bus_number(dev);
+        int devadr = libusb_get_device_address(dev);
+        busdevadrs[i] = (bus << 8) | devadr;
+    }
+    
+    for (GList *p = prev_keys; p; p = p->next)
+    {
+        gboolean found = FALSE;
+        int busdevadr = GPOINTER_TO_INT(p->data);
+        for (i = 0; !found && i < num_devices; i++)
+            found = busdevadrs[i] == busdevadr;
+        if (!found)
+        {
+            g_warning("Disconnected: %04x", busdevadr);
+            removed = TRUE;
+            if (!probe_only)
+                forget_device(uii, busdevadr);
+        }
+    }
+    g_list_free(prev_keys);
     
     for (i = 0; i < num_devices; i++)
     {
         struct libusb_device *dev = dev_list[i];
         struct libusb_device_descriptor dev_descr;
-        int bus = libusb_get_bus_number(dev);
-        int devadr = libusb_get_device_address(dev);
+        gboolean is_interesting = FALSE;
+        gboolean retry_later = FALSE;
+        uint16_t busdevadr = busdevadrs[i];
+        int bus = busdevadr >> 8;
+        int devadr = busdevadr & 255;
+        
         if (0 == libusb_get_device_descriptor(dev, &dev_descr))
         {
+            uint32_t vidpid = (((uint32_t)dev_descr.idVendor) << 16) | dev_descr.idProduct;
+            gpointer deventry = g_hash_table_lookup(uii->device_table, GINT_TO_POINTER(busdevadr));
+            if (deventry == GINT_TO_POINTER(vidpid))
+                continue;
+
             struct libusb_config_descriptor *cfg_descr;
             // printf("%03d:%03d Device %04X:%04X\n", bus, devadr, dev_descr.idVendor, dev_descr.idProduct);
             for (int ci = 0; ci < (int)dev_descr.bNumConfigurations; ci++)
@@ -504,10 +587,20 @@ static void get_midi_device_list(struct cbox_usb_io_impl *uii)
                                     {
                                         // printf("Output endpoint address = %02x\n", ep->bEndpointAddress);
                                         
+                                        is_interesting = TRUE;
                                         struct libusb_device_handle *handle = NULL;
                                         int err = libusb_open(dev, &handle);
                                         if (!err)
                                         {
+                                            if (probe_only)
+                                            {
+                                                added = TRUE;
+                                                libusb_close(handle);
+                                                goto next_device;
+                                            }
+                                            // add the device to the table only after it's been proven to be openable - let the udev scripts do the permission magic
+                                            g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
+
                                             int ifno = asdescr->bInterfaceNumber;
                                             if (libusb_kernel_driver_active(handle, ifno))
                                             {
@@ -536,6 +629,7 @@ static void get_midi_device_list(struct cbox_usb_io_impl *uii)
                                             struct cbox_usb_midi_input *mi = malloc(sizeof(struct cbox_usb_midi_input));
                                             mi->uii = uii;
                                             mi->handle = handle;
+                                            mi->busdevadr = busdevadr;
                                             mi->endpoint = ep->bEndpointAddress;
                                             cbox_midi_buffer_init(&mi->midi_buffer);
                                             uii->midi_input_ports = g_list_prepend(uii->midi_input_ports, mi);
@@ -548,7 +642,8 @@ static void get_midi_device_list(struct cbox_usb_io_impl *uii)
                                             if (len > 256)
                                                 len = 256;
                                             while(0 == libusb_bulk_transfer(handle, mi->endpoint, flushbuf, len, &transferred, 100) && transferred > 0)
-                                                usleep(1);
+                                                usleep(1000);
+                                            added = TRUE;
                                         }
                                         else
                                             g_warning("Cannot open device %03d:%03d for MIDI input: %s", bus, devadr, libusb_error_name(err));
@@ -566,16 +661,24 @@ static void get_midi_device_list(struct cbox_usb_io_impl *uii)
                     }
                 }
                 else
+                {
                     g_warning("%03d:%03d - cannot get configuration descriptor \n", bus, devadr);
+                    retry_later = TRUE;
+                }
             }
+        next_device:
+            // if there's no point trying to open the device anyway, flag it so
+            // that it doesn't get inspected again
+            if (!is_interesting && !retry_later)
+                g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
         }
         else
             g_warning("%03d:%03d - cannot get device descriptor\n", bus, devadr);
-    next_device:
-        ;
     }
     
+    free(busdevadrs);
     libusb_free_device_list(dev_list, 0);
+    return added || removed;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -585,6 +688,7 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     struct cbox_usb_io_impl *uii = malloc(sizeof(struct cbox_usb_io_impl));
     libusb_init(&uii->usbctx);
     libusb_set_debug(uii->usbctx, 3);
+    uii->device_table = g_hash_table_new(g_direct_hash, NULL);
 
     uii->sample_rate = cbox_config_get_int(cbox_io_section, "sample_rate", 44100);
     uii->buffers = cbox_config_get_int(cbox_io_section, "usb_buffers", 2);
@@ -622,7 +726,7 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     uii->ioi.destroyfunc = cbox_usbio_destroy;
     uii->midi_input_ports = NULL;
     
-    get_midi_device_list(uii);
+    scan_devices(uii, FALSE);
 
     return TRUE;
     
