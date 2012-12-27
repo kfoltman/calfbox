@@ -60,6 +60,7 @@ struct cbox_usb_io_impl
     struct cbox_io_impl ioi;
 
     struct libusb_context *usbctx;
+    struct libusb_context *usbctx_probe;
     
     GHashTable *device_table;
     
@@ -420,6 +421,7 @@ void cbox_usbio_destroy(struct cbox_io_impl *impl)
     g_list_free(uii->midi_input_ports);
     if (uii->handle_omega)
         libusb_close(uii->handle_omega);
+    libusb_exit(uii->usbctx_probe);
     libusb_exit(uii->usbctx);
 }
 
@@ -475,24 +477,18 @@ static gboolean open_omega(struct cbox_usb_io_impl *uii, GError **error)
     
     if (!uii->handle_omega)
     {
-        libusb_exit(uii->usbctx);
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Lexicon Omega not found or cannot be opened.");
-        free(uii);
         return FALSE;
     }
     if (!claim_omega_interfaces(uii->handle_omega, error))
     {
         libusb_close(uii->handle_omega);
-        libusb_exit(uii->usbctx);
-        free(uii);
         return FALSE;
     }
     if (!set_endpoint_sample_rate(uii->handle_omega, uii->sample_rate))
     {
         libusb_close(uii->handle_omega);
-        libusb_exit(uii->usbctx);
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set sample rate on Lexicon Omega.");
-        free(uii);
         return FALSE;
     }
     return TRUE;
@@ -521,7 +517,7 @@ static gboolean scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only)
     gboolean added = FALSE;
     gboolean removed = FALSE;
     
-    num_devices = libusb_get_device_list(uii->usbctx, &dev_list);
+    num_devices = libusb_get_device_list(probe_only ? uii->usbctx_probe : uii->usbctx, &dev_list);
 
     GList *prev_keys = g_hash_table_get_keys(uii->device_table);
     uint16_t *busdevadrs = malloc(sizeof(uint16_t) * num_devices);
@@ -688,8 +684,19 @@ static gboolean scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only)
 gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
 {
     struct cbox_usb_io_impl *uii = malloc(sizeof(struct cbox_usb_io_impl));
-    libusb_init(&uii->usbctx);
+    if (libusb_init(&uii->usbctx))
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot initialise libusb.");
+        return FALSE;
+    }
+    if (libusb_init(&uii->usbctx_probe))
+    {
+        libusb_exit(uii->usbctx);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot initialise libusb.");
+        return FALSE;
+    }
     libusb_set_debug(uii->usbctx, 3);
+    libusb_set_debug(uii->usbctx_probe, 3);
     uii->device_table = g_hash_table_new(g_direct_hash, NULL);
 
     uii->sample_rate = cbox_config_get_int(cbox_io_section, "sample_rate", 44100);
@@ -700,7 +707,12 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     uii->iso_packets = cbox_config_get_int(cbox_io_section, "iso_packets", 1);
     
     if (!open_omega(uii, error))
+    {
+        libusb_exit(uii->usbctx_probe);
+        libusb_exit(uii->usbctx);
+        free(uii);
         return FALSE;
+    }
 
     // fixed processing buffer size, as we have to deal with packetisation anyway
     io->buffer_size = 64;
