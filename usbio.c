@@ -278,7 +278,8 @@ static void *engine_thread(void *user_data)
     
     struct sched_param p;
     p.sched_priority = 10;
-    sched_setscheduler(0, SCHED_FIFO, &p);
+    if (0 != sched_setscheduler(0, SCHED_FIFO, &p))
+        g_warning("Cannot set realtime priority for the processing thread: %s.", strerror(errno));
     
     uii->rt_midi_input_ports = g_list_copy(uii->midi_input_ports);
     uii->midi_input_port_count = 0;
