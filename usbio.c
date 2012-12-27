@@ -514,6 +514,91 @@ static void forget_device(struct cbox_usb_io_impl *uii, int busdevadr)
     }
 }
 
+static int inspect_midi_interface(struct cbox_usb_io_impl *uii, struct libusb_device *dev, int busdevadr, uint32_t vidpid, const struct libusb_interface_descriptor *asdescr, gboolean other_config, gboolean probe_only)
+{
+    int bus = busdevadr >> 8;
+    int devadr = busdevadr & 255;
+    // printf("Has MIDI port\n");
+    for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
+    {
+        const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
+        if (ep->bEndpointAddress >= 0x80)
+        {
+            // printf("Output endpoint address = %02x\n", ep->bEndpointAddress);
+            if (other_config)
+                return -2;
+            
+            struct libusb_device_handle *handle = NULL;
+            int err = libusb_open(dev, &handle);
+            if (err)
+            {
+                // Will suffice for now, but in future it might be better to add safeguards against
+                // trying the same device over and over again
+                g_warning("Cannot open device %03d:%03d for MIDI input: %s", bus, devadr, libusb_error_name(err));
+                return FALSE;
+            }
+                
+            if (probe_only)
+            {
+                libusb_close(handle);
+                return TRUE;
+            }
+            // add the device to the table only after it's been proven to be openable - let the udev scripts do the permission magic
+            g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
+
+            int ifno = asdescr->bInterfaceNumber;
+            if (libusb_kernel_driver_active(handle, ifno))
+            {
+                if (libusb_detach_kernel_driver(handle, ifno))
+                {
+                    g_warning("Cannot detach kernel driver from device %d: %s. Please rmmod snd-usb-audio as root.", ifno, libusb_error_name(err));
+                    goto error;
+                }            
+            }
+            err = libusb_claim_interface(handle, ifno);
+            if (err)
+            {
+                g_warning("Cannot claim interface %d on device %03d:%03d for MIDI input: %s", ifno, bus, devadr, libusb_error_name(err));
+                goto error;
+            }
+            err = libusb_set_interface_alt_setting(handle, ifno, asdescr->bAlternateSetting);
+            if (err)
+            {
+                g_warning("Cannot set alt-setting %d for interface %d on device %03d:%03d for MIDI input: %s", (int)asdescr->bAlternateSetting, ifno, bus, devadr, libusb_error_name(err));
+                goto error;
+            }
+            
+            struct cbox_usb_midi_input *umi = malloc(sizeof(struct cbox_usb_midi_input));
+            umi->uii = uii;
+            umi->handle = handle;
+            umi->busdevadr = busdevadr;
+            umi->endpoint = ep->bEndpointAddress;
+            cbox_midi_buffer_init(&umi->midi_buffer);
+            uii->midi_input_ports = g_list_prepend(uii->midi_input_ports, umi);
+            int len = ep->wMaxPacketSize;
+            if (len > 256)
+                len = 256;
+            umi->max_packet_size = len;
+            
+            // Drain the output buffer of the device - otherwise playing a few notes and running the program will cause
+            // those notes to play.
+            char flushbuf[256];
+            int transferred = 0;
+            while(0 == libusb_bulk_transfer(handle, umi->endpoint, flushbuf, umi->max_packet_size, &transferred, 100) && transferred > 0)
+                usleep(1000);
+            
+            g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
+            return TRUE;
+        error:
+            // Will suffice for now, but in future it might be better to add safeguards against
+            // trying the same device over and over again
+            libusb_close(handle);
+            return FALSE;
+        }   
+    }
+    return -1;
+}
+
 static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_device *dev, uint16_t busdevadr, gboolean probe_only)
 {
     struct libusb_device_descriptor dev_descr;
@@ -533,8 +618,9 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
 
     struct libusb_config_descriptor *cfg_descr;
     int active_config = 0, alt_config = -1;
-    if (0 == libusb_get_active_config_descriptor(dev, &cfg_descr))
-        active_config = cfg_descr->bConfigurationValue;
+    if (0 != libusb_get_active_config_descriptor(dev, &cfg_descr))
+        return FALSE;
+    active_config = cfg_descr->bConfigurationValue;
         
     // printf("%03d:%03d Device %04X:%04X\n", bus, devadr, dev_descr.idVendor, dev_descr.idProduct);
     for (int ci = 0; ci < (int)dev_descr.bNumConfigurations; ci++)
@@ -555,92 +641,16 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
                     // printf("bInterfaceNumber=%d bAlternateSetting=%d bInterfaceClass=%d bInterfaceSubClass=%d\n", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, asdescr->bInterfaceClass, asdescr->bInterfaceSubClass);
                     if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 3)
                     {
-                        // printf("Has MIDI port\n");
-                        for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
+                        int res = inspect_midi_interface(uii, dev, busdevadr, vidpid, asdescr, cur_config != active_config, probe_only);
+                        if (res == -2)
                         {
-                            const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
-                            if (ep->bEndpointAddress >= 0x80)
-                            {
-                                // printf("Output endpoint address = %02x\n", ep->bEndpointAddress);
-                                if (cur_config != active_config)
-                                {
-                                    // if this is not a current config, take note of its number and
-                                    // inform the user if there are no MIDI ports in the current config
-                                    alt_config = cur_config;
-                                    goto end_config_scan;
-                                }
-                                
-                                struct libusb_device_handle *handle = NULL;
-                                int err = libusb_open(dev, &handle);
-                                if (err)
-                                {
-                                    // Will suffice for now, but in future it might be better to add safeguards against
-                                    // trying the same device over and over again
-                                    g_warning("Cannot open device %03d:%03d for MIDI input: %s", bus, devadr, libusb_error_name(err));
-                                    return FALSE;
-                                }
-                                    
-                                if (probe_only)
-                                {
-                                    libusb_close(handle);
-                                    return TRUE;
-                                }
-                                // add the device to the table only after it's been proven to be openable - let the udev scripts do the permission magic
-                                g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
-
-                                int ifno = asdescr->bInterfaceNumber;
-                                if (libusb_kernel_driver_active(handle, ifno))
-                                {
-                                    if (libusb_detach_kernel_driver(handle, ifno))
-                                    {
-                                        g_warning("Cannot detach kernel driver from Lexicon Omega interface %d: %s. Please rmmod snd-usb-audio as root.", ifno, libusb_error_name(err));
-                                        goto error;
-                                    }            
-                                }
-                                err = libusb_claim_interface(handle, ifno);
-                                if (err)
-                                {
-                                    g_warning("Cannot claim interface %d on device %03d:%03d for MIDI input: %s", ifno, bus, devadr, libusb_error_name(err));
-                                    goto error;
-                                }
-                                if (as != 0)
-                                {
-                                    err = libusb_set_interface_alt_setting(handle, ifno, asdescr->bAlternateSetting);
-                                    if (err)
-                                    {
-                                        g_warning("Cannot claim interface %d on device %03d:%03d for MIDI input: %s", ifno, bus, devadr, libusb_error_name(err));
-                                        goto error;
-                                    }
-                                }
-                                
-                                struct cbox_usb_midi_input *umi = malloc(sizeof(struct cbox_usb_midi_input));
-                                umi->uii = uii;
-                                umi->handle = handle;
-                                umi->busdevadr = busdevadr;
-                                umi->endpoint = ep->bEndpointAddress;
-                                cbox_midi_buffer_init(&umi->midi_buffer);
-                                uii->midi_input_ports = g_list_prepend(uii->midi_input_ports, umi);
-                                int len = ep->wMaxPacketSize;
-                                if (len > 256)
-                                    len = 256;
-                                umi->max_packet_size = len;
-                                
-                                // Drain the output buffer of the device - otherwise playing a few notes and running the program will cause
-                                // those notes to play.
-                                char flushbuf[256];
-                                int transferred = 0;
-                                while(0 == libusb_bulk_transfer(handle, umi->endpoint, flushbuf, umi->max_packet_size, &transferred, 100) && transferred > 0)
-                                    usleep(1000);
-                                
-                                g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
-                                return TRUE;
-                            error:
-                                // Will suffice for now, but in future it might be better to add safeguards against
-                                // trying the same device over and over again
-                                libusb_close(handle);
-                                return FALSE;
-                            }   
+                            // if this is not a current config, take note of its number and
+                            // inform the user if there are no MIDI ports in the current config
+                            alt_config = cur_config;
+                            goto end_config_scan;
                         }
+                        if (res != -1)
+                            return res;
                     }
                 }
             }
