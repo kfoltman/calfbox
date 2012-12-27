@@ -566,7 +566,7 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
                                 {
                                     // if this is not a current config, take note of its number and
                                     // inform the user if there are no MIDI ports in the current config
-                                    alt_config = ci;
+                                    alt_config = cur_config;
                                     goto end_config_scan;
                                 }
                                 
