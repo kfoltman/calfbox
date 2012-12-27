@@ -532,11 +532,20 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         return FALSE;
 
     struct libusb_config_descriptor *cfg_descr;
+    int active_config = 0, alt_config = -1;
+    if (0 == libusb_get_active_config_descriptor(dev, &cfg_descr))
+        active_config = cfg_descr->bConfigurationValue;
+        
     // printf("%03d:%03d Device %04X:%04X\n", bus, devadr, dev_descr.idVendor, dev_descr.idProduct);
     for (int ci = 0; ci < (int)dev_descr.bNumConfigurations; ci++)
     {
+        // if this is not the current config, and another config with MIDI input
+        // has already been found, do not look any further
         if (0 == libusb_get_config_descriptor(dev, ci, &cfg_descr))
         {
+            int cur_config = cfg_descr->bConfigurationValue;
+            if (alt_config != -1 && cur_config != active_config)
+                continue;
             for (int ii = 0; ii < cfg_descr->bNumInterfaces; ii++)
             {
                 const struct libusb_interface *idescr = &cfg_descr->interface[ii];
@@ -544,7 +553,7 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
                 {
                     const struct libusb_interface_descriptor *asdescr = &idescr->altsetting[as];
                     // printf("bInterfaceNumber=%d bAlternateSetting=%d bInterfaceClass=%d bInterfaceSubClass=%d\n", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, asdescr->bInterfaceClass, asdescr->bInterfaceSubClass);
-                    if (asdescr->bInterfaceClass == 1 && asdescr->bInterfaceSubClass == 3)
+                    if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 3)
                     {
                         // printf("Has MIDI port\n");
                         for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
@@ -553,6 +562,13 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
                             if (ep->bEndpointAddress >= 0x80)
                             {
                                 // printf("Output endpoint address = %02x\n", ep->bEndpointAddress);
+                                if (cur_config != active_config)
+                                {
+                                    // if this is not a current config, take note of its number and
+                                    // inform the user if there are no MIDI ports in the current config
+                                    alt_config = ci;
+                                    goto end_config_scan;
+                                }
                                 
                                 struct libusb_device_handle *handle = NULL;
                                 int err = libusb_open(dev, &handle);
@@ -628,12 +644,19 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
                     }
                 }
             }
+        end_config_scan:
+            ;
         }
         else
         {
             g_warning("%03d:%03d - cannot get configuration descriptor (will retry)", bus, devadr);
             return FALSE;
         }
+    }
+    if (alt_config != -1)
+    {
+        g_warning("%03d:%03d - MIDI port available on different config %d", bus, devadr, alt_config);
+        return FALSE;
     }
     // All configs/interfaces/alts scanned, nothing interesting found -> mark as seen
     g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
