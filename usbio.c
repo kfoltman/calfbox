@@ -16,14 +16,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// Note: this is a silly experimental driver for Lexicon Omega audio/MIDI
+// Note: this is a silly experimental driver for Lexicon Omega audio
 // interface. It's more a proof of concept than anything useful for now.
-// It only handles audio output - audio input and MIDI input will be
-// added at some point in future. MIDI output, too, perhaps.
-// Any error handling (including handling of disconnect and reconnect)
-// will also be added later.
+// It only handles audio output (Lexicon Omega only) and MIDI input (tested with
+// Lexicon Omega and two other USB MIDI devices). USB MIDI devices can be
+// connected and disconnected at runtime, except the actual device inodes
+// need to be user-writable. This can be done using udev scripts.
+//
 // Eventually, I might make it compatible with more of class-compliant audio
-// and MIDI interfaces, plus some non-compliant ones like Alesis Multimix 8.
+// interfaces, plus some non-compliant ones like Alesis Multimix 8 (audio),
+// Novation Nocturn and/or Akai MPD16 (MIDI) .
 
 #include "config.h"
 #include "config-api.h"
