@@ -66,15 +66,16 @@ struct cbox_usb_io_impl
     
     struct libusb_device_handle *handle_omega;
     int sample_rate, buffer_size, output_resolution;
+    int output_channels; // always 2 for now
     unsigned int buffers, iso_packets;
 
     pthread_t thr_engine;
-    volatile gboolean stop_engine;
+    volatile gboolean stop_engine, setup_error;
     
     int desync;
     uint64_t samples_played;
     int cancel_confirm;
-    int playback_counter;
+    int playback_counter, device_removed;
     struct libusb_transfer **playback_transfers;
     int read_ptr;
     
@@ -117,19 +118,95 @@ gboolean cbox_usbio_get_status(struct cbox_io_impl *impl, GError **error)
 
 static struct libusb_transfer *play_stuff(struct cbox_usb_io_impl *uii, int index);
 
+static void fill_playback_buffer(struct cbox_usb_io_impl *uii, struct libusb_transfer *transfer)
+{
+    static double phase = 0;
+    static int phase2 = 0;
+    struct cbox_io *io = uii->ioi.pio;
+    uint8_t *data8 = (uint8_t*)transfer->buffer;
+    int16_t *data = (int16_t*)transfer->buffer;
+    int resolution = uii->output_resolution;
+    int oc = uii->output_channels;
+    int rptr = uii->read_ptr;
+    int nframes = transfer->length / (resolution * oc);
+    int i, j, b;
+
+    for (i = 0; i < nframes; )
+    {
+        if (rptr == io->buffer_size)
+        {
+            for (b = 0; b < oc; b++)
+                memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
+            io->cb->process(io->cb->user_data, io, io->buffer_size);
+            for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
+            {
+                struct cbox_usb_midi_input *umi = p->data;
+                cbox_midi_buffer_clear(&umi->midi_buffer);
+            }
+            rptr = 0;
+        }
+        int left1 = nframes - i;
+        int left2 = io->buffer_size - rptr;
+        if (left1 > left2)
+            left1 = left2;
+
+        for (b = 0; b < oc; b++)
+        {
+            float *obuf = io->output_buffers[b] + rptr;
+            if (resolution == 2)
+            {
+                int16_t *tbuf = data + oc * i + b;
+                for (j = 0; j < left1; j++)
+                {
+                    float v = 32767 * obuf[j];
+                    if (v < -32768)
+                        v = -32768;
+                    if (v > +32767)
+                        v = +32767;
+                    *tbuf = (int16_t)v;
+                    tbuf += oc;
+                }
+            }
+            if (resolution == 3)
+            {
+                uint8_t *tbuf = data8 + (oc * i + b) * 3;
+                for (j = 0; j < left1; j++)
+                {
+                    float v = 0x7FFFFF * obuf[j];
+                    if (v < -0x800000)
+                        v = -0x800000;
+                    if (v > +0x7FFFFF)
+                        v = +0x7FFFFF;
+                    int vi = (int)v;
+                    tbuf[0] = vi & 255;
+                    tbuf[1] = (vi >> 8) & 255;
+                    tbuf[2] = (vi >> 16) & 255;
+                    tbuf += oc * 3;
+                }
+            }
+        }
+        i += left1;
+        rptr += left1;
+    }
+    uii->read_ptr = rptr;
+}
+
 static void play_callback(struct libusb_transfer *transfer)
 {
     struct cbox_usb_io_impl *uii = transfer->user_data;
-    
-    // Only supporting stereo for now - for multi-channel access
-    int oc = 2;
-    int resolution = uii->output_resolution;
-    int i, j, b;
     if (transfer->status == LIBUSB_TRANSFER_CANCELLED)
     {
         uii->cancel_confirm = 1;
         return;
     }
+    if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE)
+    {
+        uii->device_removed++;
+        return;
+    }
+    
+    int resolution = uii->output_resolution;
+    int oc = uii->output_channels;
     gboolean init_finished = uii->playback_counter == uii->buffers;
     if (uii->playback_counter < uii->buffers)
     {
@@ -141,7 +218,7 @@ static void play_callback(struct libusb_transfer *transfer)
     // printf("Play Callback! %d %p status %d\n", (int)transfer->length, transfer->buffer, (int)transfer->status);
 
     int tlen = 0;
-    for (i = 0; i < transfer->num_iso_packets; i++)
+    for (int i = 0; i < transfer->num_iso_packets; i++)
     {
         tlen += transfer->iso_packet_desc[i].actual_length;
         if (transfer->iso_packet_desc[i].status)
@@ -165,71 +242,7 @@ static void play_callback(struct libusb_transfer *transfer)
 
     if (init_finished)
     {
-        static double phase = 0;
-        static int phase2 = 0;
-        struct cbox_io *io = uii->ioi.pio;
-        uint8_t *data8 = (uint8_t*)transfer->buffer;
-        int16_t *data = (int16_t*)transfer->buffer;
-        int rptr = uii->read_ptr;
-        int nframes = transfer->length / (resolution * oc);
-        for (i = 0; i < nframes; )
-        {
-            if (rptr == io->buffer_size)
-            {
-                for (b = 0; b < oc; b++)
-                    memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
-                io->cb->process(io->cb->user_data, io, io->buffer_size);
-                for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
-                {
-                    struct cbox_usb_midi_input *umi = p->data;
-                    cbox_midi_buffer_clear(&umi->midi_buffer);
-                }
-                rptr = 0;
-            }
-            int left1 = nframes - i;
-            int left2 = io->buffer_size - rptr;
-            if (left1 > left2)
-                left1 = left2;
-
-            for (b = 0; b < oc; b++)
-            {
-                float *obuf = io->output_buffers[b] + rptr;
-                if (resolution == 2)
-                {
-                    int16_t *tbuf = data + oc * i + b;
-                    for (j = 0; j < left1; j++)
-                    {
-                        float v = 32767 * obuf[j];
-                        if (v < -32768)
-                            v = -32768;
-                        if (v > +32767)
-                            v = +32767;
-                        *tbuf = (int16_t)v;
-                        tbuf += oc;
-                    }
-                }
-                if (resolution == 3)
-                {
-                    uint8_t *tbuf = data8 + (oc * i + b) * 3;
-                    for (j = 0; j < left1; j++)
-                    {
-                        float v = 0x7FFFFF * obuf[j];
-                        if (v < -0x800000)
-                            v = -0x800000;
-                        if (v > +0x7FFFFF)
-                            v = +0x7FFFFF;
-                        int vi = (int)v;
-                        tbuf[0] = vi & 255;
-                        tbuf[1] = (vi >> 8) & 255;
-                        tbuf[2] = (vi >> 16) & 255;
-                        tbuf += oc * 3;
-                    }
-                }
-            }
-            i += left1;
-            rptr += left1;
-        }
-        uii->read_ptr = rptr;
+        fill_playback_buffer(uii, transfer);
     }
     // desync value is expressed in milli-frames, i.e. desync of 1000 means 1 frame of lag
     // It takes 1ms for each iso packet to be transmitted. Each transfer consists of
@@ -245,7 +258,7 @@ static void play_callback(struct libusb_transfer *transfer)
 struct libusb_transfer *play_stuff(struct cbox_usb_io_impl *uii, int index)
 {
     struct libusb_transfer *t;
-    int i;
+    int i, err;
     t = libusb_alloc_transfer(uii->iso_packets);
     int tsize = uii->sample_rate * 2 * uii->output_resolution / 1000;
     int bufsize = MAX_EP_PACKET_SIZE_FRAMES * 2 * uii->output_resolution * uii->iso_packets;
@@ -253,8 +266,12 @@ struct libusb_transfer *play_stuff(struct cbox_usb_io_impl *uii, int index)
     
     libusb_fill_iso_transfer(t, uii->handle_omega, OMEGA_EP_PLAYBACK, buf, tsize * uii->iso_packets, uii->iso_packets, play_callback, uii, 20000);
     libusb_set_iso_packet_lengths(t, tsize);
-    libusb_submit_transfer(t);
-    return t;
+    
+    err = libusb_submit_transfer(t);
+    if (!err)
+        return t;
+    libusb_free_transfer(t);
+    return NULL;
 }
 
 static void midi_transfer_cb(struct libusb_transfer *transfer)
@@ -320,7 +337,7 @@ static void *engine_thread(void *user_data)
     for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
         struct cbox_usb_midi_input *umi = p->data;
-        libusb_submit_transfer(umi->transfer);
+        int res = libusb_submit_transfer(umi->transfer);
     }
     
     uii->desync = 0;
@@ -330,26 +347,73 @@ static void *engine_thread(void *user_data)
     uii->playback_transfers = malloc(sizeof(struct libusb_transfer *) * uii->buffers);
     
     uii->playback_counter = 1;
+    uii->device_removed = 0;
     uii->playback_transfers[0] = play_stuff(uii, 0);
-    while(uii->playback_counter < uii->buffers)
-        libusb_handle_events(uii->usbctx);
+    uii->setup_error = uii->playback_transfers[0] == NULL;
     
-    while(!uii->stop_engine) {
-	struct timeval tv = {
-            .tv_sec = 0,
-            .tv_usec = 100
-        };
-	libusb_handle_events_timeout(uii->usbctx, &tv);
-    }
-
-    for (int i = 0; i < uii->buffers; i++)
+    if (!uii->setup_error)
     {
-        uii->cancel_confirm = FALSE;
-        libusb_cancel_transfer(uii->playback_transfers[i]);
-        while (!uii->cancel_confirm)
+        // XXXKF: what if first transfer comes through but the subsequent ones fail?
+        while(uii->playback_counter < uii->buffers)
             libusb_handle_events(uii->usbctx);
-        libusb_free_transfer(uii->playback_transfers[i]);
+        
+        while(!uii->stop_engine && !uii->device_removed) {
+            struct timeval tv = {
+                .tv_sec = 0,
+                .tv_usec = 1000
+            };
+            libusb_handle_events_timeout(uii->usbctx, &tv);
+        }
     }
+    if (uii->device_removed)
+    {
+        // Wait until all the transfers pending are finished
+        while(uii->device_removed < uii->buffers)
+            libusb_handle_events(uii->usbctx);
+    }
+    if (uii->device_removed || uii->setup_error)
+    {
+        // Run the DSP code and send output to bit bucket until engine is stopped.
+        // This ensures that the command queue will still be processed.
+        // Otherwise the GUI thread would hang waiting for the command from
+        // the queue to be completed.
+        g_warning("USB Audio output device has been disconnected - switching to null output.");
+        while(!uii->stop_engine)
+        {
+            struct cbox_io *io = uii->ioi.pio;
+            for (int b = 0; b < uii->output_channels; b++)
+                memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
+            io->cb->process(io->cb->user_data, io, io->buffer_size);
+            for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
+            {
+                struct cbox_usb_midi_input *umi = p->data;
+                cbox_midi_buffer_clear(&umi->midi_buffer);
+            }
+            
+            struct timeval tv = {
+                .tv_sec = 0,
+                .tv_usec = 1
+            };
+            libusb_handle_events_timeout(uii->usbctx, &tv);
+            usleep((int)(io->buffer_size * 1000000.0 / uii->sample_rate));
+        }
+            
+    }
+    else
+    {
+        // Cancel all transfers pending, and wait until they get cancelled
+        for (int i = 0; i < uii->buffers; i++)
+        {
+            uii->cancel_confirm = FALSE;
+            libusb_cancel_transfer(uii->playback_transfers[i]);
+            while (!uii->cancel_confirm)
+                libusb_handle_events(uii->usbctx);
+        }
+    }
+    // Free the transfers for the buffers allocated so far. In case of setup
+    // failure, some buffers transfers might not have been created yet.
+    for (int i = 0; i < uii->playback_counter; i++)
+        libusb_free_transfer(uii->playback_transfers[i]);
 
     for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
@@ -375,6 +439,7 @@ gboolean cbox_usbio_start(struct cbox_io_impl *impl, GError **error)
     // XXXKF: needs to queue the playback and capture transfers
 
     uii->stop_engine = FALSE;
+    uii->setup_error = FALSE;
     uii->playback_counter = 0;
     
     if (pthread_create(&uii->thr_engine, NULL, engine_thread, uii))
@@ -382,7 +447,7 @@ gboolean cbox_usbio_start(struct cbox_io_impl *impl, GError **error)
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "cannot create engine thread: %s", strerror(errno));
         return FALSE;
     }
-    while(uii->playback_counter < uii->buffers)
+    while(!uii->setup_error && uii->playback_counter < uii->buffers)
         usleep(10000);
 
     return TRUE;
@@ -773,6 +838,7 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     // was per-packet and not per-transfer.
     uii->iso_packets = cbox_config_get_int(cbox_io_section, "iso_packets", 1);
     uii->output_resolution = cbox_config_get_int(cbox_io_section, "output_resolution", 16) / 8;
+    uii->output_channels = 2;
     
     if (!open_omega(uii, error))
     {
