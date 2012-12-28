@@ -311,15 +311,8 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
     libusb_submit_transfer(transfer);
 }
 
-static void *engine_thread(void *user_data)
+static void start_midi_capture(struct cbox_usb_io_impl *uii)
 {
-    struct cbox_usb_io_impl *uii = user_data;
-    
-    struct sched_param p;
-    p.sched_priority = 10;
-    if (0 != sched_setscheduler(0, SCHED_FIFO, &p))
-        g_warning("Cannot set realtime priority for the processing thread: %s.", strerror(errno));
-    
     uii->rt_midi_input_ports = g_list_copy(uii->midi_input_ports);
     uii->midi_input_port_count = 0;
     uii->midi_input_port_buffers = calloc(uii->midi_input_port_count, sizeof(struct cbox_midi_buffer *));
@@ -339,7 +332,29 @@ static void *engine_thread(void *user_data)
         struct cbox_usb_midi_input *umi = p->data;
         int res = libusb_submit_transfer(umi->transfer);
     }
-    
+}
+
+static void stop_midi_capture(struct cbox_usb_io_impl *uii)
+{
+    for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_input *umi = p->data;
+
+        uii->cancel_confirm = FALSE;
+        libusb_cancel_transfer(umi->transfer);
+        while (!uii->cancel_confirm)
+            libusb_handle_events(uii->usbctx);
+        libusb_free_transfer(umi->transfer);
+        umi->transfer = NULL;
+        cbox_midi_buffer_clear(&umi->midi_buffer);
+    }
+    free(uii->midi_input_port_buffers);
+    free(uii->midi_input_port_pos);
+    g_list_free(uii->rt_midi_input_ports);
+}
+
+static void start_audio_playback(struct cbox_usb_io_impl *uii)
+{
     uii->desync = 0;
     uii->samples_played = 0;
     uii->read_ptr = uii->ioi.pio->buffer_size;
@@ -349,22 +364,18 @@ static void *engine_thread(void *user_data)
     uii->playback_counter = 1;
     uii->device_removed = 0;
     uii->playback_transfers[0] = play_stuff(uii, 0);
-    uii->setup_error = uii->playback_transfers[0] == NULL;
-    
+    uii->setup_error = uii->playback_transfers[0] == NULL;    
+
     if (!uii->setup_error)
     {
         // XXXKF: what if first transfer comes through but the subsequent ones fail?
         while(uii->playback_counter < uii->buffers)
             libusb_handle_events(uii->usbctx);
-        
-        while(!uii->stop_engine && !uii->device_removed) {
-            struct timeval tv = {
-                .tv_sec = 0,
-                .tv_usec = 1000
-            };
-            libusb_handle_events_timeout(uii->usbctx, &tv);
-        }
     }
+}
+
+static void stop_audio_playback(struct cbox_usb_io_impl *uii)
+{
     if (uii->device_removed)
     {
         // Wait until all the transfers pending are finished
@@ -378,26 +389,7 @@ static void *engine_thread(void *user_data)
         // Otherwise the GUI thread would hang waiting for the command from
         // the queue to be completed.
         g_warning("USB Audio output device has been disconnected - switching to null output.");
-        while(!uii->stop_engine)
-        {
-            struct cbox_io *io = uii->ioi.pio;
-            for (int b = 0; b < uii->output_channels; b++)
-                memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
-            io->cb->process(io->cb->user_data, io, io->buffer_size);
-            for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
-            {
-                struct cbox_usb_midi_input *umi = p->data;
-                cbox_midi_buffer_clear(&umi->midi_buffer);
-            }
-            
-            struct timeval tv = {
-                .tv_sec = 0,
-                .tv_usec = 1
-            };
-            libusb_handle_events_timeout(uii->usbctx, &tv);
-            usleep((int)(io->buffer_size * 1000000.0 / uii->sample_rate));
-        }
-            
+        run_idle_loop(uii);            
     }
     else
     {
@@ -414,22 +406,63 @@ static void *engine_thread(void *user_data)
     // failure, some buffers transfers might not have been created yet.
     for (int i = 0; i < uii->playback_counter; i++)
         libusb_free_transfer(uii->playback_transfers[i]);
+}
 
-    for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
-    {
-        struct cbox_usb_midi_input *umi = p->data;
-
-        uii->cancel_confirm = FALSE;
-        libusb_cancel_transfer(umi->transfer);
-        while (!uii->cancel_confirm)
-            libusb_handle_events(uii->usbctx);
-        libusb_free_transfer(umi->transfer);
-        umi->transfer = NULL;
-        cbox_midi_buffer_clear(&umi->midi_buffer);
+static void run_audio_loop(struct cbox_usb_io_impl *uii)
+{
+    while(!uii->stop_engine && !uii->device_removed) {
+        struct timeval tv = {
+            .tv_sec = 0,
+            .tv_usec = 1000
+        };
+        libusb_handle_events_timeout(uii->usbctx, &tv);
     }
-    free(uii->midi_input_port_buffers);
-    free(uii->midi_input_port_pos);
-    g_list_free(uii->rt_midi_input_ports);
+}
+
+static void run_idle_loop(struct cbox_usb_io_impl *uii)
+{
+    while(!uii->stop_engine)
+    {
+        struct cbox_io *io = uii->ioi.pio;
+        for (int b = 0; b < uii->output_channels; b++)
+            memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
+        io->cb->process(io->cb->user_data, io, io->buffer_size);
+        for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
+        {
+            struct cbox_usb_midi_input *umi = p->data;
+            cbox_midi_buffer_clear(&umi->midi_buffer);
+        }
+        
+        struct timeval tv = {
+            .tv_sec = 0,
+            .tv_usec = 1
+        };
+        libusb_handle_events_timeout(uii->usbctx, &tv);
+        usleep((int)(io->buffer_size * 1000000.0 / uii->sample_rate));
+    }
+}
+
+static void *engine_thread(void *user_data)
+{
+    struct cbox_usb_io_impl *uii = user_data;
+    
+    start_midi_capture(uii);
+
+    struct sched_param p;
+    p.sched_priority = 10;
+    if (0 != sched_setscheduler(0, SCHED_FIFO, &p))
+        g_warning("Cannot set realtime priority for the processing thread: %s.", strerror(errno));
+    
+    start_audio_playback(uii);
+    
+    if (!uii->setup_error)
+    {
+        run_audio_loop(uii);        
+    }
+
+    stop_audio_playback(uii);
+    
+    stop_midi_capture(uii);
 }
 
 gboolean cbox_usbio_start(struct cbox_io_impl *impl, GError **error)
