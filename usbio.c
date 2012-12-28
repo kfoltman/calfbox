@@ -99,6 +99,7 @@ struct cbox_usb_midi_input
 };
 
 static gboolean scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only);
+static void run_idle_loop(struct cbox_usb_io_impl *uii);
 
 ///////////////////////////////////////////////////////////////////////////////
 
