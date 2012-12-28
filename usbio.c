@@ -253,7 +253,9 @@ static void play_callback(struct libusb_transfer *transfer)
     // transmitted.
     uii->desync -= transfer->num_iso_packets * nsamps * 1000;
 
-    libusb_submit_transfer(transfer);
+    int err = libusb_submit_transfer(transfer);
+    if (err)
+        g_warning("Cannot submit isochronous transfer, error = %s", libusb_error_name(err));
 }
 
 struct libusb_transfer *play_stuff(struct cbox_usb_io_impl *uii, int index)
@@ -369,8 +371,7 @@ static void start_audio_playback(struct cbox_usb_io_impl *uii)
 
     if (!uii->setup_error)
     {
-        // XXXKF: what if first transfer comes through but the subsequent ones fail?
-        while(uii->playback_counter < uii->buffers)
+        while(uii->playback_counter < uii->buffers && !uii->device_removed)
             libusb_handle_events(uii->usbctx);
     }
 }
@@ -380,7 +381,7 @@ static void stop_audio_playback(struct cbox_usb_io_impl *uii)
     if (uii->device_removed)
     {
         // Wait until all the transfers pending are finished
-        while(uii->device_removed < uii->buffers)
+        while(uii->device_removed < uii->playback_counter)
             libusb_handle_events(uii->usbctx);
     }
     if (uii->device_removed || uii->setup_error)
@@ -397,10 +398,13 @@ static void stop_audio_playback(struct cbox_usb_io_impl *uii)
         // Cancel all transfers pending, and wait until they get cancelled
         for (int i = 0; i < uii->buffers; i++)
         {
-            uii->cancel_confirm = FALSE;
-            libusb_cancel_transfer(uii->playback_transfers[i]);
-            while (!uii->cancel_confirm)
-                libusb_handle_events(uii->usbctx);
+            if (uii->playback_transfers[i]->status != LIBUSB_TRANSFER_NO_DEVICE)
+            {
+                uii->cancel_confirm = FALSE;
+                libusb_cancel_transfer(uii->playback_transfers[i]);
+                while (!uii->cancel_confirm && uii->playback_transfers[i]->status != LIBUSB_TRANSFER_NO_DEVICE)
+                    libusb_handle_events(uii->usbctx);
+            }
         }
     }
     // Free the transfers for the buffers allocated so far. In case of setup
