@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syscall.h>
 #include <unistd.h>
 
 // wMaxPacketSize from the Omega audio endpoints, divided by bytes per frame
@@ -454,8 +455,10 @@ static void *engine_thread(void *user_data)
     start_midi_capture(uii);
 
     struct sched_param p;
+    memset(&p, 0, sizeof(p));
     p.sched_priority = 10;
-    if (0 != sched_setscheduler(0, SCHED_FIFO, &p))
+    pid_t tid = syscall(SYS_gettid);
+    if (0 != sched_setscheduler(tid, SCHED_FIFO, &p))
         g_warning("Cannot set realtime priority for the processing thread: %s.", strerror(errno));
     
     start_audio_playback(uii);
