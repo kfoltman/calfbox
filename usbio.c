@@ -717,7 +717,7 @@ static int inspect_midi_interface(struct cbox_usb_io_impl *uii, struct libusb_de
             // those notes to play.
             char flushbuf[256];
             int transferred = 0;
-            while(0 == libusb_bulk_transfer(handle, umi->endpoint, flushbuf, umi->max_packet_size, &transferred, 100) && transferred > 0)
+            while(0 == libusb_bulk_transfer(handle, umi->endpoint, flushbuf, umi->max_packet_size, &transferred, 10) && transferred > 0)
                 usleep(1000);
             
             g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
