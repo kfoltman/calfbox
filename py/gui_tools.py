@@ -314,10 +314,10 @@ class SaveConfigObjectDialog(Gtk.Dialog):
         e.set_activates_default(True)
         e.connect('changed', self.on_entry_changed)
         row = Gtk.HBox()
-        row.pack_start(l, False, False)
-        row.pack_start(e, True, True)
+        row.pack_start(l, False, False, 5)
+        row.pack_start(e, True, True, 5)
         row.show_all()
-        self.vbox.pack_start(row)
+        self.vbox.pack_start(row, True, True, 0)
         e.grab_focus()
         self.on_entry_changed(e)
     def get_name(self):
