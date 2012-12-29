@@ -186,7 +186,7 @@ class EQCommon(object):
     ]
     def get_save_params(self):
         values = cbox.GetThings(self.path + "/status", ["%active", "%center", "%q", "%gain"], [])
-        result = {}
+        result = {'engine':self.engine_name}
         for row in range(self.bands):
             row2 = 1 + row
             result['band%s_active' % row2] = values.active[row]
