@@ -87,6 +87,33 @@ struct cbox_usb_io_impl
     int midi_input_port_count;
 };
 
+enum cbox_usb_device_status
+{
+    CBOX_DEVICE_STATUS_PROBING,
+    CBOX_DEVICE_STATUS_UNSUPPORTED,
+    CBOX_DEVICE_STATUS_OPENED,
+};
+
+struct cbox_usb_device_info
+{
+    struct libusb_device *dev;
+    struct libusb_device_handle *handle;
+    enum cbox_usb_device_status status;
+    uint8_t bus;
+    uint8_t devadr;
+    uint16_t busdevadr;
+    struct {
+        uint16_t vid;
+        uint16_t pid;
+    };
+    int active_config;
+    gboolean is_midi, is_audio;
+    uint32_t configs_with_midi;
+    uint32_t configs_with_audio;
+    time_t last_probe_time;
+    int failures;
+};
+
 struct cbox_usb_midi_input
 {
     struct cbox_usb_io_impl *uii;
@@ -100,6 +127,7 @@ struct cbox_usb_midi_input
 };
 
 static gboolean scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only);
+static void forget_device(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo);
 static void run_idle_loop(struct cbox_usb_io_impl *uii);
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -294,12 +322,12 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
     }
     if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE)
     {
-        g_warning("No device %03d:%03d, unlinking", umi->busdevadr >> 8, umi->busdevadr & 255);
+        g_debug("No device %03d:%03d, unlinking", umi->busdevadr >> 8, umi->busdevadr & 255);
         umi->uii->rt_midi_input_ports = g_list_remove(umi->uii->rt_midi_input_ports, umi);
         return;
     }
     if (transfer->status != 0)
-        g_warning("Transfer status %d", transfer->status);
+        g_warning("USB error on device %03d:%03d: transfer status %d", umi->busdevadr >> 8, umi->busdevadr & 255, transfer->status);
     for (int i = 0; i + 3 < transfer->actual_length; i += 4)
     {
         uint8_t *data = &transfer->buffer[i];
@@ -391,7 +419,7 @@ static void stop_audio_playback(struct cbox_usb_io_impl *uii)
         // This ensures that the command queue will still be processed.
         // Otherwise the GUI thread would hang waiting for the command from
         // the queue to be completed.
-        g_warning("USB Audio output device has been disconnected - switching to null output.");
+        g_message("USB Audio output device has been disconnected - switching to null output.");
         run_idle_loop(uii);            
     }
     else
@@ -513,6 +541,7 @@ void cbox_usbio_poll_ports(struct cbox_io_impl *impl)
     // Dry run, just to detect if anything changed
     if (scan_devices(uii, TRUE))
     {
+        g_debug("Restarting I/O due to device being connected or disconnected");
         cbox_usbio_stop(&uii->ioi, NULL);
         // Re-scan, this time actually create the MIDI inputs
         scan_devices(uii, FALSE);
@@ -543,15 +572,17 @@ int cbox_usbio_get_midi_data(struct cbox_io_impl *impl, struct cbox_midi_buffer 
 void cbox_usbio_destroy(struct cbox_io_impl *impl)
 {
     struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
-    for (GList *p = uii->midi_input_ports; p; p = p->next)
+    
+    GList *prev_keys = g_hash_table_get_values(uii->device_table);
+    for (GList *p = prev_keys; p; p = p->next)
     {
-        struct cbox_usb_midi_input *umi = p->data;
-        libusb_close(umi->handle);
-        free(p->data);
+        struct cbox_usb_device_info *udi = p->data;
+        if (udi->status == CBOX_DEVICE_STATUS_OPENED)
+            forget_device(uii, udi);
     }
-    g_list_free(uii->midi_input_ports);
-    if (uii->handle_omega)
-        libusb_close(uii->handle_omega);
+    g_list_free(prev_keys);
+    g_hash_table_destroy(uii->device_table);
+    
     libusb_exit(uii->usbctx_probe);
     libusb_exit(uii->usbctx);
 }
@@ -571,168 +602,131 @@ static gboolean set_endpoint_sample_rate(struct libusb_device_handle *h, int sam
     return TRUE;
 }
 
-static gboolean claim_omega_interfaces(struct cbox_usb_io_impl *uii, GError **error)
+static gboolean configure_usb_interface(struct libusb_device_handle *handle, int bus, int devadr, int ifno, int altset, GError **error)
 {
-    struct libusb_device_handle *handle = uii->handle_omega;
+    int err = 0;
+    if (libusb_kernel_driver_active(handle, ifno))
+    {
+        err = libusb_detach_kernel_driver(handle, ifno);
+        if (err)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot detach kernel driver from device %d: %s. Please rmmod snd-usb-audio as root.", ifno, libusb_error_name(err));
+            return FALSE;
+        }            
+    }
+    err = libusb_claim_interface(handle, ifno);
+    if (err)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot claim interface %d on device %03d:%03d for MIDI input: %s", ifno, bus, devadr, libusb_error_name(err));
+        return FALSE;
+    }
+    err = libusb_set_interface_alt_setting(handle, ifno, altset);
+    if (err)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set alt-setting %d for interface %d on device %03d:%03d for MIDI input: %s", altset, ifno, bus, devadr, libusb_error_name(err));
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static gboolean claim_omega_interfaces(struct cbox_usb_io_impl *uii, struct libusb_device_handle *handle, int bus, int devadr, GError **error)
+{
     static int interfaces[] = { 1, 2 };
     int altsets[] = { uii->output_resolution == 3 ? 2 : 1, 1 };
     for (int i = 0; i < sizeof(interfaces) / sizeof(int); i++)
     {
         int ifno = interfaces[i];
-        int err = libusb_kernel_driver_active(handle, ifno);
-        if (err)
-        {
-            if (libusb_detach_kernel_driver(handle, ifno))
-            {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot detach kernel driver from Lexicon Omega interface %d: %s. Please rmmod snd-usb-audio as root.", ifno, libusb_error_name(err));
-                return FALSE;
-            }            
-        }
-        err = libusb_claim_interface(handle, ifno);
-        if (err)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot claim interface %d on Lexicon Omega: %s", ifno, libusb_error_name(err));
+        if (!configure_usb_interface(handle, bus, devadr, ifno, altsets[i], error))
             return FALSE;
-        }
-        err = libusb_set_interface_alt_setting(handle, ifno, altsets[i]);
-        if (err)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set alternate setting %d on interface %d on Lexicon Omega: %s", altsets[i], ifno, libusb_error_name(err));
-            return FALSE;
-        }
     }
     return TRUE;
 }
 
-static gboolean open_omega(struct cbox_usb_io_impl *uii, GError **error)
+static gboolean open_omega(struct cbox_usb_io_impl *uii, int bus, int devadr, struct libusb_device_handle *handle, GError **error)
 {
     if (uii->output_resolution != 2 && uii->output_resolution != 3)
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Only 16-bit or 24-bit output resolution is supported.");
         return FALSE;
     }
-    uii->handle_omega = libusb_open_device_with_vid_pid(uii->usbctx, 0x1210, 0x0002);
-    
-    if (!uii->handle_omega)
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Lexicon Omega not found or cannot be opened.");
+    if (!claim_omega_interfaces(uii, handle, bus, devadr, error))
         return FALSE;
-    }
-    if (!claim_omega_interfaces(uii, error))
+    if (!set_endpoint_sample_rate(handle, uii->sample_rate))
     {
-        libusb_close(uii->handle_omega);
-        return FALSE;
-    }
-    if (!set_endpoint_sample_rate(uii->handle_omega, uii->sample_rate))
-    {
-        libusb_close(uii->handle_omega);
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set sample rate on Lexicon Omega.");
         return FALSE;
     }
+    uii->handle_omega = handle;
     return TRUE;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void forget_device(struct cbox_usb_io_impl *uii, int busdevadr)
+static void forget_device(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo)
 {
-    g_hash_table_remove(uii->device_table, GINT_TO_POINTER(busdevadr));
-    for (GList *p = uii->midi_input_ports; p; p = p->next)
+    g_hash_table_remove(uii->device_table, GINT_TO_POINTER(devinfo->busdevadr));
+    for (GList *p = uii->midi_input_ports, *pNext = NULL; p; p = pNext)
     {
+        pNext = p->next;
         struct cbox_usb_midi_input *umi = p->data;
-        if (umi->busdevadr == busdevadr)
+        if (umi->busdevadr == devinfo->busdevadr)
         {
             uii->midi_input_ports = g_list_delete_link(uii->midi_input_ports, p);
-            libusb_close(umi->handle);
             free(umi);
-            return;
         }
     }
+    libusb_close(devinfo->handle);
+    free(devinfo);
 }
 
-static int inspect_midi_interface(struct cbox_usb_io_impl *uii, struct libusb_device *dev, int busdevadr, uint32_t vidpid, const struct libusb_interface_descriptor *asdescr, gboolean other_config, gboolean probe_only)
+static const struct libusb_endpoint_descriptor *get_midi_input_endpoint(const struct libusb_interface_descriptor *asdescr)
 {
-    int bus = busdevadr >> 8;
-    int devadr = busdevadr & 255;
-    // printf("Has MIDI port\n");
     for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
     {
         const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
         if (ep->bEndpointAddress >= 0x80)
-        {
-            // printf("Output endpoint address = %02x\n", ep->bEndpointAddress);
-            if (other_config)
-                return -2;
-            
-            struct libusb_device_handle *handle = NULL;
-            int err = libusb_open(dev, &handle);
-            if (err)
-            {
-                // Will suffice for now, but in future it might be better to add safeguards against
-                // trying the same device over and over again
-                g_warning("Cannot open device %03d:%03d for MIDI input: %s", bus, devadr, libusb_error_name(err));
-                return FALSE;
-            }
-                
-            if (probe_only)
-            {
-                libusb_close(handle);
-                return TRUE;
-            }
-            // add the device to the table only after it's been proven to be openable - let the udev scripts do the permission magic
-            g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
-
-            int ifno = asdescr->bInterfaceNumber;
-            if (libusb_kernel_driver_active(handle, ifno))
-            {
-                if (libusb_detach_kernel_driver(handle, ifno))
-                {
-                    g_warning("Cannot detach kernel driver from device %d: %s. Please rmmod snd-usb-audio as root.", ifno, libusb_error_name(err));
-                    goto error;
-                }            
-            }
-            err = libusb_claim_interface(handle, ifno);
-            if (err)
-            {
-                g_warning("Cannot claim interface %d on device %03d:%03d for MIDI input: %s", ifno, bus, devadr, libusb_error_name(err));
-                goto error;
-            }
-            err = libusb_set_interface_alt_setting(handle, ifno, asdescr->bAlternateSetting);
-            if (err)
-            {
-                g_warning("Cannot set alt-setting %d for interface %d on device %03d:%03d for MIDI input: %s", (int)asdescr->bAlternateSetting, ifno, bus, devadr, libusb_error_name(err));
-                goto error;
-            }
-            
-            struct cbox_usb_midi_input *umi = malloc(sizeof(struct cbox_usb_midi_input));
-            umi->uii = uii;
-            umi->handle = handle;
-            umi->busdevadr = busdevadr;
-            umi->endpoint = ep->bEndpointAddress;
-            cbox_midi_buffer_init(&umi->midi_buffer);
-            uii->midi_input_ports = g_list_prepend(uii->midi_input_ports, umi);
-            int len = ep->wMaxPacketSize;
-            if (len > 256)
-                len = 256;
-            umi->max_packet_size = len;
-            
-            // Drain the output buffer of the device - otherwise playing a few notes and running the program will cause
-            // those notes to play.
-            char flushbuf[256];
-            int transferred = 0;
-            while(0 == libusb_bulk_transfer(handle, umi->endpoint, flushbuf, umi->max_packet_size, &transferred, 10) && transferred > 0)
-                usleep(1000);
-            
-            g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
-            return TRUE;
-        error:
-            // Will suffice for now, but in future it might be better to add safeguards against
-            // trying the same device over and over again
-            libusb_close(handle);
-            return FALSE;
-        }   
+            return ep;
     }
-    return -1;
+    return NULL;
+}
+
+static struct cbox_usb_midi_input *open_midi_interface(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo, struct libusb_device_handle *handle, int ifno, int altset, const struct libusb_endpoint_descriptor *ep)
+{
+    int bus = devinfo->bus;
+    int devadr = devinfo->devadr;
+    GError *error = NULL;
+    // printf("Has MIDI port\n");
+    // printf("Output endpoint address = %02x\n", ep->bEndpointAddress);
+    if (!configure_usb_interface(handle, bus, devadr, ifno, altset, &error))
+    {
+        g_warning("%s", error->message);
+        g_error_free(error);
+        return NULL;
+    }
+    
+    struct cbox_usb_midi_input *umi = malloc(sizeof(struct cbox_usb_midi_input));
+    umi->uii = uii;
+    umi->handle = handle;
+    umi->busdevadr = devinfo->busdevadr;
+    umi->endpoint = ep->bEndpointAddress;
+    cbox_midi_buffer_init(&umi->midi_buffer);
+    uii->midi_input_ports = g_list_prepend(uii->midi_input_ports, umi);
+    int len = ep->wMaxPacketSize;
+    if (len > 256)
+        len = 256;
+    umi->max_packet_size = len;
+    
+    // Drain the output buffer of the device - otherwise playing a few notes and running the program will cause
+    // those notes to play.
+    char flushbuf[256];
+    int transferred = 0;
+    while(0 == libusb_bulk_transfer(handle, umi->endpoint, flushbuf, umi->max_packet_size, &transferred, 10) && transferred > 0)
+        usleep(1000);
+    devinfo->status = CBOX_DEVICE_STATUS_OPENED;
+    
+    return umi;
+error:
+    return NULL;
 }
 
 static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_device *dev, uint16_t busdevadr, gboolean probe_only)
@@ -743,70 +737,169 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
     
     if (0 != libusb_get_device_descriptor(dev, &dev_descr))
     {
-        g_warning("%03d:%03d - cannot get device descriptor (will retry)", bus, devadr);
+        g_warning("USB device %03d:%03d - cannot get device descriptor (will retry)", bus, devadr);
         return FALSE;
     }
     
-    uint32_t vidpid = (((uint32_t)dev_descr.idVendor) << 16) | dev_descr.idProduct;
-    gpointer deventry = g_hash_table_lookup(uii->device_table, GINT_TO_POINTER(busdevadr));
-    if (deventry == GINT_TO_POINTER(vidpid))
-        return FALSE;
+    struct libusb_config_descriptor *cfg_descr = NULL;
+    struct cbox_usb_device_info *udi = g_hash_table_lookup(uii->device_table, GINT_TO_POINTER(busdevadr));
+    if (!udi)
+    {
+        if (0 != libusb_get_active_config_descriptor(dev, &cfg_descr))
+            return FALSE;
+        udi = malloc(sizeof(struct cbox_usb_device_info));
+        udi->dev = dev;
+        udi->handle = NULL;
+        udi->status = CBOX_DEVICE_STATUS_PROBING;
+        udi->active_config = cfg_descr->bConfigurationValue;
+        udi->bus = bus;
+        udi->devadr = devadr;
+        udi->busdevadr = busdevadr;
+        udi->vid = dev_descr.idVendor;
+        udi->pid = dev_descr.idProduct;
+        udi->configs_with_midi = 0;
+        udi->configs_with_audio = 0;
+        udi->is_midi = FALSE;
+        udi->is_audio = FALSE;
+        udi->last_probe_time = time(NULL);
+        udi->failures = 0;
+        g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), udi);
+    }
+    else
+    if (udi->vid == dev_descr.idVendor && udi->pid == dev_descr.idProduct)
+    {
+        // device already open or determined to be
+        if (udi->status == CBOX_DEVICE_STATUS_OPENED ||
+            udi->status == CBOX_DEVICE_STATUS_UNSUPPORTED)
+            return FALSE;
+        // give up after 10 attempts to query or open the device
+        if (udi->failures > 10)
+            return FALSE;
+        // only do ~1 attempt per second
+        if (probe_only && time(NULL) == udi->last_probe_time)
+            return FALSE;
+        udi->last_probe_time = time(NULL);
+    }
 
-    struct libusb_config_descriptor *cfg_descr;
+    int intf_midi_in = -1, as_midi_in = -1;
+    const struct libusb_endpoint_descriptor *ep_midi_in = NULL;
     int active_config = 0, alt_config = -1;
-    if (0 != libusb_get_active_config_descriptor(dev, &cfg_descr))
-        return FALSE;
-    active_config = cfg_descr->bConfigurationValue;
-        
+    gboolean is_midi = FALSE, is_audio = FALSE;
+
     // printf("%03d:%03d Device %04X:%04X\n", bus, devadr, dev_descr.idVendor, dev_descr.idProduct);
     for (int ci = 0; ci < (int)dev_descr.bNumConfigurations; ci++)
     {
         // if this is not the current config, and another config with MIDI input
         // has already been found, do not look any further
-        if (0 == libusb_get_config_descriptor(dev, ci, &cfg_descr))
+        if (0 != libusb_get_config_descriptor(dev, ci, &cfg_descr))
         {
-            int cur_config = cfg_descr->bConfigurationValue;
-            if (alt_config != -1 && cur_config != active_config)
-                continue;
-            for (int ii = 0; ii < cfg_descr->bNumInterfaces; ii++)
+            udi->failures++;
+            g_warning("%03d:%03d - cannot get configuration descriptor (try %d)", bus, devadr, udi->failures);
+            return FALSE;
+        }
+            
+        int cur_config = cfg_descr->bConfigurationValue;
+        uint32_t config_mask = 0;
+        // XXXKF not sure about legal range for bConfigurationValue
+        if(cfg_descr->bConfigurationValue >= 0 && cfg_descr->bConfigurationValue < 32)
+            config_mask = 1 << cfg_descr->bConfigurationValue;
+        else
+            g_warning("Unexpected configuration value %d", cfg_descr->bConfigurationValue);
+        
+        for (int ii = 0; ii < cfg_descr->bNumInterfaces; ii++)
+        {
+            const struct libusb_interface *idescr = &cfg_descr->interface[ii];
+            for (int as = 0; as < idescr->num_altsetting; as++)
             {
-                const struct libusb_interface *idescr = &cfg_descr->interface[ii];
-                for (int as = 0; as < idescr->num_altsetting; as++)
+                const struct libusb_interface_descriptor *asdescr = &idescr->altsetting[as];
+                if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 3)
                 {
-                    const struct libusb_interface_descriptor *asdescr = &idescr->altsetting[as];
-                    // printf("bInterfaceNumber=%d bAlternateSetting=%d bInterfaceClass=%d bInterfaceSubClass=%d\n", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, asdescr->bInterfaceClass, asdescr->bInterfaceSubClass);
-                    if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 3)
+                    const struct libusb_endpoint_descriptor *ep = get_midi_input_endpoint(asdescr);
+                    if (!ep)
+                        continue;
+                    
+                    if (cur_config != udi->active_config)
                     {
-                        int res = inspect_midi_interface(uii, dev, busdevadr, vidpid, asdescr, cur_config != active_config, probe_only);
-                        if (res == -2)
-                        {
-                            // if this is not a current config, take note of its number and
-                            // inform the user if there are no MIDI ports in the current config
-                            alt_config = cur_config;
-                            goto end_config_scan;
-                        }
-                        if (res != -1)
-                            return res;
+                        udi->configs_with_midi |= config_mask;
+                        continue;
+                    }
+                    
+                    if (!ep_midi_in)
+                    {
+                        intf_midi_in = asdescr->bInterfaceNumber;
+                        as_midi_in = asdescr->bAlternateSetting;
+                        ep_midi_in = ep;
                     }
                 }
             }
-        end_config_scan:
-            ;
+        }
+    }
+    if (!ep_midi_in && udi->configs_with_midi)
+        g_warning("%03d:%03d - MIDI port available on different configs: mask=0x%x", bus, devadr, udi->configs_with_midi);
+
+    if (udi->vid == 0x1210 && udi->pid == 0x0002) // Lexicon Omega
+        is_audio = TRUE;
+    
+    // All configs/interfaces/alts scanned, nothing interesting found -> mark as unsupported
+    udi->is_midi = ep_midi_in != NULL;
+    udi->is_audio = is_audio;
+    if (!udi->is_midi && !udi->is_audio)
+    {
+        udi->status = CBOX_DEVICE_STATUS_UNSUPPORTED;
+        return FALSE;
+    }
+    
+    gboolean opened = FALSE;
+    struct libusb_device_handle *handle = NULL;
+    int err = libusb_open(dev, &handle);
+    if (0 != err)
+    {
+        g_warning("Cannot open device %03d:%03d: %s; errno = %s", bus, devadr, libusb_error_name(err), strerror(errno));
+        udi->failures++;
+        return FALSE;
+    }
+    
+    if (probe_only)
+    {
+        libusb_close(handle);
+        // Make sure that the reconnection code doesn't bail out due to
+        // last_probe_time == now.
+        udi->last_probe_time = 0;
+        return udi->is_midi || udi->is_audio;
+    }
+    
+    if (ep_midi_in)
+    {
+        g_debug("Found MIDI device %03d:%03d, trying to open", bus, devadr);
+        if (0 != open_midi_interface(uii, udi, handle, intf_midi_in, as_midi_in, ep_midi_in))
+            opened = TRUE;
+    }
+    if (udi->vid == 0x1210 && udi->pid == 0x0002)
+    {
+        GError *error = NULL;
+        if (open_omega(uii, bus, devadr, handle, &error))
+        {
+            // should have already been marked as opened by the MIDI code, but
+            // I might add the ability to disable some MIDI interfaces at some point
+            udi->status = CBOX_DEVICE_STATUS_OPENED;
+            opened = TRUE;
         }
         else
         {
-            g_warning("%03d:%03d - cannot get configuration descriptor (will retry)", bus, devadr);
-            return FALSE;
+            g_warning("Cannot open Lexicon Omega audio output: %s", error->message);
+            g_error_free(error);
         }
     }
-    if (alt_config != -1)
+    
+    if (!opened)
     {
-        g_warning("%03d:%03d - MIDI port available on different config %d", bus, devadr, alt_config);
-        return FALSE;
+        udi->failures++;
+        libusb_close(handle);
     }
-    // All configs/interfaces/alts scanned, nothing interesting found -> mark as seen
-    g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), GINT_TO_POINTER(vidpid));
-    return FALSE;
+    else
+        udi->handle = handle;
+    
+    return opened;
 }
 
 static gboolean scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only)
@@ -818,7 +911,6 @@ static gboolean scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only)
     
     num_devices = libusb_get_device_list(probe_only ? uii->usbctx_probe : uii->usbctx, &dev_list);
 
-    GList *prev_keys = g_hash_table_get_keys(uii->device_table);
     uint16_t *busdevadrs = malloc(sizeof(uint16_t) * num_devices);
     for (i = 0; i < num_devices; i++)
     {
@@ -828,18 +920,23 @@ static gboolean scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only)
         busdevadrs[i] = (bus << 8) | devadr;
     }
     
+    GList *prev_keys = g_hash_table_get_values(uii->device_table);
     for (GList *p = prev_keys; p; p = p->next)
     {
         gboolean found = FALSE;
-        int busdevadr = GPOINTER_TO_INT(p->data);
+        struct cbox_usb_device_info *udi = p->data;
         for (i = 0; !found && i < num_devices; i++)
-            found = busdevadrs[i] == busdevadr;
+            found = busdevadrs[i] == udi->busdevadr;
         if (!found)
         {
-            g_warning("Disconnected: %04x (%s)", busdevadr, probe_only ? "probe" : "reconfigure");
-            removed = TRUE;
+            // Only specifically trigger removal if the device is ours
+            if (udi->status == CBOX_DEVICE_STATUS_OPENED)
+            {
+                g_message("Disconnected: %03d:%03d (%s)", udi->bus, udi->devadr, probe_only ? "probe" : "reconfigure");
+                removed = TRUE;
+            }
             if (!probe_only)
-                forget_device(uii, busdevadr);
+                forget_device(uii, udi);
         }
     }
     g_list_free(prev_keys);
@@ -880,15 +977,8 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     uii->iso_packets = cbox_config_get_int(cbox_io_section, "iso_packets", 1);
     uii->output_resolution = cbox_config_get_int(cbox_io_section, "output_resolution", 16) / 8;
     uii->output_channels = 2;
+    uii->handle_omega = NULL;
     
-    if (!open_omega(uii, error))
-    {
-        libusb_exit(uii->usbctx_probe);
-        libusb_exit(uii->usbctx);
-        free(uii);
-        return FALSE;
-    }
-
     // fixed processing buffer size, as we have to deal with packetisation anyway
     io->buffer_size = 64;
     io->cb = NULL;
