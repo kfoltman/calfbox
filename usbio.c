@@ -489,14 +489,21 @@ static void *engine_thread(void *user_data)
     if (0 != sched_setscheduler(tid, SCHED_FIFO, &p))
         g_warning("Cannot set realtime priority for the processing thread: %s.", strerror(errno));
     
-    start_audio_playback(uii);
-    
-    if (!uii->setup_error)
+    if (uii->handle_omega)
     {
-        run_audio_loop(uii);        
+        start_audio_playback(uii);
+        if (!uii->setup_error)
+        {
+            run_audio_loop(uii);        
+        }
+        stop_audio_playback(uii);
     }
-
-    stop_audio_playback(uii);
+    else
+    {
+        // notify the UI thread that the (fake) audio loop is running
+        uii->playback_counter = uii->buffers;
+        run_idle_loop(uii);
+    }
     
     stop_midi_capture(uii);
 }
@@ -675,6 +682,8 @@ static void forget_device(struct cbox_usb_io_impl *uii, struct cbox_usb_device_i
             free(umi);
         }
     }
+    if (uii->handle_omega == devinfo->handle)
+        uii->handle_omega = NULL;
     libusb_close(devinfo->handle);
     free(devinfo);
 }
