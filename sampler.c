@@ -708,6 +708,10 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
         
         if (v->mode != spt_inactive)
         {
+            // if it's a DAHD envelope without sustain, consider the note finished
+            if (v->amp_env.cur_stage == 4 && v->amp_env.shape->stages[3].end_value == 0)
+                cbox_envelope_go_to(&v->amp_env, 15);                
+
             if (v->amp_env.cur_stage == 15)
                 vrel++;
             vcount++;
