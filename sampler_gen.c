@@ -201,12 +201,13 @@ static inline uint32_t process_voice_stereo_noloop(struct sampler_voice *v, floa
     float rgain = v->last_rgain * ffrac;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE * ffrac;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE * ffrac;
+    float scaler = 1.0 / (256.0 * 65536.0);
     PREPARE_LOOP
 
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
+        float t = (v->frac_pos >> 8) * scaler;
         int16_t *p = &v->layer->waveform->data[v->pos << 1];
-        float t = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
         float b0 = -t*(t-1.f)*(t-2.f);
         float b1 = 3.f*(t+1.f)*(t-1.f)*(t-2.f);
         float c0 = (b0 * p[0] + b1 * p[2] - 3.f*(t+1.f)*t*(t-2.f) * p[4] + (t+1.f)*t*(t-1.f) * p[6]);
