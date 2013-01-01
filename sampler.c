@@ -443,6 +443,188 @@ static inline int addcc(struct sampler_channel *c, int cc_no)
     return (((int)c->cc[cc_no]) << 7) + c->cc[cc_no + 32];
 }
 
+void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs)
+{
+    // if it's a DAHD envelope without sustain, consider the note finished
+    if (v->amp_env.cur_stage == 4 && v->amp_env.shape->stages[3].end_value == 0)
+        cbox_envelope_go_to(&v->amp_env, 15);                
+
+    struct sampler_channel *c = v->channel;
+    
+    if (v->delay >= CBOX_BLOCK_SIZE)
+    {
+        v->delay -= CBOX_BLOCK_SIZE;
+        return;
+    }
+    // XXXKF I'm sacrificing sample accuracy for delays for now
+    v->delay = 0;
+    
+    float modsrcs[smsrc_pernote_count];
+    modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * (1.0 / 127.0);
+    modsrcs[smsrc_pitch - smsrc_pernote_offset] = v->pitch * (1.0 / 100.0);
+    modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0; // XXXKF not supported yet
+    modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released) * 0.01f;
+    modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released) * 0.01f;
+    modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->amp_env, v->released) * 0.01f;
+
+    modsrcs[smsrc_amplfo - smsrc_pernote_offset] = lfo_run(&v->amp_lfo);
+    modsrcs[smsrc_fillfo - smsrc_pernote_offset] = lfo_run(&v->filter_lfo);
+    modsrcs[smsrc_pitchlfo - smsrc_pernote_offset] = lfo_run(&v->pitch_lfo);
+    
+    if (v->amp_env.cur_stage < 0)
+    {
+        if (v->cutoff == -1 || 
+            (!cbox_biquadf_is_audible(&v->filter_left, 1.0 / 65536.0) && !cbox_biquadf_is_audible(&v->filter_right, 1.0 / 65536.0)))
+        {
+            v->mode = spt_inactive;
+            return;
+        }
+    }           
+    
+    float moddests[smdestcount];
+    moddests[smdest_gain] = 0;
+    moddests[smdest_pitch] = v->pitch + c->pitchbend;
+    moddests[smdest_cutoff] = 0;
+    moddests[smdest_resonance] = 0;
+    GSList *mod = v->layer->modulations;
+    static const int modoffset[4] = {0, -1, -1, 1 };
+    static const int modscale[4] = {1, 1, 2, -2 };
+    while(mod)
+    {
+        struct sampler_modulation *sm = mod->data;
+        float value = 0.f, value2 = 1.f;
+        if (sm->src < smsrc_pernote_offset)
+            value = c->cc[sm->src]  / 127.0;
+        else
+            value = modsrcs[sm->src - smsrc_pernote_offset];
+        value = modoffset[sm->flags & 3] + value * modscale[sm->flags & 3];
+
+        if (sm->src2 != smsrc_none)
+        {
+            if (sm->src2 < smsrc_pernote_offset)
+                value2 = c->cc[sm->src2] / 127.0;
+            else
+                value2 = modsrcs[sm->src2 - smsrc_pernote_offset];
+            
+            value2 = modoffset[(sm->flags & 12) >> 2] + value2 * modscale[(sm->flags & 12) >> 2];
+            value *= value2;
+        }
+        moddests[sm->dest] += value * sm->amount;
+        
+        mod = g_slist_next(mod);
+    }
+    
+    double maxv = 127 << 7;
+    double freq = v->base_freq * cent2factor(moddests[smdest_pitch]) ;
+    uint64_t freq64 = freq * 65536.0 * 65536.0 / m->module.srate;
+    v->delta = freq64 >> 32;
+    v->frac_delta = freq64 & 0xFFFFFFFF;
+    float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * v->gain * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
+    if (moddests[smdest_gain] != 0.0)
+        gain *= dB2gain(moddests[smdest_gain]);
+    float pan = (v->layer->pan + 100) * (1.0 / 200.0) + (addcc(c, 10) * 1.0 / maxv - 0.5) * 2;
+    if (pan < 0)
+        pan = 0;
+    if (pan > 1)
+        pan = 1;
+    v->lgain = gain * (1 - pan)  / 32768.0;
+    v->rgain = gain * pan / 32768.0;
+    if (v->cutoff != -1)
+    {
+        float cutoff = v->cutoff * cent2factor(moddests[smdest_cutoff]);
+        if (cutoff < 20)
+            cutoff = 20;
+        if (cutoff > m->module.srate * 0.45)
+            cutoff = m->module.srate * 0.45;
+        //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
+        float resonance = v->resonance * dB2gain(moddests[smdest_resonance]);
+        if (resonance < 0.7)
+            resonance = 0.7;
+        if (resonance > 32)
+            resonance = 32;
+        // XXXKF this is found experimentally and probably far off from correct formula
+        if (is_4pole(v))
+            resonance = sqrt(resonance / 0.707) * 0.5;
+        switch(v->filter)
+        {
+        case sft_lp12:
+            cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
+            break;
+        case sft_hp12:
+            cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
+            break;
+        case sft_bp6:
+            cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
+            break;
+        case sft_lp6:
+            cbox_biquadf_set_1plp(&v->filter_coeffs, cutoff, m->module.srate);
+            break;
+        case sft_hp6:
+            cbox_biquadf_set_1php(&v->filter_coeffs, cutoff, m->module.srate);
+            break;
+        case sft_lp24:
+            cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
+            break;
+        case sft_hp24:
+            cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
+            break;
+        case sft_bp12:
+            cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
+            break;
+        default:
+            assert(0);
+        }
+    }
+    
+    float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
+    float *tmp_outputs[2] = {left, right};
+    uint32_t samples = 0;
+    if (v->last_waveform != v->layer->waveform)
+    {
+        v->last_waveform = v->layer->waveform;
+        if (v->layer->waveform)
+        {
+            v->mode = v->layer->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+            v->cur_sample_end = v->layer->waveform->info.frames;
+        }
+        else
+        {
+            v->mode = spt_inactive;
+            return;
+        }
+        
+    }
+    samples = sampler_voice_sample_playback(v, tmp_outputs);
+    for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
+        left[i] = right[i] = 0.f;
+    if (v->cutoff != -1)
+    {
+        cbox_biquadf_process(&v->filter_left, &v->filter_coeffs, left);
+        if (is_4pole(v))
+            cbox_biquadf_process(&v->filter_left2, &v->filter_coeffs, left);
+        cbox_biquadf_process(&v->filter_right, &v->filter_coeffs, right);
+        if (is_4pole(v))
+            cbox_biquadf_process(&v->filter_right2, &v->filter_coeffs, right);
+    }
+    mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.0);
+    if ((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0))
+    {
+        if (v->send1bus > 0 && v->send1gain != 0)
+        {
+            int oofs = m->module.aux_offset + (v->send1bus - 1) * 2;
+            mix_block_into_with_gain(outputs, oofs, left, right, v->send1gain);
+        }
+        if (v->send2bus > 0 && v->send2gain != 0)
+        {
+            int oofs = m->module.aux_offset + (v->send2bus - 1) * 2;
+            mix_block_into_with_gain(outputs, oofs, left, right, v->send2gain);
+        }
+    }
+    
+    v->last_lgain = v->lgain;
+    v->last_rgain = v->rgain;
+}
+
 void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct sampler_module *m = (struct sampler_module *)module;
@@ -463,187 +645,11 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
         
         if (v->mode != spt_inactive)
         {
-            // if it's a DAHD envelope without sustain, consider the note finished
-            if (v->amp_env.cur_stage == 4 && v->amp_env.shape->stages[3].end_value == 0)
-                cbox_envelope_go_to(&v->amp_env, 15);                
+            sampler_voice_process(v, m, outputs);
 
             if (v->amp_env.cur_stage == 15)
                 vrel++;
             vcount++;
-            struct sampler_channel *c = v->channel;
-            
-            if (v->delay >= CBOX_BLOCK_SIZE)
-            {
-                v->delay -= CBOX_BLOCK_SIZE;
-                continue;
-            }
-            // XXXKF I'm sacrificing sample accuracy for delays for now
-            v->delay = 0;
-            
-            float modsrcs[smsrc_pernote_count];
-            modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * (1.0 / 127.0);
-            modsrcs[smsrc_pitch - smsrc_pernote_offset] = v->pitch * (1.0 / 100.0);
-            modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0; // XXXKF not supported yet
-            modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released) * 0.01f;
-            modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released) * 0.01f;
-            modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->amp_env, v->released) * 0.01f;
-
-            modsrcs[smsrc_amplfo - smsrc_pernote_offset] = lfo_run(&v->amp_lfo);
-            modsrcs[smsrc_fillfo - smsrc_pernote_offset] = lfo_run(&v->filter_lfo);
-            modsrcs[smsrc_pitchlfo - smsrc_pernote_offset] = lfo_run(&v->pitch_lfo);
-            
-            if (v->amp_env.cur_stage < 0)
-            {
-                if (v->cutoff == -1 || 
-                    (!cbox_biquadf_is_audible(&v->filter_left, 1.0 / 65536.0) && !cbox_biquadf_is_audible(&v->filter_right, 1.0 / 65536.0)))
-                {
-                    v->mode = spt_inactive;
-                    continue;
-                }
-            }           
-            
-            float moddests[smdestcount];
-            moddests[smdest_gain] = 0;
-            moddests[smdest_pitch] = v->pitch + c->pitchbend;
-            moddests[smdest_cutoff] = 0;
-            moddests[smdest_resonance] = 0;
-            GSList *mod = v->layer->modulations;
-            static const int modoffset[4] = {0, -1, -1, 1 };
-            static const int modscale[4] = {1, 1, 2, -2 };
-            while(mod)
-            {
-                struct sampler_modulation *sm = mod->data;
-                float value = 0.f, value2 = 1.f;
-                if (sm->src < smsrc_pernote_offset)
-                    value = c->cc[sm->src]  / 127.0;
-                else
-                    value = modsrcs[sm->src - smsrc_pernote_offset];
-                value = modoffset[sm->flags & 3] + value * modscale[sm->flags & 3];
-
-                if (sm->src2 != smsrc_none)
-                {
-                    if (sm->src2 < smsrc_pernote_offset)
-                        value2 = c->cc[sm->src2] / 127.0;
-                    else
-                        value2 = modsrcs[sm->src2 - smsrc_pernote_offset];
-                    
-                    value2 = modoffset[(sm->flags & 12) >> 2] + value2 * modscale[(sm->flags & 12) >> 2];
-                    value *= value2;
-                }
-                moddests[sm->dest] += value * sm->amount;
-                
-                mod = g_slist_next(mod);
-            }
-            
-            double maxv = 127 << 7;
-            double freq = v->base_freq * cent2factor(moddests[smdest_pitch]) ;
-            uint64_t freq64 = freq * 65536.0 * 65536.0 / m->module.srate;
-            v->delta = freq64 >> 32;
-            v->frac_delta = freq64 & 0xFFFFFFFF;
-            float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * v->gain * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
-            if (moddests[smdest_gain] != 0.0)
-                gain *= dB2gain(moddests[smdest_gain]);
-            float pan = (v->layer->pan + 100) * (1.0 / 200.0) + (addcc(c, 10) * 1.0 / maxv - 0.5) * 2;
-            if (pan < 0)
-                pan = 0;
-            if (pan > 1)
-                pan = 1;
-            v->lgain = gain * (1 - pan)  / 32768.0;
-            v->rgain = gain * pan / 32768.0;
-            if (v->cutoff != -1)
-            {
-                float cutoff = v->cutoff * cent2factor(moddests[smdest_cutoff]);
-                if (cutoff < 20)
-                    cutoff = 20;
-                if (cutoff > m->module.srate * 0.45)
-                    cutoff = m->module.srate * 0.45;
-                //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
-                float resonance = v->resonance * dB2gain(moddests[smdest_resonance]);
-                if (resonance < 0.7)
-                    resonance = 0.7;
-                if (resonance > 32)
-                    resonance = 32;
-                // XXXKF this is found experimentally and probably far off from correct formula
-                if (is_4pole(v))
-                    resonance = sqrt(resonance / 0.707) * 0.5;
-                switch(v->filter)
-                {
-                case sft_lp12:
-                    cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
-                    break;
-                case sft_hp12:
-                    cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
-                    break;
-                case sft_bp6:
-                    cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
-                    break;
-                case sft_lp6:
-                    cbox_biquadf_set_1plp(&v->filter_coeffs, cutoff, m->module.srate);
-                    break;
-                case sft_hp6:
-                    cbox_biquadf_set_1php(&v->filter_coeffs, cutoff, m->module.srate);
-                    break;
-                case sft_lp24:
-                    cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
-                    break;
-                case sft_hp24:
-                    cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
-                    break;
-                case sft_bp12:
-                    cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
-                    break;
-                default:
-                    assert(0);
-                }
-            }
-            
-            float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
-            float *tmp_outputs[2] = {left, right};
-            uint32_t samples = 0;
-            if (v->last_waveform != v->layer->waveform)
-            {
-                v->last_waveform = v->layer->waveform;
-                if (v->layer->waveform)
-                {
-                    v->mode = v->layer->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-                    v->cur_sample_end = v->layer->waveform->info.frames;
-                }
-                else
-                {
-                    v->mode = spt_inactive;
-                    continue;
-                }
-                
-            }
-            samples = sampler_voice_process(v, tmp_outputs);
-            for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
-                left[i] = right[i] = 0.f;
-            if (v->cutoff != -1)
-            {
-                cbox_biquadf_process(&v->filter_left, &v->filter_coeffs, left);
-                if (is_4pole(v))
-                    cbox_biquadf_process(&v->filter_left2, &v->filter_coeffs, left);
-                cbox_biquadf_process(&v->filter_right, &v->filter_coeffs, right);
-                if (is_4pole(v))
-                    cbox_biquadf_process(&v->filter_right2, &v->filter_coeffs, right);
-            }
-            mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.0);
-            if ((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0))
-            {
-                if (v->send1bus > 0 && v->send1gain != 0)
-                {
-                    int oofs = m->module.aux_offset + (v->send1bus - 1) * 2;
-                    mix_block_into_with_gain(outputs, oofs, left, right, v->send1gain);
-                }
-                if (v->send2bus > 0 && v->send2gain != 0)
-                {
-                    int oofs = m->module.aux_offset + (v->send2bus - 1) * 2;
-                    mix_block_into_with_gain(outputs, oofs, left, right, v->send2gain);
-                }
-            }
-            
-            v->last_lgain = v->lgain;
-            v->last_rgain = v->rgain;
         }
     }
     m->active_voices = vcount;

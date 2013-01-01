@@ -315,7 +315,7 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
 }
 
 
-uint32_t sampler_voice_process(struct sampler_voice *v, float **tmp_outputs)
+uint32_t sampler_voice_sample_playback(struct sampler_voice *v, float **tmp_outputs)
 {
     if (v->mode == spt_stereo16)
         return process_voice_stereo(v, tmp_outputs);

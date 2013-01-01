@@ -19,6 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_SAMPLER_IMPL_H
 #define CBOX_SAMPLER_IMPL_H
 
-extern uint32_t sampler_voice_process(struct sampler_voice *v, float **tmp_outputs);
+extern uint32_t sampler_voice_sample_playback(struct sampler_voice *v, float **tmp_outputs);
 
 #endif
