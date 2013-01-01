@@ -153,7 +153,7 @@ typedef int midi_note_t;
     MACRO(int, lovel, 0) \
     MACRO(int, hivel, 127) \
     MACRO(int, velcurve_quadratic, -1) \
-    MACRO(float, cutoff, 21000) \
+    MACRO(float, cutoff, -1) \
     MACRO##_dBamp(float, resonance, 0) \
     MACRO(midi_note_t, sw_lokey, 0) \
     MACRO(midi_note_t, sw_hikey, 127) \
