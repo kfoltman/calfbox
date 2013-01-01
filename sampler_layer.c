@@ -267,6 +267,7 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
     }
     l->use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
     l->last_key = l->sw_lokey;
+    l->current_seq_position = l->seq_position;
 }
 
 struct layer_foreach_struct

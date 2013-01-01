@@ -70,11 +70,10 @@ GSList *skip_inactive_layers(struct sampler_program *prg, struct sampler_channel
                  (l->sw_up == -1 || !(c->switchmask[l->sw_up >> 5] & (1 << (l->sw_up & 31)))) &&
                  (l->sw_previous == -1 || l->sw_previous == c->previous_note)))
             {
-                // note that the positions in memory are 0-based
-                gboolean play = !l->seq_position;
-                l->seq_position++;
-                if (l->seq_position >= l->seq_length)
-                    l->seq_position = 0;
+                gboolean play = l->current_seq_position == 1;
+                l->current_seq_position++;
+                if (l->current_seq_position >= l->seq_length)
+                    l->current_seq_position = 1;
                 if (play)
                     return next_layer;
             }

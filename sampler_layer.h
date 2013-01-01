@@ -161,7 +161,7 @@ typedef int midi_note_t;
     MACRO(midi_note_t, sw_down, -1) \
     MACRO(midi_note_t, sw_up, -1) \
     MACRO(midi_note_t, sw_previous, -1) \
-    MACRO(int, seq_position, 0) \
+    MACRO(int, seq_position, 1) \
     MACRO(int, seq_length, 1) \
     MACRO(int, effect1bus, 1) \
     MACRO(int, effect2bus, 2) \
@@ -252,7 +252,7 @@ struct sampler_layer
 
     float freq;
     int use_keyswitch;
-    int last_key;
+    int last_key, current_seq_position;
     float velcurve[128];
     
     GSList *modulations;
