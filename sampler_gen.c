@@ -194,13 +194,50 @@ static uint32_t process_voice_stereo_lerp(struct sampler_voice *v, float **outpu
     return CBOX_BLOCK_SIZE;
 }
 
+static inline uint32_t process_voice_stereo_noloop(struct sampler_voice *v, float **output)
+{
+    float ffrac = 1.0f / 6.0f;
+    float lgain = v->last_lgain * ffrac;
+    float rgain = v->last_rgain * ffrac;
+    float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE * ffrac;
+    float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE * ffrac;
+    PREPARE_LOOP
+
+    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+    {
+        int16_t *p = &v->layer->waveform->data[v->pos << 1];
+        float t = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
+        float b0 = -t*(t-1.f)*(t-2.f);
+        float b1 = 3.f*(t+1.f)*(t-1.f)*(t-2.f);
+        float c0 = (b0 * p[0] + b1 * p[2] - 3.f*(t+1.f)*t*(t-2.f) * p[4] + (t+1.f)*t*(t-1.f) * p[6]);
+        float c1 = (b0 * p[1] + b1 * p[3] - 3.f*(t+1.f)*t*(t-2.f) * p[5] + (t+1.f)*t*(t-1.f) * p[7]);
+        output[0][i] = lgain * c0;
+        output[1][i] = rgain * c1;
+        lgain += lgain_delta;
+        rgain += rgain_delta;
+        if (v->frac_pos > ~v->frac_delta)
+            v->pos++;
+        v->frac_pos += v->frac_delta;
+        v->pos += v->delta;
+    }
+    return CBOX_BLOCK_SIZE;
+}
+
 static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
 {
+    PREPARE_LOOP
+
+    if (v->pos < loop_end - v->loop_overlap)
+    {
+        uint32_t remain = loop_end - v->loop_overlap - v->pos;
+        if (remain > CBOX_BLOCK_SIZE * (1 + v->delta))
+            return process_voice_stereo_noloop(v, output);
+    }
+
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
     float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
     float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
-    PREPARE_LOOP
 
     for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
@@ -260,7 +297,7 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
         float t = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
         for (int c = 0; c < 2; c++)
         {
-            ch[c] = (-t*(t-1)*(t-2) * idata[c][0] + 3*(t+1)*(t-1)*(t-2) * idata[c][1] - 3*(t+1)*t*(t-2) * idata[c][2] + (t+1)*t*(t-1) * idata[c][3]) * (1.0 / 6.0);
+            ch[c] = (-t*(t-1.f)*(t-2.f) * idata[c][0] + 3.f*(t+1.f)*(t-1.f)*(t-2.f) * idata[c][1] - 3.f*(t+1.f)*t*(t-2.f) * idata[c][2] + (t+1.f)*t*(t-1.f) * idata[c][3]) * (1.0f / 6.0f);
         }
         
         if (v->frac_pos > ~v->frac_delta)
