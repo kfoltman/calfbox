@@ -308,10 +308,8 @@ static void play_callback_adaptive(struct libusb_transfer *transfer)
     int err = libusb_submit_transfer(transfer);
     if (err)
     {
-        if (err == LIBUSB_TRANSFER_NO_DEVICE)
+        if (err == LIBUSB_ERROR_NO_DEVICE)
             uii->device_removed++;
-        if (err == LIBUSB_TRANSFER_CANCELLED)
-            uii->cancel_confirm = 1;
         g_warning("Cannot submit isochronous transfer, error = %s", libusb_error_name(err));
     }
 }
@@ -400,10 +398,8 @@ void play_callback_asynchronous(struct libusb_transfer *transfer)
     int err = libusb_submit_transfer(transfer);
     if (err)
     {
-        if (err == LIBUSB_TRANSFER_NO_DEVICE)
+        if (err == LIBUSB_ERROR_NO_DEVICE)
             uii->device_removed++;
-        if (err == LIBUSB_TRANSFER_CANCELLED)
-            uii->cancel_confirm = 1;
         g_warning("Cannot submit isochronous transfer, error = %s", libusb_error_name(err));
     }
 }
@@ -512,8 +508,6 @@ static void sync_callback(struct libusb_transfer *transfer)
     int err = libusb_submit_transfer(transfer);
     if (err)
     {
-        if (err == LIBUSB_TRANSFER_CANCELLED)
-            uii->cancel_confirm = 1;
         g_warning("Cannot submit isochronous sync transfer, error = %s", libusb_error_name(err));
     }
     if (uii->debug_sync)
