@@ -509,7 +509,13 @@ static void sync_callback(struct libusb_transfer *transfer)
         if (uii->debug_sync)
             printf(" size = %4d sync_freq = %4d", size, uii->sync_freq);
     }
-    libusb_submit_transfer(transfer);
+    int err = libusb_submit_transfer(transfer);
+    if (err)
+    {
+        if (err == LIBUSB_TRANSFER_CANCELLED)
+            uii->cancel_confirm = 1;
+        g_warning("Cannot submit isochronous sync transfer, error = %s", libusb_error_name(err));
+    }
     if (uii->debug_sync)
         printf("\n");
 }
