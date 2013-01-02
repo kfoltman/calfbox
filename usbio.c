@@ -86,7 +86,7 @@ struct cbox_usb_io_impl
     int playback_counter;
     int sync_counter;
 
-    unsigned int iso_packets;
+    unsigned int iso_packets_omega, iso_packets_multimix;
 
     pthread_t thr_engine;
     volatile gboolean stop_engine, setup_error;
@@ -314,11 +314,12 @@ struct libusb_transfer *play_stuff_adaptive(struct cbox_usb_io_impl *uii, int in
 {
     struct libusb_transfer *t;
     int i, err;
-    t = libusb_alloc_transfer(uii->iso_packets);
+    int packets = uii->iso_packets_omega;
+    t = libusb_alloc_transfer(packets);
     int tsize = uii->sample_rate * 2 * uii->output_resolution / 1000;
     uint8_t *buf = (uint8_t *)calloc(1, uii->audio_output_pktsize);
     
-    libusb_fill_iso_transfer(t, uii->handle_audiodev, uii->audio_output_endpoint, buf, tsize * uii->iso_packets, uii->iso_packets, play_callback_adaptive, uii, 20000);
+    libusb_fill_iso_transfer(t, uii->handle_audiodev, uii->audio_output_endpoint, buf, tsize * packets, packets, play_callback_adaptive, uii, 20000);
     libusb_set_iso_packet_lengths(t, tsize);
     
     err = libusb_submit_transfer(t);
@@ -401,9 +402,10 @@ struct libusb_transfer *play_stuff_asynchronous(struct cbox_usb_io_impl *uii, in
 {
     struct libusb_transfer *t;
     int err;
-    t = libusb_alloc_transfer(uii->iso_packets);
-    int tsize = calc_packet_lengths(uii, t, uii->iso_packets);
-    int bufsize = uii->audio_output_pktsize * uii->iso_packets;
+    int packets = uii->iso_packets_multimix;
+    t = libusb_alloc_transfer(packets);
+    int tsize = calc_packet_lengths(uii, t, packets);
+    int bufsize = uii->audio_output_pktsize * packets;
     uint8_t *buf = (uint8_t *)calloc(1, bufsize);
     
     if (!index)
@@ -412,7 +414,7 @@ struct libusb_transfer *play_stuff_asynchronous(struct cbox_usb_io_impl *uii, in
             uii->sync_transfers[uii->sync_counter] = sync_stuff_asynchronous(uii, uii->sync_counter);
     }
     
-    libusb_fill_iso_transfer(t, uii->handle_audiodev, uii->audio_output_endpoint, buf, tsize, uii->iso_packets, play_callback_asynchronous, uii, 20000);
+    libusb_fill_iso_transfer(t, uii->handle_audiodev, uii->audio_output_endpoint, buf, tsize, packets, play_callback_asynchronous, uii, 20000);
     err = libusb_submit_transfer(t);
     if (err)
     {
@@ -1301,7 +1303,11 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     // shouldn't be more than 4, otherwise it will crackle due to limitations of
     // the packet length adjustment. It might work better if adjustment
     // was per-packet and not per-transfer.
-    uii->iso_packets = cbox_config_get_int(cbox_io_section, "iso_packets", 1);
+    uii->iso_packets_omega = cbox_config_get_int(cbox_io_section, "iso_packets_omega", 1);
+    // The USB 2.0 device uses a higher packet rate (125us I think), so the
+    // default number of packets per transfer needs to be different, too -
+    // 1ms is a minimum reasonable value
+    uii->iso_packets_multimix = cbox_config_get_int(cbox_io_section, "iso_packets_multimix", 16);
     uii->output_resolution = cbox_config_get_int(cbox_io_section, "output_resolution", 16) / 8;
     uii->output_channels = 2;
     uii->handle_audiodev = NULL;
