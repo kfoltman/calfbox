@@ -34,6 +34,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 CBOX_CLASS_DEFINITION_ROOT(cbox_scene)
 
+static gboolean cbox_scene_addlayercmd(struct cbox_scene *s, struct cbox_command_target *fb, struct cbox_osc_command *cmd, int cmd_type, GError **error)
+{
+    int pos = CBOX_ARG_I(cmd, 0);
+    if (pos < 0 || pos > s->layer_count)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", pos, s->layer_count);
+        return FALSE;
+    }
+    if (pos == 0)
+        pos = s->layer_count;
+    else
+        pos--;
+    struct cbox_layer *layer = NULL;
+    
+    switch(cmd_type)
+    {
+    case 1:
+        layer = cbox_layer_new_from_config(s, CBOX_ARG_S(cmd, 1), error);
+        break;
+    case 2:
+        layer = cbox_layer_new_with_instrument(s, CBOX_ARG_S(cmd, 1), error);
+        break;
+    default:
+        assert(0);
+        break;
+    }
+    if (!layer)
+        return FALSE;
+    if (!cbox_scene_insert_layer(s, layer, pos, error))
+    {
+        CBOX_DELETE(layer);
+        return FALSE;
+    }
+    if (fb)
+    {
+        if (!cbox_execute_on(fb, NULL, "/uuid", "o", error, layer))
+            return FALSE;
+    }
+    return TRUE;
+}
+
 static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct cbox_scene *s = ct->user_data;
@@ -59,57 +100,11 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     }
     else if (!strcmp(cmd->command, "/add_layer") && !strcmp(cmd->arg_types, "is"))
     {
-        int pos = CBOX_ARG_I(cmd, 0);
-        if (pos < 0 || pos > s->layer_count)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", pos, s->layer_count);
-            return FALSE;
-        }
-        if (pos == 0)
-            pos = s->layer_count;
-        else
-            pos--;
-        struct cbox_layer *layer = cbox_layer_new_from_config(s, CBOX_ARG_S(cmd, 1), error);
-        if (!layer)
-            return FALSE;
-        if (!cbox_scene_insert_layer(s, layer, pos, error))
-        {
-            CBOX_DELETE(layer);
-            return FALSE;
-        }
-        if (fb)
-        {
-            if (!cbox_execute_on(fb, NULL, "/uuid", "o", error, layer))
-                return FALSE;
-        }
-        return TRUE;
+        return cbox_scene_addlayercmd(s, fb, cmd, 1, error);
     }
     else if (!strcmp(cmd->command, "/add_instrument_layer") && !strcmp(cmd->arg_types, "is"))
     {
-        int pos = CBOX_ARG_I(cmd, 0);
-        if (pos < 0 || pos > s->layer_count)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", pos, s->layer_count);
-            return FALSE;
-        }
-        if (pos == 0)
-            pos = s->layer_count;
-        else
-            pos--;
-        struct cbox_layer *layer = cbox_layer_new_with_instrument(s, CBOX_ARG_S(cmd, 1), error);
-        if (!layer)
-            return FALSE;
-        if (!cbox_scene_insert_layer(s, layer, pos, error))
-        {
-            CBOX_DELETE(layer);
-            return FALSE;
-        }
-        if (fb)
-        {
-            if (!cbox_execute_on(fb, NULL, "/uuid", "o", error, layer))
-                return FALSE;
-        }
-        return TRUE;
+        return cbox_scene_addlayercmd(s, fb, cmd, 2, error);
     }
     else if (!strcmp(cmd->command, "/delete_layer") && !strcmp(cmd->arg_types, "i"))
     {
