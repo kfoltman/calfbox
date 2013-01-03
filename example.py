@@ -326,6 +326,7 @@ class MainWindow(Gtk.Window):
     def tools_drumkit_editor(self, w):
         if self.drumkit_editor is None:
             self.drumkit_editor = drumkit_editor.EditorDialog(self)
+            self.refresh_instrument_pages()
             self.drumkit_editor.connect('destroy', self.on_drumkit_editor_destroy)
             self.drumkit_editor.show_all()
         self.drumkit_editor.present()

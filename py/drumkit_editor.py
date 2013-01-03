@@ -340,6 +340,7 @@ class FileView(Gtk.TreeView):
 
 class EditorDialog(Gtk.Dialog):
     def __init__(self, parent):
+        self.prepare_scene()
         Gtk.Dialog.__init__(self, "Drum kit editor", parent, Gtk.DialogFlags.DESTROY_WITH_PARENT, 
             ())
 
@@ -404,6 +405,17 @@ class EditorDialog(Gtk.Dialog):
         widget.set_active(True)
         
         self.update_kit()
+        
+    def prepare_scene(self):
+        scene = cbox.Document.get_scene()
+        scene_status = scene.status()
+        layers = [layer.status().instrument_name for layer in scene_status.layers]
+        if '_preview_sample' not in layers:
+            scene.add_new_instrument_layer("_preview_sample", "stream_player", pos = 0)
+            ps = scene.status().instruments['_preview_sample'][1]
+            ps.cmd('/output/1/gain', None, -12.0)
+        if '_preview_kit' not in layers:
+            scene.add_new_instrument_layer("_preview_kit", "sampler", pos = 1)
 
     def update_kit(self):
         cbox.do_cmd("/scene/instr/_preview_kit/engine/load_patch_from_string", None, [0, "", self.bank_model.to_sfz(), "Preview"])
