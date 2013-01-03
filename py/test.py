@@ -84,7 +84,7 @@ class TestCbox(unittest.TestCase):
         scene = Document.new_scene(44100, 1024)
         # XXXKF: I should add a method to add a layer using engine name alone, without
         # having to add a scene, layer or instrument in the INI
-        scene.add_instrument_layer("vintage")
+        scene.add_new_instrument_layer("temporary", "sampler")
         scene_status = scene.status()
         layer = scene_status.layers[0]
         self.verify_uuid(scene.uuid, "cbox_scene")
@@ -94,7 +94,7 @@ class TestCbox(unittest.TestCase):
         
         # XXXKF: this lack of stable Python representation of engines is annoying
         #instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
-        instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<group> resonance=3 <region> key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
+        instrument.cmd('/engine/load_patch_from_string', None, 0, '.', '<group> resonance=3 <region> key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
         patches = instrument.get_things("/engine/patches", ["*patch"]).patch
         patches_dict = {}
         for patch in patches:
@@ -115,7 +115,7 @@ class TestCbox(unittest.TestCase):
                         self.assertTrue('cutoff=1000' in region_str)
                     else:
                         self.assertTrue('cutoff=2000' in region_str)
-        self.assertEquals(patches_dict, {0 : ('vintage', 122), 1 : ('test_sampler_api', 2)})
+        self.assertEquals(patches_dict, {0 : ('test_sampler_api', 2)})
         region = Document.map_uuid(region_uuid)
         group = Document.map_uuid(region.status().parent_group)
         self.assertTrue("resonance=3" in group.as_string())

@@ -56,6 +56,14 @@ static gboolean cbox_scene_addlayercmd(struct cbox_scene *s, struct cbox_command
     case 2:
         layer = cbox_layer_new_with_instrument(s, CBOX_ARG_S(cmd, 1), error);
         break;
+    case 3:
+        {
+            struct cbox_instrument *instr = cbox_scene_create_instrument(s, CBOX_ARG_S(cmd, 1), CBOX_ARG_S(cmd, 2), error);
+            if (!instr)
+                return FALSE;
+            layer = cbox_layer_new_with_instrument(s, CBOX_ARG_S(cmd, 1), error);
+            break;
+        }
     default:
         assert(0);
         break;
@@ -105,6 +113,10 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     else if (!strcmp(cmd->command, "/add_instrument_layer") && !strcmp(cmd->arg_types, "is"))
     {
         return cbox_scene_addlayercmd(s, fb, cmd, 2, error);
+    }
+    else if (!strcmp(cmd->command, "/add_new_instrument_layer") && !strcmp(cmd->arg_types, "iss"))
+    {
+        return cbox_scene_addlayercmd(s, fb, cmd, 3, error);
     }
     else if (!strcmp(cmd->command, "/delete_layer") && !strcmp(cmd->arg_types, "i"))
     {
@@ -706,7 +718,69 @@ void cbox_scene_clear(struct cbox_scene *scene)
         CBOX_DELETE(scene->aux_buses[scene->aux_bus_count - 1]);
 }
 
-extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *scene, const char *name, gboolean load, GError **error)
+static struct cbox_instrument *create_instrument(struct cbox_scene *scene, struct cbox_module *module)
+{
+    int auxes = (module->outputs - module->aux_offset) / 2;
+
+    struct cbox_instrument *instr = malloc(sizeof(struct cbox_instrument));
+    CBOX_OBJECT_HEADER_INIT(instr, cbox_instrument, CBOX_GET_DOCUMENT(scene));
+    instr->scene = scene;
+    instr->module = module;
+    instr->outputs = calloc(module->outputs / 2, sizeof(struct cbox_instrument_output));
+    instr->refcount = 0;
+    instr->aux_outputs = calloc(auxes, sizeof(struct cbox_aux_bus *));
+    instr->aux_output_names = calloc(auxes, sizeof(char *));
+    instr->aux_output_count = auxes;
+
+    for (int i = 0; i < module->outputs / 2; i ++)
+    {
+        instr->outputs[i].output_bus = 0;
+        instr->outputs[i].gain = 1.0;
+        instr->outputs[i].insert = NULL;
+    }
+    
+    return instr;
+}
+
+struct cbox_instrument *cbox_scene_create_instrument(struct cbox_scene *scene, const char *instrument_name, const char *engine_name, GError **error)
+{
+    gpointer value = g_hash_table_lookup(scene->instrument_hash, instrument_name);
+    if (value)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Instrument already exists: '%s'", instrument_name);
+        return NULL;
+    }
+
+    struct cbox_document *doc = CBOX_GET_DOCUMENT(scene);
+    struct cbox_module_manifest *mptr = NULL;
+    struct cbox_instrument *instr = NULL;
+    struct cbox_module *module = NULL;
+        
+    mptr = cbox_module_manifest_get_by_name(engine_name);
+    if (!mptr)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine called '%s'", engine_name);
+        return NULL;
+    }
+
+    module = cbox_module_manifest_create_module(mptr, NULL, doc, scene->rt, instrument_name, error);
+    if (!module)
+    {
+        cbox_force_error(error);
+        g_prefix_error(error, "Cannot create engine '%s' for instrument '%s': ", engine_name, instrument_name);
+        return NULL;
+    }
+    
+    instr = create_instrument(scene, module);
+    
+    cbox_command_target_init(&instr->cmd_target, cbox_instrument_process_cmd, instr);
+    g_hash_table_insert(scene->instrument_hash, g_strdup(instrument_name), instr);
+    CBOX_OBJECT_REGISTER(instr);
+    
+    return instr;
+}
+
+struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *scene, const char *name, gboolean load, GError **error)
 {
     struct cbox_module_manifest *mptr = NULL;
     struct cbox_instrument *instr = NULL;
@@ -754,10 +828,11 @@ extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_sce
         goto error;
     }
     
-    struct cbox_instrument_output *outputs = malloc(sizeof(struct cbox_instrument_output) * module->outputs / 2);
+    instr = create_instrument(scene, module);
+
     for (int i = 0; i < module->outputs / 2; i ++)
     {
-        struct cbox_instrument_output *oobj = outputs + i;
+        struct cbox_instrument_output *oobj = instr->outputs + i;
         cbox_instrument_output_init(oobj, scene, cbox_rt_get_buffer_size(module->rt));
         
         gchar *key = i == 0 ? g_strdup("output_bus") : g_strdup_printf("output%d_bus", 1 + i);
@@ -767,8 +842,6 @@ extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_sce
         oobj->gain = cbox_config_get_gain_db(instr_section, key, 0);
         g_free(key);
         
-        oobj->insert = NULL;
-
         key = i == 0 ? g_strdup("insert") : g_strdup_printf("insert%d", 1 + i);
         cv = cbox_config_get_string(instr_section, key);
         g_free(key);
@@ -784,17 +857,7 @@ extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_sce
         }
     }
 
-    int auxes = (module->outputs - module->aux_offset) / 2;
-    instr = malloc(sizeof(struct cbox_instrument));
-    CBOX_OBJECT_HEADER_INIT(instr, cbox_instrument, CBOX_GET_DOCUMENT(scene));
-    instr->scene = scene;
-    instr->module = module;
-    instr->outputs = outputs;
-    instr->refcount = 0;
-    instr->aux_outputs = malloc(sizeof(struct cbox_aux_bus *) * auxes);
-    instr->aux_output_names = malloc(sizeof(char *) * auxes);
-    instr->aux_output_count = auxes;
-    for (int i = 0; i < auxes; i++)
+    for (int i = 0; i < instr->aux_output_count; i++)
     {
         instr->aux_outputs[i] = NULL;
         

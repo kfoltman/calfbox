@@ -64,6 +64,7 @@ extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, con
 extern void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_midi_buffer *midibuf_total, float *output_buffers[]);
 extern void cbox_scene_clear(struct cbox_scene *scene);
 extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *scene, const char *name, gboolean load, GError **error);
+extern struct cbox_instrument *cbox_scene_create_instrument(struct cbox_scene *scene, const char *instrument_name, const char *engine_name, GError **error);
 
 
 #endif

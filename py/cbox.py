@@ -334,11 +334,16 @@ class DocScene(DocObj):
         else:
             # Note: The positions in high-level API are zero-based.
             return self.cmd_makeobj("/add_layer", 1 + pos, aux)
-    def add_instrument_layer(self, aux, pos = None):
+    def add_instrument_layer(self, name, pos = None):
         if pos is None:
-            return self.cmd_makeobj("/add_instrument_layer", 0, aux)
+            return self.cmd_makeobj("/add_instrument_layer", 0, name)
         else:
-            return self.cmd_makeobj("/add_instrument_layer", 1 + pos, aux)
+            return self.cmd_makeobj("/add_instrument_layer", 1 + pos, name)
+    def add_new_instrument_layer(self, name, engine, pos = None):
+        if pos is None:
+            return self.cmd_makeobj("/add_new_instrument_layer", 0, name, engine)
+        else:
+            return self.cmd_makeobj("/add_new_instrument_layer", 1 + pos, name, engine)
     def transform_status(self, status):
         status.layers = [Document.map_uuid(i) for i in status.layer]
         delattr(status, 'layer')
