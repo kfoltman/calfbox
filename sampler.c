@@ -455,6 +455,20 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->delay -= CBOX_BLOCK_SIZE;
         return;
     }
+    if (v->last_waveform != v->layer->waveform)
+    {
+        v->last_waveform = v->layer->waveform;
+        if (v->layer->waveform)
+        {
+            v->mode = v->layer->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+            v->cur_sample_end = v->layer->waveform->info.frames;
+        }
+        else
+        {
+            v->mode = spt_inactive;
+            return;
+        }        
+    }
     // XXXKF I'm sacrificing sample accuracy for delays for now
     v->delay = 0;
     
@@ -578,21 +592,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
     float *tmp_outputs[2] = {left, right};
     uint32_t samples = 0;
-    if (v->last_waveform != v->layer->waveform)
-    {
-        v->last_waveform = v->layer->waveform;
-        if (v->layer->waveform)
-        {
-            v->mode = v->layer->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-            v->cur_sample_end = v->layer->waveform->info.frames;
-        }
-        else
-        {
-            v->mode = spt_inactive;
-            return;
-        }
-        
-    }
     samples = sampler_voice_sample_playback(v, tmp_outputs);
     for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
         left[i] = right[i] = 0.f;
