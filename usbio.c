@@ -484,8 +484,9 @@ static void sync_callback(struct libusb_transfer *transfer)
         }
         else if (transfer->iso_packet_desc[i].actual_length)
         {
+            assert(transfer->iso_packet_desc[i].actual_length == 3);
             size += data[ofs];
-            if (i)
+            if (i && transfer->iso_packet_desc[i - 1].actual_length)
                 assert(data[ofs + 1] == data[ofs - 64]);
             //printf("%d\n", (int)data[ofs]);
             if (uii->debug_sync)
