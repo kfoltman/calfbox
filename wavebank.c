@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <errno.h>
 #include <glib.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -38,6 +39,48 @@ GQuark cbox_waveform_error_quark()
     return g_quark_from_string("cbox-waveform-error-quark");
 }
 
+float func_sine(float v, void *user_data)
+{
+    return sin(2 * M_PI * v);
+}
+
+float func_sqr(float v, void *user_data)
+{
+    return v < 0.5 ? -1 : 1;
+}
+
+float func_saw(float v, void *user_data)
+{
+    return 2 * v - 1;
+}
+
+void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, void *user_data), void *user_data)
+{
+    int nsize = 2048;
+    int16_t *wave = calloc(nsize, sizeof(int16_t));
+    for (int i = 0; i < nsize; i++)
+    {
+        float v = getfunc(i * 1.0 / nsize, user_data);
+        if (fabs(v) > 1) 
+            v = (v < 0) ? -1 : 1;
+        wave[i] = (int16_t)(32767 * v);
+    }
+    struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
+    waveform->data = wave;
+    waveform->info.channels = 1;
+    waveform->info.frames = nsize;
+    waveform->info.samplerate = nsize * 440;
+    waveform->id = ++bank.serial_no;
+    waveform->bytes = waveform->info.channels * 2 * (waveform->info.frames + 1);
+    waveform->refcount = 1;
+    waveform->canonical_name = g_strdup(name);
+    waveform->display_name = g_strdup(name);
+    g_hash_table_insert(bank.waveforms_by_name, waveform->canonical_name, waveform);
+    g_hash_table_insert(bank.waveforms_by_id, &waveform->id, waveform);
+    // These waveforms are not included in the bank size, I don't think it has
+    // much value for the user.
+}
+
 void cbox_wavebank_init()
 {
     bank.bytes = 0;
@@ -45,6 +88,10 @@ void cbox_wavebank_init()
     bank.serial_no = 0;
     bank.waveforms_by_name = g_hash_table_new(g_str_hash, g_str_equal);
     bank.waveforms_by_id = g_hash_table_new(g_int_hash, g_int_equal);
+    
+    cbox_wavebank_add_std_waveform("*sine", func_sine, NULL);
+    cbox_wavebank_add_std_waveform("*saw", func_saw, NULL);
+    cbox_wavebank_add_std_waveform("*sqr", func_sqr, NULL);
 }
 
 struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *filename, GError **error)
@@ -56,6 +103,18 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     {
         g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, "%s: no filename specified", context_name);
         return NULL;
+    }
+    
+    // Built in waveforms don't go through path canonicalization
+    if (filename[0] == '*')
+    {
+        gpointer value = g_hash_table_lookup(bank.waveforms_by_name, filename);
+        if (value)
+        {
+            struct cbox_waveform *waveform = value;
+            cbox_waveform_ref(waveform);
+            return waveform;
+        }
     }
     
     char *canonical = realpath(filename, NULL);
@@ -74,8 +133,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
         return waveform;
     }
     
-    struct cbox_waveform *waveform = malloc(sizeof(struct cbox_waveform));
-    memset(&waveform->info, 0, sizeof(waveform->info));
+    struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
     SNDFILE *sndfile = sf_open(filename, SFM_READ, &waveform->info);
     if (!sndfile)
     {
