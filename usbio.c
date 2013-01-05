@@ -174,6 +174,19 @@ gboolean cbox_usbio_get_status(struct cbox_io_impl *impl, GError **error)
 static struct libusb_transfer *play_stuff_adaptive(struct cbox_usb_io_impl *uii, int index);
 static struct libusb_transfer *play_stuff_asynchronous(struct cbox_usb_io_impl *uii, int index);
 
+static void calc_output_buffer(struct cbox_usb_io_impl *uii)
+{
+    struct cbox_io *io = uii->ioi.pio;
+    for (int b = 0; b < uii->output_channels; b++)
+        memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
+    io->cb->process(io->cb->user_data, io, io->buffer_size);
+    for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_input *umi = p->data;
+        cbox_midi_buffer_clear(&umi->midi_buffer);
+    }
+}
+
 static void fill_playback_buffer(struct cbox_usb_io_impl *uii, struct libusb_transfer *transfer)
 {
     static double phase = 0;
@@ -191,14 +204,7 @@ static void fill_playback_buffer(struct cbox_usb_io_impl *uii, struct libusb_tra
     {
         if (rptr == io->buffer_size)
         {
-            for (b = 0; b < oc; b++)
-                memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
-            io->cb->process(io->cb->user_data, io, io->buffer_size);
-            for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
-            {
-                struct cbox_usb_midi_input *umi = p->data;
-                cbox_midi_buffer_clear(&umi->midi_buffer);
-            }
+            calc_output_buffer(uii);
             rptr = 0;
         }
         int left1 = nframes - i;
