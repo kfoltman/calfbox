@@ -194,14 +194,14 @@ void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *
     dst->use_keyswitch = src->use_keyswitch;
     dst->last_key = src->last_key;
     memcpy(dst->velcurve, src->velcurve, 128 * sizeof(float));
-    dst->modulations = g_slist_copy(dst->modulations);
+    dst->modulations = g_slist_copy(src->modulations);
     for(GSList *mod = dst->modulations; mod; mod = mod->next)
     {
         gpointer dst = g_malloc(sizeof(struct sampler_modulation));
         memcpy(dst, mod->data, sizeof(struct sampler_modulation));
         mod->data = dst;
     }
-    dst->nifs = g_slist_copy(dst->nifs);
+    dst->nifs = g_slist_copy(src->nifs);
     for(GSList *nif = dst->nifs; nif; nif = nif->next)
     {
         gpointer dst = g_malloc(sizeof(struct sampler_noteinitfunc));
