@@ -486,8 +486,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     
     if (v->amp_env.cur_stage < 0)
     {
-        if (v->cutoff == -1 || 
-            (!cbox_biquadf_is_audible(&v->filter_left, 1.0 / 65536.0) && !cbox_biquadf_is_audible(&v->filter_right, 1.0 / 65536.0)))
+        if (v->cutoff == -1 || is_tail_finished(v))
         {
             v->mode = spt_inactive;
             return;
