@@ -591,7 +591,7 @@ static void start_midi_capture(struct cbox_usb_io_impl *uii)
         struct cbox_usb_midi_input *umi = p->data;
         cbox_midi_buffer_clear(&umi->midi_buffer);
         umi->transfer = libusb_alloc_transfer(0);
-        libusb_fill_bulk_transfer(umi->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, umi->max_packet_size, midi_transfer_cb, umi, 1000);
+        libusb_fill_bulk_transfer(umi->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, umi->max_packet_size, midi_transfer_cb, umi, 0);
         uii->midi_input_port_buffers[uii->midi_input_port_count] = &umi->midi_buffer;
         uii->midi_input_port_count++;
     }
