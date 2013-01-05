@@ -316,7 +316,10 @@ static void play_callback_adaptive(struct libusb_transfer *transfer)
     if (err)
     {
         if (err == LIBUSB_ERROR_NO_DEVICE)
+        {
             uii->device_removed++;
+            transfer->status = LIBUSB_TRANSFER_NO_DEVICE;
+        }
         g_warning("Cannot submit isochronous transfer, error = %s", libusb_error_name(err));
     }
 }
@@ -406,7 +409,10 @@ void play_callback_asynchronous(struct libusb_transfer *transfer)
     if (err)
     {
         if (err == LIBUSB_ERROR_NO_DEVICE)
+        {
+            transfer->status = LIBUSB_TRANSFER_NO_DEVICE;
             uii->device_removed++;
+        }
         g_warning("Cannot submit isochronous transfer, error = %s", libusb_error_name(err));
     }
 }
@@ -516,6 +522,8 @@ static void sync_callback(struct libusb_transfer *transfer)
     int err = libusb_submit_transfer(transfer);
     if (err)
     {
+        if (err == LIBUSB_ERROR_NO_DEVICE)
+            transfer->status = LIBUSB_TRANSFER_NO_DEVICE;
         g_warning("Cannot submit isochronous sync transfer, error = %s", libusb_error_name(err));
     }
     if (uii->debug_sync)
@@ -594,7 +602,9 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
             }
         }
     }
-    libusb_submit_transfer(transfer);
+    int err = libusb_submit_transfer(transfer);
+    if (err == LIBUSB_ERROR_NO_DEVICE)
+        transfer->status = LIBUSB_TRANSFER_NO_DEVICE;
 }
 
 static void start_midi_capture(struct cbox_usb_io_impl *uii)
@@ -628,7 +638,7 @@ static void stop_midi_capture(struct cbox_usb_io_impl *uii)
 
         uii->cancel_confirm = FALSE;
         libusb_cancel_transfer(umi->transfer);
-        while (!uii->cancel_confirm)
+        while (!uii->cancel_confirm && umi->transfer->status != LIBUSB_TRANSFER_NO_DEVICE)
             libusb_handle_events(uii->usbctx);
         libusb_free_transfer(umi->transfer);
         umi->transfer = NULL;
