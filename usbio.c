@@ -142,6 +142,7 @@ struct cbox_usb_device_info
 struct cbox_usb_midi_input
 {
     struct cbox_usb_io_impl *uii;
+    struct cbox_usb_device_info *devinfo;
     struct libusb_device_handle *handle;
     int busdevadr;
     int endpoint;
@@ -553,6 +554,8 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
     }
     if (transfer->status == LIBUSB_TRANSFER_TIMED_OUT || transfer->status == LIBUSB_TRANSFER_ERROR || transfer->status == LIBUSB_TRANSFER_STALL)
     {
+        if (transfer->status != LIBUSB_TRANSFER_TIMED_OUT)
+            g_warning("USB error on device %03d:%03d: transfer status %d", umi->busdevadr >> 8, umi->busdevadr & 255, transfer->status);
         libusb_submit_transfer(transfer);
         return;
     }
@@ -562,18 +565,33 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
         umi->uii->rt_midi_input_ports = g_list_remove(umi->uii->rt_midi_input_ports, umi);
         return;
     }
-    if (transfer->status != 0)
-        g_warning("USB error on device %03d:%03d: transfer status %d", umi->busdevadr >> 8, umi->busdevadr & 255, transfer->status);
-    for (int i = 0; i + 3 < transfer->actual_length; i += 4)
+
+    const struct cbox_usb_device_info *udi = umi->devinfo;
+    if (udi->vid == 0x09e8 && udi->pid == 0x0062)
     {
-        uint8_t *data = &transfer->buffer[i];
-        if ((data[0] & 15) >= 0x08)
+        for (int i = 0; i < transfer->actual_length;)
         {
-            // normalise: note on with vel 0 -> note off
-            if ((data[1] & 0xF0) == 0x90 && data[3] == 0)
-                cbox_midi_buffer_write_inline(&umi->midi_buffer, 0, data[1] - 0x10, data[2], data[3]);
-            else
-                cbox_midi_buffer_write_event(&umi->midi_buffer, 0, data + 1, midi_cmd_size(data[1]));
+            uint8_t *data = &transfer->buffer[i];
+            uint8_t len = data[0] & 15;
+            if (!len || i + len >= transfer->actual_length)
+                break;
+            cbox_midi_buffer_write_inline(&umi->midi_buffer, 0, data[1], len > 1 ? data[2] : 0, len > 2 ? data[3] : 0);
+            i += len + 1;
+        }
+    }
+    else
+    {
+        for (int i = 0; i + 3 < transfer->actual_length; i += 4)
+        {
+            uint8_t *data = &transfer->buffer[i];
+            if ((data[0] & 15) >= 0x08)
+            {
+                // normalise: note on with vel 0 -> note off
+                if ((data[1] & 0xF0) == 0x90 && data[3] == 0)
+                    cbox_midi_buffer_write_inline(&umi->midi_buffer, 0, data[1] - 0x10, data[2], data[3]);
+                else
+                    cbox_midi_buffer_write_event(&umi->midi_buffer, 0, data + 1, midi_cmd_size(data[1]));
+            }
         }
     }
     libusb_submit_transfer(transfer);
@@ -878,7 +896,7 @@ static gboolean configure_usb_interface(struct libusb_device_handle *handle, int
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot claim interface %d on device %03d:%03d for MIDI input: %s", ifno, bus, devadr, libusb_error_name(err));
         return FALSE;
     }
-    err = libusb_set_interface_alt_setting(handle, ifno, altset);
+    err = altset ? libusb_set_interface_alt_setting(handle, ifno, altset) : 0;
     if (err)
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set alt-setting %d for interface %d on device %03d:%03d for MIDI input: %s", altset, ifno, bus, devadr, libusb_error_name(err));
@@ -1018,6 +1036,17 @@ static const struct libusb_endpoint_descriptor *get_midi_input_endpoint(const st
     return NULL;
 }
 
+static const struct libusb_endpoint_descriptor *get_endpoint_by_address(const struct libusb_interface_descriptor *asdescr, uint8_t addr)
+{
+    for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
+    {
+        const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
+        if (ep->bEndpointAddress == addr)
+            return ep;
+    }
+    return NULL;
+}
+
 static struct cbox_usb_midi_input *open_midi_interface(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo, struct libusb_device_handle *handle, int ifno, int altset, const struct libusb_endpoint_descriptor *ep)
 {
     int bus = devinfo->bus;
@@ -1034,6 +1063,7 @@ static struct cbox_usb_midi_input *open_midi_interface(struct cbox_usb_io_impl *
     
     struct cbox_usb_midi_input *umi = malloc(sizeof(struct cbox_usb_midi_input));
     umi->uii = uii;
+    umi->devinfo = devinfo;
     umi->handle = handle;
     umi->busdevadr = devinfo->busdevadr;
     umi->endpoint = ep->bEndpointAddress;
@@ -1158,6 +1188,12 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
                         as_midi_in = asdescr->bAlternateSetting;
                         ep_midi_in = ep;
                     }
+                }
+                else if (udi->vid == 0x09e8 && udi->pid == 0x0062) // Akai MPD16
+                {
+                    intf_midi_in = asdescr->bInterfaceNumber;
+                    as_midi_in = asdescr->bAlternateSetting;
+                    ep_midi_in = get_endpoint_by_address(asdescr, 0x82);
                 }
             }
         }
