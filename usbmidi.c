@@ -126,14 +126,22 @@ void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii)
     g_list_free(uii->rt_midi_input_ports);
 }
 
-struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo, struct libusb_device_handle *handle, int ifno, int altset, const struct libusb_endpoint_descriptor *ep)
+void cbox_usb_midi_info_init(struct cbox_usb_midi_info *umi, struct cbox_usb_device_info *udi)
+{
+    umi->udi = udi;
+    umi->intf = -1;
+    umi->alt_setting = -1;
+    umi->ep = NULL;
+}
+
+struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo, struct libusb_device_handle *handle, const struct cbox_usb_midi_info *uminf)
 {
     int bus = devinfo->bus;
     int devadr = devinfo->devadr;
     GError *error = NULL;
     // printf("Has MIDI port\n");
     // printf("Output endpoint address = %02x\n", ep->bEndpointAddress);
-    if (!configure_usb_interface(handle, bus, devadr, ifno, altset, &error))
+    if (!configure_usb_interface(handle, bus, devadr, uminf->intf, uminf->alt_setting, &error))
     {
         g_warning("%s", error->message);
         g_error_free(error);
@@ -145,10 +153,10 @@ struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *u
     umi->devinfo = devinfo;
     umi->handle = handle;
     umi->busdevadr = devinfo->busdevadr;
-    umi->endpoint = ep->bEndpointAddress;
+    umi->endpoint = uminf->ep->bEndpointAddress;
     cbox_midi_buffer_init(&umi->midi_buffer);
     uii->midi_input_ports = g_list_prepend(uii->midi_input_ports, umi);
-    int len = ep->wMaxPacketSize;
+    int len = uminf->ep->wMaxPacketSize;
     if (len > 256)
         len = 256;
     umi->max_packet_size = len;

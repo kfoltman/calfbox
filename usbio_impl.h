@@ -105,6 +105,14 @@ struct cbox_usb_device_info
     int failures;
 };
 
+struct cbox_usb_midi_info
+{
+    struct cbox_usb_device_info *udi;
+    int intf;
+    int alt_setting;
+    const struct libusb_endpoint_descriptor *ep;
+};
+
 struct cbox_usb_midi_input
 {
     struct cbox_usb_io_impl *uii;
@@ -118,6 +126,7 @@ struct cbox_usb_midi_input
     uint8_t midi_recv_data[256];
 };
 
+extern void cbox_usb_midi_info_init(struct cbox_usb_midi_info *umi, struct cbox_usb_device_info *udi);
 extern void usbio_start_midi_capture(struct cbox_usb_io_impl *uii);
 extern void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii);
 
@@ -131,7 +140,7 @@ extern gboolean usbio_scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_
 extern void usbio_forget_device(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo);
 extern struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *uii,
     struct cbox_usb_device_info *devinfo, struct libusb_device_handle *handle,
-    int ifno, int altset, const struct libusb_endpoint_descriptor *ep);
+    const struct cbox_usb_midi_info *uminf);
 extern void usbio_run_idle_loop(struct cbox_usb_io_impl *uii);;
 
 #define USB_DEVICE_SETUP_TIMEOUT 2000

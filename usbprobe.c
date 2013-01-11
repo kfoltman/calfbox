@@ -162,6 +162,23 @@ static const struct libusb_endpoint_descriptor *get_endpoint_by_address(const st
     return NULL;
 }
 
+static gboolean parse_midi_class(struct cbox_usb_midi_info *umi, const struct libusb_interface_descriptor *asdescr, gboolean other_config)
+{
+    const struct libusb_endpoint_descriptor *ep = get_midi_input_endpoint(asdescr);
+    if (!ep)
+        return FALSE;
+    
+    if (other_config)
+        return TRUE;
+    
+    if (umi->ep)
+        return FALSE;
+    umi->intf = asdescr->bInterfaceNumber;
+    umi->alt_setting = asdescr->bAlternateSetting;
+    umi->ep = ep;
+    return TRUE;
+}
+
 static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_device *dev, uint16_t busdevadr, gboolean probe_only)
 {
     struct libusb_device_descriptor dev_descr;
@@ -214,9 +231,11 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         udi->last_probe_time = time(NULL);
     }
 
-    int intf_midi_in = -1, as_midi_in = -1;
-    const struct libusb_endpoint_descriptor *ep_midi_in = NULL;
     int active_config = 0, alt_config = -1;
+
+    struct cbox_usb_midi_info uminf;
+    cbox_usb_midi_info_init(&uminf, udi);
+
     gboolean is_midi = FALSE, is_audio = FALSE;
 
     // printf("%03d:%03d Device %04X:%04X\n", bus, devadr, dev_descr.idVendor, dev_descr.idProduct);
@@ -232,6 +251,7 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         }
             
         int cur_config = cfg_descr->bConfigurationValue;
+        gboolean other_config = cur_config != udi->active_config;
         uint32_t config_mask = 0;
         // XXXKF not sure about legal range for bConfigurationValue
         if(cfg_descr->bConfigurationValue >= 0 && cfg_descr->bConfigurationValue < 32)
@@ -247,33 +267,19 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
                 const struct libusb_interface_descriptor *asdescr = &idescr->altsetting[as];
                 if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 3)
                 {
-                    const struct libusb_endpoint_descriptor *ep = get_midi_input_endpoint(asdescr);
-                    if (!ep)
-                        continue;
-                    
-                    if (cur_config != udi->active_config)
-                    {
+                    if (parse_midi_class(&uminf, asdescr, other_config) && other_config)
                         udi->configs_with_midi |= config_mask;
-                        continue;
-                    }
-                    
-                    if (!ep_midi_in)
-                    {
-                        intf_midi_in = asdescr->bInterfaceNumber;
-                        as_midi_in = asdescr->bAlternateSetting;
-                        ep_midi_in = ep;
-                    }
                 }
                 else if (udi->vid == 0x09e8 && udi->pid == 0x0062) // Akai MPD16
                 {
-                    intf_midi_in = asdescr->bInterfaceNumber;
-                    as_midi_in = asdescr->bAlternateSetting;
-                    ep_midi_in = get_endpoint_by_address(asdescr, 0x82);
+                    uminf.intf = asdescr->bInterfaceNumber;
+                    uminf.alt_setting = asdescr->bAlternateSetting;
+                    uminf.ep = get_endpoint_by_address(asdescr, 0x82);
                 }
             }
         }
     }
-    if (!ep_midi_in && udi->configs_with_midi)
+    if (!uminf.ep && udi->configs_with_midi)
         g_warning("%03d:%03d - MIDI port available on different configs: mask=0x%x", bus, devadr, udi->configs_with_midi);
 
     if (udi->vid == 0x1210 && udi->pid == 0x0002) // Lexicon Omega
@@ -282,7 +288,7 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         is_audio = TRUE;
     
     // All configs/interfaces/alts scanned, nothing interesting found -> mark as unsupported
-    udi->is_midi = ep_midi_in != NULL;
+    udi->is_midi = uminf.ep != NULL;
     udi->is_audio = is_audio;
     if (!udi->is_midi && !udi->is_audio)
     {
@@ -309,10 +315,10 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         return udi->is_midi || udi->is_audio;
     }
     
-    if (ep_midi_in)
+    if (uminf.ep)
     {
         g_debug("Found MIDI device %03d:%03d, trying to open", bus, devadr);
-        if (0 != usbio_open_midi_interface(uii, udi, handle, intf_midi_in, as_midi_in, ep_midi_in))
+        if (0 != usbio_open_midi_interface(uii, udi, handle, &uminf))
             opened = TRUE;
     }
     if (udi->vid == 0x1210 && udi->pid == 0x0002)
