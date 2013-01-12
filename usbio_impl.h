@@ -105,6 +105,14 @@ struct cbox_usb_device_info
     int failures;
 };
 
+struct cbox_usb_audio_info
+{
+    struct cbox_usb_device_info *udi;
+    int intf;
+    int alt_setting;
+    const struct libusb_endpoint_descriptor *ep;
+};
+
 struct cbox_usb_midi_info
 {
     struct cbox_usb_device_info *udi;
@@ -130,6 +138,7 @@ extern void cbox_usb_midi_info_init(struct cbox_usb_midi_info *umi, struct cbox_
 extern void usbio_start_midi_capture(struct cbox_usb_io_impl *uii);
 extern void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii);
 
+extern void cbox_usb_audio_info_init(struct cbox_usb_audio_info *uai, struct cbox_usb_device_info *udi);
 extern void usbio_start_audio_playback(struct cbox_usb_io_impl *uii);
 extern void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii);
 

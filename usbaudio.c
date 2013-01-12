@@ -402,6 +402,14 @@ struct libusb_transfer *sync_stuff_asynchronous(struct cbox_usb_io_impl *uii, in
 
 ///////////////////////////////////////////////////////////////////////////
 
+void cbox_usb_audio_info_init(struct cbox_usb_audio_info *uai, struct cbox_usb_device_info *udi)
+{
+    uai->udi = udi;
+    uai->intf = -1;
+    uai->alt_setting = -1;
+    uai->ep = NULL;
+}
+
 void usbio_start_audio_playback(struct cbox_usb_io_impl *uii)
 {
     uii->desync = 0;

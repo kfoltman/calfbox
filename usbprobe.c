@@ -162,6 +162,253 @@ static const struct libusb_endpoint_descriptor *get_endpoint_by_address(const st
     return NULL;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+struct usb_ut_descriptor_header
+{
+    uint8_t bLength;
+    uint8_t bDescriptorType;
+    uint8_t bDescriptorSubtype;
+};
+
+struct usb_class_specific_header
+{
+    struct usb_ut_descriptor_header hdr;
+    uint8_t bcdADC[2];
+    uint8_t wTotalLengthLo, wTotalLengthHi;
+    uint8_t bInCollection;
+    uint8_t baInterfaceNr[0];
+};
+
+struct usbaudio_input_terminal_descriptor
+{
+    uint8_t bTerminalID;
+    uint8_t wTerminalTypeLo, wTerminalTypeHi;
+    uint8_t bAssocTerminal;
+    uint8_t bNrChannels;
+    uint8_t wChannelConfigLo, wChannelConfigHi;
+    uint8_t iChannelNames;
+    uint8_t iTerminal;
+};
+
+struct usbaudio_output_terminal_descriptor
+{
+    uint8_t bTerminalID;
+    uint8_t wTerminalTypeLo, wTerminalTypeHi;
+    uint8_t bAssocTerminal;
+    uint8_t bSourceID;
+    uint8_t iTerminal;
+};
+
+struct usbaudio_mixer_unit_descriptor1
+{
+    uint8_t bUnitID;
+    uint8_t bNrInPins;
+    uint8_t baSourceID[0];
+};
+
+struct usbaudio_mixer_unit_descriptor2
+{
+    uint8_t bNrChannels;
+    uint8_t wChannelConfigLo, wChannelConfigHi;
+    uint8_t bmControls[0];
+    // after the last index, 8-bit iMixer
+};
+
+struct usbaudio_selector_unit_descriptor1
+{
+    uint8_t bUnitID;
+    uint8_t bNrInPins;
+    uint8_t baSourceID[0];
+    // after the last index, 8-bit iSelector
+};
+
+struct usbaudio_feature_unit_descriptor1
+{
+    uint8_t bUnitID;
+    uint8_t bSourceID;
+    uint8_t bControlSize;
+    uint8_t bmaControls[0];
+    // after the last index, 8-bit iFeature
+};
+
+// Unit/Terminal Descriptor header from the spec
+#include <stdio.h>
+
+// termt10.pdf
+static const char *get_terminal_type_name(int type)
+{
+    switch(type)
+    {
+        case 0x101: return "USB Streaming";
+        case 0x1FF: return "USB vendor specific";
+        case 0x201: return "Microphone";
+        case 0x202: return "Desktop microphone";
+        case 0x203: return "Personal microphone";
+        case 0x204: return "Omni-directional microphone";
+        case 0x205: return "Microphone array";
+        case 0x206: return "Processing microphone array";
+        case 0x301: return "Speaker";
+        case 0x302: return "Headphones";
+        case 0x303: return "Head-mounted display audio";
+        case 0x304: return "Desktop speaker";
+        case 0x305: return "Room speaker";
+        case 0x306: return "Communication speaker";
+        case 0x307: return "Low-frequency effects speaker";
+        case 0x400: return "Bi-directional Undefined";
+        case 0x401: return "Handset (handheld)";
+        case 0x402: return "Handset (head-mounted)";
+        case 0x403: return "Speakerphone";
+        case 0x404: return "Echo-suppressing speakerphone";
+        case 0x405: return "Echo-cancelling speakerphone";
+        case 0x501: return "Phone line";
+        case 0x502: return "Telephone";
+        case 0x503: return "Down line phone";
+        case 0x600: return "External Undefined";
+        case 0x601: return "Analog connector";
+        case 0x602: return "Digital audio interface";
+        case 0x603: return "Line connector";
+        case 0x604: return "Legacy audio";
+        case 0x605: return "S/PDIF";
+        case 0x606: return "1394 D/A Stream";
+        case 0x607: return "1394 D/V Stream Sountrack";
+        case 0x700: return "Embedded undefined";
+        case 0x701: return "Level calibration noise source";
+        case 0x702: return "Equalization noise";
+        case 0x703: return "CD player";
+        case 0x704: return "DAT";
+        case 0x705: return "DCC";
+        case 0x706: return "MiniDisc";
+        case 0x707: return "Analog tape";
+        case 0x708: return "Phono";
+        case 0x709: return "VCR Audio";
+        case 0x70A: return "VideoDisc Audio";
+        case 0x70B: return "DVD Audio";
+        case 0x70C: return "TV Tuner Audio";
+        case 0x70D: return "Satellite Receiver Audio";
+        case 0x70E: return "Cable Tuner Audio";
+        case 0x70F: return "DSS Audio";
+        case 0x710: return "Radio Receiver";
+        case 0x711: return "Radio Transmitter";
+        case 0x712: return "Multitrack Recorder";
+        case 0x713: return "Synthesizer";
+        default:
+            return "Unknown";
+    }
+}
+
+static gboolean parse_audio_control_class(struct cbox_usb_audio_info *uai, const struct libusb_interface_descriptor *asdescr, gboolean other_config)
+{
+#if 0
+    if (asdescr->extra_length < 8)
+    {
+        g_warning("AudioControl interface descriptor length is %d, should be at least 8", (int)asdescr->extra_length);
+        return FALSE;
+    }
+    const struct usb_class_specific_header *extra = (const struct usb_class_specific_header *)asdescr->extra;
+    uint16_t wTotalLength = extra->wTotalLengthLo + 256 * extra->wTotalLengthHi;
+    if (wTotalLength > asdescr->extra_length)
+    {
+        g_warning("AudioControl interface descriptor total length is %d, but libusb value is %d", (int)wTotalLength, (int)asdescr->extra_length);
+        return FALSE;
+    }
+    if (extra->hdr.bDescriptorType != 36)
+    {
+        g_warning("AudioControl interface descriptor type is %d, but expected 36 (CS_INTERFACE)", (int)extra->hdr.bDescriptorType);
+        return FALSE;
+    }
+    if (extra->hdr.bDescriptorSubtype != 1)
+    {
+        g_warning("AudioControl interface descriptor type is %d, but expected 1 (HEADER)", (int)extra->hdr.bDescriptorSubtype);
+        return FALSE;
+    }
+    
+    printf("Device %04x:%04x\n", uai->udi->vid, uai->udi->pid);
+    printf("hdrlen=%d dt=%d dst=%d ver=%02x%02x total len=%d\n", extra->hdr.bLength, extra->hdr.bDescriptorType, extra->hdr.bDescriptorSubtype, extra->bcdADC[0], extra->bcdADC[1], wTotalLength);
+    for(int i = 0; i < extra->bInCollection; i++)
+    {
+        printf("interface nr %d = %d\n", i, extra->baInterfaceNr[i]);
+    }
+    
+    for(uint32_t pos = extra->hdr.bLength; pos < wTotalLength; pos += asdescr->extra[pos])
+    {
+        const struct usb_ut_descriptor_header *hdr = (const struct usb_ut_descriptor_header *)(asdescr->extra + pos);
+        if (hdr->bDescriptorType != 36)
+        {
+            g_warning("Skipping unit/terminal descriptor type %d,%d", (int)hdr->bDescriptorType, (int)hdr->bDescriptorSubtype);
+            continue;
+        }
+        printf("hdr %d,%d len %d\n", hdr->bDescriptorType, hdr->bDescriptorSubtype, hdr->bLength);        
+        switch(hdr->bDescriptorSubtype)
+        {
+            case 2: // INPUT_TERMINAL
+            {
+                const struct usbaudio_input_terminal_descriptor *itd = (const struct usbaudio_input_terminal_descriptor *)(hdr + 1);
+                int wTerminalType = itd->wTerminalTypeHi * 256 + itd->wTerminalTypeLo;
+                printf("INPUT TERMINAL %d: type %04x (%s)\n", (int)itd->bTerminalID, wTerminalType, get_terminal_type_name(wTerminalType));
+                break;
+            }
+            case 3: // OUTPUT_TERMINAL
+            {
+                const struct usbaudio_output_terminal_descriptor *otd = (const struct usbaudio_output_terminal_descriptor *)(hdr + 1);
+                int wTerminalType = otd->wTerminalTypeHi * 256 + otd->wTerminalTypeLo;
+                printf("OUTPUT TERMINAL %d: type %04x (%s) source %d\n", (int)otd->bTerminalID, wTerminalType, get_terminal_type_name(wTerminalType), otd->bSourceID);
+                break;
+            }
+            case 4: // MIXER_UNIT
+            {
+                const struct usbaudio_mixer_unit_descriptor1 *mud = (const struct usbaudio_mixer_unit_descriptor1 *)(hdr + 1);
+                printf("MIXER UNIT %d\n", (int)mud->bUnitID);
+                for (int i = 0; i < mud->bNrInPins; i++)
+                {
+                    printf("Input[%d] = %d\n", i, mud->baSourceID[i]);
+                }
+                break;
+            }
+            case 5: // SELECTOR_UNIT
+            {
+                const struct usbaudio_selector_unit_descriptor1 *sud = (const struct usbaudio_selector_unit_descriptor1 *)(hdr + 1);
+                printf("SELECTOR UNIT %d (%d pins)\n", (int)sud->bUnitID, sud->bNrInPins);
+                for (int i = 0; i < sud->bNrInPins; i++)
+                {
+                    printf("Input[%d] = %d\n", i, sud->baSourceID[i]);
+                }
+                break;
+            }
+            case 6: // FEATURE_UNIT
+            {
+                static const char *features[] = {"Mute", "Volume", "Bass", "Mid", "Treble", "EQ", "AGC", "Delay", "Bass Boost", "Loudness" };
+                const struct usbaudio_feature_unit_descriptor1 *fud = (const struct usbaudio_feature_unit_descriptor1 *)(hdr + 1);
+                printf("FEATURE UNIT %d (source = %d, control size %d)\n", (int)fud->bUnitID, fud->bSourceID, fud->bControlSize);
+                for (int i = 0; i < fud->bControlSize * 8; i++)
+                {
+                    if (i >= sizeof(features) / sizeof(features[0]))
+                        break;
+                    if (fud->bmaControls[i >> 3] & (1 << (i & 7)))
+                        printf("Master %s\n", features[i]);
+                }
+                for (int ch = 1; ch < (hdr->bLength - 7) / fud->bControlSize; ch++)
+                {
+                    int chofs = ch * fud->bControlSize;
+                    for (int i = 0; i < fud->bControlSize * 8; i++)
+                    {
+                        if (i >= sizeof(features) / sizeof(features[0]))
+                            break;
+                        if (fud->bmaControls[(i >> 3) + chofs] & (1 << (i & 7)))
+                            printf("Channel %d %s\n", ch, features[i]);
+                    }
+                }
+                break;
+            }
+            default:
+                printf("Unsupported unit type %d\n", hdr->bDescriptorSubtype);
+                break;
+        }
+    }
+#endif
+    return FALSE;
+}
+
 static gboolean parse_midi_class(struct cbox_usb_midi_info *umi, const struct libusb_interface_descriptor *asdescr, gboolean other_config)
 {
     const struct libusb_endpoint_descriptor *ep = get_midi_input_endpoint(asdescr);
@@ -233,6 +480,9 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
 
     int active_config = 0, alt_config = -1;
 
+    struct cbox_usb_audio_info uainf;
+    cbox_usb_audio_info_init(&uainf, udi);
+
     struct cbox_usb_midi_info uminf;
     cbox_usb_midi_info_init(&uminf, udi);
 
@@ -265,7 +515,12 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
             for (int as = 0; as < idescr->num_altsetting; as++)
             {
                 const struct libusb_interface_descriptor *asdescr = &idescr->altsetting[as];
-                if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 3)
+                if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 1)
+                {
+                    if (parse_audio_control_class(&uainf, asdescr, other_config) && other_config)
+                        udi->configs_with_audio |= config_mask;
+                }
+                else if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 3)
                 {
                     if (parse_midi_class(&uminf, asdescr, other_config) && other_config)
                         udi->configs_with_midi |= config_mask;
