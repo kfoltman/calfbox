@@ -240,6 +240,8 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
     {
         l->loop_start = 0;
     }
+    if (l->off_mode == som_unknown)
+        l->off_mode = l->off_by != 0 ? som_fast : som_normal;
 
     // if no amp_velcurve_nnn setting, default to quadratic
     if (l->velcurve_quadratic == -1)
@@ -433,8 +435,10 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     }
 #define PROC_APPLY_PARAM_enum(enumtype, name, def_value) \
     if (!strcmp(key, #name)) { \
-        if (!enumtype##_from_string(value, &l->name))  \
+        if (!enumtype##_from_string(value, &l->name)) { \
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Value %s is not a correct value for %s", value, #name); \
             return FALSE; \
+        } \
         l->has_##name = 1; \
         return TRUE; \
     }

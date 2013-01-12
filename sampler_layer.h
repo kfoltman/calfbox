@@ -51,8 +51,16 @@ enum sample_loop_mode
     MACRO("loop_continuous", slm_loop_continuous) \
     MACRO("loop_sustain", slm_loop_sustain) 
 
-extern gboolean sample_loop_mode_from_string(const char *name, enum sample_loop_mode *value);
-extern const char *sample_loop_mode_to_string(enum sample_loop_mode value);
+enum sample_off_mode
+{
+    som_unknown,
+    som_normal,
+    som_fast
+};
+
+#define ENUM_VALUES_sample_off_mode(MACRO) \
+    MACRO("normal", som_normal) \
+    MACRO("fast", som_fast)  
 
 enum sampler_filter_type
 {
@@ -77,8 +85,16 @@ enum sampler_filter_type
     MACRO("lpf_1p", sft_lp6)  \
     MACRO("hpf_1p", sft_hp6)
 
-extern gboolean sampler_filter_type_from_string(const char *name, enum sampler_filter_type *value);
-extern const char *sampler_filter_type_to_string(enum sampler_filter_type value);
+#define ENUM_LIST(MACRO) \
+    MACRO(sample_loop_mode) \
+    MACRO(sample_off_mode) \
+    MACRO(sampler_filter_type) \
+
+#define MAKE_FROM_TO_STRING_EXTERN(enumtype) \
+    extern const char *enumtype##_to_string(enum enumtype value); \
+    extern gboolean enumtype##_from_string(const char *name, enum enumtype *value);
+
+ENUM_LIST(MAKE_FROM_TO_STRING_EXTERN)
 
 enum sampler_modsrc
 {
@@ -177,6 +193,7 @@ typedef int midi_note_t;
     MACRO(int, hivel, 127) \
     MACRO(int, velcurve_quadratic, -1) \
     MACRO##_enum(sampler_filter_type, filter, sft_lp12) \
+    MACRO##_enum(sample_off_mode, off_mode, som_unknown) \
     MACRO(float, cutoff, -1) \
     MACRO##_dBamp(float, resonance, 0) \
     MACRO(midi_note_t, sw_lokey, 0) \

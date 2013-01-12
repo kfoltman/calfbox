@@ -235,15 +235,23 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
     {
         for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
         {
-            if (m->voices[i].mode == spt_inactive)
+            struct sampler_voice *v = &m->voices[i];
+            if (v->mode == spt_inactive)
                 continue;
 
             for (int j = 0; j < exgroupcount; j++)
             {
-                if (m->voices[i].off_by == exgroups[j] && m->voices[i].note != note)
+                if (v->off_by == exgroups[j] && v->note != note)
                 {
-                    m->voices[i].released = 1;
-                    cbox_envelope_go_to(&m->voices[i].amp_env, 15);
+                    if (v->layer->off_mode == som_fast)
+                    {
+                        v->released = 1;
+                        cbox_envelope_go_to(&v->amp_env, 15);
+                    }
+                    else
+                    {
+                        v->released = 1;
+                    }
                     break;
                 }
             }
@@ -1246,8 +1254,7 @@ void sampler_destroyfunc(struct cbox_module *module)
         return FALSE; \
     }
 
-MAKE_FROM_TO_STRING(sampler_filter_type)
-MAKE_FROM_TO_STRING(sample_loop_mode)
+ENUM_LIST(MAKE_FROM_TO_STRING)
 
 //////////////////////////////////////////////////////////////////////////
 // Note initialisation functions
