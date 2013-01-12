@@ -142,6 +142,8 @@ typedef int midi_note_t;
     MACRO(int, transpose, 0) \
     MACRO(int, lochan, 1) \
     MACRO(int, hichan, 16) \
+    MACRO(float, lorand, 0) \
+    MACRO(float, hirand, 1) \
     MACRO(midi_note_t, key, -1) \
     MACRO(midi_note_t, lokey, 0) \
     MACRO(midi_note_t, hikey, 127) \
@@ -150,6 +152,7 @@ typedef int midi_note_t;
     MACRO(midi_note_t, fil_keycenter, 60) \
     MACRO(int, fil_keytrack, 0) \
     MACRO(int, fil_veltrack, 0) \
+    MACRO(int, amp_veltrack, 100) \
     MACRO(int, lovel, 0) \
     MACRO(int, hivel, 127) \
     MACRO(int, velcurve_quadratic, -1) \

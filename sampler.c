@@ -49,7 +49,7 @@ static void sampler_process_block(struct cbox_module *module, cbox_sample_t **in
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void sampler_destroyfunc(struct cbox_module *module);
 
-GSList *skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel)
+GSList *skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random)
 {
     int ch = (c - c->module->channels) + 1;
     for(;next_layer;next_layer = g_slist_next(next_layer))
@@ -62,7 +62,7 @@ GSList *skip_inactive_layers(struct sampler_program *prg, struct sampler_channel
             if (note >= l->sw_lokey && note <= l->sw_hikey)
                 l->last_key = note;
         }
-        if (note >= l->lokey && note <= l->hikey && vel >= l->lovel && vel <= l->hivel && ch >= l->lochan && ch <= l->hichan)
+        if (note >= l->lokey && note <= l->hikey && vel >= l->lovel && vel <= l->hivel && ch >= l->lochan && ch <= l->hichan && random >= l->lorand && random < l->hirand)
         {
             if (!l->use_keyswitch || 
                 ((l->sw_last == -1 || l->sw_last == l->last_key) &&
@@ -123,8 +123,8 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     v->frac_pos = 0;
     v->loop_start = l->loop_start;
     v->loop_overlap = l->loop_overlap;
-    v->loop_overlap_step = 1.0 / l->loop_overlap;
-    v->gain = l->volume_linearized * l->velcurve[vel];
+    v->loop_overlap_step = 1.0 / l->loop_overlap;    
+    v->gain = l->volume_linearized * (1.0 + (l->velcurve[vel] - 1.0) * l->amp_veltrack * 0.01);
     v->note = note;
     v->vel = vel;
     v->mode = l->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
@@ -202,11 +202,12 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
 
 void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
 {
+    float random = rand() * 1.0 / (RAND_MAX + 1.0);
     c->switchmask[note >> 5] |= 1 << (note & 31);
     struct sampler_program *prg = c->program;
     if (!prg)
         return;
-    GSList *next_layer = skip_inactive_layers(prg, c, prg->layers, note, vel);
+    GSList *next_layer = skip_inactive_layers(prg, c, prg->layers, note, vel, random);
     if (!next_layer)
     {
         c->previous_note = note;
@@ -224,7 +225,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             struct sampler_voice *v = &m->voices[i];
             struct sampler_layer *l = next_layer->data;
             sampler_start_voice(m, c, v, l, note, vel, exgroups, &exgroupcount);
-            next_layer = skip_inactive_layers(prg, c, g_slist_next(next_layer), note, vel);
+            next_layer = skip_inactive_layers(prg, c, g_slist_next(next_layer), note, vel, random);
             if (!next_layer)
                 break;
         }
