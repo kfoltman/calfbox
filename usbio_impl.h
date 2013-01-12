@@ -52,7 +52,7 @@ struct cbox_usb_io_impl
     int playback_counter;
     int sync_counter;
 
-    unsigned int iso_packets_omega, iso_packets_multimix;
+    unsigned int iso_packets, iso_packets_multimix;
 
     pthread_t thr_engine;
     volatile gboolean stop_engine, setup_error;
@@ -137,19 +137,20 @@ struct cbox_usb_midi_input
 extern void cbox_usb_midi_info_init(struct cbox_usb_midi_info *umi, struct cbox_usb_device_info *udi);
 extern void usbio_start_midi_capture(struct cbox_usb_io_impl *uii);
 extern void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii);
+extern struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *uii,
+    const struct cbox_usb_midi_info *uminf, struct libusb_device_handle *handle);
 
 extern void cbox_usb_audio_info_init(struct cbox_usb_audio_info *uai, struct cbox_usb_device_info *udi);
 extern void usbio_start_audio_playback(struct cbox_usb_io_impl *uii);
 extern void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii);
+extern gboolean usbio_open_audio_interface(struct cbox_usb_io_impl *uii, 
+    struct cbox_usb_audio_info *uainf, struct libusb_device_handle *handle, GError **error);
+extern gboolean usbio_open_audio_interface_multimix(struct cbox_usb_io_impl *uii, int bus, int devadr, struct libusb_device_handle *handle, GError **error);
 
-extern struct libusb_transfer *usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii, int index);
 extern struct libusb_transfer *usbio_play_buffer_asynchronous(struct cbox_usb_io_impl *uii, int index);
 extern gboolean usbio_scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only);
 
 extern void usbio_forget_device(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo);
-extern struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *uii,
-    struct cbox_usb_device_info *devinfo, struct libusb_device_handle *handle,
-    const struct cbox_usb_midi_info *uminf);
 extern void usbio_run_idle_loop(struct cbox_usb_io_impl *uii);;
 
 #define USB_DEVICE_SETUP_TIMEOUT 2000

@@ -134,8 +134,9 @@ void cbox_usb_midi_info_init(struct cbox_usb_midi_info *umi, struct cbox_usb_dev
     umi->ep = NULL;
 }
 
-struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo, struct libusb_device_handle *handle, const struct cbox_usb_midi_info *uminf)
+struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *uii, const struct cbox_usb_midi_info *uminf, struct libusb_device_handle *handle)
 {
+    struct cbox_usb_device_info *devinfo = uminf->udi;
     int bus = devinfo->bus;
     int devadr = devinfo->devadr;
     GError *error = NULL;

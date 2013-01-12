@@ -24,6 +24,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define NUM_SYNC_PACKETS 10
 
+#define MULTIMIX_EP_PLAYBACK 0x02
+//#define MULTIMIX_EP_CAPTURE 0x86
+#define MULTIMIX_EP_SYNC 0x81
+
+static struct libusb_transfer *usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii, int index);
+
+///////////////////////////////////////////////////////////////////////////////
+
+static gboolean set_endpoint_sample_rate(struct libusb_device_handle *h, int sample_rate, int ep)
+{
+    uint8_t freq_data[3];
+    freq_data[0] = sample_rate & 0xFF;
+    freq_data[1] = (sample_rate & 0xFF00) >> 8;
+    freq_data[2] = (sample_rate & 0xFF0000) >> 16;
+    if (libusb_control_transfer(h, 0x22, 0x01, 256, ep, freq_data, 3, USB_DEVICE_SETUP_TIMEOUT) != 3)
+        return FALSE;
+    return TRUE;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+gboolean usbio_open_audio_interface(struct cbox_usb_io_impl *uii, struct cbox_usb_audio_info *uainf, struct libusb_device_handle *handle, GError **error)
+{
+    if (uii->output_resolution != 2 && uii->output_resolution != 3)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Only 16-bit or 24-bit output resolution is supported.");
+        return FALSE;
+    }
+    if (!configure_usb_interface(handle, uainf->udi->bus, uainf->udi->devadr, uainf->intf, uainf->alt_setting, error))
+        return FALSE;
+    if (!set_endpoint_sample_rate(handle, uii->sample_rate, uainf->ep->bEndpointAddress))
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set sample rate on class-compliant USB audio device.");
+        return FALSE;
+    }
+    uii->play_function = usbio_play_buffer_adaptive;
+    uii->handle_audiodev = handle;
+    uii->audio_output_endpoint = uainf->ep->bEndpointAddress;
+    uii->audio_output_pktsize = uainf->ep->wMaxPacketSize; // 48 * 2 * uii->output_resolution;
+    uii->audio_sync_endpoint = 0;
+    return TRUE;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+static gboolean claim_multimix_interfaces(struct cbox_usb_io_impl *uii, struct libusb_device_handle *handle, int bus, int devadr, GError **error)
+{
+    static int interfaces[] = { 0, 1 };
+    for (int i = 0; i < sizeof(interfaces) / sizeof(int); i++)
+    {
+        int ifno = interfaces[i];
+        if (!configure_usb_interface(handle, bus, devadr, ifno, 1, error))
+            return FALSE;
+    }
+    return TRUE;
+}
+
+gboolean usbio_open_audio_interface_multimix(struct cbox_usb_io_impl *uii, int bus, int devadr, struct libusb_device_handle *handle, GError **error)
+{
+    if (uii->output_resolution != 3)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Only 24-bit output resolution is supported.");
+        return FALSE;
+    }
+    if (!claim_multimix_interfaces(uii, handle, bus, devadr, error))
+        return FALSE;
+    if (!set_endpoint_sample_rate(handle, uii->sample_rate, MULTIMIX_EP_PLAYBACK))
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set sample rate on Alesis Multimix.");
+        return FALSE;
+    }
+
+    uii->play_function = usbio_play_buffer_asynchronous;
+    uii->handle_audiodev = handle;
+    uii->audio_output_endpoint = MULTIMIX_EP_PLAYBACK;
+    uii->audio_output_pktsize = 156;
+    uii->audio_sync_endpoint = MULTIMIX_EP_SYNC;
+    return TRUE;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 static void calc_output_buffer(struct cbox_usb_io_impl *uii)
 {
     struct cbox_io *io = uii->ioi.pio;
@@ -177,7 +259,7 @@ struct libusb_transfer *usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii,
 {
     struct libusb_transfer *t;
     int i, err;
-    int packets = uii->iso_packets_omega;
+    int packets = uii->iso_packets;
     t = libusb_alloc_transfer(packets);
     int tsize = uii->sample_rate * 2 * uii->output_resolution / 1000;
     uint8_t *buf = (uint8_t *)calloc(1, uii->audio_output_pktsize);

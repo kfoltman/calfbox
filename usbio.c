@@ -28,7 +28,8 @@ running calfbox as root, or by setting right permissions in udev scripts
 - this may be considered a safer method.
 
 Devices supported:
-* Lexicon Omega (audio output and MIDI input)
+* Class-compliant audio output devices (tested with Lexicon Omega and some 
+  cheap no-brand C-Media USB soundcard dongle)
 * Alesis Multimix 8 USB 2.0 (audio output only)
 * Class-compliant MIDI input devices (tested with several devices)
 
@@ -253,7 +254,7 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     // shouldn't be more than 4, otherwise it will crackle due to limitations of
     // the packet length adjustment. It might work better if adjustment
     // was per-packet and not per-transfer.
-    uii->iso_packets_omega = cbox_config_get_int(cbox_io_section, "iso_packets_omega", 1);
+    uii->iso_packets = cbox_config_get_int(cbox_io_section, "iso_packets", 1);
     // The USB 2.0 device uses a higher packet rate (125us I think), so the
     // default number of packets per transfer needs to be different, too -
     // 1ms is a minimum reasonable value

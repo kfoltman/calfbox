@@ -19,125 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "usbio_impl.h"
 #include <errno.h>
 
-#define OMEGA_EP_PLAYBACK 0x01
-//#define OMEGA_EP_CAPTURE 0x83
-
-#define MULTIMIX_EP_PLAYBACK 0x02
-//#define MULTIMIX_EP_CAPTURE 0x86
-#define MULTIMIX_EP_SYNC 0x81
-
-///////////////////////////////////////////////////////////////////////////////
-
-static gboolean set_endpoint_sample_rate(struct libusb_device_handle *h, int sample_rate, int ep)
-{
-    uint8_t freq_data[3];
-    freq_data[0] = sample_rate & 0xFF;
-    freq_data[1] = (sample_rate & 0xFF00) >> 8;
-    freq_data[2] = (sample_rate & 0xFF0000) >> 16;
-    if (libusb_control_transfer(h, 0x22, 0x01, 256, ep, freq_data, 3, USB_DEVICE_SETUP_TIMEOUT) != 3)
-        return FALSE;
-    return TRUE;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-static gboolean claim_omega_interfaces(struct cbox_usb_io_impl *uii, struct libusb_device_handle *handle, int bus, int devadr, GError **error)
-{
-    static int interfaces[] = { 1, 2 };
-    int altsets[] = { uii->output_resolution == 3 ? 2 : 1, 1 };
-    for (int i = 0; i < sizeof(interfaces) / sizeof(int); i++)
-    {
-        int ifno = interfaces[i];
-        if (!configure_usb_interface(handle, bus, devadr, ifno, altsets[i], error))
-            return FALSE;
-    }
-    return TRUE;
-}
-
-static gboolean open_omega(struct cbox_usb_io_impl *uii, int bus, int devadr, struct libusb_device_handle *handle, GError **error)
-{
-    if (uii->output_resolution != 2 && uii->output_resolution != 3)
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Only 16-bit or 24-bit output resolution is supported.");
-        return FALSE;
-    }
-    if (!claim_omega_interfaces(uii, handle, bus, devadr, error))
-        return FALSE;
-    if (!set_endpoint_sample_rate(handle, uii->sample_rate, OMEGA_EP_PLAYBACK))
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set sample rate on Lexicon Omega.");
-        return FALSE;
-    }
-    uii->play_function = usbio_play_buffer_adaptive;
-    uii->handle_audiodev = handle;
-    uii->audio_output_endpoint = OMEGA_EP_PLAYBACK;
-    uii->audio_output_pktsize = 48 * 2 * uii->output_resolution;
-    uii->audio_sync_endpoint = 0;
-    return TRUE;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-static gboolean claim_multimix_interfaces(struct cbox_usb_io_impl *uii, struct libusb_device_handle *handle, int bus, int devadr, GError **error)
-{
-    static int interfaces[] = { 0, 1 };
-    for (int i = 0; i < sizeof(interfaces) / sizeof(int); i++)
-    {
-        int ifno = interfaces[i];
-        if (!configure_usb_interface(handle, bus, devadr, ifno, 1, error))
-            return FALSE;
-    }
-    return TRUE;
-}
-
-static gboolean open_multimix(struct cbox_usb_io_impl *uii, int bus, int devadr, struct libusb_device_handle *handle, GError **error)
-{
-    if (uii->output_resolution != 3)
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Only 24-bit output resolution is supported.");
-        return FALSE;
-    }
-    if (!claim_multimix_interfaces(uii, handle, bus, devadr, error))
-        return FALSE;
-#if 0
-    uint8_t res_config = uii->output_resolution == 3 ? 0x30 : 0x50;
-    // I wasn't able to find out what those URBs do. The 0x49 seems to affect the
-    // input bit rate (16-bit or 24-bit) via setting bit 5, but for other bits,
-    // I don't know if anything is using them.
-    // The 0x41 one - no clue at all, I just probed it using the loop below.
-    res_config = 0x0;
-    if (libusb_control_transfer(handle, 0x40, 0x41, res_config, 0, NULL, 0, 20000) != 0)
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set resolution on Alesis Multimix.");
-        return FALSE;
-    }
-    res_config = 0x20;
-    if (libusb_control_transfer(handle, 0x40, 0x49, res_config, 0, NULL, 0, 20000) != 0)
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set resolution on Alesis Multimix.");
-        return FALSE;
-    }
-    for (int i = 0; i < 255; i++)
-    {
-        uint8_t bufsize = 0;
-        if (libusb_control_transfer(handle, 0xC0, i, 0, 0, &bufsize, 1, 1000) == 1)
-            printf("Cmd %d value = %d\n", i, (int)bufsize);
-    }
-#endif
-    if (!set_endpoint_sample_rate(handle, uii->sample_rate, MULTIMIX_EP_PLAYBACK))
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set sample rate on Alesis Multimix.");
-        return FALSE;
-    }
-
-    uii->play_function = usbio_play_buffer_asynchronous;
-    uii->handle_audiodev = handle;
-    uii->audio_output_endpoint = MULTIMIX_EP_PLAYBACK;
-    uii->audio_output_pktsize = 156;
-    uii->audio_sync_endpoint = MULTIMIX_EP_SYNC;
-    return TRUE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 static const struct libusb_endpoint_descriptor *get_midi_input_endpoint(const struct libusb_interface_descriptor *asdescr)
@@ -146,6 +27,17 @@ static const struct libusb_endpoint_descriptor *get_midi_input_endpoint(const st
     {
         const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
         if (ep->bEndpointAddress >= 0x80)
+            return ep;
+    }
+    return NULL;
+}
+
+static const struct libusb_endpoint_descriptor *get_audio_output_endpoint(const struct libusb_interface_descriptor *asdescr)
+{
+    for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
+    {
+        const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
+        if (ep->bEndpointAddress < 0x80 && (ep->bmAttributes & 0xF) == 9) // output, isochronous, adaptive
             return ep;
     }
     return NULL;
@@ -409,6 +301,101 @@ static gboolean parse_audio_control_class(struct cbox_usb_audio_info *uai, const
     return FALSE;
 }
 
+struct usbaudio_streaming_interface_descriptor_general
+{
+    struct usb_ut_descriptor_header hdr; // 7, 36, 1
+    uint8_t bTerminalLink;
+    uint8_t bDelay;
+    uint8_t wFormatTagLo, wFormatTagHi;
+};
+
+struct usbaudio_streaming_interface_descriptor_format_type_pcm
+{
+    struct usb_ut_descriptor_header hdr; // 7, 36, 2
+    uint8_t bFormatType;
+    uint8_t bNrChannels;
+    uint8_t bSubframeSize;
+    uint8_t bBitResolution;
+    uint8_t bSamFreqType;
+    uint8_t taSamFreq[0][3];
+};
+
+static gboolean parse_audio_class(struct cbox_usb_io_impl *uii, struct cbox_usb_audio_info *uai, const struct libusb_interface_descriptor *asdescr, gboolean other_config)
+{
+    // omit alternate setting 0, as it's used to describe a 'standby' setting of the interface (no bandwidth)
+    if (asdescr->bAlternateSetting == 0)
+        return FALSE;
+    if (asdescr->extra_length < 7)
+    {
+        g_warning("AudioStreaming interface descriptor length is %d, should be at least 7", (int)asdescr->extra_length);
+        return FALSE;
+    }
+    const struct usbaudio_streaming_interface_descriptor_general *extra = (struct usbaudio_streaming_interface_descriptor_general *)asdescr->extra;
+    if (extra->hdr.bLength != 7 || extra->hdr.bDescriptorType != 36 || extra->hdr.bDescriptorSubtype != 1)
+    {
+        g_warning("The AudioStreaming descriptor does not start with the general descriptor (len %d, type %d, subtype %d)", (int)extra->hdr.bLength, (int)extra->hdr.bDescriptorType, (int)extra->hdr.bDescriptorSubtype);
+        return FALSE;
+    }
+    if (extra->wFormatTagLo != 1 || extra->wFormatTagHi != 0)
+    {
+        g_warning("The AudioStreaming descriptor does not describe a PCM device");
+        return FALSE;
+    }
+    const struct usbaudio_streaming_interface_descriptor_format_type_pcm *fmt = (struct usbaudio_streaming_interface_descriptor_format_type_pcm *)(asdescr->extra + extra->hdr.bLength);
+    if (fmt->hdr.bLength != 14 || fmt->hdr.bDescriptorType != 36 || fmt->hdr.bDescriptorSubtype != 2)
+    {
+        g_warning("The AudioStreaming descriptor does not have a format type descriptor after general descriptor (len %d, type %d, subtype %d)", (int)fmt->hdr.bLength, (int)fmt->hdr.bDescriptorType, (int)fmt->hdr.bDescriptorSubtype);
+        return FALSE;
+    }
+    
+    // We need this to tell inputs from outputs - until I implement reasonable
+    // Audio Control support
+    const struct libusb_endpoint_descriptor *ep = get_audio_output_endpoint(asdescr);
+    if (ep)
+    {
+        if (fmt->bBitResolution != uii->output_resolution * 8)
+        {
+            g_warning("Interface %d alternate setting %d does not support %d bit resolution, only %d", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, uii->output_resolution * 8, fmt->bBitResolution);
+            return FALSE;
+        }
+        if (fmt->bSamFreqType)
+        {
+            gboolean found = FALSE;
+            for (int i = 0; i < fmt->bSamFreqType; i++)
+            {
+                int sf = fmt->taSamFreq[i][0] + 256 * fmt->taSamFreq[i][1] + 65536 * fmt->taSamFreq[i][2];
+                if (sf == uii->sample_rate)
+                {
+                    found = TRUE;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                g_warning("Interface %d alternate setting %d does not support sample rate of %d Hz", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, uii->sample_rate);
+                for (int i = 0; i < fmt->bSamFreqType; i++)
+                {
+                    int sf = fmt->taSamFreq[i][0] + 256 * fmt->taSamFreq[i][1] + 65536 * fmt->taSamFreq[i][2];
+                    g_warning("Sample rate[%d] = %d Hz", i, sf);
+                }
+                return FALSE;
+            }
+        }
+        // XXXKF in case of continuous sample rate, check the limits... assuming
+        // that there are any devices with continuous sample rate, that is.
+        if (other_config)
+            return TRUE;
+        if (uai->ep)
+            return FALSE;
+        g_warning("Interface %d alt-setting %d endpoint %02x looks promising", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, ep->bEndpointAddress);
+        uai->intf = asdescr->bInterfaceNumber;
+        uai->alt_setting = asdescr->bAlternateSetting;
+        uai->ep = ep;
+        return TRUE;
+    }
+    return FALSE;
+}
+
 static gboolean parse_midi_class(struct cbox_usb_midi_info *umi, const struct libusb_interface_descriptor *asdescr, gboolean other_config)
 {
     const struct libusb_endpoint_descriptor *ep = get_midi_input_endpoint(asdescr);
@@ -520,6 +507,11 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
                     if (parse_audio_control_class(&uainf, asdescr, other_config) && other_config)
                         udi->configs_with_audio |= config_mask;
                 }
+                else if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 2)
+                {
+                    if (parse_audio_class(uii, &uainf, asdescr, other_config) && other_config)
+                        udi->configs_with_audio |= config_mask;
+                }
                 else if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 3)
                 {
                     if (parse_midi_class(&uminf, asdescr, other_config) && other_config)
@@ -537,7 +529,7 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
     if (!uminf.ep && udi->configs_with_midi)
         g_warning("%03d:%03d - MIDI port available on different configs: mask=0x%x", bus, devadr, udi->configs_with_midi);
 
-    if (udi->vid == 0x1210 && udi->pid == 0x0002) // Lexicon Omega
+    if (uainf.ep) // Class-compliant USB audio device
         is_audio = TRUE;
     if (udi->vid == 0x13b2 && udi->pid == 0x0030) // Alesis Multimix 8
         is_audio = TRUE;
@@ -573,13 +565,13 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
     if (uminf.ep)
     {
         g_debug("Found MIDI device %03d:%03d, trying to open", bus, devadr);
-        if (0 != usbio_open_midi_interface(uii, udi, handle, &uminf))
+        if (0 != usbio_open_midi_interface(uii, &uminf, handle))
             opened = TRUE;
     }
-    if (udi->vid == 0x1210 && udi->pid == 0x0002)
+    if (uainf.ep)
     {
         GError *error = NULL;
-        if (open_omega(uii, bus, devadr, handle, &error))
+        if (usbio_open_audio_interface(uii, &uainf, handle, &error))
         {
             // should have already been marked as opened by the MIDI code, but
             // I might add the ability to disable some MIDI interfaces at some point
@@ -588,14 +580,14 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         }
         else
         {
-            g_warning("Cannot open Lexicon Omega audio output: %s", error->message);
+            g_warning("Cannot open class-compliant USB audio output: %s", error->message);
             g_error_free(error);
         }
     }
-    if (udi->vid == 0x13b2 && udi->pid == 0x0030)
+    else if (udi->vid == 0x13b2 && udi->pid == 0x0030)
     {
         GError *error = NULL;
-        if (open_multimix(uii, bus, devadr, handle, &error))
+        if (usbio_open_audio_interface_multimix(uii, bus, devadr, handle, &error))
         {
             // should have already been marked as opened by the MIDI code, but
             // I might add the ability to disable some MIDI interfaces at some point
