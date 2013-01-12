@@ -1225,26 +1225,29 @@ void sampler_destroyfunc(struct cbox_module *module)
     free(m->programs);
 }
 
-enum sampler_filter_type sampler_filter_type_from_string(const char *name)
-{
-    if (!strcmp(name, "lpf_2p"))
-        return sft_lp12;
-    if (!strcmp(name, "hpf_2p"))
-        return sft_hp12;
-    if (!strcmp(name, "bpf_2p"))
-        return sft_bp6;
-    if (!strcmp(name, "lpf_4p"))
-        return sft_lp24;
-    if (!strcmp(name, "hpf_4p"))
-        return sft_hp24;
-    if (!strcmp(name, "bpf_4p"))
-        return sft_bp12;
-    if (!strcmp(name, "lpf_1p"))
-        return sft_lp6;
-    if (!strcmp(name, "hpf_1p"))
-        return sft_hp6;
-    return sft_unknown;
-}
+#define MAKE_TO_STRING_CONTENT(name, v) \
+    case v: return name;
+
+#define MAKE_FROM_STRING_CONTENT(n, v) \
+    if (!strcmp(name, n)) { *value = v; return TRUE; }
+
+#define MAKE_FROM_TO_STRING(enumtype) \
+    const char *enumtype##_to_string(enum enumtype value) \
+    { \
+        switch(value) { \
+            ENUM_VALUES_##enumtype(MAKE_TO_STRING_CONTENT) \
+            default: return NULL; \
+        } \
+    } \
+    \
+    gboolean enumtype##_from_string(const char *name, enum enumtype *value) \
+    { \
+        ENUM_VALUES_##enumtype(MAKE_FROM_STRING_CONTENT) \
+        return FALSE; \
+    }
+
+MAKE_FROM_TO_STRING(sampler_filter_type)
+MAKE_FROM_TO_STRING(sample_loop_mode)
 
 //////////////////////////////////////////////////////////////////////////
 // Note initialisation functions

@@ -45,7 +45,14 @@ enum sample_loop_mode
     slmcount
 };
 
-typedef enum sample_loop_mode sample_loop_mode_t;
+#define ENUM_VALUES_sample_loop_mode(MACRO) \
+    MACRO("no_loop", slm_no_loop) \
+    MACRO("one_shot", slm_one_shot)  \
+    MACRO("loop_continuous", slm_loop_continuous) \
+    MACRO("loop_sustain", slm_loop_sustain) 
+
+extern gboolean sample_loop_mode_from_string(const char *name, enum sample_loop_mode *value);
+extern const char *sample_loop_mode_to_string(enum sample_loop_mode value);
 
 enum sampler_filter_type
 {
@@ -59,6 +66,19 @@ enum sampler_filter_type
     sft_lp6,
     sft_hp6,
 };
+
+#define ENUM_VALUES_sampler_filter_type(MACRO) \
+    MACRO("lpf_2p", sft_lp12) \
+    MACRO("hpf_2p", sft_hp12) \
+    MACRO("bpf_2p", sft_bp6)  \
+    MACRO("lpf_4p", sft_lp24) \
+    MACRO("hpf_4p", sft_hp24) \
+    MACRO("bpf_4p", sft_bp12) \
+    MACRO("lpf_1p", sft_lp6)  \
+    MACRO("hpf_1p", sft_hp6)
+
+extern gboolean sampler_filter_type_from_string(const char *name, enum sampler_filter_type *value);
+extern const char *sampler_filter_type_to_string(enum sampler_filter_type value);
 
 enum sampler_modsrc
 {
@@ -135,7 +155,7 @@ typedef int midi_note_t;
     MACRO(uint32_t, loop_end, 0) \
     MACRO(uint32_t, end, 0) \
     MACRO(uint32_t, loop_overlap, -1) \
-    MACRO(sample_loop_mode_t, loop_mode, slm_unknown) \
+    MACRO##_enum(sample_loop_mode, loop_mode, slm_unknown) \
     MACRO##_dBamp(float, volume, 0) \
     MACRO(float, pan, 0) \
     MACRO(float, tune, 0) \
@@ -156,6 +176,7 @@ typedef int midi_note_t;
     MACRO(int, lovel, 0) \
     MACRO(int, hivel, 127) \
     MACRO(int, velcurve_quadratic, -1) \
+    MACRO##_enum(sampler_filter_type, filter, sft_lp12) \
     MACRO(float, cutoff, -1) \
     MACRO##_dBamp(float, resonance, 0) \
     MACRO(midi_note_t, sw_lokey, 0) \
@@ -220,6 +241,8 @@ struct sampler_lfo_has_fields
 #define PROC_FIELDS_TO_STRUCT_dBamp(type, name, def_value) \
     type name; \
     type name##_linearized;
+#define PROC_FIELDS_TO_STRUCT_enum(enumtype, name, def_value) \
+    enum enumtype name;
 #define PROC_FIELDS_TO_STRUCT_dahdsr(name, parname, index) \
     struct cbox_dahdsr name; \
     struct cbox_envelope_shape name##_shape;
@@ -229,6 +252,8 @@ struct sampler_lfo_has_fields
 #define PROC_HAS_FIELD(type, name, def_value) \
     unsigned int has_##name:1;
 #define PROC_HAS_FIELD_dBamp(type, name, def_value) \
+    PROC_HAS_FIELD(type, name, def_value)
+#define PROC_HAS_FIELD_enum(enumtype, name, def_value) \
     PROC_HAS_FIELD(type, name, def_value)
 
 #define PROC_HAS_FIELD_dahdsr(name, parname, index) \
@@ -247,7 +272,6 @@ struct sampler_layer
     struct sampler_program *parent_program;
     struct sampler_layer *parent_group;
     int child_count;
-    enum sampler_filter_type filter;
     struct cbox_waveform *waveform;
 
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
@@ -278,7 +302,5 @@ extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampl
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
-
-extern enum sampler_filter_type sampler_filter_type_from_string(const char *name);
 
 #endif

@@ -117,6 +117,8 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
 #define PROC_FIELDS_INITIALISER(type, name, def_value) \
     l->name = def_value; \
     l->has_##name = 0;
+#define PROC_FIELDS_INITIALISER_enum(type, name, def_value) \
+    PROC_FIELDS_INITIALISER(type, name, def_value)
 #define PROC_FIELDS_INITIALISER_dBamp(type, name, def_value) \
     l->name = def_value; \
     l->name##_linearized = -1; \
@@ -154,7 +156,6 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_INITIALISER)
     
     l->freq = 44100;
-    l->filter = sft_lp12;
     l->use_keyswitch = 0;
     l->last_key = 0;
     l->velcurve[0] = 0;
@@ -174,6 +175,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     dst->name = src->name; \
     dst->has_##name = 0;
 #define PROC_FIELDS_CLONE_dBamp PROC_FIELDS_CLONE
+#define PROC_FIELDS_CLONE_enum PROC_FIELDS_CLONE
 #define PROC_FIELDS_CLONE_dahdsr(name, parname, index) \
         DAHDSR_FIELDS(PROC_SUBSTRUCT_CLONE, name, dst, src) \
         DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst) 
@@ -217,6 +219,7 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *w
 }
 
 #define PROC_FIELDS_FINALISER(type, name, def_value) 
+#define PROC_FIELDS_FINALISER_enum(type, name, def_value) 
 #define PROC_FIELDS_FINALISER_dBamp(type, name, def_value) \
     l->name##_linearized = dB2gain(l->name);
 #define PROC_FIELDS_FINALISER_dahdsr(name, parname, index) \
@@ -409,23 +412,6 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     return TRUE;
 }
 
-static sample_loop_mode_t parse_loop_mode(const char *value)
-{
-    if (!strcmp(value, "one_shot"))
-        return slm_one_shot;
-    else if (!strcmp(value, "no_loop"))
-        return slm_no_loop;
-    else if (!strcmp(value, "loop_continuous"))
-        return slm_loop_continuous;
-    else if (!strcmp(value, "loop_sustain"))
-        return slm_loop_sustain;
-    else
-    {
-        g_warning("Unhandled loop mode: %s", value);
-        return slm_unknown;
-    }
-}
-
 #define PARSE_PARAM_midi_note_t(field, strname, valuestr) \
     return ((l->field = sfz_note_from_string(value)), (l->has_##field = 1));
 #define PARSE_PARAM_int(field, strname, valuestr) \
@@ -445,6 +431,13 @@ static sample_loop_mode_t parse_loop_mode(const char *value)
     if (!strcmp(key, #name)) { \
         return ((l->name = atof(value)), (l->has_##name = 1)); \
     }
+#define PROC_APPLY_PARAM_enum(enumtype, name, def_value) \
+    if (!strcmp(key, #name)) { \
+        if (!enumtype##_from_string(value, &l->name))  \
+            return FALSE; \
+        l->has_##name = 1; \
+        return TRUE; \
+    }
 // LFO and envelope need special handling now
 #define PROC_APPLY_PARAM_dahdsr(name, parname, index) \
     if (!strncmp(key, #parname "_", sizeof(#parname))) \
@@ -455,6 +448,7 @@ static sample_loop_mode_t parse_loop_mode(const char *value)
 
 gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error)
 {
+try_now:
     // XXXKF: this is seriously stupid code, this should use a hash table for
     // fixed strings, or something else that doesn't explode O(N**2) with
     // number of attributes. But premature optimization is a root of all evil.
@@ -493,7 +487,10 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
     else if (!strcmp(key, "loopend"))
         l->loop_end = atoi(value), l->has_loop_end = 1;
     else if (!strcmp(key, "loopmode"))
-        l->loop_mode = parse_loop_mode(value), l->has_loop_mode = (l->loop_mode != slm_unknown);
+    {
+        key = "loop_mode";
+        goto try_now; // yes, goto, why not?
+    }
     else if (!strcmp(key, "cutoff_chanaft"))
         sampler_layer_set_modulation1(l, smsrc_chanaft, smdest_cutoff, atof(value), 0);
     else if (!strcmp(key, "amp_random"))
@@ -504,14 +501,6 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
         sampler_layer_add_nif(l, sampler_nif_addrandom, 2, atof(value));
     else if (!strcmp(key, "pitch_veltrack"))
         sampler_layer_add_nif(l, sampler_nif_vel2pitch, 0, atof(value));
-    else if (!strcmp(key, "fil_type"))
-    {
-        enum sampler_filter_type ft = sampler_filter_type_from_string(value);
-        if (ft == sft_unknown)
-            g_warning("Unhandled filter type: %s", value);
-        else
-            l->filter = ft;
-    }
     else if (!strncmp(key, "delay_cc", 8))
     {
         int ccno = atoi(key + 8);
@@ -585,6 +574,9 @@ static const char *sample_loop_mode_names[] = {
 #define PROC_FIELDS_TO_FILEPTR_dBamp(type, name, def_value) \
     if (l->has_##name) \
         g_string_append_printf(outstr, " %s=%g", #name, (float)(l->name));
+#define PROC_FIELDS_TO_FILEPTR_enum(enumtype, name, def_value) \
+    if (l->has_##name && (tmpstr = enumtype##_to_string(l->name)) != NULL) \
+        g_string_append_printf(outstr, " %s=%s", #name, tmpstr);
 
 #define ENV_PARAM_OUTPUT(param, index, env, envfield, envname) \
     if (l->has_##envfield.param) \
@@ -598,6 +590,7 @@ static const char *sample_loop_mode_names[] = {
 gchar *sampler_layer_to_string(struct sampler_layer *l)
 {
     GString *outstr = g_string_sized_new(200);
+    const char *tmpstr;
     if (l->waveform && l->waveform->display_name)
         g_string_append_printf(outstr, " sample=%s", l->waveform->display_name);
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
