@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         loop_end = v->cur_sample_end; \
 
 #define IS_LOOP_FINISHED \
-    v->loop_mode == slm_no_loop || v->loop_mode == slm_one_shot || post_sustain
+    v->loop_mode == slm_no_loop || v->loop_mode == slm_one_shot || v->loop_mode == slm_one_shot_chokeable || post_sustain
 
 static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
 {
