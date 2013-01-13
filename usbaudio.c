@@ -139,7 +139,7 @@ static void calc_output_buffer(struct cbox_usb_io_impl *uii)
         real_time_registry[cpu_time_write_ptr] = time1;
         cpu_time_registry[cpu_time_write_ptr] = time2;
         cpu_time_write_ptr = (cpu_time_write_ptr + 1) % NUM_CPUTIME_ENTRIES;
-        if (time1 > 0.0005 || time2 > 0.0005)
+        if (time1 > 0.0008 || time2 > 0.0008)
             g_warning("CPU time = %f ms, real time = %f ms", time2 * 1000, time1 * 1000);
     }
 }
