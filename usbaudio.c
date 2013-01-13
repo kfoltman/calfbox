@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
+#include <time.h>
 
 #define NUM_SYNC_PACKETS 10
 
@@ -28,6 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //#define MULTIMIX_EP_CAPTURE 0x86
 #define MULTIMIX_EP_SYNC 0x81
 
+#define NUM_CPUTIME_ENTRIES 100
+
+static int register_cpu_time = 1;
+static float real_time_registry[NUM_CPUTIME_ENTRIES];
+static float cpu_time_registry[NUM_CPUTIME_ENTRIES];
+static int cpu_time_write_ptr = 0;
 static struct libusb_transfer *usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii, int index);
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -108,6 +115,12 @@ gboolean usbio_open_audio_interface_multimix(struct cbox_usb_io_impl *uii, int b
 
 static void calc_output_buffer(struct cbox_usb_io_impl *uii)
 {
+    struct timespec tvs1, tve1, tvs2, tve2;
+    if (register_cpu_time)
+    {
+        clock_gettime(CLOCK_MONOTONIC_RAW, &tvs1);
+        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &tvs2);
+    }
     struct cbox_io *io = uii->ioi.pio;
     for (int b = 0; b < uii->output_channels; b++)
         memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
@@ -116,6 +129,18 @@ static void calc_output_buffer(struct cbox_usb_io_impl *uii)
     {
         struct cbox_usb_midi_input *umi = p->data;
         cbox_midi_buffer_clear(&umi->midi_buffer);
+    }
+    if (register_cpu_time)
+    {
+        clock_gettime(CLOCK_MONOTONIC_RAW, &tve1);
+        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &tve2);
+        float time1 = tve1.tv_sec - tvs1.tv_sec + (tve1.tv_nsec - tvs1.tv_nsec) / 1000000000.0;
+        float time2 = tve2.tv_sec - tvs2.tv_sec + (tve2.tv_nsec - tvs2.tv_nsec) / 1000000000.0;
+        real_time_registry[cpu_time_write_ptr] = time1;
+        cpu_time_registry[cpu_time_write_ptr] = time2;
+        cpu_time_write_ptr = (cpu_time_write_ptr + 1) % NUM_CPUTIME_ENTRIES;
+        if (time1 > 0.0005 || time2 > 0.0005)
+            g_warning("CPU time = %f ms, real time = %f ms", time2 * 1000, time1 * 1000);
     }
 }
 
