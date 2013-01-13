@@ -233,7 +233,7 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
     if (l->loop_mode == slm_unknown)
         l->loop_mode = l->loop_end == 0 ? slm_no_loop : slm_loop_continuous;
     
-    if (l->loop_mode == slm_one_shot || l->loop_mode == slm_no_loop)
+    if (l->loop_mode == slm_one_shot || l->loop_mode == slm_no_loop || l->loop_mode == slm_one_shot_chokeable)
         l->loop_start = -1;
 
     if ((l->loop_mode == slm_loop_continuous || l->loop_mode == slm_loop_sustain) && l->loop_start == -1)
@@ -418,8 +418,6 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     return ((l->field = sfz_note_from_string(value)), (l->has_##field = 1));
 #define PARSE_PARAM_int(field, strname, valuestr) \
     return ((l->field = atoi(value)), (l->has_##field = 1));
-#define PARSE_PARAM_sample_loop_mode_t(field, strname, valuestr) \
-    return ((l->field = parse_loop_mode(value)), (l->has_##field = (l->field != slm_unknown)));
 #define PARSE_PARAM_uint32_t(field, strname, valuestr) \
     return ((l->field = (uint32_t)strtoul(value, NULL, 10)), (l->has_##field = 1));
 #define PARSE_PARAM_float(field, strname, valuestr) \
@@ -544,23 +542,12 @@ try_now:
     return TRUE;
 }
 
-static const char *sample_loop_mode_names[] = {
-    "unknown",
-    "no_loop",
-    "one_shot",
-    "loop_continuous",
-    "loop_sustain", // unsupported
-};
-
 #define TYPE_PRINTF_uint32_t(name, def_value) \
     if (l->has_##name) \
         g_string_append_printf(outstr, " %s=%u", #name, (unsigned)(l->name));
 #define TYPE_PRINTF_int(name, def_value) \
     if (l->has_##name) \
         g_string_append_printf(outstr, " %s=%d", #name, (int)(l->name));
-#define TYPE_PRINTF_sample_loop_mode_t(name, def_value) \
-    if (l->has_##name && l->name < slmcount) \
-        g_string_append_printf(outstr, " %s=%s", #name, sample_loop_mode_names[l->name]);
 #define TYPE_PRINTF_midi_note_t(name, def_value) \
     if (l->has_##name) { \
         int val = l->name; \
