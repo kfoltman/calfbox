@@ -42,6 +42,7 @@ enum sample_loop_mode
     slm_one_shot,
     slm_loop_continuous,
     slm_loop_sustain, // unsupported
+    slm_one_shot_chokeable,
     slmcount
 };
 
@@ -49,7 +50,8 @@ enum sample_loop_mode
     MACRO("no_loop", slm_no_loop) \
     MACRO("one_shot", slm_one_shot)  \
     MACRO("loop_continuous", slm_loop_continuous) \
-    MACRO("loop_sustain", slm_loop_sustain) 
+    MACRO("loop_sustain", slm_loop_sustain) \
+    MACRO("one_shot_chokeable", slm_one_shot_chokeable) 
 
 enum sample_off_mode
 {

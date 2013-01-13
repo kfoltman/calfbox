@@ -92,7 +92,7 @@ static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, i
 }
 
 
-static void sampler_voice_release(struct sampler_voice *v);
+static void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft);
 
 static void sampler_start_voice(struct sampler_module *m, struct sampler_channel *c, struct sampler_voice *v, struct sampler_layer *l, int note, int vel, int *exgroups, int *pexgroupcount)
 {
@@ -259,8 +259,10 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
     }
 }
 
-void sampler_voice_release(struct sampler_voice *v)
+void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
 {
+    if ((v->loop_mode == slm_one_shot_chokeable) != is_polyaft)
+        return;
     if (v->delay >= CBOX_BLOCK_SIZE)
     {
         v->released = 1;
@@ -274,7 +276,7 @@ void sampler_voice_release(struct sampler_voice *v)
         v->loop_start = -1; // should be guaranteed by layer settings anyway
 }
 
-void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
+void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel, gboolean is_polyaft)
 {
     c->switchmask[note >> 5] &= ~(1 << (note & 31));
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
@@ -287,7 +289,7 @@ void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int 
             else if (c->cc[64] >= 64)
                 v->released_with_sustain = 1;
             else
-                sampler_voice_release(v);
+                sampler_voice_release(v, is_polyaft);
         }
     }
 }
@@ -299,7 +301,7 @@ void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
         struct sampler_voice *v = &m->voices[i];
         if (v->mode != spt_inactive && v->channel == c && v->released_with_sustain)
         {
-            sampler_voice_release(v);
+            sampler_voice_release(v, FALSE);
             v->released_with_sustain = 0;
         }
     }
@@ -312,7 +314,7 @@ void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
         struct sampler_voice *v = &m->voices[i];
         if (v->mode != spt_inactive && v->channel == c && v->released_with_sostenuto)
         {
-            sampler_voice_release(v);
+            sampler_voice_release(v, FALSE);
             v->released_with_sostenuto = 0;
             // XXXKF unsure what to do with sustain
         }
@@ -324,7 +326,7 @@ void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel 
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
-        if (v->mode != spt_inactive && v->channel == c && !v->released && v->loop_mode != slm_one_shot)
+        if (v->mode != spt_inactive && v->channel == c && !v->released && v->loop_mode != slm_one_shot && v->loop_mode != slm_one_shot_chokeable)
         {
             // XXXKF unsure what to do with sustain
             v->captured_sostenuto = 1;
@@ -339,7 +341,7 @@ void sampler_stop_all(struct sampler_module *m, struct sampler_channel *c)
         struct sampler_voice *v = &m->voices[i];
         if (v->mode != spt_inactive && v->channel == c)
         {
-            sampler_voice_release(v);
+            sampler_voice_release(v, v->loop_mode == slm_one_shot_chokeable);
             v->released_with_sustain = 0;
             v->released_with_sostenuto = 0;
             v->captured_sostenuto = 0;
@@ -733,17 +735,20 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
         switch(cmd)
         {
             case 8:
-                sampler_stop_note(m, c, data[1], data[2]);
+                sampler_stop_note(m, c, data[1], data[2], FALSE);
                 break;
 
             case 9:
                 if (data[2] > 0)
                     sampler_start_note(m, c, data[1], data[2]);
                 else
-                    sampler_stop_note(m, c, data[1], data[2]);
+                    sampler_stop_note(m, c, data[1], data[2], FALSE);
                 break;
             
             case 10:
+                // handle chokeable one shot layers
+                if (data[2] == 127)
+                    sampler_stop_note(m, c, data[1], data[2], TRUE);
                 // polyphonic pressure not handled
                 break;
             
