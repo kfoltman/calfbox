@@ -104,6 +104,11 @@ void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
     {
         struct cbox_usb_midi_input *umi = p->data;
         int res = libusb_submit_transfer(umi->transfer);
+        if (res != 0)
+        {
+            libusb_free_transfer(umi->transfer);
+            umi->transfer = NULL;
+        }
     }
 }
 
@@ -112,6 +117,9 @@ void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii)
     for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
         struct cbox_usb_midi_input *umi = p->data;
+        
+        if (!umi->transfer)
+            continue;
 
         uii->cancel_confirm = FALSE;
         if (0 == libusb_cancel_transfer(umi->transfer))
