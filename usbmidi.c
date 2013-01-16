@@ -114,9 +114,11 @@ void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii)
         struct cbox_usb_midi_input *umi = p->data;
 
         uii->cancel_confirm = FALSE;
-        libusb_cancel_transfer(umi->transfer);
-        while (!uii->cancel_confirm && umi->transfer->status != LIBUSB_TRANSFER_NO_DEVICE)
-            libusb_handle_events(uii->usbctx);
+        if (0 == libusb_cancel_transfer(umi->transfer))
+        {
+            while (!uii->cancel_confirm && umi->transfer->status != LIBUSB_TRANSFER_NO_DEVICE)
+                libusb_handle_events(uii->usbctx);
+        }
         libusb_free_transfer(umi->transfer);
         umi->transfer = NULL;
         cbox_midi_buffer_clear(&umi->midi_buffer);

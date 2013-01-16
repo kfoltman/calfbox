@@ -564,9 +564,11 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
             if (uii->playback_transfers[i]->status != LIBUSB_TRANSFER_NO_DEVICE)
             {
                 uii->cancel_confirm = FALSE;
-                libusb_cancel_transfer(uii->playback_transfers[i]);
-                while (!uii->cancel_confirm && uii->playback_transfers[i]->status != LIBUSB_TRANSFER_NO_DEVICE)
-                    libusb_handle_events(uii->usbctx);
+                if (0 == libusb_cancel_transfer(uii->playback_transfers[i]))
+                {
+                    while (!uii->cancel_confirm && uii->playback_transfers[i]->status != LIBUSB_TRANSFER_NO_DEVICE)
+                        libusb_handle_events(uii->usbctx);
+                }
             }
         }
     }
@@ -579,9 +581,11 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
         for (int i = 0; i < uii->sync_counter; i++)
         {
             uii->cancel_confirm = FALSE;
-            libusb_cancel_transfer(uii->sync_transfers[i]);
-            while (!uii->cancel_confirm && uii->sync_transfers[i]->status != LIBUSB_TRANSFER_NO_DEVICE)
-                libusb_handle_events(uii->usbctx);
+            if (0 == libusb_cancel_transfer(uii->sync_transfers[i]))
+            {
+                while (!uii->cancel_confirm && uii->sync_transfers[i]->status != LIBUSB_TRANSFER_NO_DEVICE)
+                    libusb_handle_events(uii->usbctx);
+            }
         }
         for (int i = 0; i < uii->sync_counter; i++)
             libusb_free_transfer(uii->sync_transfers[i]);
