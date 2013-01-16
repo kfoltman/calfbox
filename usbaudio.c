@@ -404,6 +404,18 @@ struct libusb_transfer *usbio_play_buffer_asynchronous(struct cbox_usb_io_impl *
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+static void sync_remove_transfer(struct cbox_usb_io_impl *uii, struct libusb_transfer *transfer)
+{
+    for (int i = 0; i < uii->sync_counter; i++)
+    {
+        if (uii->sync_transfers[i] == transfer)
+        {
+            libusb_free_transfer(uii->sync_transfers[i]);
+            uii->sync_transfers[i] = NULL;
+        }
+    }
+}
+
 /*
  * The Multimix device controls the data rate of the playback stream using a
  * device-to-host isochronous endpoint. The incoming packets consist of 3 bytes:
@@ -436,6 +448,11 @@ static void sync_callback(struct libusb_transfer *transfer)
     if (transfer->status == LIBUSB_TRANSFER_CANCELLED)
     {
         uii->cancel_confirm = 1;
+        return;
+    }
+    if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE)
+    {
+        sync_remove_transfer(uii, transfer);
         return;
     }
     // XXXKF handle device disconnected error
@@ -479,7 +496,10 @@ static void sync_callback(struct libusb_transfer *transfer)
     if (err)
     {
         if (err == LIBUSB_ERROR_NO_DEVICE)
-            transfer->status = LIBUSB_TRANSFER_NO_DEVICE;
+        {
+            sync_remove_transfer(uii, transfer);
+            return;
+        }
         g_warning("Cannot submit isochronous sync transfer, error = %s", libusb_error_name(err));
     }
     if (uii->debug_sync)
@@ -580,6 +600,8 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
     {
         for (int i = 0; i < uii->sync_counter; i++)
         {
+            if (uii->sync_transfers[i] == NULL)
+                continue;
             uii->cancel_confirm = FALSE;
             if (0 == libusb_cancel_transfer(uii->sync_transfers[i]))
             {
