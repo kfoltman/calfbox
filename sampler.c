@@ -128,7 +128,7 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     v->note = note;
     v->vel = vel;
     v->mode = l->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-    v->filter = l->filter;
+    v->filter = l->fil_type;
     v->base_freq = l->freq;
     v->pitch = pitch;
     v->released = 0;

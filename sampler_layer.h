@@ -194,7 +194,7 @@ typedef int midi_note_t;
     MACRO(int, lovel, 0) \
     MACRO(int, hivel, 127) \
     MACRO(int, velcurve_quadratic, -1) \
-    MACRO##_enum(sampler_filter_type, filter, sft_lp12) \
+    MACRO##_enum(sampler_filter_type, fil_type, sft_lp12) \
     MACRO##_enum(sample_off_mode, off_mode, som_unknown) \
     MACRO(float, cutoff, -1) \
     MACRO##_dBamp(float, resonance, 0) \

@@ -192,7 +192,6 @@ void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *
     dst->parent_program = src->parent_program;
     dst->child_count = 0;
     dst->freq = src->freq;
-    dst->filter = src->filter;
     dst->use_keyswitch = src->use_keyswitch;
     dst->last_key = src->last_key;
     memcpy(dst->velcurve, src->velcurve, 128 * sizeof(float));
