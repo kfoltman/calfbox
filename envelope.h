@@ -40,15 +40,23 @@ struct cbox_envelope_shape
 struct cbox_envelope
 {
     struct cbox_envelope_shape *shape;
-    double stage_start_value, cur_value;
+    double stage_start_value, cur_value, exp_factor, inv_time;
     int cur_stage, cur_time;
 };
 
-static inline void cbox_envelope_reset(struct cbox_envelope *env)
+static inline void cbox_envelope_init_stage(struct cbox_envelope *env)
 {
-    env->cur_value = env->stage_start_value = env->shape->start_value;
-    env->cur_stage = 0;
-    env->cur_time = 0;
+    struct cbox_envstage *es = &env->shape->stages[env->cur_stage];
+    env->inv_time = es->time ? 1.0 / es->time : 1;
+    if (es->is_exp)
+    {
+        if (env->stage_start_value < 1.0/16384.0)
+            env->stage_start_value = 1.0/16384.0;
+        double ev = es->end_value;
+        if (ev < 1.0/16384.0)
+            ev = 1.0/16384.0;
+        env->exp_factor = log(ev/env->stage_start_value);
+    }
 }
 
 static inline void cbox_envelope_go_to(struct cbox_envelope *env, int stage)
@@ -56,6 +64,15 @@ static inline void cbox_envelope_go_to(struct cbox_envelope *env, int stage)
     env->stage_start_value = env->cur_value;
     env->cur_stage = stage;
     env->cur_time = 0;
+    cbox_envelope_init_stage(env);
+}
+
+static inline void cbox_envelope_reset(struct cbox_envelope *env)
+{
+    env->cur_value = 0;
+    env->cur_stage = 0;
+    env->cur_time = 0;
+    cbox_envelope_init_stage(env);
 }
 
 static inline float cbox_envelope_get_next(struct cbox_envelope *env, int released)
@@ -66,22 +83,12 @@ static inline float cbox_envelope_get_next(struct cbox_envelope *env, int releas
     }
     struct cbox_envstage *es = &env->shape->stages[env->cur_stage];
     env->cur_time++;
-    // XXXKF: could improve this later by precalculating 1/time too
-    double pos = es->time > 0 ? env->cur_time * 1.0 / es->time : 1;
+    double pos = es->time > 0 ? env->cur_time * env->inv_time : 1;
     if (es->is_exp)
     {
-        // this should be precalculated unless modulation is in progress
-        double sv = env->stage_start_value;
-        if (sv < 1.0/16384.0)
-            sv = 1.0/16384.0;
-        double ev = es->end_value;
-        if (ev < 1.0/16384.0)
-            ev = 1.0/16384.0;
-        // XXXKF: this is highly inefficient; it should be possible to at least
-        // replace it with exp() with precalculated multiplier, and then
-        // LUT the exp. Or factor it into LUTed pow(2, frac(x)) multiplied by
-        // 1 << floor(x).
-        env->cur_value = sv * pow(ev / sv, pos);
+        // instead of exp, may use 2**x which can be factored
+        // into a shift and a table lookup
+        env->cur_value = env->stage_start_value * exp(pos * env->exp_factor);
         if (env->cur_value <= 1.1/16384.0)
             env->cur_value = 0;
     }
@@ -95,6 +102,7 @@ static inline float cbox_envelope_get_next(struct cbox_envelope *env, int releas
         else
             env->stage_start_value = env->cur_value;
         env->cur_time = 0;
+        cbox_envelope_init_stage(env);
     }
     // printf("%d %d %d\n", env->cur_stage, env->cur_time, es->time);
     return env->cur_value;
