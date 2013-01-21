@@ -26,7 +26,7 @@ struct cbox_envstage
 {
     double end_value;
     int time;
-    int next_if_pressed, next_if_released, keep_last_value, break_on_release;
+    int next_if_pressed, next_if_released, keep_last_value, break_on_release, is_exp;
 };
 
 #define MAX_ENV_STAGES 16
@@ -66,8 +66,27 @@ static inline float cbox_envelope_get_next(struct cbox_envelope *env, int releas
     }
     struct cbox_envstage *es = &env->shape->stages[env->cur_stage];
     env->cur_time++;
+    // XXXKF: could improve this later by precalculating 1/time too
     double pos = es->time > 0 ? env->cur_time * 1.0 / es->time : 1;
-    env->cur_value = env->stage_start_value + (es->end_value - env->stage_start_value) * pos;
+    if (es->is_exp)
+    {
+        // this should be precalculated unless modulation is in progress
+        double sv = env->stage_start_value;
+        if (sv < 1.0/16384.0)
+            sv = 1.0/16384.0;
+        double ev = es->end_value;
+        if (ev < 1.0/16384.0)
+            ev = 1.0/16384.0;
+        // XXXKF: this is highly inefficient; it should be possible to at least
+        // replace it with exp() with precalculated multiplier, and then
+        // LUT the exp. Or factor it into LUTed pow(2, frac(x)) multiplied by
+        // 1 << floor(x).
+        env->cur_value = sv * pow(ev / sv, pos);
+        if (env->cur_value <= 1.1/16384.0)
+            env->cur_value = 0;
+    }
+    else
+        env->cur_value = env->stage_start_value + (es->end_value - env->stage_start_value) * pos;
     if (pos >= 1 || (es->break_on_release && released))
     {
         env->cur_stage = released ? es->next_if_released : es->next_if_pressed;
@@ -98,6 +117,7 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
     env->stages[0].next_if_released = 1;
     env->stages[0].keep_last_value = 1;
     env->stages[0].break_on_release = 0;
+    env->stages[0].is_exp = 0;
 
     env->stages[1].end_value = adsr->sustain;
     env->stages[1].time = adsr->decay * sr;
@@ -105,6 +125,7 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
     env->stages[1].next_if_released = 2;
     env->stages[1].keep_last_value = 0;
     env->stages[1].break_on_release = 0;
+    env->stages[1].is_exp = 0;
 
     env->stages[2].end_value = adsr->sustain;
     env->stages[2].time = 1 * sr;
@@ -112,6 +133,7 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
     env->stages[2].next_if_released = 3;
     env->stages[2].keep_last_value = 0;
     env->stages[2].break_on_release = 1;
+    env->stages[2].is_exp = 0;
 
     env->stages[3].end_value = 0;
     env->stages[3].time = adsr->release * sr;
@@ -119,6 +141,7 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
     env->stages[3].next_if_released = -1;
     env->stages[3].keep_last_value = 0;
     env->stages[3].break_on_release = 0;
+    env->stages[3].is_exp = 1;
 
     env->stages[15].end_value = 0;
     env->stages[15].time = 0.01 * sr;
@@ -126,6 +149,7 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
     env->stages[15].next_if_released = -1;
     env->stages[15].keep_last_value = 0;
     env->stages[15].break_on_release = 0;
+    env->stages[15].is_exp = 0;
 }
 
 struct cbox_dahdsr
@@ -159,6 +183,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[0].next_if_released = 1;
     env->stages[0].keep_last_value = 1;
     env->stages[0].break_on_release = 0;
+    env->stages[0].is_exp = 0;
 
     env->stages[1].end_value = top_value;
     env->stages[1].time = dahdsr->attack * sr;
@@ -166,6 +191,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[1].next_if_released = 2;
     env->stages[1].keep_last_value = 1;
     env->stages[1].break_on_release = 0;
+    env->stages[1].is_exp = 0;
 
     env->stages[2].end_value = top_value;
     env->stages[2].time = dahdsr->hold * sr;
@@ -173,6 +199,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[2].next_if_released = 3;
     env->stages[2].keep_last_value = 1;
     env->stages[2].break_on_release = 0;
+    env->stages[2].is_exp = 0;
 
     env->stages[3].end_value = dahdsr->sustain;
     env->stages[3].time = dahdsr->decay * sr;
@@ -180,6 +207,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[3].next_if_released = 4;
     env->stages[3].keep_last_value = 0;
     env->stages[3].break_on_release = 0;
+    env->stages[3].is_exp = 0;
 
     env->stages[4].end_value = dahdsr->sustain;
     env->stages[4].time = 1 * sr;
@@ -187,6 +215,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[4].next_if_released = 5;
     env->stages[4].keep_last_value = 0;
     env->stages[4].break_on_release = 1;
+    env->stages[4].is_exp = 0;
 
     env->stages[5].end_value = 0;
     env->stages[5].time = dahdsr->release * sr;
@@ -194,6 +223,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[5].next_if_released = -1;
     env->stages[5].keep_last_value = 0;
     env->stages[5].break_on_release = 0;
+    env->stages[5].is_exp = 1;
 
     env->stages[15].end_value = 0;
     env->stages[15].time = 0.01 * sr;
@@ -201,6 +231,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[15].next_if_released = -1;
     env->stages[15].keep_last_value = 0;
     env->stages[15].break_on_release = 0;
+    env->stages[15].is_exp = 0;
 }
 
 static inline void cbox_envelope_modify_dahdsr(struct cbox_envelope_shape *env, int part, float value, int sr)
