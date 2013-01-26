@@ -190,6 +190,8 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
     struct sampler_program *prg = CBOX_H2O(hdr_ptr);
     for (GSList *p = prg->layers; p; p = g_slist_next(p))
         CBOX_DELETE((struct sampler_layer *)p->data);
+    for (GSList *p = prg->layers_release; p; p = g_slist_next(p))
+        CBOX_DELETE((struct sampler_layer *)p->data);
 
     g_free(prg->name);
     g_free(prg->sample_dir);
