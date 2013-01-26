@@ -38,6 +38,8 @@ struct cbox_waveform
     size_t bytes;
     gchar *canonical_name;
     gchar *display_name;
+    gboolean has_loop;
+    uint32_t loop_start, loop_end;
 };
 
 extern struct cbox_command_target cbox_waves_cmd_target;

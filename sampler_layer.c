@@ -229,16 +229,30 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
 {
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_FINALISER)
 
+    // XXXKF should have a distinction between 'configured' and 'effective' loop start/end
     if (l->loop_mode == slm_unknown)
-        l->loop_mode = l->loop_end == 0 ? slm_no_loop : slm_loop_continuous;
+    {
+        if (l->waveform && l->waveform->has_loop)
+        {
+            l->loop_mode = slm_loop_continuous;
+        }
+        else
+            l->loop_mode = l->loop_end == 0 ? slm_no_loop : slm_loop_continuous;
+    }
     
     if (l->loop_mode == slm_one_shot || l->loop_mode == slm_no_loop || l->loop_mode == slm_one_shot_chokeable)
         l->loop_start = -1;
 
     if ((l->loop_mode == slm_loop_continuous || l->loop_mode == slm_loop_sustain) && l->loop_start == -1)
     {
-        l->loop_start = 0;
+        if (l->waveform && l->waveform->has_loop)
+            l->loop_start = l->waveform->loop_start;
+        else
+            l->loop_start = 0;
     }
+    if (l->loop_end == 0 && l->waveform != NULL && l->waveform->has_loop)
+        l->loop_end = l->waveform->loop_end;
+
     if (l->off_mode == som_unknown)
         l->off_mode = l->off_by != 0 ? som_fast : som_normal;
 

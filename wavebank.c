@@ -75,6 +75,10 @@ void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, 
     waveform->refcount = 1;
     waveform->canonical_name = g_strdup(name);
     waveform->display_name = g_strdup(name);
+    waveform->has_loop = TRUE;
+    waveform->loop_start = 0;
+    waveform->loop_end = nsize;
+    
     g_hash_table_insert(bank.waveforms_by_name, waveform->canonical_name, waveform);
     g_hash_table_insert(bank.waveforms_by_id, &waveform->id, waveform);
     // These waveforms are not included in the bank size, I don't think it has
@@ -135,6 +139,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     
     struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
     SNDFILE *sndfile = sf_open(filename, SFM_READ, &waveform->info);
+    SF_INSTRUMENT instrument;
     if (!sndfile)
     {
         g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "%s: cannot open '%s'", context_name, filename);
@@ -155,6 +160,22 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     waveform->refcount = 1;
     waveform->canonical_name = canonical;
     waveform->display_name = g_filename_display_name(canonical);
+    waveform->has_loop = FALSE;
+    
+    if (sf_command(sndfile, SFC_GET_INSTRUMENT, &instrument, sizeof(SF_INSTRUMENT)))
+    {
+        for (int i = 0; i < instrument.loop_count; i++)
+        {
+            if (instrument.loops[i].mode == SF_LOOP_FORWARD)
+            {
+                waveform->loop_start = instrument.loops[i].start;
+                waveform->loop_end = instrument.loops[i].end;
+                waveform->has_loop = TRUE;
+                break;
+            }
+        }
+    }
+
     nshorts = waveform->info.channels * (waveform->info.frames + 1);
     for (i = 0; i < nshorts; i++)
         waveform->data[i] = 0;
@@ -290,6 +311,8 @@ static gboolean waves_process_cmd(struct cbox_command_target *ct, struct cbox_co
         if (!cbox_execute_on(fb, NULL, "/name", "s", error, waveform->display_name))
             return FALSE;
         if (!cbox_execute_on(fb, NULL, "/bytes", "i", error, (int)waveform->bytes))
+            return FALSE;
+        if (waveform->has_loop && !cbox_execute_on(fb, NULL, "/loop", "ii", error, (int)waveform->loop_start, (int)waveform->loop_end))
             return FALSE;
         return TRUE;
     }
