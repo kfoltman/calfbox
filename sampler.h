@@ -51,9 +51,10 @@ struct sampler_channel
     uint32_t sustainmask[4];
     uint32_t sostenutomask[4];
     int previous_note;
-    uint8_t prev_note_velocity[128];
     uint8_t cc[smsrc_perchan_count];
     struct sampler_program *program;
+    uint8_t prev_note_velocity[128];
+    uint32_t prev_note_start_time[128];
 };
 
 struct sampler_lfo
@@ -78,6 +79,7 @@ struct sampler_voice
     int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;
     int off_by;
     int delay;
+    int age;
     float base_freq, pitch;
     float gain;
     float lgain, rgain;
@@ -108,6 +110,7 @@ struct sampler_module
     int active_voices, max_voices;
     int serial_no;
     int output_pairs, aux_pairs;
+    uint32_t current_time;
 };
 
 extern GQuark cbox_sampler_error_quark();

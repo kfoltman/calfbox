@@ -61,6 +61,16 @@ static void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft);
 
 static void sampler_start_voice(struct sampler_module *m, struct sampler_channel *c, struct sampler_voice *v, struct sampler_layer *l, int note, int vel, int *exgroups, int *pexgroupcount)
 {
+    v->age = 0;
+    if (l->trigger == stm_release)
+    {
+        // time since last 'note on' for that note
+        v->age = m->current_time - c->prev_note_start_time[note];
+        double age = v->age * 1.0 / m->module.srate;
+        // if attenuation is more than 84dB, ignore the release trigger
+        if (age * l->rt_decay > 84)
+            return;
+    }
     uint32_t end = l->waveform->info.frames;
     if (l->end != 0)
         end = (l->end == -1) ? 0 : l->end;
@@ -171,6 +181,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
     {
         c->switchmask[note >> 5] |= 1 << (note & 31);
         c->prev_note_velocity[note] = vel;
+        c->prev_note_start_time[note] = m->current_time;
     }
     struct sampler_program *prg = c->program;
     if (!prg)
@@ -245,7 +256,7 @@ void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
 {
     if ((v->loop_mode == slm_one_shot_chokeable) != is_polyaft)
         return;
-    if (v->delay >= CBOX_BLOCK_SIZE)
+    if (v->delay >= v->age + CBOX_BLOCK_SIZE)
     {
         v->released = 1;
         v->mode = spt_inactive;
@@ -473,12 +484,11 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         cbox_envelope_go_to(&v->amp_env, 15);                
 
     struct sampler_channel *c = v->channel;
+    v->age += CBOX_BLOCK_SIZE;
     
-    if (v->delay >= CBOX_BLOCK_SIZE)
-    {
-        v->delay -= CBOX_BLOCK_SIZE;
+    if (v->age < v->delay)
         return;
-    }
+
     if (v->last_waveform != v->layer->waveform)
     {
         v->last_waveform = v->layer->waveform;
@@ -515,7 +525,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             v->mode = spt_inactive;
             return;
         }
-    }           
+    }
     
     float moddests[smdestcount];
     moddests[smdest_gain] = 0;
@@ -523,6 +533,8 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     moddests[smdest_cutoff] = 0;
     moddests[smdest_resonance] = 0;
     GSList *mod = v->layer->modulations;
+    if (v->layer->trigger == stm_release)
+        moddests[smdest_gain] -= v->age * v->layer->rt_decay / m->module.srate;
     static const int modoffset[4] = {0, -1, -1, 1 };
     static const int modscale[4] = {1, 1, 2, -2 };
     while(mod)
@@ -677,6 +689,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     if (vcount - vrel > m->max_voices)
         sampler_steal_voice(m);
     m->serial_no++;
+    m->current_time += CBOX_BLOCK_SIZE;
 }
 
 void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int cc, int val)
