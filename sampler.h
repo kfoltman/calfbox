@@ -61,7 +61,7 @@ struct sampler_lfo
 
 struct sampler_voice
 {
-    enum sample_player_type mode;
+    enum sampler_player_type mode;
     enum sampler_filter_type filter;
     struct sampler_layer *layer;
     struct sampler_program *program;
@@ -86,7 +86,7 @@ struct sampler_voice
     struct sampler_channel *channel;
     struct cbox_envelope amp_env, filter_env, pitch_env;
     struct sampler_lfo amp_lfo, filter_lfo, pitch_lfo;
-    enum sample_loop_mode loop_mode;
+    enum sampler_loop_mode loop_mode;
     int output_pair_no;
     int send1bus, send2bus;
     float send1gain, send2gain;

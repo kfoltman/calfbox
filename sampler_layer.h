@@ -28,14 +28,14 @@ struct sampler_voice;
 struct sampler_noteinitfunc;
 struct sampler_module;
 
-enum sample_player_type
+enum sampler_player_type
 {
     spt_inactive,
     spt_mono16,
     spt_stereo16
 };
 
-enum sample_loop_mode
+enum sampler_loop_mode
 {
     slm_unknown,
     slm_no_loop,
@@ -46,21 +46,21 @@ enum sample_loop_mode
     slmcount
 };
 
-#define ENUM_VALUES_sample_loop_mode(MACRO) \
+#define ENUM_VALUES_sampler_loop_mode(MACRO) \
     MACRO("no_loop", slm_no_loop) \
     MACRO("one_shot", slm_one_shot)  \
     MACRO("loop_continuous", slm_loop_continuous) \
     MACRO("loop_sustain", slm_loop_sustain) \
     MACRO("one_shot_chokeable", slm_one_shot_chokeable) 
 
-enum sample_off_mode
+enum sampler_off_mode
 {
     som_unknown,
     som_normal,
     som_fast
 };
 
-#define ENUM_VALUES_sample_off_mode(MACRO) \
+#define ENUM_VALUES_sampler_off_mode(MACRO) \
     MACRO("normal", som_normal) \
     MACRO("fast", som_fast)  
 
@@ -88,8 +88,8 @@ enum sampler_filter_type
     MACRO("hpf_1p", sft_hp6)
 
 #define ENUM_LIST(MACRO) \
-    MACRO(sample_loop_mode) \
-    MACRO(sample_off_mode) \
+    MACRO(sampler_loop_mode) \
+    MACRO(sampler_off_mode) \
     MACRO(sampler_filter_type) \
 
 #define MAKE_FROM_TO_STRING_EXTERN(enumtype) \
@@ -173,7 +173,7 @@ typedef int midi_note_t;
     MACRO(uint32_t, loop_end, 0) \
     MACRO(uint32_t, end, 0) \
     MACRO(uint32_t, loop_overlap, -1) \
-    MACRO##_enum(sample_loop_mode, loop_mode, slm_unknown) \
+    MACRO##_enum(sampler_loop_mode, loop_mode, slm_unknown) \
     MACRO##_dBamp(float, volume, 0) \
     MACRO(float, pan, 0) \
     MACRO(float, tune, 0) \
@@ -195,7 +195,7 @@ typedef int midi_note_t;
     MACRO(int, hivel, 127) \
     MACRO(int, velcurve_quadratic, -1) \
     MACRO##_enum(sampler_filter_type, fil_type, sft_lp12) \
-    MACRO##_enum(sample_off_mode, off_mode, som_unknown) \
+    MACRO##_enum(sampler_off_mode, off_mode, som_unknown) \
     MACRO(float, cutoff, -1) \
     MACRO##_dBamp(float, resonance, 0) \
     MACRO(midi_note_t, sw_lokey, 0) \
