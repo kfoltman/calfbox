@@ -233,9 +233,7 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
     if (l->loop_mode == slm_unknown)
     {
         if (l->waveform && l->waveform->has_loop)
-        {
             l->loop_mode = slm_loop_continuous;
-        }
         else
             l->loop_mode = l->loop_end == 0 ? slm_no_loop : slm_loop_continuous;
     }
@@ -244,12 +242,9 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
         l->loop_start = -1;
 
     if ((l->loop_mode == slm_loop_continuous || l->loop_mode == slm_loop_sustain) && l->loop_start == -1)
-    {
-        if (l->waveform && l->waveform->has_loop)
-            l->loop_start = l->waveform->loop_start;
-        else
-            l->loop_start = 0;
-    }
+        l->loop_start = 0;
+    if ((l->loop_mode == slm_loop_continuous || l->loop_mode == slm_loop_sustain) && l->loop_start == 0 && l->waveform && l->waveform->has_loop)
+        l->loop_start = l->waveform->loop_start;
     if (l->loop_end == 0 && l->waveform != NULL && l->waveform->has_loop)
         l->loop_end = l->waveform->loop_end;
 
