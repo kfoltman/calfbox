@@ -32,7 +32,8 @@ enum sampler_player_type
 {
     spt_inactive,
     spt_mono16,
-    spt_stereo16
+    spt_stereo16,
+    spt_finished
 };
 
 enum sampler_loop_mode
@@ -64,6 +65,16 @@ enum sampler_off_mode
     MACRO("normal", som_normal) \
     MACRO("fast", som_fast)  
 
+enum sampler_trigger
+{
+    stm_attack,
+    stm_release,
+};
+
+#define ENUM_VALUES_sampler_trigger(MACRO) \
+    MACRO("attack", stm_attack) \
+    MACRO("release", stm_release)  
+
 enum sampler_filter_type
 {
     sft_unknown,
@@ -90,6 +101,7 @@ enum sampler_filter_type
 #define ENUM_LIST(MACRO) \
     MACRO(sampler_loop_mode) \
     MACRO(sampler_off_mode) \
+    MACRO(sampler_trigger) \
     MACRO(sampler_filter_type) \
 
 #define MAKE_FROM_TO_STRING_EXTERN(enumtype) \
@@ -174,6 +186,7 @@ typedef int midi_note_t;
     MACRO(uint32_t, end, 0) \
     MACRO(uint32_t, loop_overlap, -1) \
     MACRO##_enum(sampler_loop_mode, loop_mode, slm_unknown) \
+    MACRO##_enum(sampler_trigger, trigger, stm_attack) \
     MACRO##_dBamp(float, volume, 0) \
     MACRO(float, pan, 0) \
     MACRO(float, tune, 0) \

@@ -76,6 +76,11 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
             if (!cbox_execute_on(fb, NULL, "/region", "o", error, p->data))
                 return FALSE;
         }
+        for (GSList *p = program->layers_release; p; p = g_slist_next(p))
+        {
+            if (!cbox_execute_on(fb, NULL, "/region", "o", error, p->data))
+                return FALSE;
+        }
         return TRUE;
     }
     else // otherwise, treat just like an command on normal (non-aux) output
@@ -96,6 +101,7 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->sample_dir = g_strdup(sample_dir);
     prg->source_file = NULL;
     prg->layers = NULL;
+    prg->layers_release = NULL;
     CBOX_OBJECT_REGISTER(prg);
     return prg;
 }
@@ -163,11 +169,20 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         else if (!l->waveform)
             g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
         else
-            prg->layers = g_slist_prepend(prg->layers, l);
+            sampler_program_add_layer(prg, l);
         g_free(where);
     }
     prg->layers = g_slist_reverse(prg->layers);
+    prg->layers_release = g_slist_reverse(prg->layers_release);
     return prg;
+}
+
+void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer *l)
+{
+    if (l->trigger == stm_release)
+        prg->layers_release = g_slist_prepend(prg->layers_release, l);
+    else
+        prg->layers = g_slist_prepend(prg->layers, l);
 }
 
 void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)

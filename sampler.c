@@ -162,20 +162,24 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     cbox_envelope_reset(&v->amp_env);
     cbox_envelope_reset(&v->filter_env);
     cbox_envelope_reset(&v->pitch_env);
-
 }
 
-void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel)
+void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel, gboolean is_release_trigger)
 {
     float random = rand() * 1.0 / (RAND_MAX + 1.0);
-    c->switchmask[note >> 5] |= 1 << (note & 31);
+    if (!is_release_trigger)
+    {
+        c->switchmask[note >> 5] |= 1 << (note & 31);
+        c->prev_note_velocity[note] = vel;
+    }
     struct sampler_program *prg = c->program;
     if (!prg)
         return;
-    GSList *next_layer = sampler_program_get_next_layer(prg, c, prg->layers, note, vel, random);
+    GSList *next_layer = sampler_program_get_next_layer(prg, c, !is_release_trigger ? prg->layers : prg->layers_release, note, vel, random);
     if (!next_layer)
     {
-        c->previous_note = note;
+        if (!is_release_trigger)
+            c->previous_note = note;
         return;
     }
     
@@ -195,7 +199,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
                 break;
         }
     }
-    c->previous_note = note;
+    if (!is_release_trigger)
+        c->previous_note = note;
     if (exgroupcount)
     {
         for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
@@ -224,6 +229,18 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
     }
 }
 
+void sampler_channel_start_release_triggered_voices(struct sampler_channel *c, int note)
+{
+    if (c->program && c->program->layers_release)
+    {
+        if (c->prev_note_velocity[note])
+        {
+            sampler_start_note(c->module, c, note, c->prev_note_velocity[note], TRUE);
+            c->prev_note_velocity[note] = 0;
+        }
+    }    
+}
+
 void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
 {
     if ((v->loop_mode == slm_one_shot_chokeable) != is_polyaft)
@@ -232,13 +249,14 @@ void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
     {
         v->released = 1;
         v->mode = spt_inactive;
-        return;
     }
-    
-    if (v->loop_mode != slm_one_shot)
-        v->released = 1;
     else
-        v->loop_start = -1; // should be guaranteed by layer settings anyway
+    {
+        if (v->loop_mode != slm_one_shot)
+            v->released = 1;
+        else
+            v->loop_start = -1; // should be guaranteed by layer settings anyway
+    }
 }
 
 void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel, gboolean is_polyaft)
@@ -247,7 +265,7 @@ void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int 
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
-        if (v->mode != spt_inactive && v->channel == c && v->note == note)
+        if (v->channel == c && v->note == note && v->layer->trigger != stm_release)
         {
             if (v->captured_sostenuto)
                 v->released_with_sostenuto = 1;
@@ -255,8 +273,13 @@ void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int 
                 v->released_with_sustain = 1;
             else
                 sampler_voice_release(v, is_polyaft);
+                
         }
     }
+    if (c->cc[64] < 64)
+        sampler_channel_start_release_triggered_voices(c, note);
+    else
+        c->sustainmask[note >> 5] |= (1 << (note & 31));
 }
 
 void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
@@ -264,12 +287,25 @@ void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
-        if (v->mode != spt_inactive && v->channel == c && v->released_with_sustain)
+        if (v->channel == c && v->released_with_sustain && v->layer->trigger != stm_release)
         {
-            sampler_voice_release(v, FALSE);
-            v->released_with_sustain = 0;
+            if (v->mode != spt_inactive)
+            {
+                sampler_voice_release(v, FALSE);
+                v->released_with_sustain = 0;
+            }
         }
     }
+    // Start release layers for the newly released keys
+    if (c->program->layers_release)
+    {
+        for (int i = 0; i < 128; i++)
+        {
+            if (c->sustainmask[i >> 5] & (1 << (i & 31)))
+                sampler_channel_start_release_triggered_voices(c, i);
+        }
+    }
+    memset(c->sustainmask, 0, sizeof(c->sustainmask));
 }
 
 void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
@@ -277,13 +313,24 @@ void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
-        if (v->mode != spt_inactive && v->channel == c && v->released_with_sostenuto)
+        if (v->mode != spt_inactive && v->channel == c && v->released_with_sostenuto && v->layer->trigger != stm_release)
         {
+            sampler_channel_start_release_triggered_voices(c, v->note);
             sampler_voice_release(v, FALSE);
             v->released_with_sostenuto = 0;
             // XXXKF unsure what to do with sustain
         }
     }
+    // Start release layers for the newly released keys
+    if (c->program->layers_release)
+    {
+        for (int i = 0; i < 128; i++)
+        {
+            if (c->sostenutomask[i >> 5] & (1 << (i & 31)))
+                sampler_channel_start_release_triggered_voices(c, i);
+        }
+    }
+    memset(c->sostenutomask, 0, sizeof(c->sostenutomask));
 }
 
 void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel *c)
@@ -295,6 +342,7 @@ void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel 
         {
             // XXXKF unsure what to do with sustain
             v->captured_sostenuto = 1;
+            c->sostenutomask[v->note >> 5] |= (1 << (v->note & 31));
         }
     }
 }
@@ -710,7 +758,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
 
             case 9:
                 if (data[2] > 0)
-                    sampler_start_note(m, c, data[1], data[2]);
+                    sampler_start_note(m, c, data[1], data[2], FALSE);
                 else
                     sampler_stop_note(m, c, data[1], data[2], FALSE);
                 break;
@@ -758,6 +806,8 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     if (c->program)
         c->program->in_use++;
     memset(c->switchmask, 0, sizeof(c->switchmask));
+    memset(c->sustainmask, 0, sizeof(c->sustainmask));
+    memset(c->sostenutomask, 0, sizeof(c->sostenutomask));
 }
 
 static int get_first_free_program_no(struct sampler_module *m)

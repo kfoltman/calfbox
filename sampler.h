@@ -48,7 +48,10 @@ struct sampler_channel
     float pitchbend;
     float pbrange;
     uint32_t switchmask[4];
+    uint32_t sustainmask[4];
+    uint32_t sostenutomask[4];
     int previous_note;
+    uint8_t prev_note_velocity[128];
     uint8_t cc[smsrc_perchan_count];
     struct sampler_program *program;
 };

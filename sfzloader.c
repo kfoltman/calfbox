@@ -28,7 +28,6 @@ struct sfz_load_state
     struct sampler_program *program;
     struct sampler_layer *group;
     struct sampler_layer *region;
-    GSList *layers;
     GError **error;
 };
 
@@ -38,7 +37,7 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
     // printf("-- copy current region to the list of layers\n");
     struct sampler_layer *l = ls->region;
     sampler_layer_finalize(l, ls->m);
-    ls->layers = g_slist_prepend(ls->layers, ls->region);
+    sampler_program_add_layer(ls->program, ls->region);
 
 #if DUMP_LAYER_ATTRIBS
     fprintf(stdout, "<region>");
@@ -101,7 +100,7 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
 
 gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, int is_from_string, GError **error)
 {
-    struct sfz_load_state ls = { .group = NULL, .m = m, .filename = sfz, .layers = NULL, .region = NULL, .error = error, .program = prg };
+    struct sfz_load_state ls = { .group = NULL, .m = m, .filename = sfz, .region = NULL, .error = error, .program = prg };
     struct sfz_parser_client c = { .user_data = &ls, .region = load_sfz_region, .group = load_sfz_group, .key_value = load_sfz_key_value };
     g_clear_error(error);
 
@@ -117,7 +116,8 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
         ls.group->waveform = NULL;
     }
     
-    prg->layers = g_slist_reverse(ls.layers);
+    prg->layers = g_slist_reverse(prg->layers);
+    prg->layers_release = g_slist_reverse(prg->layers_release);
     return TRUE;
 }
 
