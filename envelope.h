@@ -188,7 +188,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[0].end_value = 0;
     env->stages[0].time = dahdsr->delay * sr;
     env->stages[0].next_if_pressed = 1;
-    env->stages[0].next_if_released = 1;
+    env->stages[0].next_if_released = 5;
     env->stages[0].keep_last_value = 1;
     env->stages[0].break_on_release = 0;
     env->stages[0].is_exp = 0;
@@ -196,7 +196,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[1].end_value = top_value;
     env->stages[1].time = dahdsr->attack * sr;
     env->stages[1].next_if_pressed = 2;
-    env->stages[1].next_if_released = 2;
+    env->stages[1].next_if_released = 5;
     env->stages[1].keep_last_value = 1;
     env->stages[1].break_on_release = 0;
     env->stages[1].is_exp = 0;
@@ -204,7 +204,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[2].end_value = top_value;
     env->stages[2].time = dahdsr->hold * sr;
     env->stages[2].next_if_pressed = 3;
-    env->stages[2].next_if_released = 3;
+    env->stages[2].next_if_released = 5;
     env->stages[2].keep_last_value = 1;
     env->stages[2].break_on_release = 0;
     env->stages[2].is_exp = 0;
@@ -212,7 +212,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[3].end_value = dahdsr->sustain;
     env->stages[3].time = dahdsr->decay * sr;
     env->stages[3].next_if_pressed = 4;
-    env->stages[3].next_if_released = 4;
+    env->stages[3].next_if_released = 5;
     env->stages[3].keep_last_value = 0;
     env->stages[3].break_on_release = 0;
     env->stages[3].is_exp = 0;
