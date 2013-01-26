@@ -87,6 +87,11 @@ void cbox_config_set_string(const char *section, const char *key, const char *va
     g_key_file_set_string(config_keyfile, section, key, value);
 }
 
+char *cbox_config_permify(const char *temporary)
+{
+    return g_string_chunk_insert(cfg_strings, temporary);
+}
+
 char *cbox_config_get_string_with_default(const char *section, const char *key, char *def_value)
 {
     if (section && key && g_key_file_has_key(config_keyfile, section, key, NULL))

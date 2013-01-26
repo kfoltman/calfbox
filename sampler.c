@@ -845,6 +845,19 @@ static struct sampler_program *load_program(struct sampler_module *m, const char
 
     char *sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
     char *spath = cbox_config_get_string(cfg_section, "sample_path");
+    char *sfz = cbox_config_get_string(cfg_section, "sfz");
+    
+    if (sfz && !sfz_path && !spath)
+    {
+        char *lastslash = strrchr(sfz, '/');
+        if (lastslash && !sfz_path && !spath)
+        {
+            char *tmp = g_strndup(sfz, lastslash - sfz);
+            sfz_path = cbox_config_permify(tmp);
+            g_free(tmp);
+            sfz = lastslash + 1;
+        }
+    }
 
     struct sampler_program *prg = sampler_program_new(
         m,
@@ -853,13 +866,14 @@ static struct sampler_program *load_program(struct sampler_module *m, const char
         spath ? spath : (sfz_path ? sfz_path : "")
     );
     
-    char *sfz = cbox_config_get_string(cfg_section, "sfz");
     if (sfz)
     {
         if (sfz_path)
             prg->source_file = g_build_filename(sfz_path, sfz, NULL);
         else
+        {
             prg->source_file = g_strdup(sfz);
+        }
 
         if (sampler_module_load_program_sfz(m, prg, prg->source_file, FALSE, error))
             return prg;

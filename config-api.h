@@ -33,6 +33,7 @@ extern float cbox_config_get_gain(const char *section, const char *key, float de
 extern float cbox_config_get_gain_db(const char *section, const char *key, float def_value);
 extern void cbox_config_foreach_section(void (*process)(void *user_data, const char *section), void *user_data);
 extern void cbox_config_foreach_key(void (*process)(void *user_data, const char *key), const char *section, void *user_data);
+extern char *cbox_config_permify(const char *temporary);
 
 extern void cbox_config_set_string(const char *section, const char *key, const char *value);
 extern void cbox_config_set_int(const char *section, const char *key, int value);
