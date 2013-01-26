@@ -20,5 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_SAMPLER_IMPL_H
 
 extern uint32_t sampler_voice_sample_playback(struct sampler_voice *v, float **tmp_outputs);
+extern void sampler_program_change_byidx(struct sampler_module *m, struct sampler_channel *c, int program_idx);
+extern void sampler_program_change(struct sampler_module *m, struct sampler_channel *c, int program);
 
 #endif

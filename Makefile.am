@@ -42,6 +42,7 @@ calfbox_SOURCES = \
     sampler.c \
     sampler_gen.c \
     sampler_layer.c \
+    sampler_prg.c \
     scene.c \
     scripting.c \
     seq.c \
@@ -95,6 +96,7 @@ noinst_HEADERS = \
     sampler.h \
     sampler_impl.h \
     sampler_layer.h \
+    sampler_prg.h \
     scene.h \
     scripting.h \
     seq.h \

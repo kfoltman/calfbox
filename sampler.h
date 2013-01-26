@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010-2011 Krzysztof Foltman
+Copyright (C) 2010-2013 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "envelope.h"
 #include "module.h"
 #include "sampler_layer.h"
+#include "sampler_prg.h"
 #include "wavebank.h"
 #include <stdint.h>
 
@@ -40,21 +41,6 @@ enum CboxSamplerError
 
 struct sampler_noteinitfunc;
 struct sampler_voice;
-
-CBOX_EXTERN_CLASS(sampler_program)
-
-struct sampler_program
-{
-    CBOX_OBJECT_HEADER()
-    struct cbox_command_target cmd_target;
-
-    gchar *name;
-    int prog_no;
-    GSList *layers;
-    gchar *sample_dir; // can be empty, cannot be NULL
-    gchar *source_file; // can be empty, cannot be NULL
-    int in_use;
-};
 
 struct sampler_channel
 {
@@ -123,7 +109,6 @@ struct sampler_module
 
 extern GQuark cbox_sampler_error_quark();
 
-extern void sampler_program_change_byidx(struct sampler_module *m, struct sampler_channel *c, int program_idx);
-extern void sampler_program_change(struct sampler_module *m, struct sampler_channel *c, int program);
+extern gboolean sampler_select_program(struct sampler_module *m, int channel, const gchar *preset, GError **error);
 
 #endif

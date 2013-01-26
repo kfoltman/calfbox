@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010-2011 Krzysztof Foltman
+Copyright (C) 2010-2013 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -43,44 +43,9 @@ GQuark cbox_sampler_error_quark()
     return g_quark_from_string("cbox-sampler-error-quark");
 }
 
-CBOX_CLASS_DEFINITION_ROOT(sampler_program)
-
 static void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void sampler_destroyfunc(struct cbox_module *module);
-
-GSList *skip_inactive_layers(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random)
-{
-    int ch = (c - c->module->channels) + 1;
-    for(;next_layer;next_layer = g_slist_next(next_layer))
-    {
-        struct sampler_layer *l = next_layer->data;
-        if (!l->waveform)
-            continue;
-        if (l->sw_last != -1)
-        {
-            if (note >= l->sw_lokey && note <= l->sw_hikey)
-                l->last_key = note;
-        }
-        if (note >= l->lokey && note <= l->hikey && vel >= l->lovel && vel <= l->hivel && ch >= l->lochan && ch <= l->hichan && random >= l->lorand && random < l->hirand)
-        {
-            if (!l->use_keyswitch || 
-                ((l->sw_last == -1 || l->sw_last == l->last_key) &&
-                 (l->sw_down == -1 || (c->switchmask[l->sw_down >> 5] & (1 << (l->sw_down & 31)))) &&
-                 (l->sw_up == -1 || !(c->switchmask[l->sw_up >> 5] & (1 << (l->sw_up & 31)))) &&
-                 (l->sw_previous == -1 || l->sw_previous == c->previous_note)))
-            {
-                gboolean play = l->current_seq_position == 1;
-                l->current_seq_position++;
-                if (l->current_seq_position >= l->seq_length)
-                    l->current_seq_position = 1;
-                if (play)
-                    return next_layer;
-            }
-        }
-    }
-    return NULL;
-}
 
 static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, int srate)
 {
@@ -207,7 +172,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
     struct sampler_program *prg = c->program;
     if (!prg)
         return;
-    GSList *next_layer = skip_inactive_layers(prg, c, prg->layers, note, vel, random);
+    GSList *next_layer = sampler_program_get_next_layer(prg, c, prg->layers, note, vel, random);
     if (!next_layer)
     {
         c->previous_note = note;
@@ -225,7 +190,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
             struct sampler_voice *v = &m->voices[i];
             struct sampler_layer *l = next_layer->data;
             sampler_start_voice(m, c, v, l, note, vel, exgroups, &exgroupcount);
-            next_layer = skip_inactive_layers(prg, c, g_slist_next(next_layer), note, vel, random);
+            next_layer = sampler_program_get_next_layer(prg, c, g_slist_next(next_layer), note, vel, random);
             if (!next_layer)
                 break;
         }
@@ -795,121 +760,6 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     memset(c->switchmask, 0, sizeof(c->switchmask));
 }
 
-static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
-{
-    struct sampler_program *program = ct->user_data;
-    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
-    {
-        if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
-
-        if (!(CBOX_OBJECT_DEFAULT_STATUS(program, fb, error)))
-            return FALSE;
-        return TRUE;
-    }
-    if (!strcmp(cmd->command, "/regions") && !strcmp(cmd->arg_types, ""))
-    {
-        if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
-        for (GSList *p = program->layers; p; p = g_slist_next(p))
-        {
-            if (!cbox_execute_on(fb, NULL, "/region", "o", error, p->data))
-                return FALSE;
-        }
-        return TRUE;
-    }
-    else // otherwise, treat just like an command on normal (non-aux) output
-        return cbox_object_default_process_cmd(ct, fb, cmd, error);
-    
-}
-
-static struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_no, const char *name, const char *sample_dir)
-{
-    struct cbox_document *doc = CBOX_GET_DOCUMENT(&m->module);
-    struct sampler_program *prg = malloc(sizeof(struct sampler_program));
-    memset(prg, 0, sizeof(*prg));
-    CBOX_OBJECT_HEADER_INIT(prg, sampler_program, doc);
-    cbox_command_target_init(&prg->cmd_target, sampler_program_process_cmd, prg);
-    
-    prg->prog_no = prog_no;
-    prg->name = g_strdup(name);
-    prg->sample_dir = g_strdup(sample_dir);
-    prg->source_file = NULL;
-    prg->layers = NULL;
-    CBOX_OBJECT_REGISTER(prg);
-    return prg;
-}
-
-static struct sampler_program *load_program(struct sampler_module *m, const char *cfg_section, const char *name, int pgm_id, GError **error)
-{
-    int i;
-
-    g_clear_error(error);
-    
-    char *name2 = cbox_config_get_string(cfg_section, "name");
-
-    char *sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
-    char *spath = cbox_config_get_string(cfg_section, "sample_path");
-    char *sfz = cbox_config_get_string(cfg_section, "sfz");
-    
-    if (sfz && !sfz_path && !spath)
-    {
-        char *lastslash = strrchr(sfz, '/');
-        if (lastslash && !sfz_path && !spath)
-        {
-            char *tmp = g_strndup(sfz, lastslash - sfz);
-            sfz_path = cbox_config_permify(tmp);
-            g_free(tmp);
-            sfz = lastslash + 1;
-        }
-    }
-
-    struct sampler_program *prg = sampler_program_new(
-        m,
-        pgm_id != -1 ? pgm_id : cbox_config_get_int(cfg_section, "program", 0),
-        name2 ? name2 : name,
-        spath ? spath : (sfz_path ? sfz_path : "")
-    );
-    
-    if (sfz)
-    {
-        if (sfz_path)
-            prg->source_file = g_build_filename(sfz_path, sfz, NULL);
-        else
-        {
-            prg->source_file = g_strdup(sfz);
-        }
-
-        if (sampler_module_load_program_sfz(m, prg, prg->source_file, FALSE, error))
-            return prg;
-        CBOX_DELETE(prg);
-        return NULL;
-    }
-    
-    for (i = 0; ; i++)
-    {
-        char *where = NULL;
-        gchar *s = g_strdup_printf("layer%d", 1 + i);
-        const char *layer_section = cbox_config_get_string(cfg_section, s);
-        g_free(s);
-        if (!layer_section)
-            break;
-        where = g_strdup_printf("slayer:%s", layer_section);
-        
-        prg->source_file = g_strdup_printf("config:%s", cfg_section);
-        struct sampler_layer *l = sampler_layer_new_from_section(m, prg, where);
-        if (!l)
-            g_warning("Sample layer '%s' cannot be created - skipping", layer_section);
-        else if (!l->waveform)
-            g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
-        else
-            prg->layers = g_slist_prepend(prg->layers, l);
-        g_free(where);
-    }
-    prg->layers = g_slist_reverse(prg->layers);
-    return prg;
-}
-
 static int get_first_free_program_no(struct sampler_module *m)
 {
     int prog_no = -1;
@@ -1000,7 +850,7 @@ static gboolean load_program_at(struct sampler_module *m, const char *cfg_sectio
 {
     struct sampler_program *pgm = NULL;
     int index = find_program(m, prog_no);
-    pgm = load_program(m, cfg_section, name, prog_no, error);
+    pgm = sampler_program_new_from_cfg(m, cfg_section, name, prog_no, error);
     if (!pgm)
         return FALSE;
     
@@ -1039,19 +889,6 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
     programs[m->program_count] = pgm;
     free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
     return TRUE;
-}
-
-void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
-{
-    struct sampler_program *prg = CBOX_H2O(hdr_ptr);
-    for (GSList *p = prg->layers; p; p = g_slist_next(p))
-        CBOX_DELETE((struct sampler_layer *)p->data);
-
-    g_free(prg->name);
-    g_free(prg->sample_dir);
-    g_free(prg->source_file);
-    g_slist_free(prg->layers);
-    free(prg);
 }
 
 gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -1146,7 +983,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     return TRUE;
 }
 
-static gboolean select_patch_by_name(struct sampler_module *m, int channel, const gchar *preset, GError **error)
+gboolean sampler_select_program(struct sampler_module *m, int channel, const gchar *preset, GError **error)
 {
     for (int i = 0; i < m->program_count; i++)
     {
@@ -1238,7 +1075,7 @@ MODULE_CREATE_FUNCTION(sampler)
             pgm_section = g_strdup_printf("spgm:%s", pgm_name);
         }
         
-        m->programs[i] = load_program(m, pgm_section, pgm_section + 5, pgm_id, error);
+        m->programs[i] = sampler_program_new_from_cfg(m, pgm_section, pgm_section + 5, pgm_id, error);
         g_free(pgm_section);
         if (!m->programs[i])
         {
@@ -1265,7 +1102,7 @@ MODULE_CREATE_FUNCTION(sampler)
         gchar *preset = cbox_config_get_string(cfg_section, key);
         if (preset)
         {
-            if (!select_patch_by_name(m, i, preset, error))
+            if (!sampler_select_program(m, i, preset, error))
             {
                 CBOX_DELETE(&m->module);
                 return NULL;
