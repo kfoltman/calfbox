@@ -123,4 +123,7 @@ struct sampler_module
 
 extern GQuark cbox_sampler_error_quark();
 
+extern void sampler_program_change_byidx(struct sampler_module *m, struct sampler_channel *c, int program_idx);
+extern void sampler_program_change(struct sampler_module *m, struct sampler_channel *c, int program);
+
 #endif

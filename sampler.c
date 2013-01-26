@@ -705,23 +705,28 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
         c->cc[cc] = val;
 }
 
-void sampler_program_change(struct sampler_module *m, struct sampler_channel *c, int program)
+void sampler_program_change_byidx(struct sampler_module *m, struct sampler_channel *c, int program_idx)
 {
     if (c->program)
-        c->program->in_use--;
+        c->program->in_use--;    
+    c->program = m->programs[program_idx];
+    c->program->in_use++;
+}
+
+void sampler_program_change(struct sampler_module *m, struct sampler_channel *c, int program)
+{
     // XXXKF replace with something more efficient
     for (int i = 0; i < m->program_count; i++)
     {
         // XXXKF support banks
         if (m->programs[i]->prog_no == program)
         {
-            c->program = m->programs[i];
+            sampler_program_change_byidx(m, c, i);
             return;
         }
     }
     g_warning("Unknown program %d", program);
-    c->program = m->programs[0];
-    c->program->in_use++;
+    sampler_program_change_byidx(m, c, 0);
 }
 
 void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
@@ -1141,6 +1146,21 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     return TRUE;
 }
 
+static gboolean select_patch_by_name(struct sampler_module *m, int channel, const gchar *preset, GError **error)
+{
+    for (int i = 0; i < m->program_count; i++)
+    {
+        if (!strcmp(m->programs[i]->name, preset))
+        {
+            printf("Selecting %s in channel %d\n", preset, channel + 1);
+            sampler_program_change_byidx(m, &m->channels[channel], i);
+            return TRUE;
+        }
+    }
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Preset not found: %s", preset);
+    return FALSE;
+}
+
 MODULE_CREATE_FUNCTION(sampler)
 {
     int result = 0;
@@ -1232,13 +1252,28 @@ MODULE_CREATE_FUNCTION(sampler)
         free(m);
         return NULL;
     }
-    
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
         m->voices[i].mode = spt_inactive;
     m->active_voices = 0;
     
     for (i = 0; i < 16; i++)
         init_channel(m, &m->channels[i]);
+
+    for (i = 0; i < 16; i++)
+    {
+        gchar *key = g_strdup_printf("channel%d", i + 1);
+        gchar *preset = cbox_config_get_string(cfg_section, key);
+        if (preset)
+        {
+            if (!select_patch_by_name(m, i, preset, error))
+            {
+                CBOX_DELETE(&m->module);
+                return NULL;
+            }
+        }
+        g_free(key);
+    }
+    
 
     return &m->module;
 }
