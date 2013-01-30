@@ -59,7 +59,7 @@ static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, i
 
 static void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft);
 
-static void sampler_start_voice(struct sampler_module *m, struct sampler_channel *c, struct sampler_voice *v, struct sampler_layer *l, int note, int vel, int *exgroups, int *pexgroupcount)
+static void sampler_start_voice(struct sampler_module *m, struct sampler_channel *c, struct sampler_voice *v, struct sampler_layer_data *l, int note, int vel, int *exgroups, int *pexgroupcount)
 {
     v->age = 0;
     if (l->trigger == stm_release)
@@ -104,7 +104,6 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     v->vel = vel;
     v->mode = l->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
     v->filter = l->fil_type;
-    v->base_freq = l->freq;
     v->pitch = pitch;
     v->released = 0;
     v->released_with_sustain = 0;
@@ -204,7 +203,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
         {
             struct sampler_voice *v = &m->voices[i];
             struct sampler_layer *l = next_layer->data;
-            sampler_start_voice(m, c, v, l, note, vel, exgroups, &exgroupcount);
+            sampler_start_voice(m, c, v, l->runtime, note, vel, exgroups, &exgroupcount);
             next_layer = sampler_program_get_next_layer(prg, c, g_slist_next(next_layer), note, vel, random);
             if (!next_layer)
                 break;
@@ -563,7 +562,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     
     double maxv = 127 << 7;
-    double freq = v->base_freq * cent2factor(moddests[smdest_pitch]) ;
+    double freq = v->layer->eff_freq * cent2factor(moddests[smdest_pitch]) ;
     uint64_t freq64 = freq * 65536.0 * 65536.0 / m->module.srate;
     v->delta = freq64 >> 32;
     v->frac_delta = freq64 & 0xFFFFFFFF;

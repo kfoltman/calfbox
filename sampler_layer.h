@@ -297,26 +297,35 @@ struct sampler_lfo_has_fields
 
 CBOX_EXTERN_CLASS(sampler_layer)
 
+struct sampler_layer_data
+{
+    struct cbox_waveform *waveform;
+
+    SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
+    SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)    
+
+    float velcurve[128];
+
+    GSList *modulations;
+    GSList *nifs;
+
+    // computed values:
+    float eff_freq;
+    int eff_use_keyswitch;
+};
+
 struct sampler_layer
 {
     CBOX_OBJECT_HEADER()
     struct cbox_command_target cmd_target;
+    
+    struct sampler_layer_data data, *runtime;
 
     struct sampler_program *parent_program;
     struct sampler_layer *parent_group;
     int child_count;
-    struct cbox_waveform *waveform;
 
-    SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
-    SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)
-
-    float freq;
-    int use_keyswitch;
     int last_key, current_seq_position;
-    float velcurve[128];
-    
-    GSList *modulations;
-    GSList *nifs;
 };
 
 extern struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, struct sampler_layer *parent_group);
@@ -326,9 +335,10 @@ extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_m
 extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param);
 extern void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_section);
-extern void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m);
+extern void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_module *m);
+extern void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m);
 extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error);
-extern gchar *sampler_layer_to_string(struct sampler_layer *l);
+extern gchar *sampler_layer_data_to_string(struct sampler_layer_data *l);
 extern void sampler_layer_dump(struct sampler_layer *l, FILE *f);
 
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);

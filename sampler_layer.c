@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 
-static void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src);
+static void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampler_layer_data *src);
 
 void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags)
 {
@@ -42,7 +42,7 @@ void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc 
 
 void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags)
 {
-    GSList *p = l->modulations;
+    GSList *p = l->data.modulations;
     while(p)
     {
         struct sampler_modulation *sm = p->data;
@@ -60,7 +60,7 @@ void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc s
     sm->dest = dest;
     sm->amount = amount;
     sm->flags = flags;
-    l->modulations = g_slist_prepend(l->modulations, sm);
+    l->data.modulations = g_slist_prepend(l->data.modulations, sm);
 }
 
 void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param)
@@ -69,7 +69,7 @@ void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc
     nif->notefunc = notefunc;
     nif->variant = variant;
     nif->param = param;
-    l->nifs = g_slist_prepend(l->nifs, nif);
+    l->data.nifs = g_slist_prepend(l->data.nifs, nif);
 }
 
 static void lfo_params_clear(struct sampler_lfo_params *lfop)
@@ -97,7 +97,7 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        gchar *res = sampler_layer_to_string(layer);
+        gchar *res = sampler_layer_data_to_string(&layer->data);
         gboolean result = cbox_execute_on(fb, NULL, "/value", "s", error, res);
         g_free(res);
         return result;
@@ -115,20 +115,20 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
 
 
 #define PROC_FIELDS_INITIALISER(type, name, def_value) \
-    l->name = def_value; \
-    l->has_##name = 0;
+    ld->name = def_value; \
+    ld->has_##name = 0;
 #define PROC_FIELDS_INITIALISER_enum(type, name, def_value) \
     PROC_FIELDS_INITIALISER(type, name, def_value)
 #define PROC_FIELDS_INITIALISER_dBamp(type, name, def_value) \
-    l->name = def_value; \
-    l->name##_linearized = -1; \
-    l->has_##name = 0;
+    ld->name = def_value; \
+    ld->name##_linearized = -1; \
+    ld->has_##name = 0;
 #define PROC_FIELDS_INITIALISER_dahdsr(name, parname, index) \
-    cbox_dahdsr_init(&l->name, 100.f); \
-    DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, l)
+    cbox_dahdsr_init(&ld->name, 100.f); \
+    DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, ld)
 #define PROC_FIELDS_INITIALISER_lfo(name, parname, index) \
-    lfo_params_clear(&l->name##_params); \
-    LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, l)
+    lfo_params_clear(&ld->name##_params); \
+    LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, ld)
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_layer)
 
@@ -142,31 +142,36 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     
     if (parent_group)
     {
-        sampler_layer_clone(l, parent_group);
+        sampler_layer_data_clone(&l->data, &parent_group->data);
+        l->child_count = 0;
         l->parent_program = parent_program;
         l->parent_group = parent_group;
         parent_group->child_count++;
+        l->runtime = &l->data;
         CBOX_OBJECT_REGISTER(l);
         return l;
     }
     l->parent_program = parent_program;
     l->child_count = 0;
-    l->waveform = NULL;
+    struct sampler_layer_data *ld = &l->data;
+    ld->waveform = NULL;
     
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_INITIALISER)
     
-    l->freq = 44100;
-    l->use_keyswitch = 0;
-    l->last_key = 0;
-    l->velcurve[0] = 0;
-    l->velcurve[127] = 1;
+    ld->eff_freq = 44100;
+    ld->velcurve[0] = 0;
+    ld->velcurve[127] = 1;
     for (int i = 1; i < 127; i++)
-        l->velcurve[i] = -1;
-    l->modulations = NULL;
-    l->nifs = NULL;
+        ld->velcurve[i] = -1;
+    ld->modulations = NULL;
+    ld->nifs = NULL;
+
+    ld->eff_use_keyswitch = 0;
+    l->last_key = -1;
     sampler_layer_set_modulation1(l, 74, smdest_cutoff, 9600, 2);
     sampler_layer_set_modulation1(l, 71, smdest_resonance, 12, 2);
     sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
+    l->runtime = &l->data;
     CBOX_OBJECT_REGISTER(l);
     return l;
 }
@@ -183,17 +188,12 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
         LFO_FIELDS(PROC_SUBSTRUCT_CLONE, name##_params, dst, src) \
         LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst)
 
-void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *src)
+void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampler_layer_data *src)
 {
     dst->waveform = src->waveform;
     if (dst->waveform)
         cbox_waveform_ref(dst->waveform);
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_CLONE)
-    dst->parent_program = src->parent_program;
-    dst->child_count = 0;
-    dst->freq = src->freq;
-    dst->use_keyswitch = src->use_keyswitch;
-    dst->last_key = src->last_key;
     memcpy(dst->velcurve, src->velcurve, 128 * sizeof(float));
     dst->modulations = g_slist_copy(src->modulations);
     for(GSList *mod = dst->modulations; mod; mod = mod->next)
@@ -213,8 +213,7 @@ void sampler_layer_clone(struct sampler_layer *dst, const struct sampler_layer *
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform)
 {
-    l->waveform = waveform;
-    l->freq = (waveform && waveform->info.samplerate) ? waveform->info.samplerate : 44100;
+    l->data.waveform = waveform;
 }
 
 #define PROC_FIELDS_FINALISER(type, name, def_value) 
@@ -225,10 +224,11 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *w
     cbox_envelope_init_dahdsr(&l->name##_shape, &l->name, m->module.srate / CBOX_BLOCK_SIZE, 100.f);
 #define PROC_FIELDS_FINALISER_lfo(name, parname, index) /* no finaliser required */
 
-void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
+void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_module *m)
 {
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_FINALISER)
 
+    l->eff_freq = (l->waveform && l->waveform->info.samplerate) ? l->waveform->info.samplerate : 44100;
     // XXXKF should have a distinction between 'configured' and 'effective' loop start/end
     if (l->loop_mode == slm_unknown)
     {
@@ -278,9 +278,13 @@ void sampler_layer_finalize(struct sampler_layer *l, struct sampler_module *m)
         }
         start = i;
     }
-    l->use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
-    l->last_key = l->sw_lokey;
-    l->current_seq_position = l->seq_position;
+    l->eff_use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
+}
+
+void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)
+{
+    l->last_key = l->data.sw_lokey;
+    l->current_seq_position = l->data.seq_position;
 }
 
 struct layer_foreach_struct
@@ -325,7 +329,8 @@ struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, s
 {
     struct sampler_layer *l = sampler_layer_new(parent_program, NULL);
     sampler_layer_load_overrides(l, cfg_section);
-    sampler_layer_finalize(l, m);
+    sampler_layer_data_finalize(&l->data, m);
+    sampler_layer_reset_switches(l, m);
     return l;
 }
 
@@ -423,13 +428,13 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
 }
 
 #define PARSE_PARAM_midi_note_t(field, strname, valuestr) \
-    return ((l->field = sfz_note_from_string(value)), (l->has_##field = 1));
+    return ((l->data.field = sfz_note_from_string(value)), (l->data.has_##field = 1));
 #define PARSE_PARAM_int(field, strname, valuestr) \
-    return ((l->field = atoi(value)), (l->has_##field = 1));
+    return ((l->data.field = atoi(value)), (l->data.has_##field = 1));
 #define PARSE_PARAM_uint32_t(field, strname, valuestr) \
-    return ((l->field = (uint32_t)strtoul(value, NULL, 10)), (l->has_##field = 1));
+    return ((l->data.field = (uint32_t)strtoul(value, NULL, 10)), (l->data.has_##field = 1));
 #define PARSE_PARAM_float(field, strname, valuestr) \
-    return ((l->field = atof(value)), (l->has_##field = 1));
+    return ((l->data.field = atof(value)), (l->data.has_##field = 1));
 
 #define PROC_APPLY_PARAM(type, name, def_value) \
     if (!strcmp(key, #name)) { \
@@ -437,24 +442,24 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     }
 #define PROC_APPLY_PARAM_dBamp(type, name, def_value) \
     if (!strcmp(key, #name)) { \
-        return ((l->name = atof(value)), (l->has_##name = 1)); \
+        return ((l->data.name = atof(value)), (l->data.has_##name = 1)); \
     }
 #define PROC_APPLY_PARAM_enum(enumtype, name, def_value) \
     if (!strcmp(key, #name)) { \
-        if (!enumtype##_from_string(value, &l->name)) { \
+        if (!enumtype##_from_string(value, &l->data.name)) { \
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Value %s is not a correct value for %s", value, #name); \
             return FALSE; \
         } \
-        l->has_##name = 1; \
+        l->data.has_##name = 1; \
         return TRUE; \
     }
 // LFO and envelope need special handling now
 #define PROC_APPLY_PARAM_dahdsr(name, parname, index) \
     if (!strncmp(key, #parname "_", sizeof(#parname))) \
-        return parse_envelope_param(l, &l->name, &l->has_##name, index, key + sizeof(#parname), value);
+        return parse_envelope_param(l, &l->data.name, &l->data.has_##name, index, key + sizeof(#parname), value);
 #define PROC_APPLY_PARAM_lfo(name, parname, index) \
     if (!strncmp(key, #parname "_", sizeof(#parname))) \
-        return parse_lfo_param(l, &l->name##_params, &l->has_##name, index, key + sizeof(#parname), value);
+        return parse_lfo_param(l, &l->data.name##_params, &l->data.has_##name, index, key + sizeof(#parname), value);
 
 gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error)
 {
@@ -470,7 +475,7 @@ try_now:
     
     if (!strcmp(key, "sample"))
     {
-        struct cbox_waveform *old_waveform = l->waveform;
+        struct cbox_waveform *old_waveform = l->data.waveform;
         gchar *value_copy = g_strdup(value);
         for (int i = 0; value_copy[i]; i++)
         {
@@ -489,13 +494,13 @@ try_now:
         return TRUE;
     }
     else if (!strcmp(key, "lolev"))
-        l->lovel = atoi(value), l->has_lovel = 1;
+        l->data.lovel = atoi(value), l->data.has_lovel = 1;
     else if (!strcmp(key, "hilev"))
-        l->hivel = atoi(value), l->has_hivel = 1;
+        l->data.hivel = atoi(value), l->data.has_hivel = 1;
     else if (!strcmp(key, "loopstart"))
-        l->loop_start = atoi(value), l->has_loop_start = 1;
+        l->data.loop_start = atoi(value), l->data.has_loop_start = 1;
     else if (!strcmp(key, "loopend"))
-        l->loop_end = atoi(value), l->has_loop_end = 1;
+        l->data.loop_end = atoi(value), l->data.has_loop_end = 1;
     else if (!strcmp(key, "loopmode"))
     {
         key = "loop_mode";
@@ -530,16 +535,16 @@ try_now:
     else if (!strncmp(key, "amp_velcurve_", 13))
     {
         // if not known yet, set to 0, it can always be overriden via velcurve_quadratic setting
-        if (l->velcurve_quadratic == -1)
-            l->velcurve_quadratic = 0;
+        if (l->data.velcurve_quadratic == -1)
+            l->data.velcurve_quadratic = 0;
         int point = atoi(key + 13);
         if (point >= 0 && point <= 127)
         {
-            l->velcurve[point] = atof(value);
-            if (l->velcurve[point] < 0)
-                l->velcurve[point] = 0;
-            if (l->velcurve[point] > 1)
-                l->velcurve[point] = 1;
+            l->data.velcurve[point] = atof(value);
+            if (l->data.velcurve[point] < 0)
+                l->data.velcurve[point] = 0;
+            if (l->data.velcurve[point] > 1)
+                l->data.velcurve[point] = 1;
         }
         else
             return FALSE;
@@ -586,7 +591,7 @@ try_now:
 #define PROC_FIELDS_TO_FILEPTR_lfo(name, parname, index) \
     LFO_FIELDS(ENV_PARAM_OUTPUT, l->name##_params, name, parname)
 
-gchar *sampler_layer_to_string(struct sampler_layer *l)
+gchar *sampler_layer_data_to_string(struct sampler_layer_data *l)
 {
     GString *outstr = g_string_sized_new(200);
     const char *tmpstr;
@@ -670,7 +675,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *l)
 
 void sampler_layer_dump(struct sampler_layer *l, FILE *f)
 {
-    gchar *str = sampler_layer_to_string(l);
+    gchar *str = sampler_layer_data_to_string(&l->data);
     fprintf(f, "%s\n", str);
 }
 
@@ -684,9 +689,9 @@ void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
             CBOX_DELETE(l->parent_group);
         l->parent_group = NULL;
     }
-    g_slist_free_full(l->nifs, g_free);
-    g_slist_free_full(l->modulations, g_free);
-    if (l->waveform)
-        cbox_waveform_unref(l->waveform);
+    g_slist_free_full(l->data.nifs, g_free);
+    g_slist_free_full(l->data.modulations, g_free);
+    if (l->data.waveform)
+        cbox_waveform_unref(l->data.waveform);
     free(l);
 }

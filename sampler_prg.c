@@ -27,26 +27,27 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
     int ch = (c - c->module->channels) + 1;
     for(;next_layer;next_layer = g_slist_next(next_layer))
     {
-        struct sampler_layer *l = next_layer->data;
+        struct sampler_layer *lr = next_layer->data;
+        struct sampler_layer_data *l = &lr->data;
         if (!l->waveform)
             continue;
         if (l->sw_last != -1)
         {
             if (note >= l->sw_lokey && note <= l->sw_hikey)
-                l->last_key = note;
+                lr->last_key = note;
         }
         if (note >= l->lokey && note <= l->hikey && vel >= l->lovel && vel <= l->hivel && ch >= l->lochan && ch <= l->hichan && random >= l->lorand && random < l->hirand)
         {
-            if (!l->use_keyswitch || 
-                ((l->sw_last == -1 || l->sw_last == l->last_key) &&
+            if (!l->eff_use_keyswitch || 
+                ((l->sw_last == -1 || l->sw_last == lr->last_key) &&
                  (l->sw_down == -1 || (c->switchmask[l->sw_down >> 5] & (1 << (l->sw_down & 31)))) &&
                  (l->sw_up == -1 || !(c->switchmask[l->sw_up >> 5] & (1 << (l->sw_up & 31)))) &&
                  (l->sw_previous == -1 || l->sw_previous == c->previous_note)))
             {
-                gboolean play = l->current_seq_position == 1;
-                l->current_seq_position++;
-                if (l->current_seq_position >= l->seq_length)
-                    l->current_seq_position = 1;
+                gboolean play = lr->current_seq_position == 1;
+                lr->current_seq_position++;
+                if (lr->current_seq_position >= l->seq_length)
+                    lr->current_seq_position = 1;
                 if (play)
                     return next_layer;
             }
@@ -166,7 +167,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         struct sampler_layer *l = sampler_layer_new_from_section(m, prg, where);
         if (!l)
             g_warning("Sample layer '%s' cannot be created - skipping", layer_section);
-        else if (!l->waveform)
+        else if (!l->data.waveform)
             g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
         else
             sampler_program_add_layer(prg, l);
@@ -179,7 +180,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
 
 void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer *l)
 {
-    if (l->trigger == stm_release)
+    if (l->data.trigger == stm_release)
         prg->layers_release = g_slist_prepend(prg->layers_release, l);
     else
         prg->layers = g_slist_prepend(prg->layers, l);

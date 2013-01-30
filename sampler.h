@@ -67,7 +67,7 @@ struct sampler_voice
 {
     enum sampler_player_type mode;
     enum sampler_filter_type filter;
-    struct sampler_layer *layer;
+    struct sampler_layer_data *layer;
     struct sampler_program *program;
     struct cbox_waveform *last_waveform;
     uint32_t pos, delta, loop_start, cur_sample_end;
@@ -80,7 +80,7 @@ struct sampler_voice
     int off_by;
     int delay;
     int age;
-    float base_freq, pitch;
+    float pitch;
     float gain;
     float lgain, rgain;
     float last_lgain, last_rgain;

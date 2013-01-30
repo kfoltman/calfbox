@@ -36,7 +36,8 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
     struct sfz_load_state *ls = client->user_data;
     // printf("-- copy current region to the list of layers\n");
     struct sampler_layer *l = ls->region;
-    sampler_layer_finalize(l, ls->m);
+    sampler_layer_data_finalize(&l->data, ls->m);
+    sampler_layer_reset_switches(l, ls->m);
     sampler_program_add_layer(ls->program, ls->region);
 
 #if DUMP_LAYER_ATTRIBS
@@ -49,10 +50,10 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
 static void load_sfz_group(struct sfz_parser_client *client)
 {
     struct sfz_load_state *ls = client->user_data;
-    if (ls->group && ls->group->waveform)
+    if (ls->group && ls->group->data.waveform)
     {
-        cbox_waveform_unref(ls->group->waveform);
-        ls->group->waveform = NULL;
+        cbox_waveform_unref(ls->group->data.waveform);
+        ls->group->data.waveform = NULL;
     }
     if (ls->region)
         load_sfz_end_region(client);
@@ -110,10 +111,10 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
 
     if (ls.region)
         load_sfz_end_region(&c);
-    if (ls.group && ls.group->waveform)
+    if (ls.group && ls.group->data.waveform)
     {
-        cbox_waveform_unref(ls.group->waveform);
-        ls.group->waveform = NULL;
+        cbox_waveform_unref(ls.group->data.waveform);
+        ls.group->data.waveform = NULL;
     }
     
     prg->layers = g_slist_reverse(prg->layers);
