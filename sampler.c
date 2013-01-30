@@ -79,8 +79,6 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     if (end > l->waveform->info.frames)
         end = l->waveform->info.frames;
     
-    double pitch = ((note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100);
-    
     v->output_pair_no = l->output % m->output_pairs;
     v->serial_no = m->serial_no;
     v->pos = l->offset;
@@ -99,11 +97,12 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     v->loop_start = l->loop_start;
     v->loop_overlap = l->loop_overlap;
     v->loop_overlap_step = 1.0 / l->loop_overlap;    
-    v->gain = l->volume_linearized * (1.0 + (l->eff_velcurve[vel] - 1.0) * l->amp_veltrack * 0.01);
+    v->gain_fromvel = 1.0 + (l->eff_velcurve[vel] - 1.0) * l->amp_veltrack * 0.01;
+    v->gain_shift = 0.0;
     v->note = note;
     v->vel = vel;
     v->mode = l->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-    v->pitch = pitch;
+    v->pitch_shift = 0;
     v->released = 0;
     v->released_with_sustain = 0;
     v->released_with_sostenuto = 0;
@@ -475,6 +474,8 @@ static inline int addcc(struct sampler_channel *c, int cc_no)
 
 void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs)
 {
+    struct sampler_layer_data *l = v->layer;
+
     // if it's a DAHD envelope without sustain, consider the note finished
     if (v->amp_env.cur_stage == 4 && v->amp_env.shape->stages[3].end_value == 0)
         cbox_envelope_go_to(&v->amp_env, 15);                
@@ -502,9 +503,10 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     // XXXKF I'm sacrificing sample accuracy for delays for now
     v->delay = 0;
     
+    float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100 + v->pitch_shift;
     float modsrcs[smsrc_pernote_count];
     modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * (1.0 / 127.0);
-    modsrcs[smsrc_pitch - smsrc_pernote_offset] = v->pitch * (1.0 / 100.0);
+    modsrcs[smsrc_pitch - smsrc_pernote_offset] = pitch * (1.0 / 100.0);
     modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0; // XXXKF not supported yet
     modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released) * 0.01f;
     modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released) * 0.01f;
@@ -525,12 +527,12 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     
     float moddests[smdestcount];
     moddests[smdest_gain] = 0;
-    moddests[smdest_pitch] = v->pitch + c->pitchbend;
+    moddests[smdest_pitch] = pitch + c->pitchbend;
     moddests[smdest_cutoff] = v->cutoff_shift;
     moddests[smdest_resonance] = 0;
-    GSList *mod = v->layer->modulations;
-    if (v->layer->trigger == stm_release)
-        moddests[smdest_gain] -= v->age * v->layer->rt_decay / m->module.srate;
+    GSList *mod = l->modulations;
+    if (l->trigger == stm_release)
+        moddests[smdest_gain] -= v->age * l->rt_decay / m->module.srate;
     static const int modoffset[4] = {0, -1, -1, 1 };
     static const int modscale[4] = {1, 1, 2, -2 };
     while(mod)
@@ -559,29 +561,29 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     
     double maxv = 127 << 7;
-    double freq = v->layer->eff_freq * cent2factor(moddests[smdest_pitch]) ;
+    double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;
     uint64_t freq64 = freq * 65536.0 * 65536.0 / m->module.srate;
     v->delta = freq64 >> 32;
     v->frac_delta = freq64 & 0xFFFFFFFF;
-    float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * v->gain * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
+    float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
     if (moddests[smdest_gain] != 0.0)
         gain *= dB2gain(moddests[smdest_gain]);
-    float pan = (v->layer->pan + 100) * (1.0 / 200.0) + (addcc(c, 10) * 1.0 / maxv - 0.5) * 2;
+    float pan = (l->pan + 100) * (1.0 / 200.0) + (addcc(c, 10) * 1.0 / maxv - 0.5) * 2;
     if (pan < 0)
         pan = 0;
     if (pan > 1)
         pan = 1;
     v->lgain = gain * (1 - pan)  / 32768.0;
     v->rgain = gain * pan / 32768.0;
-    if (v->layer->cutoff != -1)
+    if (l->cutoff != -1)
     {
-        float cutoff = v->layer->cutoff * cent2factor(moddests[smdest_cutoff]);
+        float cutoff = l->cutoff * cent2factor(moddests[smdest_cutoff]);
         if (cutoff < 20)
             cutoff = 20;
         if (cutoff > m->module.srate * 0.45)
             cutoff = m->module.srate * 0.45;
         //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
-        float resonance = v->layer->resonance_linearized * dB2gain(moddests[smdest_resonance]);
+        float resonance = l->resonance_linearized * dB2gain(moddests[smdest_resonance]);
         if (resonance < 0.7)
             resonance = 0.7;
         if (resonance > 32)
@@ -589,7 +591,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         // XXXKF this is found experimentally and probably far off from correct formula
         if (is_4pole(v->layer))
             resonance = sqrt(resonance / 0.707) * 0.5;
-        switch(v->layer->fil_type)
+        switch(l->fil_type)
         {
         case sft_lp12:
             cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
@@ -626,7 +628,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     samples = sampler_voice_sample_playback(v, tmp_outputs);
     for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
         left[i] = right[i] = 0.f;
-    if (v->layer->cutoff != -1)
+    if (l->cutoff != -1)
     {
         cbox_biquadf_process(&v->filter_left, &v->filter_coeffs, left);
         if (is_4pole(v->layer))
@@ -1279,7 +1281,7 @@ void sampler_update_layer(struct sampler_module *m, struct sampler_layer *l)
 
 void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
-    v->pitch += nif->param * v->vel * (1.0 / 127.0);
+    v->pitch_shift += nif->param * v->vel * (1.0 / 127.0);
 }
 
 void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
@@ -1293,13 +1295,13 @@ void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voic
     switch(nif->variant)
     {
         case 0:
-            v->gain *= dB2gain(rnd * nif->param);
+            v->gain_shift += rnd * nif->param;
             break;
         case 1:
             v->cutoff_shift += rnd * nif->param;
             break;
         case 2:
-            v->pitch += rnd * nif->param; // this is in cents
+            v->pitch_shift += rnd * nif->param; // this is in cents
             break;
     }
 }

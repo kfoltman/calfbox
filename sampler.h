@@ -79,9 +79,9 @@ struct sampler_voice
     int off_by;
     int delay;
     int age;
-    float pitch;
+    float pitch_shift;
     float cutoff_shift;
-    float gain;
+    float gain_shift, gain_fromvel;
     float lgain, rgain;
     float last_lgain, last_rgain;
     struct cbox_biquadf_state filter_left, filter_right;
