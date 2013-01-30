@@ -99,7 +99,7 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     v->loop_start = l->loop_start;
     v->loop_overlap = l->loop_overlap;
     v->loop_overlap_step = 1.0 / l->loop_overlap;    
-    v->gain = l->volume_linearized * (1.0 + (l->velcurve[vel] - 1.0) * l->amp_veltrack * 0.01);
+    v->gain = l->volume_linearized * (1.0 + (l->eff_velcurve[vel] - 1.0) * l->amp_veltrack * 0.01);
     v->note = note;
     v->vel = vel;
     v->mode = l->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;

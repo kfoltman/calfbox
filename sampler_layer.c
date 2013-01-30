@@ -268,13 +268,13 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_mo
         float ev = l->velcurve[i];
         if (l->velcurve_quadratic)
         {
-            for (int j = start + 1; j < i; j++)
-                l->velcurve[j] = sv + (ev - sv) * (j - start) * (j - start) / ((i - start) * (i - start));
+            for (int j = start; j < i; j++)
+                l->eff_velcurve[j] = sv + (ev - sv) * (j - start) * (j - start) / ((i - start) * (i - start));
         }
         else
         {
-            for (int j = start + 1; j < i; j++)
-                l->velcurve[j] = sv + (ev - sv) * (j - start) / (i - start);
+            for (int j = start; j < i; j++)
+                l->eff_velcurve[j] = sv + (ev - sv) * (j - start) / (i - start);
         }
         start = i;
     }

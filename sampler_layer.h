@@ -305,6 +305,7 @@ struct sampler_layer_data
     SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)    
 
     float velcurve[128];
+    float eff_velcurve[128];
 
     GSList *modulations;
     GSList *nifs;
