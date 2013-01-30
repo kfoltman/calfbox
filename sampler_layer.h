@@ -322,6 +322,7 @@ struct sampler_layer
     
     struct sampler_layer_data data, *runtime;
 
+    struct sampler_module *module;
     struct sampler_program *parent_program;
     struct sampler_layer *parent_group;
     int child_count;
@@ -329,7 +330,7 @@ struct sampler_layer
     int last_key, current_seq_position;
 };
 
-extern struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, struct sampler_layer *parent_group);
+extern struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group);
 extern struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, const char *cfg_section);
 extern void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform);
 extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags);

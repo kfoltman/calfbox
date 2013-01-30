@@ -59,7 +59,7 @@ static void load_sfz_group(struct sfz_parser_client *client)
     if (ls->region)
         load_sfz_end_region(client);
     // printf("-- start group\n");
-    ls->group = sampler_layer_new(ls->program, NULL);
+    ls->group = sampler_layer_new(ls->m, ls->program, NULL);
 }
 
 static void load_sfz_region(struct sfz_parser_client *client)
@@ -77,7 +77,7 @@ static void load_sfz_region(struct sfz_parser_client *client)
         sampler_layer_dump(&ls->group, stdout);
 #endif
     }
-    ls->region = sampler_layer_new(ls->program, ls->group);
+    ls->region = sampler_layer_new(ls->m, ls->program, ls->group);
     // g_warning("-- start region");
 }
 

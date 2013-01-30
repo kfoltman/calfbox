@@ -104,7 +104,12 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     {
         const char *key = CBOX_ARG_S(cmd, 0);
         const char *value = CBOX_ARG_S(cmd, 1);
-        return sampler_layer_apply_param(layer, key, value, error);
+        if (sampler_layer_apply_param(layer, key, value, error))
+        {
+            sampler_update_layer(layer->module, layer);
+            return TRUE;
+        }
+        return FALSE;
     }
     else // otherwise, treat just like an command on normal (non-aux) output
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
@@ -130,7 +135,7 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_layer)
 
-struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, struct sampler_layer *parent_group)
+struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group)
 {
     struct sampler_layer *l = malloc(sizeof(struct sampler_layer));
     struct cbox_document *doc = CBOX_GET_DOCUMENT(parent_program);
@@ -138,6 +143,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     CBOX_OBJECT_HEADER_INIT(l, sampler_layer, doc);
     cbox_command_target_init(&l->cmd_target, sampler_layer_process_cmd, l);
     
+    l->module = m;
     if (parent_group)
     {
         sampler_layer_data_clone(&l->data, &parent_group->data, FALSE);
@@ -327,7 +333,7 @@ void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_secti
 
 struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, const char *cfg_section)
 {
-    struct sampler_layer *l = sampler_layer_new(parent_program, NULL);
+    struct sampler_layer *l = sampler_layer_new(m, parent_program, NULL);
     sampler_layer_load_overrides(l, cfg_section);
     sampler_layer_data_finalize(&l->data, m);
     sampler_layer_reset_switches(l, m);

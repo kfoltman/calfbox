@@ -66,7 +66,6 @@ struct sampler_lfo
 struct sampler_voice
 {
     enum sampler_player_type mode;
-    enum sampler_filter_type filter;
     struct sampler_layer_data *layer;
     struct sampler_program *program;
     struct cbox_waveform *last_waveform;
@@ -81,10 +80,10 @@ struct sampler_voice
     int delay;
     int age;
     float pitch;
+    float cutoff_shift;
     float gain;
     float lgain, rgain;
     float last_lgain, last_rgain;
-    float cutoff, resonance;
     struct cbox_biquadf_state filter_left, filter_right;
     struct cbox_biquadf_state filter_left2, filter_right2;
     struct cbox_biquadf_coeffs filter_coeffs;

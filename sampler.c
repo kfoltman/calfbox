@@ -103,7 +103,6 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     v->note = note;
     v->vel = vel;
     v->mode = l->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-    v->filter = l->fil_type;
     v->pitch = pitch;
     v->released = 0;
     v->released_with_sustain = 0;
@@ -117,11 +116,7 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     v->pitch_env.shape = &l->pitch_env_shape;
     v->last_lgain = 0;
     v->last_rgain = 0;
-    if (l->cutoff != -1)
-        v->cutoff = l->cutoff * pow(2.0, (vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack) / 1200.0);
-    else
-        v->cutoff = -1;
-    v->resonance = l->resonance_linearized;
+    v->cutoff_shift = vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack;
     v->loop_mode = l->loop_mode;
     v->off_by = l->off_by;
     int auxes = (m->module.outputs - m->module.aux_offset) / 2;
@@ -446,23 +441,23 @@ static inline float clip01(float v)
     return v;
 }
 
-static gboolean is_4pole(struct sampler_voice *v)
+static gboolean is_4pole(struct sampler_layer_data *v)
 {
     if (v->cutoff == -1)
         return FALSE;
-    return v->filter == sft_lp24 || v->filter == sft_hp24 || v->filter == sft_bp12;
+    return v->fil_type == sft_lp24 || v->fil_type == sft_hp24 || v->fil_type == sft_bp12;
 }
 
 static gboolean is_tail_finished(struct sampler_voice *v)
 {
-    if (v->cutoff == -1)
+    if (v->layer->cutoff == -1)
         return TRUE;
     double eps = 1.0 / 65536.0;
     if (cbox_biquadf_is_audible(&v->filter_left, eps))
         return FALSE;
     if (cbox_biquadf_is_audible(&v->filter_right, eps))
         return FALSE;
-    if (is_4pole(v))
+    if (is_4pole(v->layer))
     {
         if (cbox_biquadf_is_audible(&v->filter_left2, eps))
             return FALSE;
@@ -521,7 +516,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     
     if (v->amp_env.cur_stage < 0)
     {
-        if (v->cutoff == -1 || is_tail_finished(v))
+        if (is_tail_finished(v))
         {
             v->mode = spt_inactive;
             return;
@@ -531,7 +526,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float moddests[smdestcount];
     moddests[smdest_gain] = 0;
     moddests[smdest_pitch] = v->pitch + c->pitchbend;
-    moddests[smdest_cutoff] = 0;
+    moddests[smdest_cutoff] = v->cutoff_shift;
     moddests[smdest_resonance] = 0;
     GSList *mod = v->layer->modulations;
     if (v->layer->trigger == stm_release)
@@ -578,23 +573,23 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         pan = 1;
     v->lgain = gain * (1 - pan)  / 32768.0;
     v->rgain = gain * pan / 32768.0;
-    if (v->cutoff != -1)
+    if (v->layer->cutoff != -1)
     {
-        float cutoff = v->cutoff * cent2factor(moddests[smdest_cutoff]);
+        float cutoff = v->layer->cutoff * cent2factor(moddests[smdest_cutoff]);
         if (cutoff < 20)
             cutoff = 20;
         if (cutoff > m->module.srate * 0.45)
             cutoff = m->module.srate * 0.45;
         //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
-        float resonance = v->resonance * dB2gain(moddests[smdest_resonance]);
+        float resonance = v->layer->resonance_linearized * dB2gain(moddests[smdest_resonance]);
         if (resonance < 0.7)
             resonance = 0.7;
         if (resonance > 32)
             resonance = 32;
         // XXXKF this is found experimentally and probably far off from correct formula
-        if (is_4pole(v))
+        if (is_4pole(v->layer))
             resonance = sqrt(resonance / 0.707) * 0.5;
-        switch(v->filter)
+        switch(v->layer->fil_type)
         {
         case sft_lp12:
             cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
@@ -631,13 +626,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     samples = sampler_voice_sample_playback(v, tmp_outputs);
     for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
         left[i] = right[i] = 0.f;
-    if (v->cutoff != -1)
+    if (v->layer->cutoff != -1)
     {
         cbox_biquadf_process(&v->filter_left, &v->filter_coeffs, left);
-        if (is_4pole(v))
+        if (is_4pole(v->layer))
             cbox_biquadf_process(&v->filter_left2, &v->filter_coeffs, left);
         cbox_biquadf_process(&v->filter_right, &v->filter_coeffs, right);
-        if (is_4pole(v))
+        if (is_4pole(v->layer))
             cbox_biquadf_process(&v->filter_right2, &v->filter_coeffs, right);
     }
     mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.0);
@@ -1301,7 +1296,7 @@ void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voic
             v->gain *= dB2gain(rnd * nif->param);
             break;
         case 1:
-            v->cutoff *= cent2factor(rnd * nif->param);
+            v->cutoff_shift += rnd * nif->param;
             break;
         case 2:
             v->pitch += rnd * nif->param; // this is in cents
