@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "sampler_prg.h"
 #include "sfzloader.h"
 
+#include <assert.h>
+
 CBOX_CLASS_DEFINITION_ROOT(sampler_program)
 
 GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random)
@@ -165,6 +167,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         
         prg->source_file = g_strdup_printf("config:%s", cfg_section);
         struct sampler_layer *l = sampler_layer_new_from_section(m, prg, where);
+        sampler_update_layer(m, l);
         if (!l)
             g_warning("Sample layer '%s' cannot be created - skipping", layer_section);
         else if (!l->data.waveform)
@@ -180,6 +183,8 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
 
 void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer *l)
 {
+    // Always call sampler_update_layer before sampler_program_add_layer.
+    assert(l->runtime);
     if (l->data.trigger == stm_release)
         prg->layers_release = g_slist_prepend(prg->layers_release, l);
     else

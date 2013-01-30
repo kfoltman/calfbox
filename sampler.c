@@ -203,6 +203,8 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
         {
             struct sampler_voice *v = &m->voices[i];
             struct sampler_layer *l = next_layer->data;
+            // Maybe someone forgot to call sampler_update_layer?
+            assert(l->runtime);
             sampler_start_voice(m, c, v, l->runtime, note, vel, exgroups, &exgroupcount);
             next_layer = sampler_program_get_next_layer(prg, c, g_slist_next(next_layer), note, vel, random);
             if (!next_layer)
@@ -1208,6 +1210,74 @@ void sampler_destroyfunc(struct cbox_module *module)
     }
 
 ENUM_LIST(MAKE_FROM_TO_STRING)
+
+//////////////////////////////////////////////////////////////////////////
+
+struct sampler_update_layer_cmd
+{
+    struct sampler_module *module;
+    struct sampler_layer *layer;
+    struct sampler_layer_data *new_data;
+    struct sampler_layer_data *old_data;
+};
+
+static int sampler_update_layer_cmd_prepare(void *data)
+{
+    struct sampler_update_layer_cmd *cmd = data;
+    cmd->old_data = cmd->layer->runtime;
+    cmd->new_data = calloc(1, sizeof(struct sampler_layer_data));
+    
+    sampler_layer_data_clone(cmd->new_data, &cmd->layer->data, TRUE);
+    sampler_layer_data_finalize(cmd->new_data, cmd->module);
+    if (cmd->layer->runtime == NULL)
+    {
+        // initial update of the layer, so none of the voices need updating yet
+        // because the layer hasn't been allocated to any voice
+        cmd->layer->runtime = cmd->new_data;
+        return 1;
+    }
+    return 0;
+}
+
+static int sampler_update_layer_cmd_execute(void *data)
+{
+    struct sampler_update_layer_cmd *cmd = data;
+    
+    for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
+    {
+        if (cmd->module->voices[i].layer == cmd->old_data)
+            cmd->module->voices[i].layer = cmd->new_data;
+    }
+    cmd->layer->runtime = cmd->new_data;
+    return 10;
+}
+
+static void sampler_update_layer_cmd_cleanup(void *data)
+{
+    struct sampler_update_layer_cmd *cmd = data;
+    
+    sampler_layer_data_destroy(cmd->old_data);
+}
+
+void sampler_update_layer(struct sampler_module *m, struct sampler_layer *l)
+{
+    static struct cbox_rt_cmd_definition rtcmd = {
+        .prepare = sampler_update_layer_cmd_prepare,
+        .execute = sampler_update_layer_cmd_execute,
+        .cleanup = sampler_update_layer_cmd_cleanup,
+    };
+    
+    struct sampler_update_layer_cmd lcmd;
+    lcmd.module = m;
+    lcmd.layer = l;
+    lcmd.new_data = NULL;
+    lcmd.old_data = NULL;
+    
+    // In order to be able to use the async call, it would be necessary to
+    // identify old data by layer pointer, not layer data pointer. For now,
+    // it might be good enough to just use sync calls for this.
+    cbox_rt_execute_cmd_sync(m->module.rt, &rtcmd, &lcmd);
+}
 
 //////////////////////////////////////////////////////////////////////////
 // Note initialisation functions

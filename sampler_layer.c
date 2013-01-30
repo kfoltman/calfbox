@@ -33,8 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 
-static void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampler_layer_data *src);
-
 void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags)
 {
     sampler_layer_set_modulation(l, src, smsrc_none, dest, amount, flags);
@@ -142,12 +140,12 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     
     if (parent_group)
     {
-        sampler_layer_data_clone(&l->data, &parent_group->data);
+        sampler_layer_data_clone(&l->data, &parent_group->data, FALSE);
         l->child_count = 0;
         l->parent_program = parent_program;
         l->parent_group = parent_group;
         parent_group->child_count++;
-        l->runtime = &l->data;
+        l->runtime = NULL;
         CBOX_OBJECT_REGISTER(l);
         return l;
     }
@@ -171,24 +169,26 @@ struct sampler_layer *sampler_layer_new(struct sampler_program *parent_program, 
     sampler_layer_set_modulation1(l, 74, smdest_cutoff, 9600, 2);
     sampler_layer_set_modulation1(l, 71, smdest_resonance, 12, 2);
     sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
-    l->runtime = &l->data;
+    l->runtime = NULL;
     CBOX_OBJECT_REGISTER(l);
     return l;
 }
 
 #define PROC_FIELDS_CLONE(type, name, def_value) \
     dst->name = src->name; \
-    dst->has_##name = 0;
+    dst->has_##name = copy_hasattr ? src->has_##name : FALSE;
 #define PROC_FIELDS_CLONE_dBamp PROC_FIELDS_CLONE
 #define PROC_FIELDS_CLONE_enum PROC_FIELDS_CLONE
 #define PROC_FIELDS_CLONE_dahdsr(name, parname, index) \
         DAHDSR_FIELDS(PROC_SUBSTRUCT_CLONE, name, dst, src) \
-        DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst) 
+        if (!copy_hasattr) \
+            DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst) 
 #define PROC_FIELDS_CLONE_lfo(name, parname, index) \
         LFO_FIELDS(PROC_SUBSTRUCT_CLONE, name##_params, dst, src) \
-        LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst)
+        if (!copy_hasattr) \
+            LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst)
 
-void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampler_layer_data *src)
+void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampler_layer_data *src, gboolean copy_hasattr)
 {
     dst->waveform = src->waveform;
     if (dst->waveform)
@@ -679,6 +679,14 @@ void sampler_layer_dump(struct sampler_layer *l, FILE *f)
     fprintf(f, "%s\n", str);
 }
 
+void sampler_layer_data_destroy(struct sampler_layer_data *l)
+{
+    g_slist_free_full(l->nifs, g_free);
+    g_slist_free_full(l->modulations, g_free);
+    if (l->waveform)
+        cbox_waveform_unref(l->waveform);
+}
+
 void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct sampler_layer *l = CBOX_H2O(objhdr);
@@ -689,9 +697,8 @@ void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
             CBOX_DELETE(l->parent_group);
         l->parent_group = NULL;
     }
-    g_slist_free_full(l->data.nifs, g_free);
-    g_slist_free_full(l->data.modulations, g_free);
-    if (l->data.waveform)
-        cbox_waveform_unref(l->data.waveform);
+    sampler_layer_data_destroy(&l->data);
+    if (l->runtime)
+        sampler_layer_data_destroy(l->runtime);
     free(l);
 }

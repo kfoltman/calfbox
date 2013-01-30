@@ -38,6 +38,7 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
     struct sampler_layer *l = ls->region;
     sampler_layer_data_finalize(&l->data, ls->m);
     sampler_layer_reset_switches(l, ls->m);
+    sampler_update_layer(ls->m, l);
     sampler_program_add_layer(ls->program, ls->region);
 
 #if DUMP_LAYER_ATTRIBS

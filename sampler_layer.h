@@ -341,6 +341,8 @@ extern void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler
 extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error);
 extern gchar *sampler_layer_data_to_string(struct sampler_layer_data *l);
 extern void sampler_layer_dump(struct sampler_layer *l, FILE *f);
+extern void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampler_layer_data *src, gboolean copy_hasattr);
+extern void sampler_layer_data_destroy(struct sampler_layer_data *l);
 
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
