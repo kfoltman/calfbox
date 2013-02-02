@@ -135,8 +135,22 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         }
         return FALSE;
     }
-    else // otherwise, treat just like an command on normal (non-aux) output
-        return cbox_object_default_process_cmd(ct, fb, cmd, error);
+    if (!strcmp(cmd->command, "/get_children") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        GHashTableIter iter;
+        g_hash_table_iter_init(&iter, layer->child_layers);
+        gpointer key, value;
+        while(g_hash_table_iter_next(&iter, &key, &value))
+        {
+            if (!cbox_execute_on(fb, NULL, "/region", "o", error, key))
+                return FALSE;
+        }
+        return TRUE;
+    }
+    // otherwise, treat just like an command on normal (non-aux) output
+    return cbox_object_default_process_cmd(ct, fb, cmd, error);
     
 }
 
@@ -168,19 +182,18 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     cbox_command_target_init(&l->cmd_target, sampler_layer_process_cmd, l);
     
     l->module = m;
+    l->child_layers = g_hash_table_new(NULL, NULL);
     if (parent_group)
     {
         sampler_layer_data_clone(&l->data, &parent_group->data, FALSE);
-        l->child_count = 0;
         l->parent_program = parent_program;
         l->parent_group = parent_group;
-        parent_group->child_count++;
+        g_hash_table_add(parent_group->child_layers, l);
         l->runtime = NULL;
         CBOX_OBJECT_REGISTER(l);
         return l;
     }
     l->parent_program = parent_program;
-    l->child_count = 0;
     struct sampler_layer_data *ld = &l->data;
     ld->waveform = NULL;
     ld->has_waveform = FALSE;
@@ -792,11 +805,10 @@ void sampler_layer_data_destroy(struct sampler_layer_data *l)
 void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct sampler_layer *l = CBOX_H2O(objhdr);
-    assert(l->child_count == 0);
+    assert(g_hash_table_size(l->child_layers) == 0);
     if (l->parent_group)
     {
-        if (!--l->parent_group->child_count)
-            CBOX_DELETE(l->parent_group);
+        g_hash_table_remove(l->parent_group->child_layers, l);
         l->parent_group = NULL;
     }
     sampler_layer_data_destroy(&l->data);

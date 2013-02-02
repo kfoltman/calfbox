@@ -381,11 +381,16 @@ class SamplerProgram(DocObj):
         DocObj.__init__(self, uuid, [])
     def get_regions(self):
         return map(Document.map_uuid, self.get_things("/regions", ['*region']).region)
+    def get_groups(self):
+        g = self.get_things("/groups", ['*group', 'default_group'])
+        return [Document.map_uuid(g.default_group)] + map(Document.map_uuid, g.group)
 Document.classmap['sampler_program'] = SamplerProgram
 
 class SamplerLayer(DocObj):
     def __init__(self, uuid):
         DocObj.__init__(self, uuid, ['parent_program', 'parent_group'])
+    def get_children(self):
+        return map(Document.map_uuid, self.get_things("/get_children", ['*region']).region)
     def as_string(self):
         return self.get_things("/as_string", ['value']).value
     def as_string_full(self):

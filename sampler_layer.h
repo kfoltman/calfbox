@@ -333,11 +333,11 @@ struct sampler_layer
     struct sampler_module *module;
     struct sampler_program *parent_program;
     struct sampler_layer *parent_group;
-    int child_count;
 
     int last_key, current_seq_position;
     
     GHashTable *unknown_keys;
+    GHashTable *child_layers;
 };
 
 extern struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group);

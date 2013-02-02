@@ -58,6 +58,16 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
     return NULL;
 }
 
+static gboolean return_layers(GSList *layers, const char *keyword, struct cbox_command_target *fb, GError **error)
+{
+    for (GSList *p = layers; p; p = g_slist_next(p))
+    {
+        if (!cbox_execute_on(fb, NULL, keyword, "o", error, p->data))
+            return FALSE;
+    }
+    return TRUE;
+}
+
 static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct sampler_program *program = ct->user_data;
@@ -74,17 +84,17 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        for (GSList *p = program->layers; p; p = g_slist_next(p))
-        {
-            if (!cbox_execute_on(fb, NULL, "/region", "o", error, p->data))
-                return FALSE;
-        }
-        for (GSList *p = program->layers_release; p; p = g_slist_next(p))
-        {
-            if (!cbox_execute_on(fb, NULL, "/region", "o", error, p->data))
-                return FALSE;
-        }
-        return TRUE;
+        return return_layers(program->layers, "/region", fb, error) && 
+            return_layers(program->layers_release, "/region", fb, error);
+    }
+    else // otherwise, treat just like an command on normal (non-aux) output
+    if (!strcmp(cmd->command, "/groups") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_execute_on(fb, NULL, "/default_group", "o", error, program->default_group))
+            return FALSE;
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        return return_layers(program->groups, "/group", fb, error);
     }
     else // otherwise, treat just like an command on normal (non-aux) output
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
@@ -105,6 +115,8 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->source_file = NULL;
     prg->layers = NULL;
     prg->layers_release = NULL;
+    prg->groups = NULL;
+    prg->default_group = sampler_layer_new(m, prg, NULL);
     CBOX_OBJECT_REGISTER(prg);
     return prg;
 }
@@ -191,6 +203,11 @@ void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer
         prg->layers = g_slist_prepend(prg->layers, l);
 }
 
+void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer *l)
+{
+    prg->groups = g_slist_prepend(prg->groups, l);
+}
+
 void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
 {
     struct sampler_program *prg = CBOX_H2O(hdr_ptr);
@@ -198,6 +215,9 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
         CBOX_DELETE((struct sampler_layer *)p->data);
     for (GSList *p = prg->layers_release; p; p = g_slist_next(p))
         CBOX_DELETE((struct sampler_layer *)p->data);
+    for (GSList *p = prg->groups; p; p = g_slist_next(p))
+        CBOX_DELETE((struct sampler_layer *)p->data);
+    CBOX_DELETE(prg->default_group);
 
     g_free(prg->name);
     g_free(prg->sample_dir);

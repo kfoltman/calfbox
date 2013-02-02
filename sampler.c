@@ -1258,6 +1258,19 @@ static void sampler_update_layer_cmd_cleanup(void *data)
 
 void sampler_update_layer(struct sampler_module *m, struct sampler_layer *l)
 {
+    // if changing a group, update all child regions instead
+    if (g_hash_table_size(l->child_layers))
+    {
+        GHashTableIter iter;
+        g_hash_table_iter_init(&iter, l->child_layers);
+        gpointer key, value;
+        while(g_hash_table_iter_next(&iter, &key, &value))
+        {
+            sampler_layer_data_finalize(&((struct sampler_layer *)key)->data, &l->data, m);
+            sampler_update_layer(m, (struct sampler_layer *)key);
+        }
+        return;
+    }
     static struct cbox_rt_cmd_definition rtcmd = {
         .prepare = sampler_update_layer_cmd_prepare,
         .execute = sampler_update_layer_cmd_execute,

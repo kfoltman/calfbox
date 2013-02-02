@@ -166,17 +166,13 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         pname, uuid, in_use_cnt = cbox.GetThings("%s/patches" % self.path, ['%patch'], []).patch[prog_no]
         print "UUID=%s" % uuid
         patch = cbox.Document.map_uuid(uuid)
-        groups = {}
-        for r in patch.get_regions():
-            grp = r.status().parent_group
-            if grp not in groups:
-                groups[grp] = []
-            groups[grp].append(r)
-        for g in sorted(groups.keys()):
-            if g is not None:
-                print ("<group> %s" % cbox.Document.map_uuid(g).as_string())
-            for r in groups[g]:
-                print ("<region> %s" % r.as_string())
+        groups = patch.get_groups()
+        for r in groups[0].get_children():
+            print "<region> %s" % (r.as_string())
+        for grp in patch.get_groups()[1:]:
+            print "<group> %s" % (grp.as_string())
+            for r in grp.get_children():
+                print "<region> %s" % (r.as_string())
         
     def load(self, event):
         d = LoadProgramDialog(self.get_toplevel())
