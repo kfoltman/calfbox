@@ -117,6 +117,7 @@ static void *engine_thread(void *user_data)
 
     if (uii->handle_audiodev)
     {
+        uii->no_resubmit = FALSE;
         struct sched_param p;
         memset(&p, 0, sizeof(p));
         p.sched_priority = cbox_config_get_int("io", "rtpriority", 10);
@@ -127,8 +128,9 @@ static void *engine_thread(void *user_data)
         usbio_start_audio_playback(uii);
         if (!uii->setup_error)
         {
-            run_audio_loop(uii);        
+            run_audio_loop(uii);
         }
+        uii->no_resubmit = TRUE;
         memset(&p, 0, sizeof(p));
         p.sched_priority = 0;
         if (0 != sched_setscheduler(tid, SCHED_OTHER, &p))

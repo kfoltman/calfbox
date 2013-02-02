@@ -79,6 +79,8 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
             }
         }
     }
+    if (umi->uii->no_resubmit)
+        return;
     int err = libusb_submit_transfer(transfer);
     if (err == LIBUSB_ERROR_NO_DEVICE)
         transfer->status = LIBUSB_TRANSFER_NO_DEVICE;

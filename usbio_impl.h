@@ -55,7 +55,7 @@ struct cbox_usb_io_impl
     unsigned int iso_packets, iso_packets_multimix;
 
     pthread_t thr_engine;
-    volatile gboolean stop_engine, setup_error;
+    volatile gboolean stop_engine, setup_error, no_resubmit;
     
     int desync;
     uint64_t samples_played;

@@ -268,6 +268,8 @@ static void play_callback_adaptive(struct libusb_transfer *transfer)
     // transmitted.
     uii->desync -= transfer->num_iso_packets * nsamps * 1000;
 
+    if (uii->no_resubmit)
+        return;
     int err = libusb_submit_transfer(transfer);
     if (err)
     {
@@ -361,6 +363,8 @@ void play_callback_asynchronous(struct libusb_transfer *transfer)
     {
         fill_playback_buffer(uii, transfer);
     }
+    if (uii->no_resubmit)
+        return;
     int err = libusb_submit_transfer(transfer);
     if (err)
     {
@@ -492,6 +496,8 @@ static void sync_callback(struct libusb_transfer *transfer)
         if (uii->debug_sync)
             printf(" size = %4d sync_freq = %4d", size, uii->sync_freq);
     }
+    if (uii->no_resubmit)
+        return;
     int err = libusb_submit_transfer(transfer);
     if (err)
     {
