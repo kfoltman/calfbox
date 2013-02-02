@@ -94,7 +94,7 @@ class TestCbox(unittest.TestCase):
         
         # XXXKF: this lack of stable Python representation of engines is annoying
         #instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
-        instrument.cmd('/engine/load_patch_from_string', None, 0, '.', '<group> resonance=3 <region> key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
+        instrument.cmd('/engine/load_patch_from_string', None, 0, '.', '<group> resonance=3 <region> unknown=123 key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
         patches = instrument.get_things("/engine/patches", ["*patch"]).patch
         patches_dict = {}
         for patch in patches:
@@ -112,8 +112,10 @@ class TestCbox(unittest.TestCase):
                     self.assertTrue('impulse.wav' in region_str)
                     self.assertTrue('key=c' in region_str)
                     if 'key=c2' in region_str:
+                        self.assertTrue('unknown=123' in region_str)
                         self.assertTrue('cutoff=1000' in region_str)
                     else:
+                        self.assertFalse('unknown=123' in region_str)
                         self.assertTrue('cutoff=2000' in region_str)
         self.assertEquals(patches_dict, {0 : ('test_sampler_api', 2)})
         region = Document.map_uuid(region_uuid)
