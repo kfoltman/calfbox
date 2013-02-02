@@ -16,6 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config.h"
+
+#if USE_PYTHON
+
 #include "app.h"
 #include "blob.h"
 #include "errors.h"
@@ -303,3 +307,5 @@ void cbox_script_run(const char *name)
     }
     Py_Finalize();
 }
+
+#endif

@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "app.h"
+#include "config.h"
 #include "config-api.h"
 #include "dom.h"
 #include "instr.h"
@@ -43,7 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 
-static const char *short_options = "i:c:r:e:s:t:b:d:D:N:o:nmh";
+static const char *short_options = "i:c:"
+#if USE_PYTHON
+"r:"
+#endif
+"e:s:t:b:d:D:N:o:nmh";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
@@ -58,7 +63,9 @@ static struct option long_options[] = {
     {"beats", 1, 0, 'b'},
     {"drum-pattern", 1, 0, 'd'},
     {"drum-track", 1, 0, 'D'},
+#if USE_PYTHON
     {"run-script", 1, 0, 'r'},
+#endif
     {"output", 1, 0, 'o'},
     {0,0,0,0},
 };
@@ -80,7 +87,9 @@ void print_help(char *progname)
         " -i | --instrument <i>     Load instrument <i> as a single-instrument scene\n"
         " -s | --scene <s>          Load a scene <s>\n"
         " -c | --config <c>         Use specified config file instead of default\n"
+#if USE_PYTHON
         " -r | --run-script <s>     Run a Python script from a given file\n"
+#endif
         " -o | --output <o>         Write the first stereo output to a WAV file\n"
         "\n",
         progname);
@@ -131,7 +140,9 @@ int main(int argc, char *argv[])
     const char *effect_preset_name = NULL;
     const char *drum_pattern_name = NULL;
     const char *drum_track_name = NULL;
+#if USE_PYTHON
     const char *script_name = NULL;
+#endif
     const char *output_name = NULL;
     char *instr_section = NULL;
     struct cbox_scene *scene = NULL;
@@ -174,9 +185,11 @@ int main(int argc, char *argv[])
             case 'D':
                 drum_track_name = optarg;
                 break;
+#if USE_PYTHON
             case 'r':
                 script_name = optarg;
                 break;
+#endif
             case 'm':
                 metronome = 1;
                 break;
@@ -294,9 +307,12 @@ int main(int argc, char *argv[])
         cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_new_metronome(app.rt->master->song, app.rt->master->timesig_nom));
     cbox_master_play(app.rt->master);
     cbox_rt_set_scene(app.rt, scene);
+#if USE_PYTHON
     if (script_name)
         cbox_script_run(script_name);
-    else if (!no_ui)
+    else
+#endif
+    if (!no_ui)
         run_ui();
     else
     {
