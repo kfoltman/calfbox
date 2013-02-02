@@ -84,7 +84,7 @@ class WithPatchTable:
         self.mapping = {}
         for id in patches:
             self.mapping[id] = len(self.mapping)
-            self.patches.append(("%s (%s)" % (patches[id], id), id))
+            self.patches.append((self.fmt_patch_name(patches[id], id), id))
         self.patch_combo_update()
 
     def patch_combo_changed(self, combo, channel):
@@ -103,6 +103,9 @@ class WithPatchTable:
                 cb.set_active(current_patch_index)
         #self.status_label.set_markup(s)
         return True
+        
+    def fmt_patch_name(self, patch, id):
+        return "%s (%s)" % (patch, id)
         
 class FluidsynthWindow(Gtk.VBox, WithPatchTable):
     def __init__(self, instrument, path):
@@ -192,6 +195,9 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         self.voices_widget.set_text(str(attribs.active_voices))
         return True
 
+    def fmt_patch_name(self, patch, id):
+        return "%s (%s)" % (patch[0], id)
+        
 class TonewheelOrganWindow(Gtk.VBox):
     combos = [
         (1, 'Upper', 'upper_vibrato', [(0, 'Off'), (1, 'On')]),
