@@ -129,8 +129,9 @@ static void *engine_thread(void *user_data)
         {
             run_audio_loop(uii);        
         }
+        memset(&p, 0, sizeof(p));
         p.sched_priority = 0;
-        if (0 != sched_setscheduler(tid, SCHED_FIFO, &p))
+        if (0 != sched_setscheduler(tid, SCHED_OTHER, &p))
             g_warning("Cannot unset realtime priority for the processing thread: %s.", strerror(errno));
         usbio_stop_audio_playback(uii);
     }
