@@ -95,7 +95,7 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        gchar *res = sampler_layer_data_to_string(&layer->data);
+        gchar *res = sampler_layer_to_string(layer);
         gboolean result = cbox_execute_on(fb, NULL, "/value", "s", error, res);
         g_free(res);
         return result;
@@ -176,6 +176,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     sampler_layer_set_modulation1(l, 71, smdest_resonance, 12, 2);
     sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
     l->runtime = NULL;
+    l->unknown_keys = NULL;
     CBOX_OBJECT_REGISTER(l);
     return l;
 }
@@ -467,6 +468,14 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     if (!strncmp(key, #parname "_", sizeof(#parname))) \
         return parse_lfo_param(l, &l->data.name##_params, &l->data.has_##name, index, key + sizeof(#parname), value);
 
+static void sampler_layer_apply_unknown(struct sampler_layer *l, const char *key, const char *value)
+{
+    if (!l->unknown_keys)
+        l->unknown_keys = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+    
+    g_hash_table_insert(l->unknown_keys, g_strdup(key), g_strdup(value));
+}
+
 gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error)
 {
 try_now:
@@ -528,7 +537,7 @@ try_now:
         if (ccno > 0 && ccno < 120)
             sampler_layer_add_nif(l, sampler_nif_cc2delay, ccno, atof(value));
         else
-            return FALSE;
+            goto unknown_key;
     }
     else if (!strncmp(key, "cutoff_cc", 9))
     {
@@ -536,7 +545,7 @@ try_now:
         if (ccno > 0 && ccno < 120)
             sampler_layer_set_modulation1(l, ccno, smdest_cutoff, atof(value), 0);
         else
-            return FALSE;
+            goto unknown_key;
     }
     else if (!strncmp(key, "amp_velcurve_", 13))
     {
@@ -553,11 +562,15 @@ try_now:
                 l->data.velcurve[point] = 1;
         }
         else
-            return FALSE;
+            goto unknown_key;
     }
     else
-        return FALSE;
+        goto unknown_key;
     
+    return TRUE;
+unknown_key:
+    sampler_layer_apply_unknown(l, key, value);
+    g_warning("Unknown SFZ property key: '%s'", key);
     return TRUE;
 }
 
@@ -597,8 +610,9 @@ try_now:
 #define PROC_FIELDS_TO_FILEPTR_lfo(name, parname, index) \
     LFO_FIELDS(ENV_PARAM_OUTPUT, l->name##_params, name, parname)
 
-gchar *sampler_layer_data_to_string(struct sampler_layer_data *l)
+gchar *sampler_layer_to_string(struct sampler_layer *lr)
 {
+    struct sampler_layer_data *l = &lr->data;
     GString *outstr = g_string_sized_new(200);
     const char *tmpstr;
     if (l->waveform && l->waveform->display_name)
@@ -673,6 +687,15 @@ gchar *sampler_layer_data_to_string(struct sampler_layer_data *l)
         }
         g_string_append_printf(outstr, " genericmod_from_%d_and_%d_to_%d=%g", md->src, md->src2, md->dest, md->amount);
     }
+
+    if (lr->unknown_keys)
+    {
+        GHashTableIter hti;
+        gchar *key, *value;
+        g_hash_table_iter_init(&hti, lr->unknown_keys);
+        while(g_hash_table_iter_next(&hti, (gpointer *)&key, (gpointer *)&value))
+            g_string_append_printf(outstr, " %s=%s", key, value);
+    }
     
     gchar *res = outstr->str;
     g_string_free(outstr, FALSE);
@@ -681,7 +704,7 @@ gchar *sampler_layer_data_to_string(struct sampler_layer_data *l)
 
 void sampler_layer_dump(struct sampler_layer *l, FILE *f)
 {
-    gchar *str = sampler_layer_data_to_string(&l->data);
+    gchar *str = sampler_layer_to_string(l);
     fprintf(f, "%s\n", str);
 }
 
@@ -706,5 +729,7 @@ void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
     sampler_layer_data_destroy(&l->data);
     if (l->runtime)
         sampler_layer_data_destroy(l->runtime);
+    if (l->unknown_keys)
+        g_hash_table_destroy(l->unknown_keys);
     free(l);
 }

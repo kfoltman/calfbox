@@ -93,10 +93,8 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     }
     
     if (!sampler_layer_apply_param(l, key, value, ls->error))
-    {
-        g_warning("Unhandled sfz key: %s", key);
         return FALSE;
-    }
+
     return TRUE;
 }
 
