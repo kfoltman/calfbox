@@ -12,10 +12,6 @@
 #   - encoder knob 1 adjusts the volume
 #   - mixer button exits the application
 
-import pygtk
-import gtk
-import glib
-import gobject
 import math
 import sys
 
