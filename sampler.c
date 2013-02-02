@@ -145,9 +145,9 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
             exgroups[(*pexgroupcount)++] = l->group;
         }
     }
-    lfo_init(&v->amp_lfo, &l->amp_lfo_params, m->module.srate);
-    lfo_init(&v->filter_lfo, &l->filter_lfo_params, m->module.srate);
-    lfo_init(&v->pitch_lfo, &l->pitch_lfo_params, m->module.srate);
+    lfo_init(&v->amp_lfo, &l->amp_lfo, m->module.srate);
+    lfo_init(&v->filter_lfo, &l->filter_lfo, m->module.srate);
+    lfo_init(&v->pitch_lfo, &l->pitch_lfo, m->module.srate);
     
     cbox_biquadf_reset(&v->filter_left);
     cbox_biquadf_reset(&v->filter_right);
@@ -1225,7 +1225,7 @@ static int sampler_update_layer_cmd_prepare(void *data)
     cmd->new_data = calloc(1, sizeof(struct sampler_layer_data));
     
     sampler_layer_data_clone(cmd->new_data, &cmd->layer->data, TRUE);
-    sampler_layer_data_finalize(cmd->new_data, cmd->module);
+    sampler_layer_data_finalize(cmd->new_data, cmd->layer->parent_group ? &cmd->layer->parent_group->data : NULL, cmd->module);
     if (cmd->layer->runtime == NULL)
     {
         // initial update of the layer, so none of the voices need updating yet

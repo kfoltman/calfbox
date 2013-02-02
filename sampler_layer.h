@@ -240,25 +240,30 @@ typedef int midi_note_t;
 // a linear percentage value in SFZ spec - bit weird!
 
 #define DAHDSR_FIELDS(MACRO, ...) \
-    MACRO(start, 0, ## __VA_ARGS__) \
-    MACRO(delay, 1, ## __VA_ARGS__) \
-    MACRO(attack, 2, ## __VA_ARGS__) \
-    MACRO(hold, 3, ## __VA_ARGS__) \
-    MACRO(decay, 4, ## __VA_ARGS__) \
-    MACRO(sustain, 5, ## __VA_ARGS__) \
-    MACRO(release, 6, ## __VA_ARGS__) \
+    MACRO(start, 0, 0, ## __VA_ARGS__) \
+    MACRO(delay, 1, 0, ## __VA_ARGS__) \
+    MACRO(attack, 2, 0, ## __VA_ARGS__) \
+    MACRO(hold, 3, 0, ## __VA_ARGS__) \
+    MACRO(decay, 4, 0, ## __VA_ARGS__) \
+    MACRO(sustain, 5, 100, ## __VA_ARGS__) \
+    MACRO(release, 6, 0, ## __VA_ARGS__) \
     
 #define LFO_FIELDS(MACRO, ...) \
-    MACRO(freq, 0, ## __VA_ARGS__) \
-    MACRO(delay, 1, ## __VA_ARGS__) \
-    MACRO(fade, 2, ## __VA_ARGS__) \
+    MACRO(freq, 0, 0, ## __VA_ARGS__) \
+    MACRO(delay, 1, 0, ## __VA_ARGS__) \
+    MACRO(fade, 2, 0, ## __VA_ARGS__) \
     
-#define PROC_SUBSTRUCT_HAS_FIELD(name, index, param) \
+#define PROC_SUBSTRUCT_HAS_FIELD(name, index, param, def_value) \
     unsigned int name:1;
-#define PROC_SUBSTRUCT_RESET_HAS_FIELD(name, index, param, dst) \
+#define PROC_SUBSTRUCT_RESET_FIELD(name, index, def_value, param, dst) \
+    dst->param.name = def_value;
+#define PROC_SUBSTRUCT_RESET_HAS_FIELD(name, index, def_value, param, dst) \
     dst->has_##param.name = 0;
-#define PROC_SUBSTRUCT_CLONE(name, index, param, dst, src) \
+#define PROC_SUBSTRUCT_CLONE(name, index, def_value, param, dst, src) \
     dst->param.name = src->param.name;
+#define PROC_SUBSTRUCT_CLONEPARENT(name, index, def_value, param, l) \
+    if (!l->has_##param.name) \
+        l->param.name = parent ? parent->param.name : def_value;
 struct sampler_dahdsr_has_fields
 {
     DAHDSR_FIELDS(PROC_SUBSTRUCT_HAS_FIELD, name)
@@ -280,7 +285,7 @@ struct sampler_lfo_has_fields
     struct cbox_dahdsr name; \
     struct cbox_envelope_shape name##_shape;
 #define PROC_FIELDS_TO_STRUCT_lfo(name, parname, index) \
-    struct sampler_lfo_params name##_params; \
+    struct sampler_lfo_params name; \
 
 #define PROC_HAS_FIELD(type, name, def_value) \
     unsigned int has_##name:1;
@@ -300,6 +305,7 @@ CBOX_EXTERN_CLASS(sampler_layer)
 struct sampler_layer_data
 {
     struct cbox_waveform *waveform;
+    gboolean has_waveform;
 
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
     SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)    
@@ -339,7 +345,7 @@ extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_m
 extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param);
 extern void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_section);
-extern void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_module *m);
+extern void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_layer_data *parent, struct sampler_module *m);
 extern void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m);
 extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error);
 extern gchar *sampler_layer_to_string(struct sampler_layer *l);

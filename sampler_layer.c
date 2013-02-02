@@ -127,10 +127,10 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     ld->name##_linearized = -1; \
     ld->has_##name = 0;
 #define PROC_FIELDS_INITIALISER_dahdsr(name, parname, index) \
-    cbox_dahdsr_init(&ld->name, 100.f); \
+    DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_FIELD, name, ld); \
     DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, ld)
 #define PROC_FIELDS_INITIALISER_lfo(name, parname, index) \
-    lfo_params_clear(&ld->name##_params); \
+    LFO_FIELDS(PROC_SUBSTRUCT_RESET_FIELD, name, ld); \
     LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, ld)
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_layer)
@@ -159,6 +159,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     l->child_count = 0;
     struct sampler_layer_data *ld = &l->data;
     ld->waveform = NULL;
+    ld->has_waveform = FALSE;
     
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_INITIALISER)
     
@@ -191,7 +192,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
         if (!copy_hasattr) \
             DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst) 
 #define PROC_FIELDS_CLONE_lfo(name, parname, index) \
-        LFO_FIELDS(PROC_SUBSTRUCT_CLONE, name##_params, dst, src) \
+        LFO_FIELDS(PROC_SUBSTRUCT_CLONE, name, dst, src) \
         if (!copy_hasattr) \
             LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst)
 
@@ -200,6 +201,8 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
     dst->waveform = src->waveform;
     if (dst->waveform)
         cbox_waveform_ref(dst->waveform);
+    if (copy_hasattr)
+        dst->has_waveform = src->has_waveform;
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_CLONE)
     memcpy(dst->velcurve, src->velcurve, 128 * sizeof(float));
     dst->modulations = g_slist_copy(src->modulations);
@@ -218,8 +221,28 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
     }
 }
 
+#define PROC_FIELDS_CLONEPARENT(type, name, def_value) \
+    if (!l->has_##name) \
+        l->name = parent ? parent->name : def_value;
+#define PROC_FIELDS_CLONEPARENT_dBamp PROC_FIELDS_CLONEPARENT
+#define PROC_FIELDS_CLONEPARENT_enum PROC_FIELDS_CLONEPARENT
+#define PROC_FIELDS_CLONEPARENT_dahdsr(name, parname, index) \
+        DAHDSR_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
+#define PROC_FIELDS_CLONEPARENT_lfo(name, parname, index) \
+        LFO_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
+
+static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct sampler_layer_data *parent)
+{
+    if (!l->has_waveform)
+        l->waveform = parent ? parent->waveform : NULL;
+    SAMPLER_FIXED_FIELDS(PROC_FIELDS_CLONEPARENT)
+    // XXXKF: add handling for velcurve, modulations and NIFs (will need a number
+    // of changes to data structures)
+}
+
 void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform)
 {
+    l->data.has_waveform = waveform != NULL;
     l->data.waveform = waveform;
 }
 
@@ -231,10 +254,11 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *w
     cbox_envelope_init_dahdsr(&l->name##_shape, &l->name, m->module.srate / CBOX_BLOCK_SIZE, 100.f);
 #define PROC_FIELDS_FINALISER_lfo(name, parname, index) /* no finaliser required */
 
-void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_module *m)
+void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_layer_data *parent, struct sampler_module *m)
 {
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_FINALISER)
 
+    sampler_layer_data_getdefaults(l, parent);
     l->eff_freq = (l->waveform && l->waveform->info.samplerate) ? l->waveform->info.samplerate : 44100;
     // XXXKF should have a distinction between 'configured' and 'effective' loop start/end
     if (l->loop_mode == slm_unknown)
@@ -336,7 +360,7 @@ struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, s
 {
     struct sampler_layer *l = sampler_layer_new(m, parent_program, NULL);
     sampler_layer_load_overrides(l, cfg_section);
-    sampler_layer_data_finalize(&l->data, m);
+    sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, m);
     sampler_layer_reset_switches(l, m);
     return l;
 }
@@ -372,7 +396,7 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_da
     enum sampler_moddest dest = dests[env_type];
     float fvalue = atof(value);
     
-#define PROC_SET_ENV_FIELD(name, index) \
+#define PROC_SET_ENV_FIELD(name, index, def_value) \
         if (!strcmp(key, #name)) {\
             env->name = fvalue; \
             has_fields->name = 1; \
@@ -407,7 +431,7 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     enum sampler_modsrc src = srcs[lfo_type];
     enum sampler_moddest dest = dests[lfo_type];
 
-#define PROC_SET_LFO_FIELD(name, index) \
+#define PROC_SET_LFO_FIELD(name, index, def_value) \
         if (!strcmp(key, #name)) {\
             params->name = fvalue; \
             has_fields->name = 1; \
@@ -466,7 +490,7 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
         return parse_envelope_param(l, &l->data.name, &l->data.has_##name, index, key + sizeof(#parname), value);
 #define PROC_APPLY_PARAM_lfo(name, parname, index) \
     if (!strncmp(key, #parname "_", sizeof(#parname))) \
-        return parse_lfo_param(l, &l->data.name##_params, &l->data.has_##name, index, key + sizeof(#parname), value);
+        return parse_lfo_param(l, &l->data.name, &l->data.has_##name, index, key + sizeof(#parname), value);
 
 static void sampler_layer_apply_unknown(struct sampler_layer *l, const char *key, const char *value)
 {
@@ -601,14 +625,14 @@ unknown_key:
     if (l->has_##name && (tmpstr = enumtype##_to_string(l->name)) != NULL) \
         g_string_append_printf(outstr, " %s=%s", #name, tmpstr);
 
-#define ENV_PARAM_OUTPUT(param, index, env, envfield, envname) \
+#define ENV_PARAM_OUTPUT(param, index, def_value, env, envfield, envname) \
     if (l->has_##envfield.param) \
         g_string_append_printf(outstr, " " #envname "_" #param "=%g", env.param);
 
 #define PROC_FIELDS_TO_FILEPTR_dahdsr(name, parname, index) \
     DAHDSR_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
 #define PROC_FIELDS_TO_FILEPTR_lfo(name, parname, index) \
-    LFO_FIELDS(ENV_PARAM_OUTPUT, l->name##_params, name, parname)
+    LFO_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
 
 gchar *sampler_layer_to_string(struct sampler_layer *lr)
 {
@@ -625,7 +649,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr)
     for(GSList *nif = l->nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;
-        #define PROC_ENVSTAGE_NAME(name, index) #name, 
+        #define PROC_ENVSTAGE_NAME(name, index, def_value) #name, 
         static const char *env_stages[] = { DAHDSR_FIELDS(PROC_ENVSTAGE_NAME) };
         int v = nd->variant;
         
