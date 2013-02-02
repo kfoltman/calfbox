@@ -152,6 +152,27 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         load_button.connect('clicked', self.load)
         panel.pack_start(load_button, False, True, 5)
         set_timer(self, 200, self.voices_update)
+        for i in range(16):
+            button = Gtk.Button("Dump SFZ")
+            button.connect("clicked", self.dump_sfz, i + 1)
+            self.table.attach(button, 2, 3, i, i + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
+
+    def dump_sfz(self, w, channel):
+        attribs = cbox.GetThings("%s/status" % self.path, ['%patch', 'polyphony', 'active_voices'], [])
+        prog_no, patch_name = attribs.patch[channel]
+        pname, uuid, in_use_cnt = cbox.GetThings("%s/patches" % self.path, ['%patch'], []).patch[prog_no]
+        print "UUID=%s" % uuid
+        patch = cbox.Document.map_uuid(uuid)
+        groups = {}
+        for r in patch.get_regions():
+            grp = r.status().parent_group
+            if grp not in groups:
+                groups[grp] = []
+            groups[grp].append(r)
+        for g in groups.keys():
+            print ("<group> %s" % cbox.Document.map_uuid(g).as_string())
+            for r in groups[g]:
+                print ("<region> %s" % r.as_string())
         
     def load(self, event):
         d = LoadProgramDialog(self.get_toplevel())
