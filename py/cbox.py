@@ -397,5 +397,7 @@ class SamplerLayer(DocObj):
         return self.get_things("/as_string_full", ['value']).value
     def set_param(self, key, value):
         self.cmd("/set_param", None, key, str(value))
+    def new_region(self):
+        return Document.map_uuid(self.get_things("/new_region", ['region']).region)
 Document.classmap['sampler_layer'] = SamplerLayer
 

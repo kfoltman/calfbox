@@ -135,6 +135,18 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         }
         return FALSE;
     }
+    if (!strcmp(cmd->command, "/new_region") && !strcmp(cmd->arg_types, ""))
+    {
+        struct sampler_layer *l = sampler_layer_new(layer->module, layer->parent_program, layer);
+        sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, layer->module);
+        sampler_layer_reset_switches(l, l->module);
+        sampler_update_layer(l->module, l);
+        // XXXKF: the new regions cannot use trigger=release, as they are always
+        // added to the list of layers having trigger=attack
+        sampler_program_add_layer(layer->parent_program, l);
+        
+        return cbox_execute_on(fb, NULL, "/region", "o", error, l);
+    }
     if (!strcmp(cmd->command, "/get_children") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
