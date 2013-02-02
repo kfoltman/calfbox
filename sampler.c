@@ -1150,6 +1150,7 @@ MODULE_CREATE_FUNCTION(sampler)
         free(m);
         return NULL;
     }
+    memset(m->voices, 0, sizeof(m->voices));
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
         m->voices[i].mode = spt_inactive;
     m->active_voices = 0;
