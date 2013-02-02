@@ -67,7 +67,7 @@ class EffectWindow(Gtk.Window):
     def on_effect_save_as(self, w):
         data = self.get_save_params()
         if data is None:
-            print "Save not implemented for this effect"
+            print ("Save not implemented for this effect")
             return
             
         dlg = SaveConfigObjectDialog(self, "Select name for effect preset")

@@ -1,13 +1,12 @@
 import cbox
 import math
-import glib
-from gi.repository import GObject, Gdk, Gtk
+from gi.repository import GObject, Gdk, Gtk, GLib as glib
 
 # Compatibility stuff
 Gtk.TreeView.insert_column_with_attributes = lambda self, col, title, renderer, xarg = None, **kwargs: self.insert_column(Gtk.TreeViewColumn(title = title, cell_renderer = renderer, **kwargs), col)
 
 def callback(cmd, cb, args):
-    print cmd, cb, args
+    print ("%s %s %s" % (cmd, cb, args))
 
 def bold_label(text, halign = 1):
     l = Gtk.Label()

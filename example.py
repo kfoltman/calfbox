@@ -342,7 +342,7 @@ class MainWindow(Gtk.Window):
         waves = cbox.GetThings("/waves/list", ["*waveform"], [])
         for w in waves.waveform:
             info = cbox.GetThings("/waves/info", ["filename", "name", "bytes", "loop"], [w])
-            print "%s: %d bytes, loop = %s" % (info.filename, info.bytes, info.loop)
+            print("%s: %d bytes, loop = %s" % (info.filename, info.bytes, info.loop))
 
     def tools_play_drum_pattern(self, w):
         d = PlayPatternDialog(self)

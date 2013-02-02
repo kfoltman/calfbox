@@ -46,14 +46,14 @@ class KeyModelPath(object):
         self.args = []
     def plus(self, var):
         if self.var is not None:
-            print "Warning: key model plus used twice with %s and %s" % (self.var, var)
+            print ("Warning: key model plus used twice with %s and %s" % (self.var, var))
         return KeyModelPath(self.controller, var)
     def set(self, value):
         model = self.controller.get_current_layer_model()
         oldval = model.attribs[self.var]
         model.attribs[self.var] = value
         if value != oldval:
-            print "%s: set %s to %s" % (self.controller, self.var, value)
+            print ("%s: set %s to %s" % (self.controller, self.var, value))
             self.controller.update_kit_later()
 
 ####################################################################################################################################################
@@ -327,7 +327,7 @@ class FileView(Gtk.TreeView):
         c = self.get_cursor()
         fn, label = self.files_model[c[0].get_indices()[0]]
         if fn.endswith("/"):
-            print "select dir %s" % fn
+            print ("select dir %s" % fn)
             try:
                 self.handler_block(self.cursor_changed_handler)
                 self.get_model().refresh(fn)

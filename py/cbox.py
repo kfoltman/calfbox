@@ -7,7 +7,7 @@ class GetUUID:
             if cmd == "/uuid" and len(args) == 1:
                 self.uuid = args[0]
             else:
-                raise ValueException, "Unexpected callback: %s" % cmd
+                raise ValueException("Unexpected callback: %s" % cmd)
         self.__call__ = callback
     
 class GetThings:
@@ -122,7 +122,7 @@ class Pattern:
     def serialize_event(time, *data):
         if len(data) >= 1 and len(data) <= 3:
             return struct.pack("iBBbb"[0:2 + len(data)], int(time), len(data), *[int(v) for v in data])
-        raise ValueError, "Invalid length of an event (%d)" % len(data)
+        raise ValueError("Invalid length of an event (%d)" % len(data))
 
 class Document:
     classmap = {}
@@ -159,8 +159,8 @@ class Document:
             return Document.objmap[uuid]
         try:
             oclass = Document.get_obj_class(uuid)
-        except Exception, e:
-            print "Note: Cannot get class for " + uuid
+        except Exception as e:
+            print ("Note: Cannot get class for " + uuid)
             Document.dump()
             raise
         o = Document.classmap[oclass](uuid)

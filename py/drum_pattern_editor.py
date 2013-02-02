@@ -135,7 +135,7 @@ channel_ls = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_INT)
 for ch in range(1, 17):
     channel_ls.append((str(ch), ch))
 snap_settings_ls = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_INT)
-for row in [("1/4", PPQN), ("1/8", PPQN / 2), ("1/8T", PPQN/3), ("1/16", PPQN/4), ("1/16T", PPQN/6), ("1/32", PPQN/8), ("1/32T", PPQN/12), ("1/64", PPQN/4)]:
+for row in [("1/4", PPQN), ("1/8", PPQN // 2), ("1/8T", PPQN//3), ("1/16", PPQN//4), ("1/16T", PPQN//6), ("1/32", PPQN//8), ("1/32T", PPQN//12), ("1/64", PPQN//4)]:
     snap_settings_ls.append(row)
 edit_mode_ls = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_STRING)
 for row in [("Drum", "D"), ("Melodic", "M")]:
