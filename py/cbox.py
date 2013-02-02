@@ -388,6 +388,8 @@ class SamplerLayer(DocObj):
         DocObj.__init__(self, uuid, ['parent_program', 'parent_group'])
     def as_string(self):
         return self.get_things("/as_string", ['value']).value
+    def as_string_full(self):
+        return self.get_things("/as_string_full", ['value']).value
     def set_param(self, key, value):
         self.cmd("/set_param", None, key, str(value))
 Document.classmap['sampler_layer'] = SamplerLayer

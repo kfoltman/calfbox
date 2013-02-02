@@ -115,11 +115,11 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
             return FALSE;
         return TRUE;
     }
-    if (!strcmp(cmd->command, "/as_string") && !strcmp(cmd->arg_types, ""))
+    if ((!strcmp(cmd->command, "/as_string") || !strcmp(cmd->command, "/as_string_full")) && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        gchar *res = sampler_layer_to_string(layer);
+        gchar *res = sampler_layer_to_string(layer, !strcmp(cmd->command, "/as_string_full"));
         gboolean result = cbox_execute_on(fb, NULL, "/value", "s", error, res);
         g_free(res);
         return result;
@@ -644,13 +644,13 @@ unknown_key:
 }
 
 #define TYPE_PRINTF_uint32_t(name, def_value) \
-    if (l->has_##name) \
+    if (show_inherited || l->has_##name) \
         g_string_append_printf(outstr, " %s=%u", #name, (unsigned)(l->name));
 #define TYPE_PRINTF_int(name, def_value) \
-    if (l->has_##name) \
+    if (show_inherited || l->has_##name) \
         g_string_append_printf(outstr, " %s=%d", #name, (int)(l->name));
 #define TYPE_PRINTF_midi_note_t(name, def_value) \
-    if (l->has_##name) { \
+    if (show_inherited || l->has_##name) { \
         int val = l->name; \
         if (val == -1) \
             g_string_append_printf(outstr, " %s=-1", #name); \
@@ -658,20 +658,20 @@ unknown_key:
             g_string_append_printf(outstr, " %s=%c%s%d", #name, "ccddeffggaab"[val%12], "\000#\000#\000\000#\000#\000#\000#\000"+(val%12), (val/12-1)); \
     } else {}
 #define TYPE_PRINTF_float(name, def_value) \
-    if (l->has_##name) \
+    if (show_inherited || l->has_##name) \
         g_string_append_printf(outstr, " %s=%g", #name, (float)(l->name));
 
 #define PROC_FIELDS_TO_FILEPTR(type, name, def_value) \
     TYPE_PRINTF_##type(name, def_value)
 #define PROC_FIELDS_TO_FILEPTR_dBamp(type, name, def_value) \
-    if (l->has_##name) \
+    if (show_inherited || l->has_##name) \
         g_string_append_printf(outstr, " %s=%g", #name, (float)(l->name));
 #define PROC_FIELDS_TO_FILEPTR_enum(enumtype, name, def_value) \
-    if (l->has_##name && (tmpstr = enumtype##_to_string(l->name)) != NULL) \
+    if ((show_inherited || l->has_##name) && (tmpstr = enumtype##_to_string(l->name)) != NULL) \
         g_string_append_printf(outstr, " %s=%s", #name, tmpstr);
 
 #define ENV_PARAM_OUTPUT(param, index, def_value, env, envfield, envname) \
-    if (l->has_##envfield.param) \
+    if (show_inherited || l->has_##envfield.param) \
         g_string_append_printf(outstr, " " #envname "_" #param "=%g", env.param);
 
 #define PROC_FIELDS_TO_FILEPTR_dahdsr(name, parname, index) \
@@ -679,12 +679,12 @@ unknown_key:
 #define PROC_FIELDS_TO_FILEPTR_lfo(name, parname, index) \
     LFO_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
 
-gchar *sampler_layer_to_string(struct sampler_layer *lr)
+gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited)
 {
     struct sampler_layer_data *l = &lr->data;
     GString *outstr = g_string_sized_new(200);
     const char *tmpstr;
-    if (l->waveform && l->waveform->display_name)
+    if ((show_inherited || l->has_waveform) && l->waveform && l->waveform->display_name)
         g_string_append_printf(outstr, " sample=%s", l->waveform->display_name);
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
     
@@ -694,7 +694,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr)
     for(GSList *nif = l->nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;
-        if (!nd->has_value)
+        if (!nd->has_value && !show_inherited)
             continue;
         #define PROC_ENVSTAGE_NAME(name, index, def_value) #name, 
         static const char *env_stages[] = { DAHDSR_FIELDS(PROC_ENVSTAGE_NAME) };
@@ -712,7 +712,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr)
     for(GSList *mod = l->modulations; mod; mod = mod->next)
     {
         struct sampler_modulation *md = mod->data;
-        if (!md->has_value)
+        if (!md->has_value && !show_inherited)
             continue;
 
         if (md->src2 == smsrc_none)
@@ -777,7 +777,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr)
 
 void sampler_layer_dump(struct sampler_layer *l, FILE *f)
 {
-    gchar *str = sampler_layer_to_string(l);
+    gchar *str = sampler_layer_to_string(l, FALSE);
     fprintf(f, "%s\n", str);
 }
 
