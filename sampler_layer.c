@@ -33,21 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 
-void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags)
+static void sampler_layer_data_set_modulation(struct sampler_layer_data *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags, gboolean propagating_defaults)
 {
-    sampler_layer_set_modulation(l, src, smsrc_none, dest, amount, flags);
-}
-
-void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags)
-{
-    GSList *p = l->data.modulations;
+    GSList *p = l->modulations;
     while(p)
     {
         struct sampler_modulation *sm = p->data;
         if (sm->src == src && sm->src2 == src2 && sm->dest == dest)
         {
+            // do not overwrite locally set value with defaults
+            if (propagating_defaults && sm->has_value)
+                return;
             sm->amount = amount;
             sm->flags = flags;
+            sm->has_value = !propagating_defaults;
             return;
         }
         p = g_slist_next(p);
@@ -58,23 +57,48 @@ void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc s
     sm->dest = dest;
     sm->amount = amount;
     sm->flags = flags;
-    l->data.modulations = g_slist_prepend(l->data.modulations, sm);
+    sm->has_value = !propagating_defaults;
+    l->modulations = g_slist_prepend(l->modulations, sm);
 }
 
-void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param)
+void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags)
 {
+    sampler_layer_data_set_modulation(&l->data, src, smsrc_none, dest, amount, flags, FALSE);
+}
+
+void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags)
+{
+    sampler_layer_data_set_modulation(&l->data, src, src2, dest, amount, flags, FALSE);
+}
+
+void sampler_layer_data_add_nif(struct sampler_layer_data *l, SamplerNoteInitFunc notefunc, int variant, float param, gboolean propagating_defaults)
+{
+    GSList *p = l->nifs;
+    while(p)
+    {
+        struct sampler_noteinitfunc *nif = p->data;
+        if (nif->notefunc == notefunc && nif->variant == variant)
+        {
+            // do not overwrite locally set value with defaults
+            if (propagating_defaults && nif->has_value)
+                return;
+            nif->param = param;
+            nif->has_value = !propagating_defaults;
+            return;
+        }
+        p = g_slist_next(p);
+    }
     struct sampler_noteinitfunc *nif = malloc(sizeof(struct sampler_noteinitfunc));
     nif->notefunc = notefunc;
     nif->variant = variant;
     nif->param = param;
-    l->data.nifs = g_slist_prepend(l->data.nifs, nif);
+    nif->has_value = !propagating_defaults;
+    l->nifs = g_slist_prepend(l->nifs, nif);
 }
 
-static void lfo_params_clear(struct sampler_lfo_params *lfop)
+void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param)
 {
-    lfop->freq = 0.f;
-    lfop->delay = 0.f;
-    lfop->fade = 0.f;
+    sampler_layer_data_add_nif(&l->data, notefunc, variant, param, FALSE);
 }
 
 static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -173,9 +197,12 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
 
     ld->eff_use_keyswitch = 0;
     l->last_key = -1;
-    sampler_layer_set_modulation1(l, 74, smdest_cutoff, 9600, 2);
-    sampler_layer_set_modulation1(l, 71, smdest_resonance, 12, 2);
-    sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
+    if (!parent_group)
+    {
+        sampler_layer_set_modulation1(l, 74, smdest_cutoff, 9600, 2);
+        sampler_layer_set_modulation1(l, 71, smdest_resonance, 12, 2);
+        sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
+    }
     l->runtime = NULL;
     l->unknown_keys = NULL;
     CBOX_OBJECT_REGISTER(l);
@@ -208,16 +235,20 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
     dst->modulations = g_slist_copy(src->modulations);
     for(GSList *mod = dst->modulations; mod; mod = mod->next)
     {
-        gpointer dst = g_malloc(sizeof(struct sampler_modulation));
-        memcpy(dst, mod->data, sizeof(struct sampler_modulation));
-        mod->data = dst;
+        struct sampler_modulation *srcm = mod->data;
+        struct sampler_modulation *dstm = g_malloc(sizeof(struct sampler_modulation));
+        memcpy(dstm, srcm, sizeof(struct sampler_modulation));
+        dstm->has_value = copy_hasattr ? srcm->has_value : FALSE;
+        mod->data = dstm;
     }
     dst->nifs = g_slist_copy(src->nifs);
     for(GSList *nif = dst->nifs; nif; nif = nif->next)
     {
-        gpointer dst = g_malloc(sizeof(struct sampler_noteinitfunc));
-        memcpy(dst, nif->data, sizeof(struct sampler_noteinitfunc));
-        nif->data = dst;
+        struct sampler_noteinitfunc *dstn = g_malloc(sizeof(struct sampler_noteinitfunc));
+        struct sampler_noteinitfunc *srcn = nif->data;
+        memcpy(dstn, srcn, sizeof(struct sampler_noteinitfunc));
+        dstn->has_value = copy_hasattr ? srcn->has_value : FALSE;
+        nif->data = dstn;
     }
 }
 
@@ -236,8 +267,22 @@ static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct 
     if (!l->has_waveform)
         l->waveform = parent ? parent->waveform : NULL;
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_CLONEPARENT)
-    // XXXKF: add handling for velcurve, modulations and NIFs (will need a number
-    // of changes to data structures)
+    // XXXKF: add handling for velcurve
+    if (parent)
+    {
+        // set NIFs used by parent
+        for(GSList *mod = parent->nifs; mod; mod = mod->next)
+        {
+            struct sampler_noteinitfunc *nif = mod->data;
+            sampler_layer_data_add_nif(l, nif->notefunc, nif->variant, nif->param, TRUE);
+        }
+        // set modulations used by parent
+        for(GSList *mod = parent->modulations; mod; mod = mod->next)
+        {
+            struct sampler_modulation *srcm = mod->data;
+            sampler_layer_data_set_modulation(l, srcm->src, srcm->src2, srcm->dest, srcm->amount, srcm->flags, TRUE);
+        }
+    }
 }
 
 void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform)
@@ -649,6 +694,8 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr)
     for(GSList *nif = l->nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;
+        if (!nd->has_value)
+            continue;
         #define PROC_ENVSTAGE_NAME(name, index, def_value) #name, 
         static const char *env_stages[] = { DAHDSR_FIELDS(PROC_ENVSTAGE_NAME) };
         int v = nd->variant;
@@ -665,6 +712,8 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr)
     for(GSList *mod = l->modulations; mod; mod = mod->next)
     {
         struct sampler_modulation *md = mod->data;
+        if (!md->has_value)
+            continue;
 
         if (md->src2 == smsrc_none)
         {

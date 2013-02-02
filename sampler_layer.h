@@ -150,7 +150,8 @@ struct sampler_modulation
     enum sampler_modsrc src2;
     enum sampler_moddest dest;
     float amount;
-    int flags;
+    int flags:31;
+    unsigned int has_value:1;
 };
 
 typedef void (*SamplerNoteInitFunc)(struct sampler_noteinitfunc *nif, struct sampler_voice *voice);
@@ -158,7 +159,8 @@ typedef void (*SamplerNoteInitFunc)(struct sampler_noteinitfunc *nif, struct sam
 struct sampler_noteinitfunc
 {
     SamplerNoteInitFunc notefunc;
-    int variant;
+    int variant:31;
+    unsigned int has_value:1;
     float param;
     // XXXKF no destructor for now - might not be necessary
 };
