@@ -88,17 +88,19 @@ void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
 {
     uii->rt_midi_input_ports = g_list_copy(uii->midi_input_ports);
     uii->midi_input_port_count = 0;
+
+    for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
+        uii->midi_input_port_count++;
     uii->midi_input_port_buffers = calloc(uii->midi_input_port_count, sizeof(struct cbox_midi_buffer *));
     uii->midi_input_port_pos = calloc(uii->midi_input_port_count, sizeof(int));
-
+    int pn = 0;
     for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
         struct cbox_usb_midi_input *umi = p->data;
         cbox_midi_buffer_clear(&umi->midi_buffer);
         umi->transfer = libusb_alloc_transfer(0);
         libusb_fill_bulk_transfer(umi->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, umi->max_packet_size, midi_transfer_cb, umi, 0);
-        uii->midi_input_port_buffers[uii->midi_input_port_count] = &umi->midi_buffer;
-        uii->midi_input_port_count++;
+        uii->midi_input_port_buffers[pn++] = &umi->midi_buffer;
     }
     for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
