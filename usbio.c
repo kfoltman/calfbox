@@ -57,6 +57,7 @@ sync. I'm going to clean it up iteratively later.
 #include <string.h>
 #include <syscall.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -114,20 +115,23 @@ static void *engine_thread(void *user_data)
     
     usbio_start_midi_capture(uii);
 
-    struct sched_param p;
-    memset(&p, 0, sizeof(p));
-    p.sched_priority = 10;
-    pid_t tid = syscall(SYS_gettid);
-    if (0 != sched_setscheduler(tid, SCHED_FIFO, &p))
-        g_warning("Cannot set realtime priority for the processing thread: %s.", strerror(errno));
-    
     if (uii->handle_audiodev)
     {
+        struct sched_param p;
+        memset(&p, 0, sizeof(p));
+        p.sched_priority = cbox_config_get_int("io", "rtpriority", 10);
+        pid_t tid = syscall(SYS_gettid);
+        if (0 != sched_setscheduler(tid, SCHED_FIFO, &p))
+            g_warning("Cannot set realtime priority for the processing thread: %s.", strerror(errno));
+        
         usbio_start_audio_playback(uii);
         if (!uii->setup_error)
         {
             run_audio_loop(uii);        
         }
+        p.sched_priority = 0;
+        if (0 != sched_setscheduler(tid, SCHED_FIFO, &p))
+            g_warning("Cannot unset realtime priority for the processing thread: %s.", strerror(errno));
         usbio_stop_audio_playback(uii);
     }
     else
@@ -290,6 +294,9 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     uii->midi_input_ports = NULL;
     
     usbio_scan_devices(uii, FALSE);
+    
+    if (cbox_config_get_int("io", "lockall", 0))
+        mlockall(MCL_FUTURE);
 
     return TRUE;
     
