@@ -169,8 +169,9 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
             if grp not in groups:
                 groups[grp] = []
             groups[grp].append(r)
-        for g in groups.keys():
-            print ("<group> %s" % cbox.Document.map_uuid(g).as_string())
+        for g in sorted(groups.keys()):
+            if g is not None:
+                print ("<group> %s" % cbox.Document.map_uuid(g).as_string())
             for r in groups[g]:
                 print ("<region> %s" % r.as_string())
         
