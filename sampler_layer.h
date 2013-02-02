@@ -248,7 +248,7 @@ typedef int midi_note_t;
     MACRO(hold, 3, 0, ## __VA_ARGS__) \
     MACRO(decay, 4, 0, ## __VA_ARGS__) \
     MACRO(sustain, 5, 100, ## __VA_ARGS__) \
-    MACRO(release, 6, 0, ## __VA_ARGS__) \
+    MACRO(release, 6, 0.05, ## __VA_ARGS__) \
     
 #define LFO_FIELDS(MACRO, ...) \
     MACRO(freq, 0, 0, ## __VA_ARGS__) \
