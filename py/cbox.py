@@ -379,6 +379,8 @@ Document.classmap['cbox_module'] = DocModule
 class SamplerProgram(DocObj):
     def __init__(self, uuid):
         DocObj.__init__(self, uuid, [])
+    def get_regions(self):
+        return map(Document.map_uuid, self.get_things("/regions", ['*region']).region)
 Document.classmap['sampler_program'] = SamplerProgram
 
 class SamplerLayer(DocObj):
