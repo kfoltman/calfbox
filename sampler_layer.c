@@ -594,7 +594,7 @@ try_now:
                 if (value_copy[i] == '\\')
                     value_copy[i] = '/';
             }
-            gchar *filename = g_build_filename(l->parent_program->sample_dir, value_copy, NULL);
+            filename = g_build_filename(l->parent_program->sample_dir, value_copy, NULL);
             g_free(value_copy);
         }
         struct cbox_waveform *wf = cbox_wavebank_get_waveform(l->parent_program->source_file, filename, error);
