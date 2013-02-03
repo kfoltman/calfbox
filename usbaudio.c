@@ -236,14 +236,15 @@ static void play_callback_adaptive(struct libusb_transfer *transfer)
     }
     // printf("Play Callback! %d %p status %d\n", (int)transfer->length, transfer->buffer, (int)transfer->status);
 
-    int tlen = 0;
+    int tlen = 0, olen = 0;
     for (int i = 0; i < transfer->num_iso_packets; i++)
     {
         tlen += transfer->iso_packet_desc[i].actual_length;
+        olen += transfer->iso_packet_desc[i].length;
         if (transfer->iso_packet_desc[i].status)
             printf("ISO error: index = %d i = %d status = %d\n", (int)transfer->user_data, i, transfer->iso_packet_desc[i].status);
     }
-    uii->samples_played += transfer->length / (oc * resolution);
+    uii->samples_played += olen / (oc * resolution);
     int nsamps = uii->sample_rate / 1000;
     // If time elapsed is greater than 
     int lag = uii->desync / (1000 * transfer->num_iso_packets);
@@ -492,7 +493,8 @@ static void sync_callback(struct libusb_transfer *transfer)
         printf(" (%d of %d)", pkts, transfer->num_iso_packets);
     if (pkts == transfer->num_iso_packets)
     {
-        uii->sync_freq = size * 10 / pkts;
+        if (size)
+            uii->sync_freq = size * 10 / pkts;
         if (uii->debug_sync)
             printf(" size = %4d sync_freq = %4d", size, uii->sync_freq);
     }
