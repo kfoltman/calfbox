@@ -102,7 +102,11 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
 
     gboolean status = is_from_string ? load_sfz_from_string(sfz, strlen(sfz), &c, error) : load_sfz(sfz, &c, error);
     if (!status)
+    {
+        if (ls.region)
+            CBOX_DELETE(ls.region);
         return FALSE;
+    }
 
     if (ls.region)
         load_sfz_end_region(&c);
