@@ -299,7 +299,7 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     usbio_scan_devices(uii, FALSE);
     
     if (cbox_config_get_int("io", "lockall", 0))
-        mlockall(MCL_FUTURE);
+        mlockall(MCL_CURRENT|MCL_FUTURE);
 
     return TRUE;
     
