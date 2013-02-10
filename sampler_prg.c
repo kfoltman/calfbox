@@ -107,7 +107,8 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     memset(prg, 0, sizeof(*prg));
     CBOX_OBJECT_HEADER_INIT(prg, sampler_program, doc);
     cbox_command_target_init(&prg->cmd_target, sampler_program_process_cmd, prg);
-    
+
+    prg->module = m;
     prg->prog_no = prog_no;
     prg->name = g_strdup(name);
     prg->sample_dir = g_strdup(sample_dir);
@@ -116,6 +117,7 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->rll = NULL;
     prg->groups = NULL;
     prg->default_group = sampler_layer_new(m, prg, NULL);
+    prg->deleting = FALSE;
     CBOX_OBJECT_REGISTER(prg);
     return prg;
 }
@@ -213,6 +215,7 @@ void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer
 void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
 {
     struct sampler_program *prg = CBOX_H2O(hdr_ptr);
+    sampler_unselect_program(prg->module, prg);
     if (prg->rll)
     {
         sampler_rll_destroy(prg->rll);

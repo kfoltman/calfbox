@@ -67,6 +67,7 @@ struct sampler_voice
 {
     enum sampler_player_type mode;
     struct sampler_layer_data *layer;
+    // Note: may be NULL when program is being deleted
     struct sampler_program *program;
     struct cbox_waveform *last_waveform;
     uint32_t pos, delta, loop_start, cur_sample_end;
@@ -117,5 +118,6 @@ extern GQuark cbox_sampler_error_quark();
 extern gboolean sampler_select_program(struct sampler_module *m, int channel, const gchar *preset, GError **error);
 extern void sampler_update_layer(struct sampler_module *m, struct sampler_layer *l);
 extern void sampler_update_program_layers(struct sampler_module *m, struct sampler_program *prg);
+extern void sampler_unselect_program(struct sampler_module *m, struct sampler_program *prg);
 
 #endif

@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "sampler.h"
 #include "sampler_impl.h"
 #include "sfzloader.h"
+#include "stm.h"
 #include <assert.h>
 #include <errno.h>
 #include <glib.h>
@@ -177,7 +178,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
         c->prev_note_start_time[note] = m->current_time;
     }
     struct sampler_program *prg = c->program;
-    if (!prg || !prg->rll)
+    if (!prg || !prg->rll || prg->deleting)
         return;
     GSList *next_layer = sampler_program_get_next_layer(prg, c, !is_release_trigger ? prg->rll->layers : prg->rll->layers_release, note, vel, random);
     if (!next_layer)
@@ -894,17 +895,26 @@ static int release_program_voices_execute(void *data)
     return finished;
 }
 
-void swap_program(struct sampler_module *m, int index, struct sampler_program *pgm)
+static void swap_program(struct sampler_module *m, int index, struct sampler_program *pgm, gboolean delete_old)
 {
     static struct cbox_rt_cmd_definition release_program_voices = { NULL, release_program_voices_execute, NULL };
     
-    struct sampler_program *old_program = cbox_rt_swap_pointers(m->module.rt, (void **)&m->programs[index], pgm);
+    
+    struct sampler_program *old_program;
+    if (pgm)
+        old_program = cbox_rt_swap_pointers(m->module.rt, (void **)&m->programs[index], pgm);
+    else
+    {
+        void **new_programs = stm_array_clone_remove((void **)m->programs, m->program_count, index);
+        free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, new_programs, &m->program_count, m->program_count - 1));
+    }
 
     struct release_program_voices_data data = {m, old_program, pgm};
 
     cbox_rt_execute_cmd_sync(m->module.rt, &release_program_voices, &data);
     
-    CBOX_DELETE(old_program);
+    if (delete_old)
+        CBOX_DELETE(old_program);
 }
 
 static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, GError **error)
@@ -917,15 +927,27 @@ static gboolean load_program_at(struct sampler_module *m, const char *cfg_sectio
     
     if (index != -1)
     {
-        swap_program(m, index, pgm);
+        swap_program(m, index, pgm, TRUE);
         return TRUE;
     }
     
     struct sampler_program **programs = malloc(sizeof(struct sampler_program *) * (m->program_count + 1));
     memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
     programs[m->program_count] = pgm;
-    free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
+    free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));
     return TRUE;
+}
+
+void sampler_unselect_program(struct sampler_module *m, struct sampler_program *prg)
+{
+    // Ensure no new notes are played on that program
+    prg->deleting = TRUE;
+    // Remove from the list of available programs, so that it cannot be selected again
+    for (int i = 0; i < m->program_count; i++)
+    {
+        if (m->programs[i] == prg)
+            swap_program(m, i, NULL, FALSE);
+    }
 }
 
 static gboolean load_from_string(struct sampler_module *m, const char *sample_dir, const char *sfz_data, const char *name, int prog_no, GError **error)
@@ -941,7 +963,7 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
 
     if (index != -1)
     {
-        swap_program(m, index, pgm);
+        swap_program(m, index, pgm, TRUE);
         return TRUE;
     }
     
@@ -1182,7 +1204,10 @@ void sampler_destroyfunc(struct cbox_module *module)
     struct sampler_module *m = (struct sampler_module *)module;
     
     for (int i = 0; i < m->program_count; i++)
+    {
+        assert(m->programs[i]);
         CBOX_DELETE(m->programs[i]);
+    }
     free(m->programs);
 }
 

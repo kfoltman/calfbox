@@ -38,6 +38,7 @@ struct sampler_program
     CBOX_OBJECT_HEADER()
     struct cbox_command_target cmd_target;
 
+    struct sampler_module *module;
     gchar *name;
     int prog_no;
     struct sampler_layer *default_group;
@@ -47,6 +48,7 @@ struct sampler_program
     gchar *sample_dir; // can be empty, cannot be NULL
     gchar *source_file; // can be empty, cannot be NULL
     int in_use;
+    gboolean deleting;
 };
 
 extern struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg);
