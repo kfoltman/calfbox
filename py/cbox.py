@@ -384,6 +384,8 @@ class SamplerProgram(DocObj):
     def get_groups(self):
         g = self.get_things("/groups", ['*group', 'default_group'])
         return [Document.map_uuid(g.default_group)] + map(Document.map_uuid, g.group)
+    def new_group(self):
+        return self.cmd_makeobj("/new_group")
 Document.classmap['sampler_program'] = SamplerProgram
 
 class SamplerLayer(DocObj):

@@ -86,7 +86,6 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
             return FALSE;
         return return_layers(program->all_layers, "/region", fb, error);
     }
-    else // otherwise, treat just like an command on normal (non-aux) output
     if (!strcmp(cmd->command, "/groups") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_execute_on(fb, NULL, "/default_group", "o", error, program->default_group))
@@ -95,8 +94,13 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
             return FALSE;
         return return_layers(program->groups, "/group", fb, error);
     }
-    else // otherwise, treat just like an command on normal (non-aux) output
-        return cbox_object_default_process_cmd(ct, fb, cmd, error);
+    if (!strcmp(cmd->command, "/new_group") && !strcmp(cmd->arg_types, ""))
+    {
+        struct sampler_layer *l = sampler_layer_new(program->module, program, NULL);
+        sampler_program_add_group(program, l);
+        return cbox_execute_on(fb, NULL, "/uuid", "o", error, l);
+    }
+    return cbox_object_default_process_cmd(ct, fb, cmd, error);
     
 }
 
