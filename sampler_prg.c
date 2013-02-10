@@ -113,7 +113,6 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->sample_dir = g_strdup(sample_dir);
     prg->source_file = NULL;
     prg->all_layers = NULL;
-    prg->deleted_layers = NULL;
     prg->rll = NULL;
     prg->groups = NULL;
     prg->default_group = sampler_layer_new(m, prg, NULL);
@@ -200,6 +199,12 @@ void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer
     prg->all_layers = g_slist_prepend(prg->all_layers, l);
 }
 
+void sampler_program_delete_layer(struct sampler_program *prg, struct sampler_layer *l)
+{
+    prg->all_layers = g_slist_remove(prg->all_layers, l);
+}
+
+
 void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer *l)
 {
     prg->groups = g_slist_prepend(prg->groups, l);
@@ -208,12 +213,13 @@ void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer
 void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
 {
     struct sampler_program *prg = CBOX_H2O(hdr_ptr);
+    if (prg->rll)
+    {
+        sampler_rll_destroy(prg->rll);
+        prg->rll = NULL;
+    }
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
         CBOX_DELETE((struct sampler_layer *)p->data);
-    for (GSList *p = prg->deleted_layers; p; p = g_slist_next(p))
-        CBOX_DELETE((struct sampler_layer *)p->data);
-    if (prg->rll)
-        sampler_rll_destroy(prg->rll);
     for (GSList *p = prg->groups; p; p = g_slist_next(p))
         CBOX_DELETE((struct sampler_layer *)p->data);
     CBOX_DELETE(prg->default_group);
@@ -222,7 +228,6 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
     g_free(prg->sample_dir);
     g_free(prg->source_file);
     g_slist_free(prg->all_layers);
-    g_slist_free(prg->deleted_layers);
     free(prg);
 }
 

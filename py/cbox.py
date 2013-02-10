@@ -184,7 +184,7 @@ class DocObj(object):
                 self.__dict__['set_' + sf] = SetterMaker(self, "/" + sf).set
             self.status_fields.append(sf)
         
-    def cmd(self, cmd, fb, *args):
+    def cmd(self, cmd, fb = None, *args):
         do_cmd(Document.uuid_cmd(self.uuid, cmd), fb, list(args))
         
     def cmd_makeobj(self, cmd, *args):
@@ -205,7 +205,7 @@ class DocObj(object):
         return status
 
     def delete(self):
-        self.cmd("/delete", None)
+        self.cmd("/delete")
 
 class DocPattern(DocObj):
     def __init__(self, uuid):

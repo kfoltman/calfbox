@@ -131,6 +131,12 @@ gboolean cbox_object_try_default_process_cmd(struct cbox_command_target *ct, str
         }
         return FALSE;
     }
+    if (!strcmp(subcmd, "/delete") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_object_destroy(obj);
+        *result = TRUE;
+        return TRUE;
+    }
     if (!strcmp(subcmd, "/get_uuid") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))

@@ -43,7 +43,6 @@ struct sampler_program
     struct sampler_layer *default_group;
     GSList *groups;
     GSList *all_layers;
-    GSList *deleted_layers;
     struct sampler_rll *rll;
     gchar *sample_dir; // can be empty, cannot be NULL
     gchar *source_file; // can be empty, cannot be NULL
@@ -57,6 +56,7 @@ extern GSList *sampler_program_get_next_layer(struct sampler_program *prg, struc
 extern struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_no, const char *name, const char *sample_dir);
 extern struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, const char *cfg_section, const char *name, int pgm_id, GError **error);
 extern void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer *l);
+extern void sampler_program_delete_layer(struct sampler_program *prg, struct sampler_layer *l);
 extern void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer *l);
 
 #endif

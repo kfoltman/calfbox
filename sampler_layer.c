@@ -138,6 +138,11 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     }
     if (!strcmp(cmd->command, "/new_region") && !strcmp(cmd->arg_types, ""))
     {
+        if (layer->parent_group)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create a region within a region");
+            return FALSE;
+        }
         struct sampler_layer *l = sampler_layer_new(layer->module, layer->parent_program, layer);
         sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, layer->module);
         sampler_layer_reset_switches(l, l->module);
@@ -822,10 +827,18 @@ void sampler_layer_data_destroy(struct sampler_layer_data *l)
 void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct sampler_layer *l = CBOX_H2O(objhdr);
+    struct sampler_program *prg = l->parent_program;
+    struct sampler_module *m = l->module;
     assert(g_hash_table_size(l->child_layers) == 0);
+
     if (l->parent_group)
     {
         g_hash_table_remove(l->parent_group->child_layers, l);
+        if (prg && prg->rll)
+        {
+            sampler_program_delete_layer(prg, l);
+            sampler_update_program_layers(m, prg);
+        }
         l->parent_group = NULL;
     }
     sampler_layer_data_destroy(&l->data);
@@ -833,5 +846,6 @@ void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
         sampler_layer_data_destroy(l->runtime);
     if (l->unknown_keys)
         g_hash_table_destroy(l->unknown_keys);
+
     free(l);
 }
