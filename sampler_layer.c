@@ -151,7 +151,7 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         sampler_program_add_layer(layer->parent_program, l);
         sampler_update_program_layers(layer->module, layer->parent_program);
         
-        return cbox_execute_on(fb, NULL, "/region", "o", error, l);
+        return cbox_execute_on(fb, NULL, "/uuid", "o", error, l);
     }
     if (!strcmp(cmd->command, "/get_children") && !strcmp(cmd->arg_types, ""))
     {
