@@ -177,9 +177,9 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
         c->prev_note_start_time[note] = m->current_time;
     }
     struct sampler_program *prg = c->program;
-    if (!prg)
+    if (!prg || !prg->rll)
         return;
-    GSList *next_layer = sampler_program_get_next_layer(prg, c, !is_release_trigger ? prg->layers : prg->layers_release, note, vel, random);
+    GSList *next_layer = sampler_program_get_next_layer(prg, c, !is_release_trigger ? prg->rll->layers : prg->rll->layers_release, note, vel, random);
     if (!next_layer)
     {
         if (!is_release_trigger)
@@ -237,7 +237,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
 
 void sampler_channel_start_release_triggered_voices(struct sampler_channel *c, int note)
 {
-    if (c->program && c->program->layers_release)
+    if (c->program && c->program->rll && c->program->rll->layers_release)
     {
         if (c->prev_note_velocity[note])
         {
@@ -303,7 +303,7 @@ void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
         }
     }
     // Start release layers for the newly released keys
-    if (c->program->layers_release)
+    if (c->program->rll && c->program->rll->layers_release)
     {
         for (int i = 0; i < 128; i++)
         {
@@ -328,7 +328,7 @@ void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
         }
     }
     // Start release layers for the newly released keys
-    if (c->program->layers_release)
+    if (c->program->rll && c->program->rll->layers_release)
     {
         for (int i = 0; i < 128; i++)
         {
@@ -1288,6 +1288,14 @@ void sampler_update_layer(struct sampler_module *m, struct sampler_layer *l)
     // identify old data by layer pointer, not layer data pointer. For now,
     // it might be good enough to just use sync calls for this.
     cbox_rt_execute_cmd_sync(m->module.rt, &rtcmd, &lcmd);
+}
+
+void sampler_update_program_layers(struct sampler_module *m, struct sampler_program *prg)
+{
+    struct sampler_rll *new_rll = sampler_rll_new_from_program(prg);
+    struct sampler_rll *old_rll = cbox_rt_swap_pointers(m->module.rt, (void **)&prg->rll, new_rll);
+    if (old_rll)
+        sampler_rll_destroy(old_rll);
 }
 
 //////////////////////////////////////////////////////////////////////////

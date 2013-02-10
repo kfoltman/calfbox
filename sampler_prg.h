@@ -26,6 +26,13 @@ struct sampler_channel;
 
 CBOX_EXTERN_CLASS(sampler_program)
 
+// Runtime layer lists; in future, I might something more clever, like a tree
+struct sampler_rll
+{
+    GSList *layers;
+    GSList *layers_release;
+};
+
 struct sampler_program
 {
     CBOX_OBJECT_HEADER()
@@ -35,12 +42,16 @@ struct sampler_program
     int prog_no;
     struct sampler_layer *default_group;
     GSList *groups;
-    GSList *layers;
-    GSList *layers_release;
+    GSList *all_layers;
+    GSList *deleted_layers;
+    struct sampler_rll *rll;
     gchar *sample_dir; // can be empty, cannot be NULL
     gchar *source_file; // can be empty, cannot be NULL
     int in_use;
 };
+
+extern struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg);
+extern void sampler_rll_destroy(struct sampler_rll *rll);
 
 extern GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random);
 extern struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_no, const char *name, const char *sample_dir);

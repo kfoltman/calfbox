@@ -116,5 +116,6 @@ extern GQuark cbox_sampler_error_quark();
 
 extern gboolean sampler_select_program(struct sampler_module *m, int channel, const gchar *preset, GError **error);
 extern void sampler_update_layer(struct sampler_module *m, struct sampler_layer *l);
+extern void sampler_update_program_layers(struct sampler_module *m, struct sampler_program *prg);
 
 #endif

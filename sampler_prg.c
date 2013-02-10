@@ -84,8 +84,7 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        return return_layers(program->layers, "/region", fb, error) && 
-            return_layers(program->layers_release, "/region", fb, error);
+        return return_layers(program->all_layers, "/region", fb, error);
     }
     else // otherwise, treat just like an command on normal (non-aux) output
     if (!strcmp(cmd->command, "/groups") && !strcmp(cmd->arg_types, ""))
@@ -113,8 +112,9 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->name = g_strdup(name);
     prg->sample_dir = g_strdup(sample_dir);
     prg->source_file = NULL;
-    prg->layers = NULL;
-    prg->layers_release = NULL;
+    prg->all_layers = NULL;
+    prg->deleted_layers = NULL;
+    prg->rll = NULL;
     prg->groups = NULL;
     prg->default_group = sampler_layer_new(m, prg, NULL);
     CBOX_OBJECT_REGISTER(prg);
@@ -188,8 +188,8 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
             sampler_program_add_layer(prg, l);
         g_free(where);
     }
-    prg->layers = g_slist_reverse(prg->layers);
-    prg->layers_release = g_slist_reverse(prg->layers_release);
+    prg->all_layers = g_slist_reverse(prg->all_layers);
+    sampler_update_program_layers(m, prg);    
     return prg;
 }
 
@@ -197,10 +197,7 @@ void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer
 {
     // Always call sampler_update_layer before sampler_program_add_layer.
     assert(l->runtime);
-    if (l->data.trigger == stm_release)
-        prg->layers_release = g_slist_prepend(prg->layers_release, l);
-    else
-        prg->layers = g_slist_prepend(prg->layers, l);
+    prg->all_layers = g_slist_prepend(prg->all_layers, l);
 }
 
 void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer *l)
@@ -211,10 +208,12 @@ void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer
 void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
 {
     struct sampler_program *prg = CBOX_H2O(hdr_ptr);
-    for (GSList *p = prg->layers; p; p = g_slist_next(p))
+    for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
         CBOX_DELETE((struct sampler_layer *)p->data);
-    for (GSList *p = prg->layers_release; p; p = g_slist_next(p))
+    for (GSList *p = prg->deleted_layers; p; p = g_slist_next(p))
         CBOX_DELETE((struct sampler_layer *)p->data);
+    if (prg->rll)
+        sampler_rll_destroy(prg->rll);
     for (GSList *p = prg->groups; p; p = g_slist_next(p))
         CBOX_DELETE((struct sampler_layer *)p->data);
     CBOX_DELETE(prg->default_group);
@@ -222,7 +221,33 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
     g_free(prg->name);
     g_free(prg->sample_dir);
     g_free(prg->source_file);
-    g_slist_free(prg->layers);
+    g_slist_free(prg->all_layers);
+    g_slist_free(prg->deleted_layers);
     free(prg);
 }
 
+/////////////////////////////////////////////////////////////////////////////////
+
+struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
+{
+    struct sampler_rll *rll = malloc(sizeof(struct sampler_rll));
+    rll->layers = NULL;
+    rll->layers_release = NULL;
+
+    for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
+    {
+        struct sampler_layer *l = p->data;
+        if (l->data.trigger == stm_release)
+            rll->layers_release = g_slist_prepend(rll->layers_release, l);
+        else
+            rll->layers = g_slist_prepend(rll->layers, l);
+    }
+    return rll;
+}
+
+void sampler_rll_destroy(struct sampler_rll *rll)
+{
+    g_slist_free(rll->layers);
+    g_slist_free(rll->layers_release);
+    free(rll);
+}

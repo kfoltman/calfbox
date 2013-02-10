@@ -111,8 +111,8 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
     if (ls.region)
         load_sfz_end_region(&c);
     
-    prg->layers = g_slist_reverse(prg->layers);
-    prg->layers_release = g_slist_reverse(prg->layers_release);
+    prg->all_layers = g_slist_reverse(prg->all_layers);
+    sampler_update_program_layers(m, prg);
     return TRUE;
 }
 
