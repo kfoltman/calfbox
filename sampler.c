@@ -950,7 +950,7 @@ void sampler_unselect_program(struct sampler_module *m, struct sampler_program *
     }
 }
 
-static gboolean load_from_string(struct sampler_module *m, const char *sample_dir, const char *sfz_data, const char *name, int prog_no, GError **error)
+static gboolean load_from_string(struct sampler_module *m, const char *sample_dir, const char *sfz_data, const char *name, int prog_no, struct sampler_program **ppgm, GError **error)
 {
     int index = find_program(m, prog_no);
     struct sampler_program *pgm = sampler_program_new(m, prog_no, name, sample_dir);
@@ -970,6 +970,8 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
     struct sampler_program **programs = malloc(sizeof(struct sampler_program *) * (m->program_count + 1));
     memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
     programs[m->program_count] = pgm;
+    if (ppgm)
+        *ppgm = pgm;
     free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
     return TRUE;
 }
@@ -1053,7 +1055,12 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     }
     else if (!strcmp(cmd->command, "/load_patch_from_string") && !strcmp(cmd->arg_types, "isss"))
     {
-        return load_from_string(m, CBOX_ARG_S(cmd, 1), CBOX_ARG_S(cmd, 2), CBOX_ARG_S(cmd, 3), CBOX_ARG_I(cmd, 0), error);
+        struct sampler_program *pgm = NULL; 
+        if (!load_from_string(m, CBOX_ARG_S(cmd, 1), CBOX_ARG_S(cmd, 2), CBOX_ARG_S(cmd, 3), CBOX_ARG_I(cmd, 0), &pgm, error))
+            return FALSE;
+        if (fb)
+            return cbox_execute_on(fb, NULL, "/uuid", "o", error, pgm);
+        return TRUE;
     }
     else if (!strcmp(cmd->command, "/get_unused_program") && !strcmp(cmd->arg_types, ""))
     {
