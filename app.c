@@ -50,17 +50,6 @@ int cmd_quit(struct cbox_menu_item_command *item, void *context)
     return 1;
 }
 
-void switch_scene(struct cbox_menu_item_command *item, struct cbox_scene *new_scene, const char *prefix)
-{
-    struct cbox_scene *old = cbox_rt_set_scene(app.rt, new_scene);
-    if (old)
-    {
-        CBOX_DELETE(old);
-        g_free(app.current_scene_name);
-    }
-    app.current_scene_name = g_strdup_printf("%s:%s", prefix, (char *)item->item.item_context);
-}
-
 int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
@@ -99,9 +88,7 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
     
     if (layer)
     {
-        if (cbox_scene_add_layer(scene, layer, &error))
-            switch_scene(item, scene, "layer");
-        else
+        if (!cbox_scene_add_layer(scene, layer, &error))
             cbox_print_error(error);
     }
     else
