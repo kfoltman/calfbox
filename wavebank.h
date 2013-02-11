@@ -29,6 +29,12 @@ enum CboxWaveformError
     CBOX_WAVEFORM_ERROR_FAILED,
 };
 
+struct cbox_waveform_level
+{
+    int16_t *data;
+    uint64_t max_rate;
+};
+
 struct cbox_waveform
 {
     int16_t *data;
@@ -40,6 +46,9 @@ struct cbox_waveform
     gchar *display_name;
     gboolean has_loop;
     uint32_t loop_start, loop_end;
+    
+    struct cbox_waveform_level *levels;
+    int level_count;
 };
 
 extern struct cbox_command_target cbox_waves_cmd_target;
@@ -48,7 +57,7 @@ extern void cbox_wavebank_init();
 extern struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *filename, GError **error);
 extern struct cbox_waveform *cbox_wavebank_peek_waveform_by_id(int id);
 extern void cbox_wavebank_foreach(void (*cb)(void *user_data, struct cbox_waveform *waveform), void *user_data);
-extern void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, void *user_data), void *user_data);
+extern void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, void *user_data), void *user_data, int levels);
 extern int cbox_wavebank_get_count();
 extern int64_t cbox_wavebank_get_bytes();
 extern int64_t cbox_wavebank_get_maxbytes();

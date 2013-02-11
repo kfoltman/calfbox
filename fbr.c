@@ -69,15 +69,6 @@ struct feedback_reducer_module
     complex float fft_buffers[2][ANALYSIS_BUFFER_SIZE];
 };
 
-// Do a butterfly operation:
-// dst1 = src1 + e^iw_1*src2
-// dst2 = src1 + e^iw_2*src2 (w = phase * 2pi / ANALYSIS_BUFFER_SIZE)
-static inline void butterfly(complex float *dst1, complex float *dst2, complex float src1, complex float src2, complex float eiw1, complex float eiw2)
-{
-    *dst1 = src1 + eiw1 * src2;
-    *dst2 = src1 + eiw2 * src2;
-}
-
 // Trivial implementation of Cooley-Tukey (+ my own mistakes) + von Hann window
 static int do_fft(struct feedback_reducer_module *m)
 {

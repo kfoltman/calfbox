@@ -70,6 +70,7 @@ struct sampler_voice
     // Note: may be NULL when program is being deleted
     struct sampler_program *program;
     struct cbox_waveform *last_waveform;
+    int16_t *sample_data;
     uint32_t pos, delta, loop_start, cur_sample_end;
     uint32_t frac_pos, frac_delta;
     uint32_t loop_overlap;

@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "cmd.h"
+#include "dspmath.h"
 #include "errors.h"
 #include "wavebank.h"
 #include <assert.h>
@@ -25,6 +26,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define STD_WAVEFORM_FRAMES 1024
+#define STD_WAVEFORM_BITS 10
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Sine table
+static complex float euler_table[STD_WAVEFORM_FRAMES];
+
+// Bit reversal table
+static int map_table[STD_WAVEFORM_FRAMES];
+
+// Initialise tables using for FFT
+static void init_tables()
+{
+    int rev = 1 << (STD_WAVEFORM_BITS - 1);
+    for (int i = 0; i < STD_WAVEFORM_FRAMES; i++)
+    {
+        euler_table[i] = cos(i * 2 * M_PI / STD_WAVEFORM_FRAMES) + I * sin(i * 2 * M_PI / STD_WAVEFORM_FRAMES);
+        int ni = 0;
+        for (int j = 0; j < STD_WAVEFORM_BITS; j++)
+        {
+            if (i & (rev >> j))
+                ni = ni | (1 << j);
+        }
+        map_table[i] = ni;
+    }
+}
+
+// Trivial implementation of Cooley-Tukey, only works for even values of ANALYSIS_BUFFER_BITS
+static void my_fft_main(complex float output[STD_WAVEFORM_FRAMES])
+{
+    complex float temp[STD_WAVEFORM_FRAMES];
+
+    for (int i = 0; i < STD_WAVEFORM_BITS; i++)
+    {
+        complex float *src = (i & 1) ? temp : output;
+        complex float *dst = (i & 1) ? output : temp;
+        int invi = STD_WAVEFORM_BITS - i - 1;
+        int disp = 1 << i;
+        int mask = disp - 1;
+        
+        for (int j = 0; j < STD_WAVEFORM_FRAMES / 2; j++)
+        {
+            int jj1 = (j & mask) + ((j & ~mask) << 1); // insert 0 at ith bit to get the left arm of the butterfly
+            int jj2 = jj1 + disp;                      // insert 1 at ith bit to get the right arm
+            assert((jj1 + disp) == (jj1 | disp));
+
+            // e^iw
+            complex float eiw1 = euler_table[(jj1 << invi) & (STD_WAVEFORM_FRAMES - 1)];
+            complex float eiw2 = euler_table[(jj2 << invi) & (STD_WAVEFORM_FRAMES - 1)];
+
+            // printf("%d -> %d, %d\n", j, jj, jj + disp);
+            butterfly(&dst[jj1], &dst[jj2], src[jj1], src[jj2], eiw1, eiw2);
+        }
+    }
+}
+
+static void my_fft_r2c(complex float output[STD_WAVEFORM_FRAMES], int16_t input[STD_WAVEFORM_FRAMES])
+{
+    assert(!(STD_WAVEFORM_BITS&1));
+    // Copy + bit reversal addressing
+    for (int i = 0; i < STD_WAVEFORM_FRAMES; i++)
+        output[i] = input[map_table[i]] * (1.0 / STD_WAVEFORM_FRAMES);
+    
+    my_fft_main(output);
+    
+}
+
+static void my_ifft_c2r(int16_t output[STD_WAVEFORM_FRAMES], complex float input[STD_WAVEFORM_FRAMES])
+{
+    complex float temp2[STD_WAVEFORM_FRAMES];
+    for (int i = 0; i < STD_WAVEFORM_FRAMES; i++)
+        temp2[i] = input[map_table[i]];
+    assert(!(STD_WAVEFORM_BITS&1));
+
+    my_fft_main(temp2);
+    // Copy + bit reversal addressing
+    float maxv = 0;
+    for (int i = 0; i < STD_WAVEFORM_FRAMES; i++)
+    {
+        float value = creal(temp2[i]);
+        if (value < -32768) value = -32768;
+        if (value > 32767) value = 32767;
+        if (fabs(value) > maxv)
+            maxv = fabs(value);
+        output[i] = (int16_t)value;
+    }    
+}
 
 struct wave_bank
 {
@@ -54,16 +144,48 @@ float func_saw(float v, void *user_data)
     return 2 * v - 1;
 }
 
-void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, void *user_data), void *user_data)
+void cbox_waveform_generate_levels(struct cbox_waveform *waveform, int levels, double ratio)
 {
-    int nsize = 2048;
+    complex float output[STD_WAVEFORM_FRAMES], bandlimited[STD_WAVEFORM_FRAMES];
+    my_fft_r2c(output, waveform->data);
+    int N = STD_WAVEFORM_FRAMES;
+    
+    waveform->levels = calloc(levels, sizeof(struct cbox_waveform_level));
+    double rate = 65536.0 * 65536.0; // / waveform->info.frames;
+    double orig_rate = 65536.0 * 65536.0; // / waveform->info.frames;
+    for (int i = 0; i < levels; i++)
+    {
+        int harmonics = N / 2 / (rate / orig_rate);
+        bandlimited[0] = 0;
+        
+        for (int j = 1; j <= harmonics; j++)
+        {
+            bandlimited[j] = output[j];
+            bandlimited[N - j] = output[N - j];
+        }
+        for (int j = harmonics; j <= N / 2; j++)
+            bandlimited[j] = bandlimited [N - j] = 0;
+        
+        waveform->levels[i].data = calloc(N, sizeof(int16_t));
+        my_ifft_c2r(waveform->levels[i].data, bandlimited);
+        waveform->levels[i].max_rate = (uint64_t)(rate);
+        rate *= ratio;
+    }
+    waveform->level_count = levels;
+}
+
+void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, void *user_data), void *user_data, int levels)
+{
+    int nsize = STD_WAVEFORM_FRAMES;
     int16_t *wave = calloc(nsize, sizeof(int16_t));
     for (int i = 0; i < nsize; i++)
     {
         float v = getfunc(i * 1.0 / nsize, user_data);
         if (fabs(v) > 1) 
             v = (v < 0) ? -1 : 1;
-        wave[i] = (int16_t)(32767 * v);
+        // cannot use full scale here, because bandlimiting will introduce
+        // some degree of overshoot
+        wave[i] = (int16_t)(25000 * v); 
     }
     struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
     waveform->data = wave;
@@ -78,6 +200,11 @@ void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, 
     waveform->has_loop = TRUE;
     waveform->loop_start = 0;
     waveform->loop_end = nsize;
+    waveform->levels = NULL;
+    waveform->level_count = 0;
+    
+    if (levels)
+        cbox_waveform_generate_levels(waveform, levels, 2);
     
     g_hash_table_insert(bank.waveforms_by_name, waveform->canonical_name, waveform);
     g_hash_table_insert(bank.waveforms_by_id, &waveform->id, waveform);
@@ -87,15 +214,17 @@ void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, 
 
 void cbox_wavebank_init()
 {
+    init_tables();
+
     bank.bytes = 0;
     bank.maxbytes = 0;
     bank.serial_no = 0;
     bank.waveforms_by_name = g_hash_table_new(g_str_hash, g_str_equal);
     bank.waveforms_by_id = g_hash_table_new(g_int_hash, g_int_equal);
     
-    cbox_wavebank_add_std_waveform("*sine", func_sine, NULL);
-    cbox_wavebank_add_std_waveform("*saw", func_saw, NULL);
-    cbox_wavebank_add_std_waveform("*sqr", func_sqr, NULL);
+    cbox_wavebank_add_std_waveform("*sine", func_sine, NULL, 0);
+    cbox_wavebank_add_std_waveform("*saw", func_saw, NULL, 11);
+    cbox_wavebank_add_std_waveform("*sqr", func_sqr, NULL, 11);
 }
 
 struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *filename, GError **error)
@@ -161,6 +290,8 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     waveform->canonical_name = canonical;
     waveform->display_name = g_filename_display_name(canonical);
     waveform->has_loop = FALSE;
+    waveform->levels = NULL;
+    waveform->level_count = 0;
     
     if (sf_command(sndfile, SFC_GET_INSTRUMENT, &instrument, sizeof(SF_INSTRUMENT)))
     {

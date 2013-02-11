@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define CBOX_BLOCK_SIZE 16
 
+#include <complex.h>
 #include <stdlib.h>
 #include <math.h>
 #include <memory.h>
@@ -121,5 +122,13 @@ static inline float rad2deg(float rad)
     return rad * 180 / M_PI;
 }
 
+// Do a butterfly operation:
+// dst1 = src1 + e^iw_1*src2
+// dst2 = src1 + e^iw_2*src2 (w = phase * 2pi / ANALYSIS_BUFFER_SIZE)
+static inline void butterfly(complex float *dst1, complex float *dst2, complex float src1, complex float src2, complex float eiw1, complex float eiw2)
+{
+    *dst1 = src1 + eiw1 * src2;
+    *dst2 = src1 + eiw2 * src2;
+}
 
 #endif

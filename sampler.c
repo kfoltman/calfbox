@@ -564,6 +564,20 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     double maxv = 127 << 7;
     double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;
     uint64_t freq64 = freq * 65536.0 * 65536.0 / m->module.srate;
+    v->sample_data = v->last_waveform->data;
+    if (v->last_waveform->levels)
+    {
+        // XXXKF: optimise later by caching last lookup value
+        // XXXKF: optimise later by using binary search
+        for (int i = 0; i < v->last_waveform->level_count; i++)
+        {
+            if (freq64 <= v->last_waveform->levels[i].max_rate)
+            {
+                v->sample_data = v->last_waveform->levels[i].data;
+                break;
+            }
+        }
+    }
     v->delta = freq64 >> 32;
     v->frac_delta = freq64 & 0xFFFFFFFF;
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
