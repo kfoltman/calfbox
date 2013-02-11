@@ -75,6 +75,7 @@ struct cbox_module
     int inputs, outputs, aux_offset;
     int bypass;
     int srate;
+    double srate_inv;
     
     struct cbox_command_target cmd_target;
         

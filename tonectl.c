@@ -106,7 +106,7 @@ MODULE_CREATE_FUNCTION(tone_control)
     m->module.process_event = tone_control_process_event;
     m->module.process_block = tone_control_process_block;
     
-    m->tpdsr = 2 * M_PI / m->module.srate;
+    m->tpdsr = 2 * M_PI * m->module.srate_inv;
     
     m->old_params = NULL;
     m->params = malloc(sizeof(struct tone_control_params));

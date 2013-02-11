@@ -218,7 +218,7 @@ void reverb_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
 
     if (p != m->old_params)
     {
-        float tpdsr = 2 * M_PI / m->module.srate;
+        float tpdsr = 2.f * M_PI * m->module.srate_inv;
         cbox_onepolef_set_lowpass(&m->filter_coeffs[0], p->lowpass * tpdsr);
         cbox_onepolef_set_highpass(&m->filter_coeffs[1], p->highpass * tpdsr);
         float rv = p->decay_time * m->module.srate / 1000;
@@ -341,7 +341,7 @@ MODULE_CREATE_FUNCTION(reverb)
             393, 0.5);
 #endif
     
-    float tpdsr = 2 * M_PI / m->module.srate;
+    float tpdsr = 2 * M_PI * m->module.srate_inv;
     
     m->params->lowpass = cbox_config_get_float(cfg_section, "lowpass", 8000.f);
     m->params->highpass = cbox_config_get_float(cfg_section, "highpass", 35.f);

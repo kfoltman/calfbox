@@ -48,11 +48,11 @@ static void sampler_process_block(struct cbox_module *module, cbox_sample_t **in
 static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void sampler_destroyfunc(struct cbox_module *module);
 
-static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, int srate)
+static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, int srate, double srate_inv)
 {
     lfo->phase = 0;
     lfo->age = 0;
-    lfo->delta = (uint32_t)(lfop->freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE / srate);
+    lfo->delta = (uint32_t)(lfop->freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE * srate_inv);
     lfo->delay = (uint32_t)(lfop->delay * srate);
     lfo->fade = (uint32_t)(lfop->fade * srate);
 }
@@ -67,7 +67,7 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     {
         // time since last 'note on' for that note
         v->age = m->current_time - c->prev_note_start_time[note];
-        double age = v->age * 1.0 / m->module.srate;
+        double age = v->age *  m->module.srate_inv;
         // if attenuation is more than 84dB, ignore the release trigger
         if (age * l->rt_decay > 84)
             return;
@@ -146,9 +146,9 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
             exgroups[(*pexgroupcount)++] = l->group;
         }
     }
-    lfo_init(&v->amp_lfo, &l->amp_lfo, m->module.srate);
-    lfo_init(&v->filter_lfo, &l->filter_lfo, m->module.srate);
-    lfo_init(&v->pitch_lfo, &l->pitch_lfo, m->module.srate);
+    lfo_init(&v->amp_lfo, &l->amp_lfo, m->module.srate, m->module.srate_inv);
+    lfo_init(&v->filter_lfo, &l->filter_lfo, m->module.srate, m->module.srate_inv);
+    lfo_init(&v->pitch_lfo, &l->pitch_lfo, m->module.srate, m->module.srate_inv);
     
     cbox_biquadf_reset(&v->filter_left);
     cbox_biquadf_reset(&v->filter_right);
@@ -533,7 +533,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     moddests[smdest_resonance] = 0;
     GSList *mod = l->modulations;
     if (l->trigger == stm_release)
-        moddests[smdest_gain] -= v->age * l->rt_decay / m->module.srate;
+        moddests[smdest_gain] -= v->age * l->rt_decay * m->module.srate_inv;
     static const int modoffset[4] = {0, -1, -1, 1 };
     static const int modscale[4] = {1, 1, 2, -2 };
     while(mod)
@@ -563,7 +563,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     
     double maxv = 127 << 7;
     double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;
-    uint64_t freq64 = freq * 65536.0 * 65536.0 / m->module.srate;
+    uint64_t freq64 = (uint64_t)(freq * 65536.0 * 65536.0 * m->module.srate_inv);
     v->sample_data = v->last_waveform->data;
     if (v->last_waveform->levels)
     {
@@ -609,12 +609,15 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         switch(l->fil_type)
         {
         case sft_lp12:
+        case sft_lp24:
             cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
             break;
         case sft_hp12:
+        case sft_hp24:
             cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
             break;
         case sft_bp6:
+        case sft_bp12:
             cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
             break;
         case sft_lp6:
@@ -622,15 +625,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             break;
         case sft_hp6:
             cbox_biquadf_set_1php(&v->filter_coeffs, cutoff, m->module.srate);
-            break;
-        case sft_lp24:
-            cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
-            break;
-        case sft_hp24:
-            cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
-            break;
-        case sft_bp12:
-            cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
             break;
         default:
             assert(0);
@@ -1354,7 +1348,7 @@ void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voic
 
 void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
-    v->delay += nif->param * v->channel->cc[nif->variant] / 127.0 * v->channel->module->module.srate;
+    v->delay += nif->param * v->channel->cc[nif->variant] * (1.0 / 127.0) * v->channel->module->module.srate;
 }
 
 void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
@@ -1400,7 +1394,7 @@ void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice 
     float param = nif->param * v->vel * (1.0 / 127.0);
     if ((nif->variant & 15) == 4)
         param *= 0.01;
-    cbox_envelope_modify_dahdsr(env->shape, nif->variant & 15, param, v->channel->module->module.srate / CBOX_BLOCK_SIZE);
+    cbox_envelope_modify_dahdsr(env->shape, nif->variant & 15, param, v->channel->module->module.srate * (1.0 / CBOX_BLOCK_SIZE));
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -150,7 +150,7 @@ MODULE_CREATE_FUNCTION(chorus)
     m->module.process_block = chorus_process_block;
     m->pos = 0;
     m->phase = 0;
-    m->tp32dsr = 65536.0 * 65536.0 / m->module.srate;
+    m->tp32dsr = 65536.0 * 65536.0 * m->module.srate_inv;
     struct chorus_params *p = malloc(sizeof(struct chorus_params));
     m->params = p;
     p->sphase = cbox_config_get_float(cfg_section, "stereo_phase", 90.f);
