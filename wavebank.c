@@ -144,6 +144,15 @@ float func_saw(float v, void *user_data)
     return 2 * v - 1;
 }
 
+float func_tri(float v, void *user_data)
+{
+    if (v <= 0.25f)
+        return v * 4;
+    if (v <= 0.75f)
+        return 1 - (v - 0.25f) * 4;
+    return -1 + 4 * (v - 0.75f);
+}
+
 void cbox_waveform_generate_levels(struct cbox_waveform *waveform, int levels, double ratio)
 {
     complex float output[STD_WAVEFORM_FRAMES], bandlimited[STD_WAVEFORM_FRAMES];
@@ -225,6 +234,7 @@ void cbox_wavebank_init()
     cbox_wavebank_add_std_waveform("*sine", func_sine, NULL, 0);
     cbox_wavebank_add_std_waveform("*saw", func_saw, NULL, 11);
     cbox_wavebank_add_std_waveform("*sqr", func_sqr, NULL, 11);
+    cbox_wavebank_add_std_waveform("*tri", func_tri, NULL, 11);
 }
 
 struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *filename, GError **error)
