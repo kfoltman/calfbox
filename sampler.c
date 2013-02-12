@@ -890,7 +890,8 @@ static int release_program_voices_execute(void *data)
         {
             if (v->program == rpv->old_pgm)
             {
-                finished = 0;
+                if (!m->deleting)
+                    finished = 0;
                 if (v->amp_env.cur_stage != 15)
                 {
                     v->released = 1;
@@ -1137,6 +1138,7 @@ MODULE_CREATE_FUNCTION(sampler)
     m->programs = NULL;
     m->max_voices = max_voices;
     m->serial_no = 0;
+    m->deleting = FALSE;
             
     for (i = 0; ; i++)
     {
@@ -1217,6 +1219,7 @@ MODULE_CREATE_FUNCTION(sampler)
 void sampler_destroyfunc(struct cbox_module *module)
 {
     struct sampler_module *m = (struct sampler_module *)module;
+    m->deleting = TRUE;
     
     for (int i = 0; i < m->program_count; i++)
     {

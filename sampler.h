@@ -112,6 +112,7 @@ struct sampler_module
     int serial_no;
     int output_pairs, aux_pairs;
     uint32_t current_time;
+    gboolean deleting;
 };
 
 extern GQuark cbox_sampler_error_quark();
