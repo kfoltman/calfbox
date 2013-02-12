@@ -200,7 +200,7 @@ void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, 
     waveform->data = wave;
     waveform->info.channels = 1;
     waveform->info.frames = nsize;
-    waveform->info.samplerate = nsize * 440;
+    waveform->info.samplerate = (int)(nsize * 261.6255);
     waveform->id = ++bank.serial_no;
     waveform->bytes = waveform->info.channels * 2 * (waveform->info.frames + 1);
     waveform->refcount = 1;
