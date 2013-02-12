@@ -249,29 +249,22 @@ int main(int argc, char *argv[])
             else
             if (cbox_config_has_section("instrument:default"))
                 instrument_name = "default";
-            else
-            {
-                fprintf(stderr, "No default scene or default instrument defined.\n");
-                goto fail;
-            }
         }
     }
     
+    scene = cbox_scene_new(app.document, app.rt, FALSE);
+    if (!scene)
+        goto fail;
     if (scene_name)
     {
         app.current_scene_name = g_strdup_printf("scene:%s", scene_name);
-        scene = cbox_scene_new(app.document, app.rt, FALSE);
-        if (!scene)
-            goto fail;
         if (!cbox_scene_load(scene, scene_name, &error))
             goto fail;
     }
     else
+    if (instrument_name)
     {
         app.current_scene_name = g_strdup_printf("instrument:%s", instrument_name);
-        scene = cbox_scene_new(app.document, app.rt, FALSE);
-        if (!scene)
-            goto fail;
         layer = cbox_layer_new_with_instrument(scene, instrument_name, &error);
         if (!layer)
             goto fail;
