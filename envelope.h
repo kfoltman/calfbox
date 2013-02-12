@@ -82,8 +82,10 @@ static inline float cbox_envelope_get_next(struct cbox_envelope *env, int releas
         return env->cur_value;
     }
     struct cbox_envstage *es = &env->shape->stages[env->cur_stage];
-    env->cur_time++;
     double pos = es->time > 0 ? env->cur_time * env->inv_time : 1;
+    env->cur_time++;
+    if (pos > 1)
+        pos = 1;
     if (es->is_exp)
     {
         // instead of exp, may use 2**x which can be factored
@@ -104,7 +106,6 @@ static inline float cbox_envelope_get_next(struct cbox_envelope *env, int releas
         env->cur_time = 0;
         cbox_envelope_init_stage(env);
     }
-    // printf("%d %d %d\n", env->cur_stage, env->cur_time, es->time);
     return env->cur_value;
 }
 
@@ -182,7 +183,7 @@ static inline void cbox_dahdsr_init(struct cbox_dahdsr *dahdsr, float top_value)
     dahdsr->release = 0.05f;
 }
 
-static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, const struct cbox_dahdsr *dahdsr, int sr, float top_value)
+static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, const struct cbox_dahdsr *dahdsr, int sr, float top_value, gboolean is_release_exp)
 {
     env->start_value = 0;
     env->stages[0].end_value = 0;
@@ -213,7 +214,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[3].time = dahdsr->decay * sr;
     env->stages[3].next_if_pressed = 4;
     env->stages[3].next_if_released = 5;
-    env->stages[3].keep_last_value = 0;
+    env->stages[3].keep_last_value = 1;
     env->stages[3].break_on_release = 1;
     env->stages[3].is_exp = 0;
 
@@ -231,7 +232,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[5].next_if_released = -1;
     env->stages[5].keep_last_value = 0;
     env->stages[5].break_on_release = 0;
-    env->stages[5].is_exp = 1;
+    env->stages[5].is_exp = is_release_exp;
 
     env->stages[15].end_value = 0;
     env->stages[15].time = 0.01 * sr;

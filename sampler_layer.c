@@ -327,7 +327,7 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *w
 #define PROC_FIELDS_FINALISER_dBamp(type, name, def_value) \
     l->name##_linearized = dB2gain(l->name);
 #define PROC_FIELDS_FINALISER_dahdsr(name, parname, index) \
-    cbox_envelope_init_dahdsr(&l->name##_shape, &l->name, m->module.srate / CBOX_BLOCK_SIZE, 100.f);
+    cbox_envelope_init_dahdsr(&l->name##_shape, &l->name, m->module.srate / CBOX_BLOCK_SIZE, 100.f, &l->name##_shape == &l->amp_env_shape);
 #define PROC_FIELDS_FINALISER_lfo(name, parname, index) /* no finaliser required */
 
 void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_layer_data *parent, struct sampler_module *m)
