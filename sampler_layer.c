@@ -495,6 +495,14 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_da
         sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 5, fvalue);
     else if (!strcmp(key, "vel2depth"))
         sampler_layer_set_modulation(layer, src, smsrc_vel, dest, atof(value), 0);
+    else if (!strncmp(key, "depthcc", 7))
+    {
+        int cc = atoi(key + 7);
+        if (cc > 0 && cc < 120)
+            sampler_layer_set_modulation(layer, src, cc, dest, fvalue, 0);
+        else
+            return FALSE;
+    }
     else
         return FALSE;
     return TRUE;
@@ -651,6 +659,14 @@ try_now:
         else
             goto unknown_key;
     }
+    else if (!strncmp(key, "gain_cc", 7))
+    {
+        int ccno = atoi(key + 7);
+        if (ccno > 0 && ccno < 120)
+            sampler_layer_set_modulation1(l, ccno, smdest_gain, atof(value), 0);
+        else
+            goto unknown_key;
+    }
     else if (!strncmp(key, "amp_velcurve_", 13))
     {
         // if not known yet, set to 0, it can always be overriden via velcurve_quadratic setting
@@ -790,6 +806,11 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             if (md->src2 == smsrc_vel)
             {
                 g_string_append_printf(outstr, " %seg_vel2depth=%g", moddest_names[md->dest], md->amount);
+                continue;
+            }
+            if (md->src2 < 120)
+            {
+                g_string_append_printf(outstr, " %s_depthcc%d=%g", modsrc_names[md->src - 120], md->src2, md->amount);
                 continue;
             }
         }
