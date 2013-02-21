@@ -101,7 +101,10 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 
 gchar *scene_format_value(const struct cbox_menu_item_static *item, void *context)
 {
-    return strdup(app.current_scene_name);
+    if (app.current_scene_name)
+        return strdup(app.current_scene_name);
+    else
+        return strdup("- No scene -");
 }
 
 gchar *transport_format_value(const struct cbox_menu_item_static *item, void *context)
