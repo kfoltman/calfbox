@@ -1,6 +1,12 @@
 #from gui_tools import *
-from gi.repository import GObject, Gdk, Gtk, GooCanvas
+from gi.repository import GObject, Gdk, Gtk, GooCanvas, GLib
 import gui_tools
+
+def guint(x):
+    value = GObject.Value()
+    value.init(GObject.TYPE_UINT)
+    value.set_uint(x)
+    return value
 
 PPQN = 48
 
@@ -398,19 +404,20 @@ class DrumCanvas(GooCanvas.Canvas):
             x = self.pulse_to_screen_x(item.pos) - self.instr_width
             y = self.row_to_screen_y(item.row + 0.5)
             if item.channel == self.channel:
-                fill_color = 0xC0C0C0FF - int(item.vel * 1.5) * 0x00010100
-                stroke_color = 0x808080FF
+                fill_color = 0xC0C0C0 - int(item.vel * 1.5) * 0x000101
+                stroke_color = 0x808080
                 if item.selected:
-                    stroke_color = 0xFF8080FF
+                    stroke_color = 0xFF8080
             else:
-                fill_color = 0xE0E0E0FF
-                stroke_color = 0xE0E0E0FF
+                fill_color = 0xE0E0E0
+                stroke_color = 0xE0E0E0
             if item.len > 1:
                 x2 = self.pulse_to_screen_x(item.pos + item.len) - self.pulse_to_screen_x(item.pos)
                 polygon = [-2, 0, 0, -5, x2 - 5, -5, x2, 0, x2 - 5, 5, 0, 5]
             else:
-                polygon = [-4, 0, 0, -5, 5, 0, 0, 5]
-            item.item = GooCanvas.CanvasPath(parent = self.notes, data = polygon_to_path(polygon), fill_color_rgba = fill_color, stroke_color_rgba = stroke_color, line_width = 1)
+                polygon = [-5, 0, 0, -5, 5, 0, 0, 5, -5, 0]
+            item.item = GooCanvas.CanvasPath(parent = self.notes, data = polygon_to_path(polygon), line_width = 1, fill_color = ("#%06x" % fill_color), stroke_color = ("#%06x" % stroke_color))
+            #item.item.set_property('stroke_color_rgba', guint(stroke_color))
             item.item.translate(x, y)
 
     def set_selection_from_rubberband(self):
