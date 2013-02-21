@@ -8,7 +8,9 @@ class GetUUID:
                 self.uuid = args[0]
             else:
                 raise ValueException("Unexpected callback: %s" % cmd)
-        self.__call__ = callback
+        self.callback = callback
+    def __call__(self, *args):
+        self.callback(*args)
     
 class GetThings:
     @staticmethod
@@ -280,7 +282,7 @@ class DocSong(DocObj):
     def load_drum_track(self, name):
         return self.cmd_makeobj("/load_track", name, 1)
     def pattern_from_blob(self, blob, length):
-        return self.cmd_makeobj("/load_blob", buffer(blob), length)
+        return self.cmd_makeobj("/load_blob", bytearray(blob), length)
     def loop_single_pattern(self, loader):
         self.clear()
         track = self.add_track()

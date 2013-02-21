@@ -84,7 +84,11 @@ static gboolean set_error_from_python(GError **error)
     PyErr_Fetch(&ptype, &pvalue, &ptraceback);
     PyObject *ptypestr = PyObject_Str(ptype);
     PyObject *pvaluestr = PyObject_Str(pvalue);
-    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "%s: %s", PyString_AsString(ptypestr), PyString_AsString(pvaluestr));
+    PyObject *ptypestr_unicode = PyUnicode_AsUTF8String(ptypestr);
+    PyObject *pvaluestr_unicode = PyUnicode_AsUTF8String(pvaluestr);
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "%s: %s", PyBytes_AsString(ptypestr_unicode), PyBytes_AsString(pvaluestr_unicode));
+    Py_DECREF(pvaluestr_unicode);
+    Py_DECREF(ptypestr_unicode);
     //g_error("%s:%s", PyString_AsString(ptypestr), PyString_AsString(pvaluestr));
     Py_DECREF(ptypestr);
     Py_DECREF(pvaluestr);
@@ -104,7 +108,7 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
     {
         if (cmd->arg_types[i] == 's')
         {
-            PyList_SetItem(arg_values, i, PyString_FromString(cmd->arg_values[i]));
+            PyList_SetItem(arg_values, i, PyUnicode_FromString(cmd->arg_values[i]));
         }
         else
         if (cmd->arg_types[i] == 'o')
@@ -112,12 +116,12 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
             struct cbox_objhdr *oh = cmd->arg_values[i];
             char buf[40];
             uuid_unparse(oh->instance_uuid.uuid, buf);
-            PyList_SetItem(arg_values, i, PyString_FromString(buf));
+            PyList_SetItem(arg_values, i, PyUnicode_FromString(buf));
         }
         else
         if (cmd->arg_types[i] == 'i')
         {
-            PyList_SetItem(arg_values, i, PyInt_FromLong(*(int *)cmd->arg_values[i]));
+            PyList_SetItem(arg_values, i, PyLong_FromLong(*(int *)cmd->arg_values[i]));
         }
         else
         if (cmd->arg_types[i] == 'f')
@@ -128,12 +132,7 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
         if (cmd->arg_types[i] == 'b')
         {
             struct cbox_blob *blob = cmd->arg_values[i];
-            void *data;
-            ssize_t size;
-            PyObject *buf = PyBuffer_New(blob->size);
-            PyObject_AsWriteBuffer(buf, &data, &size);
-            memcpy(data, blob->data, blob->size);
-            PyList_SetItem(arg_values, i, buf);
+            PyList_SetItem(arg_values, i, PyByteArray_FromStringAndSize(blob->data, blob->size));
         }
         else
         {
@@ -144,7 +143,7 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
     struct PyCboxCallback *fbcb = NULL;
     
     PyObject *args = PyTuple_New(3);
-    PyTuple_SetItem(args, 0, PyString_FromString(cmd->command));
+    PyTuple_SetItem(args, 0, PyUnicode_FromString(cmd->command));
     PyObject *pyfb = NULL;
     if (fb)
     {
@@ -188,7 +187,8 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
     struct cbox_osc_command cmd;
     GError *error = NULL;
     char *arg_types = malloc(len + 1);
-    void **arg_values = malloc(len * sizeof(void *));
+    void **arg_values = malloc(2 * len * sizeof(void *));
+    void **arg_extra = &arg_values[len];
     cmd.command = command;
     cmd.arg_types = arg_types;
     cmd.arg_values = arg_values;
@@ -199,10 +199,10 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
         cmd.arg_values[i] = &arg_space[i];
         PyObject *value = PyList_GetItem(list, i);
         
-        if (PyInt_Check(value))
+        if (PyLong_Check(value))
         {
             arg_types[i] = 'i';
-            *(int *)arg_values[i] = PyInt_AsLong(value);
+            *(int *)arg_values[i] = PyLong_AsLong(value);
         }
         else
         if (PyFloat_Check(value))
@@ -211,17 +211,20 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
             *(double *)arg_values[i] = PyFloat_AsDouble(value);
         }
         else
-        if (PyString_Check(value))
+        if (PyUnicode_Check(value))
         {
+            PyObject *utf8str = PyUnicode_AsUTF8String(value);
             arg_types[i] = 's';
-            arg_values[i] = PyString_AsString(value);
+            arg_extra[i] = utf8str;
+            arg_values[i] = PyBytes_AsString(utf8str);
         }
         else
-        if (PyObject_CheckReadBuffer(value))
+        if (PyByteArray_Check(value))
         {
-            const void *buf;
-            ssize_t len;
-            if (0 == PyObject_AsReadBuffer(value, &buf, &len))
+            const void *buf = PyByteArray_AsString(value);
+            ssize_t len = PyByteArray_Size(value);
+            
+            if (buf)
             {
                 // note: this is not really acquired, the blob is freed using free and not cbox_blob_destroy
                 struct cbox_blob *blob = cbox_blob_new_acquire_data((void *)buf, len);
@@ -234,7 +237,13 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
         }
         else
         {
-            g_error("Cannot serialize Python type '%s'", PyString_AsString(PyObject_Str((PyObject *)value->ob_type)));
+            PyObject *ob_type = (PyObject *)value->ob_type;
+            PyObject *typename_unicode = PyObject_Str(ob_type);
+            PyObject *typename_bytes = PyUnicode_AsUTF8String(typename_unicode);
+            g_error("Cannot serialize Python type '%s'", PyBytes_AsString(typename_bytes));
+            Py_DECREF(typename_bytes);
+            Py_DECREF(typename_unicode);
+            
             assert(0);
         }
     }
@@ -254,6 +263,8 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
         {
             if (arg_types[i] == 'b')
                 free(arg_values[i]);
+            if (arg_types[i] == 's')
+                Py_DECREF((PyObject *)arg_extra[i]);
         }
     }
     free(arg_space);
@@ -271,10 +282,23 @@ static PyObject *cbox_python_do_cmd(PyObject *self, PyObject *args)
     return cbox_python_do_cmd_on(&app.cmd_target, self, args);
 }
 
-static PyMethodDef EmbMethods[] = {
+static PyMethodDef CboxMethods[] = {
     {"do_cmd", cbox_python_do_cmd, METH_VARARGS, "Execute a CalfBox command using a global path."},
     {NULL, NULL, 0, NULL}
 };
+
+static PyModuleDef CboxModule = {
+    PyModuleDef_HEAD_INIT, "_cbox", NULL, -1, CboxMethods,
+    NULL, NULL, NULL, NULL
+};
+
+static PyObject*
+PyInit_cbox(void)
+{
+    PyObject *m = PyModule_Create(&CboxModule);
+    PyModule_AddObject(m, "Callback", (PyObject *)&CboxCallbackType);
+    return m;
+}
 
 void cbox_script_run(const char *name)
 {
@@ -285,19 +309,13 @@ void cbox_script_run(const char *name)
         return;
     }
     Py_Initialize();
-    PyObject *m = Py_InitModule("_cbox", EmbMethods);
-    if (!m)
-    {
-        g_warning("Cannot install the C module");
-        return;
-    }
+    PyImport_AppendInittab("_cbox", &PyInit_cbox);
     if (PyType_Ready(&CboxCallbackType) < 0)
     {
         g_warning("Cannot install the C callback type");
         return;
     }
     Py_INCREF(&CboxCallbackType);
-    PyModule_AddObject(m, "Callback", (PyObject *)&CboxCallbackType);
     
     if (PyRun_SimpleFile(fp, name) == 1)
     {

@@ -119,7 +119,7 @@ class SceneAuxBusesModel(Gtk.ListStore):
         Gtk.ListStore.__init__(self, GObject.TYPE_STRING, GObject.TYPE_STRING)
     def refresh(self, scene_status):
         self.clear()
-        for aux_name, aux_obj in scene_status.auxes.iteritems():
+        for aux_name, aux_obj in scene_status.auxes.items():
             # XXXKF make slots more 1st class
             slot = aux_obj.get_slot_status()
             self.append((slot.insert_preset, slot.insert_engine))
@@ -378,7 +378,7 @@ class MainWindow(Gtk.Window):
         self.drum_pattern_editor.present()
         
     def on_drum_pattern_changed(self, pattern):
-        data = ""
+        data = bytearray()
         for i in pattern.items():
             ch = i.channel - 1
             data += cbox.Pattern.serialize_event(int(i.pos), 0x90 + ch, int(i.row), int(i.vel))
@@ -412,7 +412,7 @@ class MainWindow(Gtk.Window):
         self.fx_choosers = {}
         
         outputs_ls = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_INT)
-        for out in range(0, rt.audio_channels[1]/2):
+        for out in range(0, rt.audio_channels[1]//2):
             outputs_ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
             
         auxbus_ls = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_STRING)
@@ -420,7 +420,7 @@ class MainWindow(Gtk.Window):
         for bus_name in scene_status.auxes.keys():
             auxbus_ls.append(("Aux: %s" % bus_name, bus_name))
             
-        for iname, (iengine, iobj) in scene_status.instruments.iteritems():
+        for iname, (iengine, iobj) in scene_status.instruments.items():
             ipath = "/scene/instr/%s" % iname
             idata = iobj.status()
             #attribs = cbox.GetThings("/scene/instr_info", ['engine', 'name'], [i])

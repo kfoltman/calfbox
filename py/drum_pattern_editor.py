@@ -102,7 +102,7 @@ class DrumPatternModel(GObject.GObject):
         return self.notes
         
     def get_length(self):
-        return self.beats * self.bars * self.ppqn
+        return int(self.beats * self.bars * self.ppqn)
         
     def changed(self):
         self.emit('changed')
@@ -383,7 +383,7 @@ class DrumCanvas(GooCanvas.Canvas):
         for i in range(0, self.rows + 1):
             color = row_ext_fg if (i == 0 or i == self.rows) else row_grid_fg
             GooCanvas.CanvasPath(parent = self.grid, data = "M %s %s L %s %s" % (0, i * self.row_height, self.pattern.get_length() * self.zoom_in, i * self.row_height), stroke_color = color, line_width = 1)
-        for i in range(0, self.pattern.get_length() + 1, self.grid_unit):
+        for i in range(0, self.pattern.get_length() + 1, int(self.grid_unit)):
             color = grid_fg
             if i % self.pattern.ppqn == 0:
                 color = beat_fg
