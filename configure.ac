@@ -42,7 +42,7 @@ PKG_CHECK_MODULES(LIBSMF_DEPS, smf >= 1.3, true, AC_MSG_ERROR([libsmf 1.3 is req
 PKG_CHECK_MODULES(LIBSNDFILE_DEPS, sndfile, true, AC_MSG_ERROR([libsndfile is required]))
 
 if test "$PYTHON_ENABLED" = "yes"; then
-    PKG_CHECK_MODULES(PYTHON_DEPS, python-2.7 >= 2.7, true, AC_MSG_ERROR([python 2.7 or newer is required (or use --without-python)]))
+    PKG_CHECK_MODULES(PYTHON_DEPS, python3 >= 3.0, true, AC_MSG_ERROR([python 3.0 or newer is required (or use --without-python)]))
 fi
 
 # Generate Automake conditionals

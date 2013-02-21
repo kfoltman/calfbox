@@ -51,10 +51,10 @@ static int
 PyCboxCallback_Init(struct PyCboxCallback *self, PyObject *args, PyObject *kwds)
 {
     PyObject *cobj = NULL;
-    if (!PyArg_ParseTuple(args, "O!:init", &PyCObject_Type, &cobj))
+    if (!PyArg_ParseTuple(args, "O!:init", &PyCapsule_Type, &cobj))
         return -1;
     
-    self->target = PyCObject_AsVoidPtr(cobj);
+    self->target = PyCapsule_GetPointer(cobj, NULL);
 }
 
 static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject *self, PyObject *args);
