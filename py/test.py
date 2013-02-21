@@ -52,7 +52,7 @@ class TestCbox(unittest.TestCase):
 
     def test_aux_scene(self):
         scene = Document.new_scene(44100, 1024)
-        scene.add_instrument_layer("default")
+        scene.add_instrument_layer("vintage")
         scene_status = scene.status()
         layer = scene_status.layers[0]
         self.verify_uuid(scene.uuid, "cbox_scene")
@@ -107,7 +107,7 @@ class TestCbox(unittest.TestCase):
             patches_dict[patchid] = (patchname, len(regions))
             for region_uuid in regions:
                 region_str = Document.map_uuid(region_uuid).as_string()
-                print patchname, region_uuid, region_str
+                print (patchname, region_uuid, region_str)
                 if patchname == 'test_sampler_api':
                     self.assertTrue('impulse.wav' in region_str)
                     self.assertTrue('key=c' in region_str)
@@ -127,9 +127,9 @@ class TestCbox(unittest.TestCase):
         self.assertTrue('test.wav' in region.as_string())
         region.set_param("key", '12')
         self.assertTrue('key=c0' in region.as_string())
-        print region.status()
-        print group.as_string()
-        print region.as_string()
+        print (region.status())
+        print (group.as_string())
+        print (region.as_string())
         
     def test_rt(self):
         rt = Document.get_rt()
