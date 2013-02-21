@@ -37,9 +37,9 @@ CBOX_CLASS_DEFINITION_ROOT(cbox_scene)
 static gboolean cbox_scene_addlayercmd(struct cbox_scene *s, struct cbox_command_target *fb, struct cbox_osc_command *cmd, int cmd_type, GError **error)
 {
     int pos = CBOX_ARG_I(cmd, 0);
-    if (pos < 0 || pos > s->layer_count)
+    if (pos < 0 || pos > 1 + s->layer_count)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", pos, s->layer_count);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", pos, 1 + s->layer_count);
         return FALSE;
     }
     if (pos == 0)
