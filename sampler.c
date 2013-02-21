@@ -976,7 +976,7 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
         return TRUE;
     }
     
-    struct sampler_program **programs = malloc(sizeof(struct sampler_program *) * (m->program_count + 1));
+    struct sampler_program **programs = calloc((m->program_count + 1), sizeof(struct sampler_program *));
     memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
     programs[m->program_count] = pgm;
     if (ppgm)
@@ -1128,7 +1128,7 @@ MODULE_CREATE_FUNCTION(sampler)
         return NULL;
     }
     
-    struct sampler_module *m = malloc(sizeof(struct sampler_module));
+    struct sampler_module *m = calloc(1, sizeof(struct sampler_module));
     CALL_MODULE_INIT(m, 0, (output_pairs + aux_pairs) * 2, sampler);
     m->output_pairs = output_pairs;
     m->aux_pairs = aux_pairs;
@@ -1152,7 +1152,7 @@ MODULE_CREATE_FUNCTION(sampler)
             break;
         }
     }
-    m->programs = malloc(sizeof(struct sampler_program *) * m->program_count);
+    m->programs = calloc(m->program_count, sizeof(struct sampler_program *));
     int success = 1;
     for (i = 0; i < m->program_count; i++)
     {
