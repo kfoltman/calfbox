@@ -12,9 +12,15 @@ sample_dir = cbox.Config.get("init", "sample_dir")
 class SampleDirsModel(Gtk.ListStore):
     def __init__(self):
         Gtk.ListStore.__init__(self, GObject.TYPE_STRING, GObject.TYPE_STRING)
+        found = False
         for entry in cbox.Config.keys("sample_dirs"):
             path = cbox.Config.get("sample_dirs", entry)
             self.append((entry, path))
+            found = True
+        if not found:
+            print ("Warning: no sample directories defined. Please add one or more entries of a form: 'name=/path/to/my/samples' to [sample_dirs] section of .cboxrc")
+            self.append(("home", os.getenv("HOME")))
+            self.append(("/", "/"))
     def has_dir(self, dir):
         return dir in [path for entry, path in self]
 
@@ -30,15 +36,16 @@ class SampleFilesModel(Gtk.ListStore):
         try:
             self.is_refreshing = True
             self.clear()
-            if not self.dirs_model.has_dir(sample_dir):
-                self.append((os.path.dirname(sample_dir.rstrip("/")) + "/", "(up)"))
-            filelist = sorted(glob.glob("%s/*" % sample_dir))
-            for f in sorted(filelist):
-                if os.path.isdir(f) and not self.dirs_model.has_dir(f + "/"):
-                    self.append((f + "/", os.path.basename(f)+"/"))
-            for f in sorted(filelist):
-                if f.lower().endswith(".wav") and not os.path.isdir(f):
-                    self.append((f,os.path.basename(f)))
+            if sample_dir is not None:
+                if not self.dirs_model.has_dir(sample_dir):
+                    self.append((os.path.dirname(sample_dir.rstrip("/")) + "/", "(up)"))
+                filelist = sorted(glob.glob("%s/*" % sample_dir))
+                for f in sorted(filelist):
+                    if os.path.isdir(f) and not self.dirs_model.has_dir(f + "/"):
+                        self.append((f + "/", os.path.basename(f)+"/"))
+                for f in sorted(filelist):
+                    if f.lower().endswith(".wav") and not os.path.isdir(f):
+                        self.append((f,os.path.basename(f)))
         finally:
             self.is_refreshing = False
 
@@ -382,7 +389,7 @@ class EditorDialog(Gtk.Dialog):
         cell = Gtk.CellRendererText()
         combo.pack_start(cell, True)
         combo.add_attribute(cell, 'text', 0)
-        combo.connect('changed', lambda combo, tree_model, combo_model: tree_model.refresh(combo_model[combo.get_active()][1]), self.tree.get_model(), combo.get_model())
+        combo.connect('changed', lambda combo, tree_model, combo_model: tree_model.refresh(combo_model[combo.get_active()][1] if combo.get_active() >= 0 else None), self.tree.get_model(), combo.get_model())
         combo.set_active(0)
         sw = Gtk.ScrolledWindow()
         sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.ALWAYS)
