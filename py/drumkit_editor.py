@@ -23,19 +23,24 @@ class SampleDirsModel(Gtk.ListStore):
 class SampleFilesModel(Gtk.ListStore):
     def __init__(self, dirs_model):
         self.dirs_model = dirs_model
+        self.is_refreshing = False
         Gtk.ListStore.__init__(self, GObject.TYPE_STRING, GObject.TYPE_STRING)
         
     def refresh(self, sample_dir):
-        self.clear()
-        if not self.dirs_model.has_dir(sample_dir):
-            self.append((os.path.dirname(sample_dir.rstrip("/")) + "/", "(up)"))
-        filelist = sorted(glob.glob("%s/*" % sample_dir))
-        for f in sorted(filelist):
-            if os.path.isdir(f) and not self.dirs_model.has_dir(f + "/"):
-                self.append((f + "/", os.path.basename(f)+"/"))
-        for f in sorted(filelist):
-            if f.lower().endswith(".wav") and not os.path.isdir(f):
-                self.append((f,os.path.basename(f)))
+        try:
+            self.is_refreshing = True
+            self.clear()
+            if not self.dirs_model.has_dir(sample_dir):
+                self.append((os.path.dirname(sample_dir.rstrip("/")) + "/", "(up)"))
+            filelist = sorted(glob.glob("%s/*" % sample_dir))
+            for f in sorted(filelist):
+                if os.path.isdir(f) and not self.dirs_model.has_dir(f + "/"):
+                    self.append((f + "/", os.path.basename(f)+"/"))
+            for f in sorted(filelist):
+                if f.lower().endswith(".wav") and not os.path.isdir(f):
+                    self.append((f,os.path.basename(f)))
+        finally:
+            self.is_refreshing = False
 
 ####################################################################################################################################################
 
@@ -293,6 +298,7 @@ class PadTable(Gtk.Table):
 
 class FileView(Gtk.TreeView):
     def __init__(self, dirs_model):
+        self.is_playing = True
         self.dirs_model = dirs_model
         self.files_model = SampleFilesModel(dirs_model)
         Gtk.TreeView.__init__(self, self.files_model)
@@ -304,17 +310,30 @@ class FileView(Gtk.TreeView):
         self.connect('drag-data-get', self.drag_data_get)
         self.connect('row-activated', self.on_row_activated)
 
+    def stop_playing(self):
+        if self.is_playing:
+            cbox.do_cmd("/scene/instr/_preview_sample/engine/unload", None, [])
+            self.is_playing = False
+
+    def start_playing(self, fn):
+        self.is_playing = True
+        cbox.do_cmd("/scene/instr/_preview_sample/engine/load", None, [fn, -1])
+        cbox.do_cmd("/scene/instr/_preview_sample/engine/play", None, [])
+
     def cursor_changed(self, w):
+        if self.files_model.is_refreshing:
+            self.stop_playing()
+            return
+
         c = self.get_cursor()
         if c[0] is not None:
             fn = self.files_model[c[0].get_indices()[0]][0]
             if fn.endswith("/"):
                 return
             if fn != "":
-                cbox.do_cmd("/scene/instr/_preview_sample/engine/load", None, [fn, -1])
-                cbox.do_cmd("/scene/instr/_preview_sample/engine/play", None, [])
+                self.start_playing(fn)
             else:
-                cbox.do_cmd("/scene/instr/_preview_sample/engine/unload", None, [])
+                self.stop_playing(fn)
             
     def drag_data_get(self, treeview, context, selection, target_id, etime):
         cursor = treeview.get_cursor()
@@ -327,15 +346,8 @@ class FileView(Gtk.TreeView):
         c = self.get_cursor()
         fn, label = self.files_model[c[0].get_indices()[0]]
         if fn.endswith("/"):
-            print ("select dir %s" % fn)
-            try:
-                self.handler_block(self.cursor_changed_handler)
-                self.get_model().refresh(fn)
-            finally:
-                self.handler_unblock(self.cursor_changed_handler)                
-            return
+            self.files_model.refresh(fn)
         
-
 ####################################################################################################################################################
 
 class EditorDialog(Gtk.Dialog):
@@ -370,7 +382,7 @@ class EditorDialog(Gtk.Dialog):
         cell = Gtk.CellRendererText()
         combo.pack_start(cell, True)
         combo.add_attribute(cell, 'text', 0)
-        combo.connect('changed', lambda cb: self.tree.files_model.refresh(cb.get_model()[cb.get_active()][1]))
+        combo.connect('changed', lambda combo, tree_model, combo_model: tree_model.refresh(combo_model[combo.get_active()][1]), self.tree.get_model(), combo.get_model())
         combo.set_active(0)
         sw = Gtk.ScrolledWindow()
         sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.ALWAYS)
