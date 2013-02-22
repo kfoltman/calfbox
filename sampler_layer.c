@@ -837,12 +837,21 @@ void sampler_layer_dump(struct sampler_layer *l, FILE *f)
     fprintf(f, "%s\n", str);
 }
 
-void sampler_layer_data_destroy(struct sampler_layer_data *l)
+void sampler_layer_data_close(struct sampler_layer_data *l)
 {
     g_slist_free_full(l->nifs, g_free);
     g_slist_free_full(l->modulations, g_free);
     if (l->waveform)
+    {
         cbox_waveform_unref(l->waveform);
+        l->waveform = NULL;
+    }
+}
+
+void sampler_layer_data_destroy(struct sampler_layer_data *l)
+{
+    sampler_layer_data_close(l);
+    free(l);
 }
 
 void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
@@ -862,11 +871,13 @@ void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
         }
         l->parent_group = NULL;
     }
-    sampler_layer_data_destroy(&l->data);
+    sampler_layer_data_close(&l->data);
     if (l->runtime)
         sampler_layer_data_destroy(l->runtime);
     if (l->unknown_keys)
         g_hash_table_destroy(l->unknown_keys);
+    if (l->child_layers)
+        g_hash_table_destroy(l->child_layers);
 
     free(l);
 }

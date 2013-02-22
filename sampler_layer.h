@@ -353,6 +353,7 @@ extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *k
 extern gchar *sampler_layer_to_string(struct sampler_layer *l, gboolean show_inherited);
 extern void sampler_layer_dump(struct sampler_layer *l, FILE *f);
 extern void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampler_layer_data *src, gboolean copy_hasattr);
+extern void sampler_layer_data_close(struct sampler_layer_data *l);
 extern void sampler_layer_data_destroy(struct sampler_layer_data *l);
 
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
