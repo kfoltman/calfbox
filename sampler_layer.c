@@ -775,7 +775,11 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             }
             if (md->src < 120 + sizeof(modsrc_names) / sizeof(modsrc_names[0]))
             {
-                g_string_append_printf(outstr, " %s_%s=%g", moddest_names[md->dest], modsrc_names[md->src - 120], md->amount);
+                if ((md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
+                    (md->src == smsrc_pitchenv && md->dest == smdest_pitch))
+                    g_string_append_printf(outstr, " %s_depth=%g", modsrc_names[md->src - 120], md->amount);
+                else
+                    g_string_append_printf(outstr, " %s_%s=%g", moddest_names[md->dest], modsrc_names[md->src - 120], md->amount);
                 continue;
             }
         }
