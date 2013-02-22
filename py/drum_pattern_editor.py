@@ -121,7 +121,7 @@ class DrumPatternModel(GObject.GObject):
         for n in self.notes:
             if not n.selected:
                 continue
-            for k, v in vals.iteritems():
+            for k, v in vals.items():
                 setattr(n, k, v)
         self.changed()
 

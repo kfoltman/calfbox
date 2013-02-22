@@ -101,7 +101,7 @@ class KeySampleModel(object):
         if self.filename == '':
             return ""
         s = "<region> key=%d sample=%s loop_mode=%s" % (self.key, self.filename, self.mode)
-        s += "".join([" %s=%s" % item for item in self.attribs.iteritems()])
+        s += "".join([" %s=%s" % item for item in self.attribs.items()])
         return s + "\n"
     def to_markup(self):
         return "<small>%s</small>" % self.sample
@@ -144,7 +144,7 @@ class BankModel(dict):
                 sample_short = os.path.basename(sample)
                 if key in self:
                     ksm = KeySampleModel(key, sample_short, sfzparser.find_sample_in_path(path, sample))
-                    for k, v in rdata.iteritems():
+                    for k, v in rdata.items():
                         if k in ksm.attribs:
                             if type(layer_attribs[k]) is float:
                                 ksm.attribs[k] = float(v)
