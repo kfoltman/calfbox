@@ -144,7 +144,7 @@ void cbox_usb_midi_info_init(struct cbox_usb_midi_info *umi, struct cbox_usb_dev
     umi->udi = udi;
     umi->intf = -1;
     umi->alt_setting = -1;
-    umi->ep = NULL;
+    umi->epdesc.found = FALSE;
 }
 
 struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *uii, const struct cbox_usb_midi_info *uminf, struct libusb_device_handle *handle)
@@ -167,10 +167,10 @@ struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *u
     umi->devinfo = devinfo;
     umi->handle = handle;
     umi->busdevadr = devinfo->busdevadr;
-    umi->endpoint = uminf->ep->bEndpointAddress;
+    umi->endpoint = uminf->epdesc.bEndpointAddress;
     cbox_midi_buffer_init(&umi->midi_buffer);
     uii->midi_input_ports = g_list_prepend(uii->midi_input_ports, umi);
-    int len = uminf->ep->wMaxPacketSize;
+    int len = uminf->epdesc.wMaxPacketSize;
     if (len > 256)
         len = 256;
     umi->max_packet_size = len;

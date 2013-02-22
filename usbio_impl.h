@@ -34,6 +34,13 @@ try at breaking it up into manageable parts.
 #include "io.h"
 #include "midi.h"
 
+struct usbio_endpoint_descriptor
+{
+    uint8_t found;
+    uint8_t bEndpointAddress;
+    uint16_t wMaxPacketSize;
+};
+
 struct usbio_transfer
 {
     struct libusb_context *usbctx;
@@ -120,7 +127,7 @@ struct cbox_usb_audio_info
     struct cbox_usb_device_info *udi;
     int intf;
     int alt_setting;
-    const struct libusb_endpoint_descriptor *ep;
+    struct usbio_endpoint_descriptor epdesc;
 };
 
 struct cbox_usb_midi_info
@@ -128,7 +135,7 @@ struct cbox_usb_midi_info
     struct cbox_usb_device_info *udi;
     int intf;
     int alt_setting;
-    const struct libusb_endpoint_descriptor *ep;
+    struct usbio_endpoint_descriptor epdesc;
 };
 
 struct cbox_usb_midi_input

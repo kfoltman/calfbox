@@ -43,15 +43,26 @@ static const struct libusb_endpoint_descriptor *get_audio_output_endpoint(const 
     return NULL;
 }
 
-static const struct libusb_endpoint_descriptor *get_endpoint_by_address(const struct libusb_interface_descriptor *asdescr, uint8_t addr)
+static void fill_endpoint_desc(struct usbio_endpoint_descriptor *epdesc, const struct libusb_endpoint_descriptor *ep)
 {
+    epdesc->found = TRUE;
+    epdesc->bEndpointAddress = ep->bEndpointAddress;
+    epdesc->wMaxPacketSize = ep->wMaxPacketSize;
+}
+
+static gboolean fill_endpoint_by_address(const struct libusb_interface_descriptor *asdescr, uint8_t addr, struct usbio_endpoint_descriptor *epdesc)
+{
+    epdesc->found = FALSE;
     for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
     {
         const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
         if (ep->bEndpointAddress == addr)
-            return ep;
+        {
+            fill_endpoint_desc(epdesc, ep);
+            return TRUE;
+        }
     }
-    return NULL;
+    return FALSE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -385,12 +396,12 @@ static gboolean parse_audio_class(struct cbox_usb_io_impl *uii, struct cbox_usb_
         // that there are any devices with continuous sample rate, that is.
         if (other_config)
             return TRUE;
-        if (uai->ep)
+        if (uai->epdesc.found)
             return FALSE;
         g_warning("Interface %d alt-setting %d endpoint %02x looks promising", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, ep->bEndpointAddress);
         uai->intf = asdescr->bInterfaceNumber;
         uai->alt_setting = asdescr->bAlternateSetting;
-        uai->ep = ep;
+        fill_endpoint_desc(&uai->epdesc, ep);
         return TRUE;
     }
     return FALSE;
@@ -405,11 +416,11 @@ static gboolean parse_midi_class(struct cbox_usb_midi_info *umi, const struct li
     if (other_config)
         return TRUE;
     
-    if (umi->ep)
+    if (umi->epdesc.found)
         return FALSE;
     umi->intf = asdescr->bInterfaceNumber;
     umi->alt_setting = asdescr->bAlternateSetting;
-    umi->ep = ep;
+    fill_endpoint_desc(&umi->epdesc, ep);
     return TRUE;
 }
 
@@ -523,21 +534,22 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
                 {
                     uminf.intf = asdescr->bInterfaceNumber;
                     uminf.alt_setting = asdescr->bAlternateSetting;
-                    uminf.ep = get_endpoint_by_address(asdescr, 0x82);
+                    fill_endpoint_by_address(asdescr, 0x82, &uminf.epdesc);
                 }
             }
         }
+        libusb_free_config_descriptor(cfg_descr);
     }
-    if (!uminf.ep && udi->configs_with_midi)
+    if (!uminf.epdesc.found && udi->configs_with_midi)
         g_warning("%03d:%03d - MIDI port available on different configs: mask=0x%x", bus, devadr, udi->configs_with_midi);
 
-    if (uainf.ep) // Class-compliant USB audio device
+    if (uainf.epdesc.found) // Class-compliant USB audio device
         is_audio = TRUE;
     if (udi->vid == 0x13b2 && udi->pid == 0x0030) // Alesis Multimix 8
         is_audio = TRUE;
     
     // All configs/interfaces/alts scanned, nothing interesting found -> mark as unsupported
-    udi->is_midi = uminf.ep != NULL;
+    udi->is_midi = uminf.epdesc.found;
     udi->is_audio = is_audio;
     if (!udi->is_midi && !udi->is_audio)
     {
@@ -564,13 +576,13 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         return udi->is_midi || udi->is_audio;
     }
     
-    if (uminf.ep)
+    if (uminf.epdesc.found)
     {
         g_debug("Found MIDI device %03d:%03d, trying to open", bus, devadr);
         if (0 != usbio_open_midi_interface(uii, &uminf, handle))
             opened = TRUE;
     }
-    if (uainf.ep)
+    if (uainf.epdesc.found)
     {
         GError *error = NULL;
         if (usbio_open_audio_interface(uii, &uainf, handle, &error))

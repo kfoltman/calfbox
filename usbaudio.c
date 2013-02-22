@@ -61,15 +61,15 @@ gboolean usbio_open_audio_interface(struct cbox_usb_io_impl *uii, struct cbox_us
     }
     if (!configure_usb_interface(handle, uainf->udi->bus, uainf->udi->devadr, uainf->intf, uainf->alt_setting, error))
         return FALSE;
-    if (!set_endpoint_sample_rate(handle, uii->sample_rate, uainf->ep->bEndpointAddress))
+    if (!set_endpoint_sample_rate(handle, uii->sample_rate, uainf->epdesc.bEndpointAddress))
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set sample rate on class-compliant USB audio device.");
         return FALSE;
     }
     uii->play_function = usbio_play_buffer_adaptive;
     uii->handle_audiodev = handle;
-    uii->audio_output_endpoint = uainf->ep->bEndpointAddress;
-    uii->audio_output_pktsize = uainf->ep->wMaxPacketSize; // 48 * 2 * uii->output_resolution;
+    uii->audio_output_endpoint = uainf->epdesc.bEndpointAddress;
+    uii->audio_output_pktsize = uainf->epdesc.wMaxPacketSize; // 48 * 2 * uii->output_resolution;
     uii->audio_sync_endpoint = 0;
     return TRUE;
 }
@@ -539,7 +539,7 @@ void cbox_usb_audio_info_init(struct cbox_usb_audio_info *uai, struct cbox_usb_d
     uai->udi = udi;
     uai->intf = -1;
     uai->alt_setting = -1;
-    uai->ep = NULL;
+    uai->epdesc.found = FALSE;
 }
 
 void usbio_start_audio_playback(struct cbox_usb_io_impl *uii)
