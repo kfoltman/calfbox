@@ -35,7 +35,7 @@ static int register_cpu_time = 1;
 static float real_time_registry[NUM_CPUTIME_ENTRIES];
 static float cpu_time_registry[NUM_CPUTIME_ENTRIES];
 static int cpu_time_write_ptr = 0;
-static struct libusb_transfer *usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii, int index);
+static void usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii);
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -212,10 +212,12 @@ static void fill_playback_buffer(struct cbox_usb_io_impl *uii, struct libusb_tra
 
 static void play_callback_adaptive(struct libusb_transfer *transfer)
 {
-    struct cbox_usb_io_impl *uii = transfer->user_data;
+    struct usbio_transfer *xf = transfer->user_data;
+    struct cbox_usb_io_impl *uii = xf->user_data;
+    xf->pending = FALSE;
     if (transfer->status == LIBUSB_TRANSFER_CANCELLED)
     {
-        uii->cancel_confirm = 1;
+        xf->cancel_confirm = 1;
         return;
     }
     if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE)
@@ -231,8 +233,7 @@ static void play_callback_adaptive(struct libusb_transfer *transfer)
     {
         // send another URB for the next transfer before re-submitting
         // this one
-        uii->playback_transfers[uii->playback_counter] = usbio_play_buffer_adaptive(uii, uii->playback_counter);
-        uii->playback_counter++;
+        usbio_play_buffer_adaptive(uii);
     }
     // printf("Play Callback! %d %p status %d\n", (int)transfer->length, transfer->buffer, (int)transfer->status);
 
@@ -271,7 +272,7 @@ static void play_callback_adaptive(struct libusb_transfer *transfer)
 
     if (uii->no_resubmit)
         return;
-    int err = libusb_submit_transfer(transfer);
+    int err = usbio_transfer_submit(xf);
     if (err)
     {
         if (err == LIBUSB_ERROR_NO_DEVICE)
@@ -279,27 +280,30 @@ static void play_callback_adaptive(struct libusb_transfer *transfer)
             uii->device_removed++;
             transfer->status = LIBUSB_TRANSFER_NO_DEVICE;
         }
-        g_warning("Cannot submit isochronous transfer, error = %s", libusb_error_name(err));
+        g_warning("Cannot resubmit isochronous transfer, error = %s", libusb_error_name(err));
     }
 }
 
-struct libusb_transfer *usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii, int index)
+void usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii)
 {
-    struct libusb_transfer *t;
+    struct usbio_transfer *t;
     int i, err;
     int packets = uii->iso_packets;
-    t = libusb_alloc_transfer(packets);
+    t = usbio_transfer_new(uii->usbctx, "play", uii->playback_counter, packets, uii);
     int tsize = uii->sample_rate * 2 * uii->output_resolution / 1000;
     uint8_t *buf = (uint8_t *)calloc(1, uii->audio_output_pktsize);
     
-    libusb_fill_iso_transfer(t, uii->handle_audiodev, uii->audio_output_endpoint, buf, tsize * packets, packets, play_callback_adaptive, uii, 20000);
-    libusb_set_iso_packet_lengths(t, tsize);
+    libusb_fill_iso_transfer(t->transfer, uii->handle_audiodev, uii->audio_output_endpoint, buf, tsize * packets, packets, play_callback_adaptive, t, 20000);
+    libusb_set_iso_packet_lengths(t->transfer, tsize);
+    uii->playback_transfers[uii->playback_counter++] = t;
     
-    err = libusb_submit_transfer(t);
+    err = usbio_transfer_submit(t);
     if (!err)
-        return t;
-    libusb_free_transfer(t);
-    return NULL;
+        return;
+    g_warning("Cannot resubmit isochronous transfer, error = %s", libusb_error_name(err));
+    uii->playback_counter--;
+    usbio_transfer_destroy(t);
+    uii->playback_transfers[uii->playback_counter] = NULL;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -328,15 +332,18 @@ static int calc_packet_lengths(struct cbox_usb_io_impl *uii, struct libusb_trans
 void play_callback_asynchronous(struct libusb_transfer *transfer)
 {
     int i;
-    struct cbox_usb_io_impl *uii = transfer->user_data;
+    struct usbio_transfer *xf = transfer->user_data;
+    struct cbox_usb_io_impl *uii = xf->user_data;
+    xf->pending = FALSE;
 
     if (transfer->status == LIBUSB_TRANSFER_CANCELLED)
     {
-        uii->cancel_confirm = 1;
+        xf->cancel_confirm = TRUE;
         return;
     }
     if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE)
     {
+        xf->cancel_confirm = TRUE;
         uii->device_removed++;
         return;
     }
@@ -346,8 +353,7 @@ void play_callback_asynchronous(struct libusb_transfer *transfer)
     {
         // send another URB for the next transfer before re-submitting
         // this one
-        uii->playback_transfers[uii->playback_counter] = usbio_play_buffer_asynchronous(uii, uii->playback_counter);
-        uii->playback_counter++;
+        usbio_play_buffer_asynchronous(uii);
     }
 
     /*
@@ -366,7 +372,7 @@ void play_callback_asynchronous(struct libusb_transfer *transfer)
     }
     if (uii->no_resubmit)
         return;
-    int err = libusb_submit_transfer(transfer);
+    int err = usbio_transfer_submit(xf);
     if (err)
     {
         if (err == LIBUSB_ERROR_NO_DEVICE)
@@ -378,48 +384,36 @@ void play_callback_asynchronous(struct libusb_transfer *transfer)
     }
 }
 
-static struct libusb_transfer *sync_stuff_asynchronous(struct cbox_usb_io_impl *uii, int index);
+static struct usbio_transfer *sync_stuff_asynchronous(struct cbox_usb_io_impl *uii, int index);
 
-struct libusb_transfer *usbio_play_buffer_asynchronous(struct cbox_usb_io_impl *uii, int index)
+void usbio_play_buffer_asynchronous(struct cbox_usb_io_impl *uii)
 {
-    struct libusb_transfer *t;
+    struct usbio_transfer *t;
     int err;
     int packets = uii->iso_packets_multimix;
-    t = libusb_alloc_transfer(packets);
-    int tsize = calc_packet_lengths(uii, t, packets);
+    t = usbio_transfer_new(uii->usbctx, "play", uii->playback_counter, packets, uii);
+    int tsize = calc_packet_lengths(uii, t->transfer, packets);
     int bufsize = uii->audio_output_pktsize * packets;
     uint8_t *buf = (uint8_t *)calloc(1, bufsize);
     
-    if (!index)
+    if (!uii->playback_counter)
     {
         for(uii->sync_counter = 0; uii->sync_counter < uii->sync_buffers; uii->sync_counter++)
             uii->sync_transfers[uii->sync_counter] = sync_stuff_asynchronous(uii, uii->sync_counter);
     }
     
-    libusb_fill_iso_transfer(t, uii->handle_audiodev, uii->audio_output_endpoint, buf, tsize, packets, play_callback_asynchronous, uii, 20000);
-    err = libusb_submit_transfer(t);
+    libusb_fill_iso_transfer(t->transfer, uii->handle_audiodev, uii->audio_output_endpoint, buf, tsize, packets, play_callback_asynchronous, t, 20000);
+    uii->playback_transfers[uii->playback_counter++] = t;
+    err = usbio_transfer_submit(t);
     if (err)
     {
-        g_warning("Cannot submit playback urb: %s, error = %s (index = %d, tsize = %d)", libusb_error_name(err), strerror(errno), index, tsize);
-        libusb_free_transfer(t);
-        return NULL;
+        g_warning("Cannot submit playback urb: %s, error = %s (index = %d, tsize = %d)", libusb_error_name(err), strerror(errno), uii->playback_counter, tsize);
+        usbio_transfer_destroy(t);
+        uii->playback_transfers[--uii->playback_counter] = NULL;
     }
-    return t;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-
-static void sync_remove_transfer(struct cbox_usb_io_impl *uii, struct libusb_transfer *transfer)
-{
-    for (int i = 0; i < uii->sync_counter; i++)
-    {
-        if (uii->sync_transfers[i] == transfer)
-        {
-            libusb_free_transfer(uii->sync_transfers[i]);
-            uii->sync_transfers[i] = NULL;
-        }
-    }
-}
 
 /*
  * The Multimix device controls the data rate of the playback stream using a
@@ -446,18 +440,20 @@ static void sync_remove_transfer(struct cbox_usb_io_impl *uii, struct libusb_tra
 
 static void sync_callback(struct libusb_transfer *transfer)
 {
-    struct cbox_usb_io_impl *uii = transfer->user_data;
+    struct usbio_transfer *xf = transfer->user_data;
+    struct cbox_usb_io_impl *uii = xf->user_data;
     uint8_t *data = transfer->buffer;
     int i, j, ofs, size, pkts;
+    xf->pending = FALSE;
 
     if (transfer->status == LIBUSB_TRANSFER_CANCELLED)
     {
-        uii->cancel_confirm = 1;
+        xf->cancel_confirm = 1;
         return;
     }
     if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE)
     {
-        sync_remove_transfer(uii, transfer);
+        xf->cancel_confirm = 1;
         return;
     }
     // XXXKF handle device disconnected error
@@ -500,36 +496,34 @@ static void sync_callback(struct libusb_transfer *transfer)
     }
     if (uii->no_resubmit)
         return;
-    int err = libusb_submit_transfer(transfer);
+    int err = usbio_transfer_submit(xf);
     if (err)
     {
         if (err == LIBUSB_ERROR_NO_DEVICE)
         {
-            sync_remove_transfer(uii, transfer);
             return;
         }
-        g_warning("Cannot submit isochronous sync transfer, error = %s", libusb_error_name(err));
     }
     if (uii->debug_sync)
         printf("\n");
 }
 
-struct libusb_transfer *sync_stuff_asynchronous(struct cbox_usb_io_impl *uii, int index)
+struct usbio_transfer *sync_stuff_asynchronous(struct cbox_usb_io_impl *uii, int index)
 {
-    struct libusb_transfer *t;
+    struct usbio_transfer *t;
     int err;
     int syncbufsize = 64;
     int syncbufcount = NUM_SYNC_PACKETS;
-    t = libusb_alloc_transfer(syncbufcount);
+    t = usbio_transfer_new(uii->usbctx, "sync", index, syncbufcount, uii);
     uint8_t *sync_buf = (uint8_t *)calloc(syncbufcount, syncbufsize);
-    libusb_fill_iso_transfer(t, uii->handle_audiodev, uii->audio_sync_endpoint, sync_buf, syncbufsize * syncbufcount, syncbufcount, sync_callback, uii, 20000);
-    libusb_set_iso_packet_lengths(t, syncbufsize);
+    libusb_fill_iso_transfer(t->transfer, uii->handle_audiodev, uii->audio_sync_endpoint, sync_buf, syncbufsize * syncbufcount, syncbufcount, sync_callback, t, 20000);
+    libusb_set_iso_packet_lengths(t->transfer, syncbufsize);
     
-    err = libusb_submit_transfer(t);
+    err = libusb_submit_transfer(t->transfer);
     if (err)
     {
         g_warning("Cannot submit sync urb: %s", libusb_error_name(err));
-        libusb_free_transfer(t);
+        usbio_transfer_destroy(t);
         return NULL;
     }
     return t;
@@ -554,11 +548,11 @@ void usbio_start_audio_playback(struct cbox_usb_io_impl *uii)
     uii->playback_transfers = malloc(sizeof(struct libusb_transfer *) * uii->playback_buffers);
     uii->sync_transfers = malloc(sizeof(struct libusb_transfer *) * uii->sync_buffers);
     
-    uii->playback_counter = 1;
+    uii->playback_counter = 0;
     uii->device_removed = 0;
     uii->sync_freq = uii->sample_rate / 100;
-    uii->playback_transfers[0] = uii->play_function(uii, 0);
-    uii->setup_error = uii->playback_transfers[0] == NULL;
+    uii->play_function(uii);
+    uii->setup_error = uii->playback_counter == 0;
 
     if (!uii->setup_error)
     {
@@ -587,38 +581,38 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
     else
     {
         // Cancel all transfers pending, and wait until they get cancelled
-        for (int i = 0; i < uii->playback_buffers; i++)
+        for (int i = 0; i < uii->playback_counter; i++)
         {
-            if (uii->playback_transfers[i]->status != LIBUSB_TRANSFER_NO_DEVICE)
-            {
-                uii->cancel_confirm = FALSE;
-                if (0 == libusb_cancel_transfer(uii->playback_transfers[i]))
-                {
-                    while (!uii->cancel_confirm && uii->playback_transfers[i]->status != LIBUSB_TRANSFER_NO_DEVICE)
-                        libusb_handle_events(uii->usbctx);
-                }
-            }
+            if (uii->playback_transfers[i])
+                usbio_transfer_shutdown(uii->playback_transfers[i]);
         }
     }
+    
     // Free the transfers for the buffers allocated so far. In case of setup
     // failure, some buffers transfers might not have been created yet.
     for (int i = 0; i < uii->playback_counter; i++)
-        libusb_free_transfer(uii->playback_transfers[i]);
+    {
+        if (uii->playback_transfers[i])
+        {
+            usbio_transfer_destroy(uii->playback_transfers[i]);
+            uii->playback_transfers[i] = NULL;
+        }
+    }
     if (uii->playback_counter && uii->audio_sync_endpoint)
     {
         for (int i = 0; i < uii->sync_counter; i++)
         {
-            if (uii->sync_transfers[i] == NULL)
-                continue;
-            uii->cancel_confirm = FALSE;
-            if (0 == libusb_cancel_transfer(uii->sync_transfers[i]))
-            {
-                while (!uii->cancel_confirm && uii->sync_transfers[i]->status != LIBUSB_TRANSFER_NO_DEVICE)
-                    libusb_handle_events(uii->usbctx);
-            }
+            if (uii->sync_transfers[i])
+                usbio_transfer_shutdown(uii->sync_transfers[i]);
         }
         for (int i = 0; i < uii->sync_counter; i++)
-            libusb_free_transfer(uii->sync_transfers[i]);
+        {
+            if (uii->sync_transfers[i])
+            {
+                usbio_transfer_destroy(uii->sync_transfers[i]);
+                uii->sync_transfers[i] = NULL;
+            }
+        }
     }
 }
 

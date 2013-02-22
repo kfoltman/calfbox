@@ -30,18 +30,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 static void midi_transfer_cb(struct libusb_transfer *transfer)
 {
-    struct cbox_usb_midi_input *umi = transfer->user_data;
+    struct usbio_transfer *xf = transfer->user_data;
+    struct cbox_usb_midi_input *umi = xf->user_data;
+    xf->pending = FALSE;
 
     if (transfer->status == LIBUSB_TRANSFER_CANCELLED)
     {
-        umi->uii->cancel_confirm = 1;
+        xf->cancel_confirm = 1;
         return;
     }
     if (transfer->status == LIBUSB_TRANSFER_TIMED_OUT || transfer->status == LIBUSB_TRANSFER_ERROR || transfer->status == LIBUSB_TRANSFER_STALL)
     {
         if (transfer->status != LIBUSB_TRANSFER_TIMED_OUT)
             g_warning("USB error on device %03d:%03d: transfer status %d", umi->busdevadr >> 8, umi->busdevadr & 255, transfer->status);
-        libusb_submit_transfer(transfer);
+        if (umi->uii->no_resubmit)
+            return;
+        int res = usbio_transfer_submit(xf);
+        if (res != 0)
+            g_warning("Error submitting URB to MIDI endpoint: error code %d", res);
         return;
     }
     if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE)
@@ -81,9 +87,7 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
     }
     if (umi->uii->no_resubmit)
         return;
-    int err = libusb_submit_transfer(transfer);
-    if (err == LIBUSB_ERROR_NO_DEVICE)
-        transfer->status = LIBUSB_TRANSFER_NO_DEVICE;
+    usbio_transfer_submit(xf);
 }
 
 void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
@@ -100,17 +104,17 @@ void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
     {
         struct cbox_usb_midi_input *umi = p->data;
         cbox_midi_buffer_clear(&umi->midi_buffer);
-        umi->transfer = libusb_alloc_transfer(0);
-        libusb_fill_bulk_transfer(umi->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, umi->max_packet_size, midi_transfer_cb, umi, 0);
+        umi->transfer = usbio_transfer_new(uii->usbctx,  "MIDI In", 0, 0, umi);
+        libusb_fill_bulk_transfer(umi->transfer->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, umi->max_packet_size, midi_transfer_cb, umi->transfer, 0);
         uii->midi_input_port_buffers[pn++] = &umi->midi_buffer;
     }
     for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
         struct cbox_usb_midi_input *umi = p->data;
-        int res = libusb_submit_transfer(umi->transfer);
+        int res = usbio_transfer_submit(umi->transfer);
         if (res != 0)
         {
-            libusb_free_transfer(umi->transfer);
+            usbio_transfer_destroy(umi->transfer);
             umi->transfer = NULL;
         }
     }
@@ -125,13 +129,8 @@ void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii)
         if (!umi->transfer)
             continue;
 
-        uii->cancel_confirm = FALSE;
-        if (0 == libusb_cancel_transfer(umi->transfer))
-        {
-            while (!uii->cancel_confirm && umi->transfer->status != LIBUSB_TRANSFER_NO_DEVICE)
-                libusb_handle_events(uii->usbctx);
-        }
-        libusb_free_transfer(umi->transfer);
+        usbio_transfer_shutdown(umi->transfer);
+        usbio_transfer_destroy(umi->transfer);
         umi->transfer = NULL;
         cbox_midi_buffer_clear(&umi->midi_buffer);
     }

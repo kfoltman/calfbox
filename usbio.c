@@ -236,6 +236,63 @@ void cbox_usbio_destroy(struct cbox_io_impl *impl)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+struct usbio_transfer *usbio_transfer_new(struct libusb_context *usbctx, const char *transfer_type, int index, int isopackets, void *user_data)
+{
+    struct usbio_transfer *p = malloc(sizeof(struct usbio_transfer));
+    p->usbctx = usbctx;
+    p->transfer = libusb_alloc_transfer(isopackets);
+    p->index = index;
+    p->cancel_confirm = FALSE;
+    p->pending = FALSE;
+    p->transfer_type = transfer_type;
+    p->user_data = user_data;
+    return p;
+}
+
+int usbio_transfer_submit(struct usbio_transfer *xfer)
+{
+    int res = libusb_submit_transfer(xfer->transfer);
+    if (res != 0)
+    {
+        g_warning("usbio_transfer_submit: cannot submit transfer '%s:%d', error = %s", xfer->transfer_type, xfer->index, libusb_error_name(res));
+        return res;
+    }
+    xfer->pending = TRUE;
+    return 0;
+}
+
+void usbio_transfer_shutdown(struct usbio_transfer *xfer)
+{
+    if (xfer->pending)
+    {
+        int res = libusb_cancel_transfer(xfer->transfer);
+        if (res != LIBUSB_ERROR_NO_DEVICE)
+        {
+            int tries = 100;
+            while(!xfer->cancel_confirm && tries > 0 && xfer->pending)
+            {
+                struct timeval tv = {
+                    .tv_sec = 0,
+                    .tv_usec = 1000
+                };
+                libusb_handle_events_timeout(xfer->usbctx, &tv);
+                tries--;
+            }
+            if (!tries)
+                g_warning("Timed out waiting for transfer '%s:%d' to complete; status = %d", xfer->transfer_type, xfer->index, xfer->transfer->status);
+        }
+    }
+}
+
+void usbio_transfer_destroy(struct usbio_transfer *xfer)
+{
+    libusb_free_transfer(xfer->transfer);
+    free(xfer);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+
 gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
 {
     struct cbox_usb_io_impl *uii = malloc(sizeof(struct cbox_usb_io_impl));

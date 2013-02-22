@@ -34,6 +34,17 @@ try at breaking it up into manageable parts.
 #include "io.h"
 #include "midi.h"
 
+struct usbio_transfer
+{
+    struct libusb_context *usbctx;
+    struct libusb_transfer *transfer;
+    void *user_data;
+    gboolean pending;
+    gboolean cancel_confirm;
+    const char *transfer_type;
+    int index;
+};
+
 struct cbox_usb_io_impl
 {
     struct cbox_io_impl ioi;
@@ -59,10 +70,9 @@ struct cbox_usb_io_impl
     
     int desync;
     uint64_t samples_played;
-    int cancel_confirm;
     int device_removed;
-    struct libusb_transfer **playback_transfers;
-    struct libusb_transfer **sync_transfers;
+    struct usbio_transfer **playback_transfers;
+    struct usbio_transfer **sync_transfers;
     int read_ptr;
     
     GList *midi_input_ports;
@@ -70,7 +80,7 @@ struct cbox_usb_io_impl
     struct cbox_midi_buffer **midi_input_port_buffers;
     int *midi_input_port_pos;
     int midi_input_port_count;
-    struct libusb_transfer *(*play_function)(struct cbox_usb_io_impl *uii, int index);
+    void (*play_function)(struct cbox_usb_io_impl *uii);
     int8_t audio_output_endpoint;
     int8_t audio_sync_endpoint;
     uint32_t sync_freq;
@@ -129,10 +139,15 @@ struct cbox_usb_midi_input
     int busdevadr;
     int endpoint;
     int max_packet_size;
-    struct libusb_transfer *transfer;
+    struct usbio_transfer *transfer;
     struct cbox_midi_buffer midi_buffer;
     uint8_t midi_recv_data[256];
 };
+
+extern struct usbio_transfer *usbio_transfer_new(struct libusb_context *usbctx, const char *transfer_type, int index, int isopackets, void *user_data);
+extern void usbio_transfer_shutdown(struct usbio_transfer *xfer);
+extern int usbio_transfer_submit(struct usbio_transfer *xfer);
+extern void usbio_transfer_destroy(struct usbio_transfer *xfer);
 
 extern void cbox_usb_midi_info_init(struct cbox_usb_midi_info *umi, struct cbox_usb_device_info *udi);
 extern void usbio_start_midi_capture(struct cbox_usb_io_impl *uii);
@@ -147,11 +162,11 @@ extern gboolean usbio_open_audio_interface(struct cbox_usb_io_impl *uii,
     struct cbox_usb_audio_info *uainf, struct libusb_device_handle *handle, GError **error);
 extern gboolean usbio_open_audio_interface_multimix(struct cbox_usb_io_impl *uii, int bus, int devadr, struct libusb_device_handle *handle, GError **error);
 
-extern struct libusb_transfer *usbio_play_buffer_asynchronous(struct cbox_usb_io_impl *uii, int index);
+extern void usbio_play_buffer_asynchronous(struct cbox_usb_io_impl *uii);
 extern gboolean usbio_scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only);
 
 extern void usbio_forget_device(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo);
-extern void usbio_run_idle_loop(struct cbox_usb_io_impl *uii);;
+extern void usbio_run_idle_loop(struct cbox_usb_io_impl *uii);
 
 #define USB_DEVICE_SETUP_TIMEOUT 2000
 
