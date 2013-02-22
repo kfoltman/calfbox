@@ -385,7 +385,7 @@ class SamplerProgram(DocObj):
         return map(Document.map_uuid, self.get_things("/regions", ['*region']).region)
     def get_groups(self):
         g = self.get_things("/groups", ['*group', 'default_group'])
-        return [Document.map_uuid(g.default_group)] + map(Document.map_uuid, g.group)
+        return [Document.map_uuid(g.default_group)] + list(map(Document.map_uuid, g.group))
     def new_group(self):
         return self.cmd_makeobj("/new_group")
 Document.classmap['sampler_program'] = SamplerProgram
