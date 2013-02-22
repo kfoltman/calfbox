@@ -619,5 +619,7 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
             }
         }
     }
+    free(uii->playback_transfers);
+    free(uii->sync_transfers);
 }
 
