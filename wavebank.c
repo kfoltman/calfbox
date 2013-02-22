@@ -120,6 +120,7 @@ struct wave_bank
 {
     int64_t bytes, maxbytes, serial_no;
     GHashTable *waveforms_by_name, *waveforms_by_id;
+    GSList *std_waveforms;
 };
 
 static struct wave_bank bank;
@@ -217,6 +218,7 @@ void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, 
     
     g_hash_table_insert(bank.waveforms_by_name, waveform->canonical_name, waveform);
     g_hash_table_insert(bank.waveforms_by_id, &waveform->id, waveform);
+    bank.std_waveforms = g_slist_prepend(bank.std_waveforms, waveform);
     // These waveforms are not included in the bank size, I don't think it has
     // much value for the user.
 }
@@ -230,6 +232,7 @@ void cbox_wavebank_init()
     bank.serial_no = 0;
     bank.waveforms_by_name = g_hash_table_new(g_str_hash, g_str_equal);
     bank.waveforms_by_id = g_hash_table_new(g_int_hash, g_int_equal);
+    bank.std_waveforms = NULL;
     
     cbox_wavebank_add_std_waveform("*sine", func_sine, NULL, 0);
     cbox_wavebank_add_std_waveform("*saw", func_saw, NULL, 11);
@@ -367,6 +370,11 @@ void cbox_wavebank_close()
 {
     if (bank.bytes > 0)
         g_warning("Warning: %lld bytes in unfreed samples", (long long int)bank.bytes);
+    while(bank.std_waveforms)
+    {
+        cbox_waveform_unref((struct cbox_waveform *)bank.std_waveforms->data);
+        bank.std_waveforms = g_slist_delete_link(bank.std_waveforms, bank.std_waveforms);
+    }
     g_hash_table_destroy(bank.waveforms_by_id);
     g_hash_table_destroy(bank.waveforms_by_name);
     bank.waveforms_by_id = NULL;
@@ -391,6 +399,9 @@ void cbox_waveform_unref(struct cbox_waveform *waveform)
 
     g_free(waveform->display_name);
     free(waveform->canonical_name);
+    for (int i = 0; i < waveform->level_count; i++)
+        free(waveform->levels[i].data);
+    free(waveform->levels);
     free(waveform->data);
     free(waveform);
     
