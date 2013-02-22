@@ -126,6 +126,7 @@ void run_ui()
     cbox_ui_stop();
     cbox_menu_state_destroy(st);
     cbox_menu_page_destroy(page);
+    cbox_menu_destroy(main_menu);
 }
 
 int main(int argc, char *argv[])

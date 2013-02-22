@@ -58,6 +58,7 @@ void cbox_menu_destroy(struct cbox_menu *menu)
     
     g_ptr_array_free(menu->items, TRUE);
     g_string_chunk_free(menu->strings);
+    free(menu);
 }
 
 
