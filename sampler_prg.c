@@ -129,14 +129,26 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
 struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, const char *cfg_section, const char *name, int pgm_id, GError **error)
 {
     int i;
-
-    g_clear_error(error);
     
-    char *name2 = cbox_config_get_string(cfg_section, "name");
+    char *name2 = NULL, *sfz_path = NULL, *spath = NULL;
+    const char *sfz = NULL;
+    
+    g_clear_error(error);
+    if (!strncmp(cfg_section, "spgm:!", 6))
+    {
+        sfz = cfg_section + 6;
+        name2 = strrchr(name, '/');
+        if (name2)
+            name2++;
+    }
+    else
+    {    
+        name2 = cbox_config_get_string(cfg_section, "name");
 
-    char *sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
-    char *spath = cbox_config_get_string(cfg_section, "sample_path");
-    char *sfz = cbox_config_get_string(cfg_section, "sfz");
+        sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
+        spath = cbox_config_get_string(cfg_section, "sample_path");
+        sfz = cbox_config_get_string(cfg_section, "sfz");
+    }
     
     if (sfz && !sfz_path && !spath)
     {
