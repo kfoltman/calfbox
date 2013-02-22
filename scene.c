@@ -895,6 +895,7 @@ static void destroy_rec_sources(struct cbox_recording_source *s, int count)
 {
     for (int i = 0; i < count; i++)
         cbox_recording_source_uninit(&s[i]);
+    free(s);
 }
 
 struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_rt *rt, int owns_rt)
