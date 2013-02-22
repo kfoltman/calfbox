@@ -232,6 +232,7 @@ void cbox_usbio_destroy(struct cbox_io_impl *impl)
     
     libusb_exit(uii->usbctx_probe);
     libusb_exit(uii->usbctx);
+    free(uii);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

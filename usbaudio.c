@@ -302,6 +302,7 @@ void usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii)
         return;
     g_warning("Cannot resubmit isochronous transfer, error = %s", libusb_error_name(err));
     uii->playback_counter--;
+    free(buf);
     usbio_transfer_destroy(t);
     uii->playback_transfers[uii->playback_counter] = NULL;
 }
@@ -408,6 +409,7 @@ void usbio_play_buffer_asynchronous(struct cbox_usb_io_impl *uii)
     if (err)
     {
         g_warning("Cannot submit playback urb: %s, error = %s (index = %d, tsize = %d)", libusb_error_name(err), strerror(errno), uii->playback_counter, tsize);
+        free(buf);
         usbio_transfer_destroy(t);
         uii->playback_transfers[--uii->playback_counter] = NULL;
     }
@@ -523,6 +525,7 @@ struct usbio_transfer *sync_stuff_asynchronous(struct cbox_usb_io_impl *uii, int
     if (err)
     {
         g_warning("Cannot submit sync urb: %s", libusb_error_name(err));
+        free(sync_buf);
         usbio_transfer_destroy(t);
         return NULL;
     }
@@ -594,6 +597,7 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
     {
         if (uii->playback_transfers[i])
         {
+            free(uii->playback_transfers[i]->transfer->buffer);
             usbio_transfer_destroy(uii->playback_transfers[i]);
             uii->playback_transfers[i] = NULL;
         }
@@ -609,6 +613,7 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
         {
             if (uii->sync_transfers[i])
             {
+                free(uii->sync_transfers[i]->transfer->buffer);
                 usbio_transfer_destroy(uii->sync_transfers[i]);
                 uii->sync_transfers[i] = NULL;
             }

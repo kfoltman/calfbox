@@ -425,10 +425,10 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         return FALSE;
     }
     
-    struct libusb_config_descriptor *cfg_descr = NULL;
     struct cbox_usb_device_info *udi = g_hash_table_lookup(uii->device_table, GINT_TO_POINTER(busdevadr));
     if (!udi)
     {
+        struct libusb_config_descriptor *cfg_descr = NULL;
         if (0 != libusb_get_active_config_descriptor(dev, &cfg_descr))
             return FALSE;
         udi = malloc(sizeof(struct cbox_usb_device_info));
@@ -448,6 +448,7 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         udi->last_probe_time = time(NULL);
         udi->failures = 0;
         g_hash_table_insert(uii->device_table, GINT_TO_POINTER(busdevadr), udi);
+        libusb_free_config_descriptor(cfg_descr);
     }
     else
     if (udi->vid == dev_descr.idVendor && udi->pid == dev_descr.idProduct)
@@ -478,6 +479,7 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
     // printf("%03d:%03d Device %04X:%04X\n", bus, devadr, dev_descr.idVendor, dev_descr.idProduct);
     for (int ci = 0; ci < (int)dev_descr.bNumConfigurations; ci++)
     {
+        struct libusb_config_descriptor *cfg_descr = NULL;
         // if this is not the current config, and another config with MIDI input
         // has already been found, do not look any further
         if (0 != libusb_get_config_descriptor(dev, ci, &cfg_descr))
