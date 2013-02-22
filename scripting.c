@@ -308,8 +308,8 @@ void cbox_script_run(const char *name)
         g_warning("Cannot open script file '%s': %s", name, strerror(errno));
         return;
     }
-    Py_Initialize();
     PyImport_AppendInittab("_cbox", &PyInit_cbox);
+    Py_Initialize();
     if (PyType_Ready(&CboxCallbackType) < 0)
     {
         g_warning("Cannot install the C callback type");
