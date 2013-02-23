@@ -1,5 +1,6 @@
 import cbox
 import math
+import re
 from gi.repository import GObject, Gdk, Gtk, GLib as glib
 
 # Compatibility stuff
@@ -24,7 +25,26 @@ def standard_hslider(adj):
     sc.set_size_request(160, -1)
     sc.set_value_pos(Gtk.PositionType.RIGHT)
     return sc
-    
+
+notenames = {
+    'c' : 0, 'c#' : 1, 'db' : 1,
+    'd' : 2, 'd#' : 3, 'eb' : 3,
+    'e' : 4, 'e#' : 5, 'fb' : 5,
+    'f' : 5, 'f#' : 6, 'gb' : 6,
+    'g' : 7, 'g#' : 8, 'ab' : 8,
+    'a' : 9, 'a#' : 10, 'bb' : 10,
+    'b' : 11, 'b#' : 0, 'cb' : 11,
+}
+
+def sfznote2value(note):
+    if re.match("[0-9]+$", note):
+        return int(rdata['key'])
+    else:
+        g = re.match("([cdefgab](#|b)?)(-?[0-9])", note)
+        if g is None:
+            raise ValueError(note)
+        return 12 + int(g.group(3)) * 12 + notenames[g.group(1).lower()]
+
 class LogMapper:
     def __init__(self, min, max, format = "%f"):
         self.min = min

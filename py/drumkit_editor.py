@@ -151,7 +151,7 @@ class BankModel(dict):
         for r in sfz.regions:
             rdata = r.merged()
             if ('key' in rdata) and ('sample' in rdata) and (rdata['sample'] != ''):
-                key = int(rdata['key'])
+                key = sfznote2value(rdata['key'])
                 sample = rdata['sample']
                 sample_short = os.path.basename(sample)
                 if key in self:
@@ -453,8 +453,11 @@ class EditorDialog(Gtk.Dialog):
         #    self.pad_editor.refresh()
         
     def refresh_layers(self):
-        self.layer_list.set_model(self.bank_model[self.current_pad.key])
-        self.layer_list.set_cursor(0)
+        if self.current_pad is not None:
+            self.layer_list.set_model(self.bank_model[self.current_pad.key])
+            self.layer_list.set_cursor(0)
+        else:
+            self.layer_list.set_model(None)
         self.layer_editor.refresh()
         
     def on_pad_selected(self, widget):
@@ -490,12 +493,12 @@ class EditorDialog(Gtk.Dialog):
 
     def on_kit_open(self, widget):
         dlg = Gtk.FileChooserDialog('Open a pad bank', self, Gtk.FileChooserAction.OPEN,
-            (Gtk.STOCK_CANCEL, Gtk.ResponseType.Cancel, Gtk.STOCK_OPEN, Gtk.ResponseType.APPLY))
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.APPLY))
         dlg.add_filter(standard_filter(["*.sfz", "*.SFZ"], "SFZ files"))
         dlg.add_filter(standard_filter(["*"], "All files"))
         try:
             if dlg.run() == Gtk.ResponseType.APPLY:
-                sfz_data = file(dlg.get_filename(), "r").read()
+                sfz_data = open(dlg.get_filename(), "r").read()
                 self.bank_model.from_sfz(sfz_data, dlg.get_current_folder())
             self.pads.refresh()
             self.refresh_layers()
@@ -510,6 +513,6 @@ class EditorDialog(Gtk.Dialog):
         dlg.add_filter(standard_filter(["*"], "All files"))
         try:
             if dlg.run() == Gtk.ResponseType.APPLY:
-                file(dlg.get_filename(), "w").write(self.bank_model.to_sfz())
+                open(dlg.get_filename(), "w").write(self.bank_model.to_sfz())
         finally:
             dlg.destroy()

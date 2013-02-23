@@ -26,7 +26,7 @@ class SFZ:
         self.regions = []
     
     def load(self, fname):
-        self.parse(file(fname, "r").read())
+        self.parse(open(fname, "r").read())
             
     def parse(self, data):
         context = SFZContext()
