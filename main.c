@@ -36,6 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "wavebank.h"
 
 #include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <glib.h>
 #include <getopt.h>
 #include <math.h>
@@ -43,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 
 static const char *short_options = "i:c:"
 #if USE_PYTHON
@@ -310,11 +313,16 @@ int main(int argc, char *argv[])
         run_ui();
     else
     {
+        printf("Ready. Press ENTER to exit.\n");
+        fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) | O_NONBLOCK);
         do {
             int ch = getchar();
-            if (ch == 10 || ch == -1)
+            if (ch == 10 || (ch == -1 && errno != EWOULDBLOCK))
                 break;
+            usleep(100000);
+            cbox_app_on_idle();
         } while(1);
+        fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) &~ O_NONBLOCK);
     }
     scene = cbox_rt_set_scene(app.rt, NULL);
     cbox_rt_stop(app.rt);
