@@ -101,7 +101,7 @@ void tonewheel_organ_process_event(struct cbox_module *module, const uint8_t *da
     if (len > 0)
     {
         int cmd = data[0] >> 4;
-        if (cmd == 9)
+        if (cmd == 9 && data[2])
         {
             int channel = data[0] & 0x0F;
             int key = data[1] & 127;
@@ -109,7 +109,7 @@ void tonewheel_organ_process_event(struct cbox_module *module, const uint8_t *da
             if (m->percussion < 0 && key >= 36 && m->enable_percussion && channel == 0)
                 m->percussion = 16.0;
         }
-        if (cmd == 8)
+        if (cmd == 8 || (cmd == 9 && !data[2]))
         {
             int channel = data[0] & 0x0F;
             int key = data[1] & 127;
