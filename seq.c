@@ -463,7 +463,11 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
             else
             {
                 if (spb->loop_start_ppqn >= spb->loop_end_ppqn)
-                    return;
+                {
+                    spb->song_pos_samples = end_samples;
+                    spb->song_pos_ppqn = spb->loop_end_ppqn;
+                    break;
+                }
                     
                 cbox_song_playback_seek_ppqn(spb, spb->loop_start_ppqn, spb->loop_start_ppqn);
             }
