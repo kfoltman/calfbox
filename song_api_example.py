@@ -43,7 +43,7 @@ clip = trk.add_clip(0, 0, pattern_len, pattern)
 song.set_loop(pattern_len, pattern_len)
 
 # Set tempo - the argument must be a float
-cbox.do_cmd("/master/set_tempo", None, [1412.8])
+cbox.do_cmd("/master/set_tempo", None, [160.0])
 
 # Send the updated song data to the realtime thread
 song.update_playback()
@@ -56,7 +56,6 @@ cbox.do_cmd("/master/play", None, [])
 print ("Playing")
 
 while True:
-    time.sleep(0.05)
     # Get transport information - current position (samples and pulses), current tempo etc.
     master = cbox.GetThings("/master/status", ['pos', 'pos_ppqn', 'tempo', 'timesig', 'sample_rate'], [])
     print (master.pos_ppqn)
