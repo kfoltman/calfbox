@@ -244,7 +244,7 @@ class DocTrack(DocObj):
     def __init__(self, uuid):
         DocObj.__init__(self, uuid, ["*clip", "=name"])
     def add_clip(self, pos, offset, length, pattern):
-        return self.cmd_makeobj("/add_clip", pos, offset, length, pattern.uuid)
+        return self.cmd_makeobj("/add_clip", int(pos), int(offset), int(length), pattern.uuid)
     def transform_status(self, status):
         res = DocTrackStatus()
         res.name = status.name
@@ -276,7 +276,7 @@ class DocSong(DocObj):
     def set_loop(self, ls, le):
         return self.cmd("/set_loop", None, ls, le)
     def set_mti(self, pos, tempo = None, timesig_nom = None, timesig_denom = None):
-        self.cmd("/set_mti", None, pos, float(tempo) if tempo is not None else -1.0, timesig_nom if timesig_nom is not None else -1, timesig_denom if timesig_denom else -1)
+        self.cmd("/set_mti", None, int(pos), float(tempo) if tempo is not None else -1.0, int(timesig_nom) if timesig_nom is not None else -1, int(timesig_denom) if timesig_denom else -1)
     def add_track(self):
         return self.cmd_makeobj("/add_track")
     def load_drum_pattern(self, name):
@@ -284,7 +284,7 @@ class DocSong(DocObj):
     def load_drum_track(self, name):
         return self.cmd_makeobj("/load_track", name, 1)
     def pattern_from_blob(self, blob, length):
-        return self.cmd_makeobj("/load_blob", bytearray(blob), length)
+        return self.cmd_makeobj("/load_blob", bytearray(blob), int(length))
     def loop_single_pattern(self, loader):
         self.clear()
         track = self.add_track()
@@ -329,26 +329,26 @@ class DocScene(DocObj):
     def delete_aux(self, aux):
         return self.cmd("/delete_aux", None, aux)
     def delete_layer(self, pos):
-        self.cmd("/delete_layer", None, 1 + pos)
+        self.cmd("/delete_layer", None, int(1 + pos))
     def move_layer(self, old_pos, new_pos):
-        self.cmd("/move_layer", None, old_pos + 1, new_pos + 1)
+        self.cmd("/move_layer", None, int(old_pos + 1), int(new_pos + 1))
         
     def add_layer(self, aux, pos = None):
         if pos is None:
             return self.cmd_makeobj("/add_layer", 0, aux)
         else:
             # Note: The positions in high-level API are zero-based.
-            return self.cmd_makeobj("/add_layer", 1 + pos, aux)
+            return self.cmd_makeobj("/add_layer", int(1 + pos), aux)
     def add_instrument_layer(self, name, pos = None):
         if pos is None:
             return self.cmd_makeobj("/add_instrument_layer", 0, name)
         else:
-            return self.cmd_makeobj("/add_instrument_layer", 1 + pos, name)
+            return self.cmd_makeobj("/add_instrument_layer", int(1 + pos), name)
     def add_new_instrument_layer(self, name, engine, pos = None):
         if pos is None:
             return self.cmd_makeobj("/add_new_instrument_layer", 0, name, engine)
         else:
-            return self.cmd_makeobj("/add_new_instrument_layer", 1 + pos, name, engine)
+            return self.cmd_makeobj("/add_new_instrument_layer", int(1 + pos), name, engine)
     def transform_status(self, status):
         status.layers = [Document.map_uuid(i) for i in status.layer]
         delattr(status, 'layer')
