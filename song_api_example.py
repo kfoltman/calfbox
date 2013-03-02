@@ -9,9 +9,9 @@ sys.path = ["./py"] + sys.path
 import cbox
 
 global Document
-global Master
+global Transport
 Document = cbox.Document
-Master = cbox.Master
+Transport = cbox.Transport
 
 song = Document.get_song()
 
@@ -45,7 +45,7 @@ clip = trk.add_clip(0, 0, pattern_len, pattern)
 song.set_loop(pattern_len, pattern_len)
 
 # Set tempo - the argument must be a float
-Master.set_tempo(160.0)
+Transport.set_tempo(160.0)
 
 # Send the updated song data to the realtime thread
 song.update_playback()
@@ -54,13 +54,13 @@ song.update_playback()
 # it is a bit ugly, still - it works
 
 # Start playback
-Master.play()
+Transport.play()
 print ("Playing")
 
 while True:
     # Get transport information - current position (samples and pulses), current tempo etc.
-    master = Master.status()
+    master = Transport.status()
     print (master.pos_ppqn)
     # Query JACK ports, new USB devices etc.
-    Master.call_on_idle()
+    cbox.call_on_idle()
     time.sleep(0.1)

@@ -87,7 +87,7 @@ class Config:
         else:
             do_cmd('/config/save', None, [str(filename)])
 
-class Master:
+class Transport:
     @staticmethod
     def seek_ppqn(ppqn):
         do_cmd('/master/seek_ppqn', None, [int(ppqn)])
@@ -112,9 +112,9 @@ class Master:
     @staticmethod
     def tell():
         return GetThings("/master/tell", ['pos', 'pos_ppqn', 'playing'], [])
-    @staticmethod
-    def call_on_idle():
-        do_cmd("/on_idle", None, [])
+
+def call_on_idle():
+    do_cmd("/on_idle", None, [])
         
 class CfgSection:
     def __init__(self, name):
