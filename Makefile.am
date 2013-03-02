@@ -4,6 +4,7 @@ bin_PROGRAMS = calfbox
 
 calfbox_SOURCES = \
     app.c \
+    appmenu.c \
     auxbus.c \
     blob.c \
     chorus.c \
