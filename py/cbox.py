@@ -274,7 +274,7 @@ class DocSong(DocObj):
     def clear(self):
         return self.cmd("/clear", None)
     def set_loop(self, ls, le):
-        return self.cmd("/set_loop", None, ls, le)
+        return self.cmd("/set_loop", None, int(ls), int(le))
     def set_mti(self, pos, tempo = None, timesig_nom = None, timesig_denom = None):
         self.cmd("/set_mti", None, int(pos), float(tempo) if tempo is not None else -1.0, int(timesig_nom) if timesig_nom is not None else -1, int(timesig_denom) if timesig_denom else -1)
     def add_track(self):
