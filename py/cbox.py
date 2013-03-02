@@ -270,11 +270,13 @@ class DocSongStatus:
 
 class DocSong(DocObj):
     def __init__(self, uuid):
-        DocObj.__init__(self, uuid, ["*track", "*pattern", 'loop_start', 'loop_end'])
+        DocObj.__init__(self, uuid, ["*track", "*pattern", "*mti", 'loop_start', 'loop_end'])
     def clear(self):
         return self.cmd("/clear", None)
     def set_loop(self, ls, le):
         return self.cmd("/set_loop", None, ls, le)
+    def set_mti(self, pos, tempo = None, timesig_nom = None, timesig_denom = None):
+        self.cmd("/set_mti", None, pos, float(tempo) if tempo is not None else -1.0, timesig_nom if timesig_nom is not None else -1, timesig_denom if timesig_denom else -1)
     def add_track(self):
         return self.cmd_makeobj("/add_track")
     def load_drum_pattern(self, name):
@@ -296,6 +298,7 @@ class DocSong(DocObj):
         res = DocSongStatus()
         res.tracks = [TrackItem(*t) for t in status.track]
         res.patterns = [PatternItem(*t) for t in status.pattern]
+        res.mtis = [tuple(t) for t in status.mti]
         return res
     def update_playback(self):
         # XXXKF Maybe make it a song-level API instead of global

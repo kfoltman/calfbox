@@ -54,6 +54,14 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
             if (!cbox_execute_on(fb, NULL, "/pattern", "sio", error, pat->name, pat->loop_end, pat))
                 return FALSE;
         }
+        uint32_t pos = 0;
+        for(GList *p = song->master_track_items; p; p = g_list_next(p))
+        {
+            struct cbox_master_track_item *mti = p->data;
+            if (!cbox_execute_on(fb, NULL, "/mti", "ifii", error, pos, mti->tempo, mti->timesig_nom, mti->timesig_denom))
+                return FALSE;
+            pos += mti->duration_ppqn;
+        }
         return cbox_execute_on(fb, NULL, "/loop_start", "i", error, (int)song->loop_start_ppqn) &&
             cbox_execute_on(fb, NULL, "/loop_end", "i", error, (int)song->loop_end_ppqn) &&
             CBOX_OBJECT_DEFAULT_STATUS(song, fb, error);
@@ -63,6 +71,12 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
     {
         song->loop_start_ppqn = CBOX_ARG_I(cmd, 0);
         song->loop_end_ppqn = CBOX_ARG_I(cmd, 1);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/set_mti") && !strcmp(cmd->arg_types, "ifii"))
+    {
+        cbox_song_set_mti(song, CBOX_ARG_I(cmd, 0), CBOX_ARG_F(cmd, 1), CBOX_ARG_I(cmd, 2), CBOX_ARG_I(cmd, 3));
         return TRUE;
     }
     else
@@ -185,6 +199,92 @@ struct cbox_song *cbox_song_new(struct cbox_document *document)
     return p;
 }
 
+void cbox_song_set_mti(struct cbox_song *song, uint32_t pos, double tempo, int timesig_nom, int timesig_denom)
+{
+    uint32_t tstart = 0, tend = 0;
+    GList *prev = NULL;
+    // A full no-op
+    if (tempo < 0 && timesig_nom < 0)
+        return;
+    gboolean is_noop = tempo == 0 && timesig_nom == 0;
+    
+    struct cbox_master_track_item *mti = NULL;
+    for(GList *p = song->master_track_items; p; p = g_list_next(p))
+    {
+        mti = p->data;
+        tend = tstart + mti->duration_ppqn;
+        // printf("range %d-%d %f %d\n", tstart, tend, mti->tempo, mti->timesig_nom);
+        if (pos == tstart)
+        {
+            double new_tempo = tempo >= 0 ? tempo : mti->tempo;
+            int new_timesig_nom = timesig_nom >= 0 ? timesig_nom : mti->timesig_nom;
+            // Is this operation going to become a no-op after the change?
+            gboolean is_noop_here = new_tempo <= 0 && new_timesig_nom <= 0;
+            // If the new item is a no-op and not the first item, delete it
+            // and extend the previous item by deleted item's duration
+            if (is_noop_here && prev)
+            {
+                uint32_t deleted_duration = mti->duration_ppqn;
+                song->master_track_items = g_list_remove(song->master_track_items, mti);
+                mti = prev->data;
+                mti->duration_ppqn += deleted_duration;
+                return;
+            }
+            goto set_values;
+        }
+        if (pos >= tstart && pos < tend)
+        {
+            if (is_noop || (tempo <= 0 && timesig_nom <= 0))
+                return;
+            // Split old item's duration
+            mti->duration_ppqn = pos - tstart;
+            mti = calloc(1, sizeof(struct cbox_master_track_item));
+            mti->duration_ppqn = tend - pos;
+            p = g_list_next(p);
+            song->master_track_items = g_list_insert_before(song->master_track_items, p, mti);
+            goto set_values;
+        }
+        prev = p;
+        tstart = tend;
+    }
+    // The new item is a no-op and it's not deleting any of the current MTIs.
+    // Ignore it then.
+    if (is_noop)
+        return;
+    // The add position is past the end of the current MTIs.
+    if (pos > tend)
+    {
+        // Either extend the previous item, if there's any
+        if (prev)
+        {
+            mti = prev->data;
+            mti->duration_ppqn += pos - tend;
+        }
+        else
+        {
+            // ... or add a dummy 'pad' item
+            mti = calloc(1, sizeof(struct cbox_master_track_item));
+            mti->duration_ppqn = pos;
+            assert(!song->master_track_items);
+            song->master_track_items = g_list_append(song->master_track_items, mti);
+            prev = song->master_track_items;
+        }
+    }
+    // Add the new item at the end
+    mti = calloc(1, sizeof(struct cbox_master_track_item));
+    song->master_track_items = g_list_append(song->master_track_items, mti);
+set_values:
+    // No effect if -1
+    if (tempo >= 0)
+        mti->tempo = tempo;
+    if ((timesig_nom > 0 && timesig_denom > 0) ||
+        (timesig_nom == 0 && timesig_denom == 0))
+    {
+        mti->timesig_nom = timesig_nom;
+        mti->timesig_denom = timesig_denom;
+    }
+}
+
 void cbox_song_add_track(struct cbox_song *song, struct cbox_track *track)
 {
     track->owner = song;
@@ -217,6 +317,12 @@ void cbox_song_clear(struct cbox_song *song)
         cbox_object_destroy(song->tracks->data);
     while(song->patterns)
         cbox_object_destroy(song->patterns->data);
+    while(song->master_track_items)
+    {
+        struct cbox_master_track_item *mti = song->master_track_items->data;
+        song->master_track_items = g_list_remove(song->master_track_items, mti);
+        cbox_master_track_item_destroy(mti);
+    }
 }
 
 void cbox_song_use_looped_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern)

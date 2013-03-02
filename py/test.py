@@ -166,9 +166,11 @@ class TestCbox(unittest.TestCase):
         
     def test_song(self):
         song = Document.get_song()
+        song.clear()
         tp = song.status()
         self.assertEqual(tp.tracks, [])
         self.assertEqual(tp.patterns, [])
+        self.assertEqual(tp.mtis, [])
         
         track = song.add_track()
         pattern = song.load_drum_pattern('pat1')
@@ -212,5 +214,34 @@ class TestCbox(unittest.TestCase):
 
         clips = track.status().clips
         self.assertEqual(clips, [cbox.ClipItem(192, 96, 48, pattern.uuid, clip2.uuid)])
+
+    def test_mti(self):
+        song = Document.get_song()
+        song.clear()
+        tp = song.status()
+        self.assertEqual(tp.tracks, [])
+        self.assertEqual(tp.patterns, [])
+        self.assertEqual(tp.mtis, [])
+        song.set_mti(0, 120.0)
+        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0)])
+        song.set_mti(60, 150.0)
+        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (60, 150.0, 0, 0)])
+        song.set_mti(90, 180.0)
+        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (60, 150.0, 0, 0), (90, 180.0, 0, 0)])
+        song.set_mti(60, 180.0)
+        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (60, 180.0, 0, 0), (90, 180.0, 0, 0)])
+        song.set_mti(65, 210.0)
+        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (60, 180.0, 0, 0), (65, 210.0, 0, 0), (90, 180.0, 0, 0)])
+
+        song.set_mti(60, 0.0, 0, 0)
+        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (65, 210.0, 0, 0), (90, 180.0, 0, 0)])
+        song.set_mti(65, 0.0, 0, 0)
+        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (90, 180.0, 0, 0)])
+        song.set_mti(68, 0.0, 0, 0)
+        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (90, 180.0, 0, 0)])
+        song.set_mti(0, 0.0, 0, 0)
+        self.assertEqual(song.status().mtis, [(0, 0, 0, 0), (90, 180.0, 0, 0)])
+        song.set_mti(90, 0.0, 0, 0)
+        self.assertEqual(song.status().mtis, [(0, 0, 0, 0)])
         
 unittest.main()
