@@ -87,6 +87,35 @@ class Config:
         else:
             do_cmd('/config/save', None, [str(filename)])
 
+class Master:
+    @staticmethod
+    def seek_ppqn(ppqn):
+        do_cmd('/master/seek_ppqn', None, [int(ppqn)])
+    @staticmethod
+    def seek_samples(samples):
+        do_cmd('/master/seek_samples', None, [int(samples)])
+    @staticmethod
+    def set_tempo(tempo):
+        do_cmd('/master/set_tempo', None, [float(tempo)])
+    @staticmethod
+    def set_timesig(nom, denom):
+        do_cmd('/master/set_timesig', None, [int(nom), int(denom)])
+    @staticmethod
+    def play():
+        do_cmd('/master/play', None, [])
+    @staticmethod
+    def stop():
+        do_cmd('/master/stop', None, [])
+    @staticmethod
+    def status():
+        return GetThings("/master/status", ['pos', 'pos_ppqn', 'tempo', 'timesig', 'sample_rate', 'playing'], [])
+    @staticmethod
+    def tell():
+        return GetThings("/master/tell", ['pos', 'pos_ppqn', 'playing'], [])
+    @staticmethod
+    def call_on_idle():
+        do_cmd("/on_idle", None, [])
+        
 class CfgSection:
     def __init__(self, name):
         self.name = name
