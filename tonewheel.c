@@ -131,6 +131,11 @@ void tonewheel_organ_process_event(struct cbox_module *module, const uint8_t *da
                 m->cc91 = data[2];
             if (data[1] == 93)
                 m->vibrato_mix = data[2] > 0;
+            if (data[1] == 120 || data[1] == 123)
+            {
+                for (int i = 24; i < 36 + 61; i++)
+                    set_keymask(m, data[0] & 0xF, i, 0);
+            }
             //if (data[1] == 6)
             //    cbox_onepole_set_lowpass(&m->filter_overdrive_coeffs, hz2w(data[2] * 10000 / 127, 44100.0));
         }
