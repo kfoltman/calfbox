@@ -232,12 +232,12 @@ class TonewheelOrganWindow(Gtk.VBox):
         table.attach(Gtk.Label("Upper"), 0, 1, 0, 1)
         table.attach(Gtk.Label("Lower"), 0, 1, 1, 2)
         for i in range(9):
-            slider = Gtk.VScale(Gtk.Adjustment(0, 0, 8, 1, 1))
+            slider = Gtk.VScale(adjustment = Gtk.Adjustment(0, 0, 8, 1, 1))
             slider.props.digits = 0
             table.attach(slider, i + 1, i + 2, 0, 1)
             self.drawbars['u%d' % i] = slider.get_adjustment()
             slider.get_adjustment().connect('value-changed', lambda adj, path, drawbar: cbox.do_cmd(path + '/upper_drawbar', None, [drawbar, int(adj.get_value())]), self.path, i)
-            slider = Gtk.VScale(Gtk.Adjustment(0, 0, 8, 1, 1))
+            slider = Gtk.VScale(adjustment = Gtk.Adjustment(0, 0, 8, 1, 1))
             slider.props.digits = 0
             table.attach(slider, i + 1, i + 2, 1, 2)
             self.drawbars['l%d' % i] = slider.get_adjustment()
