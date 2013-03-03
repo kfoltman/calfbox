@@ -51,11 +51,12 @@ static const char *short_options = "i:c:"
 #if USE_PYTHON
 "r:"
 #endif
-"e:s:t:b:d:D:N:o:nmh";
+"e:s:t:b:d:D:N:o:nmhpP";
 
 static struct option long_options[] = {
     {"help", 0, 0, 'h'},
     {"no-ui", 0, 0, 'n'},
+    {"play", 0, 0, 'p'},
     {"no-io", 1, 0, 'N'},
     {"instrument", 1, 0, 'i'},
     {"scene", 1, 0, 's'},
@@ -81,6 +82,8 @@ void print_help(char *progname)
         " -h | --help               Show this help text\n"
         " -m | --metronome          Create a simple metronome pattern\n"
         " -n | --no-ui              Do not start the user interface\n"
+        " -p | --play               Start pattern playback (default for -d/-D)\n"
+        " -P | --no-play            Don't start pattern playback\n"
         " -N | --no-io <rate>       Use off-line processing instead of JACK I/O\n"
         " -d | --drum-pattern <p>   Load drum pattern with a given name\n"
         " -D | --drum-track <t>     Load drum track with a given name\n"
@@ -156,6 +159,7 @@ int main(int argc, char *argv[])
     GError *error = NULL;
     gboolean no_ui = FALSE;
     gboolean no_io = FALSE;
+    int play_immediately = 0;
     int no_io_srate = 0;
     
     cbox_dom_init();
@@ -203,6 +207,12 @@ int main(int argc, char *argv[])
             case 'N':
                 no_io = TRUE;
                 no_io_srate = atoi(optarg);
+                break;
+            case 'p':
+                play_immediately = 1;
+                break;
+            case 'P':
+                play_immediately = -1;
                 break;
             case 'b':
                 bpb = atoi(optarg);
@@ -302,7 +312,10 @@ int main(int argc, char *argv[])
         cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load_track(app.rt->master->song, drum_track_name, 1));
     else if (metronome)
         cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_new_metronome(app.rt->master->song, app.rt->master->timesig_nom));
-    cbox_master_play(app.rt->master);
+    
+    gboolean has_song = drum_pattern_name || drum_track_name || metronome;
+    if (play_immediately == 1 || (play_immediately != -1 && has_song))
+        cbox_master_play(app.rt->master);
     cbox_rt_set_scene(app.rt, scene);
 #if USE_PYTHON
     if (script_name)
