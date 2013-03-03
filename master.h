@@ -31,6 +31,7 @@ enum cbox_master_transport_state
 {
     CMTS_STOP,
     CMTS_ROLLING,
+    CMTS_STOPPING,
 };
 
 struct cbox_master

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "errors.h"
 #include "master.h"
 #include "seq.h"
+#include "rt.h"
 #include "song.h"
 #include <string.h>
 
@@ -159,9 +160,19 @@ void cbox_master_play(struct cbox_master *master)
     master->state = CMTS_ROLLING;
 }
 
+static int stop_transport_execute(void *arg)
+{
+    struct cbox_master *master = arg;
+    if (master->state == CMTS_ROLLING)
+        master->state = CMTS_STOPPING;
+    
+    return master->state == CMTS_STOP;
+}
+
 void cbox_master_stop(struct cbox_master *master)
 {
-    master->state = CMTS_STOP;
+    static struct cbox_rt_cmd_definition cmd = { NULL, stop_transport_execute, NULL };
+    cbox_rt_execute_cmd_sync(master->rt, &cmd, master);
 }
 
 int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn)

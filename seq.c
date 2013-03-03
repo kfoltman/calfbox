@@ -420,11 +420,13 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
         cbox_song_playback_set_tempo(spb, spb->master->new_tempo);
         spb->master->new_tempo = 0;
     }
-    if (spb->master->state == CMTS_STOP)
+    if (spb->master->state == CMTS_STOPPING)
     {
-        cbox_song_playback_active_notes_release(spb, output);
+        if (cbox_song_playback_active_notes_release(spb, output))
+            spb->master->state = CMTS_STOP;
     }
     else
+    if (spb->master->state == CMTS_ROLLING)
     {        
         for(int i = 0; i < spb->track_count; i++)
         {
@@ -482,15 +484,14 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
             }
             rpos = rend;
         }
+        int bpos[MAX_TRACKS];
+        for(int i = 0; i < spb->track_count; i++)
+        {
+            midibufsrcs[i] = &spb->tracks[i]->output_buffer;
+            bpos[i] = 0;
+        }
+        cbox_midi_buffer_merge(output, midibufsrcs, spb->track_count, bpos);
     }
-    
-    int bpos[MAX_TRACKS];
-    for(int i = 0; i < spb->track_count; i++)
-    {
-        midibufsrcs[i] = &spb->tracks[i]->output_buffer;
-        bpos[i] = 0;
-    }
-    cbox_midi_buffer_merge(output, midibufsrcs, spb->track_count, bpos);
 }
 
 int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf)
