@@ -285,7 +285,7 @@ int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_not
     int note_offs = 0;
     for (int c = 0; c < 16; c++)
     {
-        if (!notes->channels_active & (1 << c))
+        if (!(notes->channels_active & (1 << c)))
             continue;
         
         for (int g = 0; g < 4; g++)
@@ -422,7 +422,7 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
     }
     if (spb->master->state == CMTS_STOPPING)
     {
-        if (cbox_song_playback_active_notes_release(spb, output))
+        if (cbox_song_playback_active_notes_release(spb, output) > 0)
             spb->master->state = CMTS_STOP;
     }
     else
