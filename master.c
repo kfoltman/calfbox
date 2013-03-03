@@ -79,14 +79,14 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     if (!strcmp(cmd->command, "/seek_samples") && !strcmp(cmd->arg_types, "i"))
     {
         if (m->spb)
-            cbox_song_playback_seek_samples(m->spb, CBOX_ARG_I(cmd, 0));
+            cbox_master_seek_samples(m, CBOX_ARG_I(cmd, 0));
         return TRUE;
     }
     else
     if (!strcmp(cmd->command, "/seek_ppqn") && !strcmp(cmd->arg_types, "i"))
     {
         if (m->spb)
-            cbox_song_playback_seek_ppqn(m->spb, CBOX_ARG_I(cmd, 0), FALSE);
+            cbox_master_seek_ppqn(m, CBOX_ARG_I(cmd, 0));
         return TRUE;
     }
     else
@@ -155,9 +155,21 @@ uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct 
 }
 */
 
+static int play_transport_execute(void *arg)
+{
+    struct cbox_master *master = arg;
+    // wait for the notes to be released
+    if (master->state == CMTS_STOPPING)
+        return 0;
+    
+    master->state = CMTS_ROLLING;
+    return 1;
+}
+
 void cbox_master_play(struct cbox_master *master)
 {
-    master->state = CMTS_ROLLING;
+    static struct cbox_rt_cmd_definition cmd = { NULL, play_transport_execute, NULL };
+    cbox_rt_execute_cmd_sync(master->rt, &cmd, master);
 }
 
 static int stop_transport_execute(void *arg)
@@ -173,6 +185,64 @@ void cbox_master_stop(struct cbox_master *master)
 {
     static struct cbox_rt_cmd_definition cmd = { NULL, stop_transport_execute, NULL };
     cbox_rt_execute_cmd_sync(master->rt, &cmd, master);
+}
+
+struct seek_command_arg
+{
+    struct cbox_master *master;
+    gboolean is_ppqn;
+    uint32_t target_pos;
+    gboolean was_rolling;
+    gboolean status_known;
+};
+
+static int seek_transport_execute(void *arg_)
+{
+    struct seek_command_arg *arg = arg_;
+    // On first pass, check if transport is rolling from the DSP thread
+    if (!arg->status_known)
+    {
+        arg->status_known = TRUE;
+        arg->was_rolling = arg->master->state == CMTS_ROLLING;
+    }
+    // If transport was rolling, stop, release notes, seek, then restart
+    if (arg->master->state == CMTS_ROLLING)
+        arg->master->state = CMTS_STOPPING;
+    
+    // wait until transport stopped
+    if (arg->master->state != CMTS_STOP)
+        return 0;
+    
+    if (arg->master->state == CMTS_STOP)
+    {
+        if (arg->is_ppqn)
+            cbox_song_playback_seek_ppqn(arg->master->spb, arg->target_pos, FALSE);
+        else
+            cbox_song_playback_seek_samples(arg->master->spb, arg->target_pos);
+        if (arg->was_rolling)
+            arg->master->state = CMTS_ROLLING;
+        return 1;
+    }
+}
+
+void cbox_master_seek_ppqn(struct cbox_master *master, uint32_t pos_ppqn)
+{
+    if (master->spb)
+    {
+        static struct cbox_rt_cmd_definition cmd = { NULL, seek_transport_execute, NULL };
+        struct seek_command_arg arg = { master, TRUE, pos_ppqn, FALSE, FALSE };
+        cbox_rt_execute_cmd_sync(master->rt, &cmd, &arg);
+    }
+}
+
+void cbox_master_seek_samples(struct cbox_master *master, uint32_t pos_samples)
+{
+    if (master->spb)
+    {
+        static struct cbox_rt_cmd_definition cmd = { NULL, seek_transport_execute, NULL };
+        struct seek_command_arg arg = { master, FALSE, pos_samples, FALSE, FALSE };
+        cbox_rt_execute_cmd_sync(master->rt, &cmd, &arg);
+    }
 }
 
 int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn)

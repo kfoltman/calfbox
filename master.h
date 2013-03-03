@@ -62,6 +62,8 @@ extern void cbox_master_set_timesig(struct cbox_master *master, int beats, int u
 //extern uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct cbox_bbt *bbt);
 extern void cbox_master_play(struct cbox_master *master);
 extern void cbox_master_stop(struct cbox_master *master);
+extern void cbox_master_seek_ppqn(struct cbox_master *master, uint32_t pos_ppqn);
+extern void cbox_master_seek_samples(struct cbox_master *master, uint32_t pos_samples);
 extern void cbox_master_destroy(struct cbox_master *master);
 
 int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn);
