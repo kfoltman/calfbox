@@ -76,6 +76,12 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
         return TRUE;
     }
     else
+    if (!strcmp(cmd->command, "/panic") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_master_panic(m);
+        return TRUE;
+    }
+    else
     if (!strcmp(cmd->command, "/seek_samples") && !strcmp(cmd->arg_types, "i"))
     {
         if (m->spb)
@@ -243,6 +249,20 @@ void cbox_master_seek_samples(struct cbox_master *master, uint32_t pos_samples)
         struct seek_command_arg arg = { master, FALSE, pos_samples, FALSE, FALSE };
         cbox_rt_execute_cmd_sync(master->rt, &cmd, &arg);
     }
+}
+
+void cbox_master_panic(struct cbox_master *master)
+{
+    cbox_master_stop(master);
+    struct cbox_midi_buffer buf;
+    cbox_midi_buffer_init(&buf);
+    for (int ch = 0; ch < 16; ch++)
+    {
+        cbox_midi_buffer_write_inline(&buf, ch, 0xB0 + ch, 120, 0);
+        cbox_midi_buffer_write_inline(&buf, ch, 0xB0 + ch, 123, 0);
+        cbox_midi_buffer_write_inline(&buf, ch, 0xB0 + ch, 121, 0);
+    }
+    cbox_rt_send_events(master->rt, &buf);
 }
 
 int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn)

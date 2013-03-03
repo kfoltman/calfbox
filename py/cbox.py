@@ -107,6 +107,9 @@ class Transport:
     def stop():
         do_cmd('/master/stop', None, [])
     @staticmethod
+    def panic():
+        do_cmd('/master/panic', None, [])
+    @staticmethod
     def status():
         return GetThings("/master/status", ['pos', 'pos_ppqn', 'tempo', 'timesig', 'sample_rate', 'playing'], [])
     @staticmethod
