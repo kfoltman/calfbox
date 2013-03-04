@@ -223,7 +223,7 @@ class NonDocObj(object):
         return Document.map_uuid(fb.uuid)
 
     def get_things(self, cmd, fields, *args):
-        return GetThings.by_uuid(self.uuid, cmd, fields, list(args))
+        return GetThings(self.path + cmd, fields, list(args))
 
     def make_path(self, path):
         return self.path + path
@@ -352,12 +352,20 @@ class DocLayer(DocObj):
 Document.classmap['cbox_layer'] = DocLayer
 
 class SamplerEngine(NonDocObj):
+    def load_patch_from_cfg(self, patch_no, cfg_section, display_name):
+        return self.cmd_makeobj("/load_patch", int(patch_no), cfg_section, display_name)
     def load_patch_from_string(self, patch_no, sample_dir, sfz_data, display_name):
         return self.cmd_makeobj("/load_patch_from_string", int(patch_no), sample_dir, sfz_data, display_name)
     def load_patch_from_file(self, patch_no, sfz_name, display_name):
         return self.cmd_makeobj("/load_patch_from_file", int(patch_no), sfz_name, display_name)
     def set_patch(self, channel, patch_no):
-        do_cmd(self.path + "/set_patch", None, [int(channel), int(patch_no)])
+        self.cmd("/set_patch", None, int(channel), int(patch_no))
+    def get_unused_program(self):
+        return self.get_things("/get_unused_program", ['program_no']).program_no
+    def set_polyphony(self, polyphony):
+        self.cmd("/polyphony", None, int(polyphony))
+    def get_patches(self):
+        return self.get_things("/patches", ['patch']).patch
 
 class FluidsynthEngine(NonDocObj):
     def __init__(self, path):
@@ -365,7 +373,11 @@ class FluidsynthEngine(NonDocObj):
     def load_soundfont(self, filename):
         return self.cmd_makeobj("/load_soundfont", filename)
     def set_patch(self, channel, patch_no):
-        do_cmd(self.path + "/set_patch", None, [int(channel), int(patch_no)])
+        self.cmd("/set_patch", None, int(channel), int(patch_no))
+    def set_polyphony(self, polyphony):
+        self.cmd("/polyphony", None, int(polyphony))
+    def get_patches(self):
+        return self.get_things("/patches", ['patch']).patch
 
 engine_classes = {'sampler' : SamplerEngine, 'fluidsynth' : FluidsynthEngine}
 
