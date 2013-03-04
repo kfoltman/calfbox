@@ -143,6 +143,11 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
     }
     else
     {    
+        if (!sfz && !cbox_config_has_section(cfg_section))
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot load sampler program '%s' from section '%s': section not found", name, cfg_section);
+            return FALSE;
+        }
         name2 = cbox_config_get_string(cfg_section, "name");
 
         sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
