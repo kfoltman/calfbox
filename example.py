@@ -475,7 +475,7 @@ class MainWindow(Gtk.Window):
                 y += 1
             if iengine in instr_gui.instrument_window_map:
                 b.pack_start(Gtk.HSeparator(), False, False, 5)
-                b.pack_start(instr_gui.instrument_window_map[iengine](iname, "%s/engine" % ipath), True, True, 5)
+                b.pack_start(instr_gui.instrument_window_map[iengine](iname, iobj), True, True, 5)
             self.nb.append_page(b, Gtk.Label(iname))
         self.update()
         

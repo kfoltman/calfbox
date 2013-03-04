@@ -2,9 +2,10 @@ import cbox
 from gui_tools import *
 
 class StreamWindow(Gtk.VBox):
-    def __init__(self, instrument, path):
+    def __init__(self, instrument, iobj):
         Gtk.Widget.__init__(self)
-        self.path = path
+        self.engine = iobj.engine
+        self.path = self.engine.path
         
         panel = Gtk.VBox(spacing=5)
         
@@ -35,9 +36,9 @@ class StreamWindow(Gtk.VBox):
         panel.pack_start(buttons, False, False, 5)
         
         self.add(panel)
-        self.play_button.connect('clicked', lambda x: cbox.do_cmd("%s/play" % self.path, None, []))
-        self.rewind_button.connect('clicked', lambda x: cbox.do_cmd("%s/seek" % self.path, None, [0]))
-        self.stop_button.connect('clicked', lambda x: cbox.do_cmd("%s/stop" % self.path, None, []))
+        self.play_button.connect('clicked', lambda x: self.engine.play())
+        self.rewind_button.connect('clicked', lambda x: self.engine.seek(0))
+        self.stop_button.connect('clicked', lambda x: self.engine.stop())
         set_timer(self, 30, self.update)
 
     def update(self):
@@ -53,10 +54,10 @@ class StreamWindow(Gtk.VBox):
         return True
         
     def pos_slider_moved(self, adjustment):
-        cbox.do_cmd("%s/seek" % self.path, None, [int(adjustment.get_value())])
+        self.engine.seek(adjustment.get_value())
         
     def file_set(self, button):
-        cbox.do_cmd("%s/load" % self.path, None, [button.get_filename(), -1])
+        self.engine.load(button.get_filename())
         
 
 class WithPatchTable:
@@ -79,8 +80,8 @@ class WithPatchTable:
 
     def update_model(self):
         self.patches.clear()
-        patches = cbox.GetThings("%s/patches" % self.path, ["%patch"], []).patch
-        ch_patches = cbox.GetThings("%s/status" % self.path, ["%patch"], []).patch
+        patches = self.engine.get_patches()
+        ch_patches = self.engine.status().patches
         self.mapping = {}
         for id in patches:
             self.mapping[id] = len(self.mapping)
@@ -90,10 +91,10 @@ class WithPatchTable:
     def patch_combo_changed(self, combo, channel):
         if combo.get_active() == -1:
             return
-        cbox.do_cmd(self.path + "/set_patch", None, [int(channel), int(self.patches[combo.get_active()][1])])
+        self.engine.set_patch(channel, self.patches[combo.get_active()][1])
 
     def patch_combo_update(self):
-        patch = cbox.GetThings("%s/status" % self.path, ['%patch'], []).patch
+        patch = self.engine.status().patches
         for i in range(16):
             cb = self.patch_combos[i]
             old_patch_index = cb.get_active() if cb.get_active() >= 0 else -1
@@ -108,11 +109,13 @@ class WithPatchTable:
         return "%s (%s)" % (patch, id)
         
 class FluidsynthWindow(Gtk.VBox, WithPatchTable):
-    def __init__(self, instrument, path):
+    def __init__(self, instrument, iobj):
         Gtk.VBox.__init__(self)
-        self.path = path
+        self.engine = iobj.engine
+        self.path = self.engine.path
+        print (iobj.path)
         
-        attribs = cbox.GetThings("%s/status" % self.path, ['%patch', 'polyphony'], [])
+        attribs = iobj.status()
 
         panel = Gtk.VBox(spacing=5)
         table = Gtk.Table(2, 1)
@@ -139,12 +142,10 @@ class FluidsynthWindow(Gtk.VBox, WithPatchTable):
 
         self.add(panel)
     def file_set(self, button):
-        cbox.do_cmd("%s/load_soundfont" % self.path, None, [button.get_filename()])
+        self.engine.load_soundfont(button.get_filename())
         self.update_model()
     def unload(self, button):
         self.filebutton.set_filename('')
-        #cbox.do_cmd("%s/load_soundfont" % self.path, None, [''])
-        #self.update_model()
 
 class LoadProgramDialog(SelectObjectDialog):
     title = "Load a sampler program"
@@ -159,9 +160,10 @@ class LoadProgramDialog(SelectObjectDialog):
                 model.append((s.name[5:], "SFZ", s.name, title))    
 
 class SamplerWindow(Gtk.VBox, WithPatchTable):
-    def __init__(self, instrument, path):
+    def __init__(self, instrument, iobj):
         Gtk.VBox.__init__(self)
-        self.path = path
+        self.engine = iobj.engine
+        self.path = self.engine.path
         
         attribs = cbox.GetThings("%s/status" % self.path, ['%patch', 'polyphony', 'active_voices'], [])
 
@@ -205,13 +207,13 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
             if response == Gtk.ResponseType.OK:
                 scene = d.get_selected_object()
                 pgm_id = cbox.GetThings("%s/get_unused_program" % self.path, ['program_no'], []).program_no
-                cbox.do_cmd("%s/load_patch" % self.path, None, [pgm_id, scene[2], scene[2][5:]])
+                self.engine.load_patch_from_cfg(pgm_id, scene[2], scene[2][5:])
                 self.update_model()
         finally:
             d.destroy()        
         
     def voices_update(self):
-        attribs = cbox.GetThings("%s/status" % self.path, ['active_voices'], [])
+        attribs = self.engine.status().active_voices()
         self.voices_widget.set_text(str(attribs.active_voices))
         return True
 
@@ -227,9 +229,10 @@ class TonewheelOrganWindow(Gtk.VBox):
         (2, 'Enable', 'percussion_enable', [(0, 'Off'), (1, 'On')]),
         (2, 'Harmonic', 'percussion_3rd', [(0, '2nd'), (1, '3rd')]),
     ]
-    def __init__(self, instrument, path):
+    def __init__(self, instrument, iobj):
         Gtk.VBox.__init__(self)
-        self.path = path
+        self.engine = iobj.engine
+        self.path = self.engine.path
         panel = Gtk.VBox(spacing=10)
         table = Gtk.Table(4, 10)
         table.props.row_spacing = 10

@@ -228,6 +228,12 @@ class NonDocObj(object):
     def make_path(self, path):
         return self.path + path
 
+    def status(self):
+        return self.transform_status(self.get_things("/status", self.status_fields))
+        
+    def transform_status(self, status):
+        return status
+
 class DocObj(NonDocObj):
     def __init__(self, uuid, status_field_list):
         NonDocObj.__init__(self, Document.uuid_cmd(uuid, ''))
@@ -238,12 +244,6 @@ class DocObj(NonDocObj):
                 sf = sf[1:]
                 self.__dict__['set_' + sf] = SetterMaker(self, "/" + sf).set
             self.status_fields.append(sf)
-
-    def status(self):
-        return self.transform_status(self.get_things("/status", self.status_fields))
-        
-    def transform_status(self, status):
-        return status
 
     def delete(self):
         self.cmd("/delete")
@@ -352,6 +352,7 @@ class DocLayer(DocObj):
 Document.classmap['cbox_layer'] = DocLayer
 
 class SamplerEngine(NonDocObj):
+    status_fields = ['polyphony', 'active_voices', '%volume', '%patch', '%pan']
     def load_patch_from_cfg(self, patch_no, cfg_section, display_name):
         return self.cmd_makeobj("/load_patch", int(patch_no), cfg_section, display_name)
     def load_patch_from_string(self, patch_no, sample_dir, sfz_data, display_name):
@@ -365,11 +366,13 @@ class SamplerEngine(NonDocObj):
     def set_polyphony(self, polyphony):
         self.cmd("/polyphony", None, int(polyphony))
     def get_patches(self):
-        return self.get_things("/patches", ['patch']).patch
+        return self.get_things("/patches", ['%patch']).patch
+    def transform_status(self, status):
+        status.patches = status.patch
+        return status
 
 class FluidsynthEngine(NonDocObj):
-    def __init__(self, path):
-        self.path = path
+    status_fields = ['polyphony', 'soundfont', '%patch']
     def load_soundfont(self, filename):
         return self.cmd_makeobj("/load_soundfont", filename)
     def set_patch(self, channel, patch_no):
@@ -377,9 +380,28 @@ class FluidsynthEngine(NonDocObj):
     def set_polyphony(self, polyphony):
         self.cmd("/polyphony", None, int(polyphony))
     def get_patches(self):
-        return self.get_things("/patches", ['patch']).patch
+        return self.get_things("/patches", ['%patch']).patch
+    def transform_status(self, status):
+        status.patches = status.patch
+        return status
 
-engine_classes = {'sampler' : SamplerEngine, 'fluidsynth' : FluidsynthEngine}
+class StreamPlayerEngine(NonDocObj):
+    def play(self):
+        self.cmd('/play')
+    def stop(self):
+        self.cmd('/stop')
+    def seek(self, place):
+        self.cmd('/seek', None, int(place))
+    def load(self, filename, loop_start = -1):
+        self.cmd('/load', None, filename, int(loop_start))
+    def unload(self, filename, loop_start = -1):
+        self.cmd('/unload')
+
+engine_classes = {
+    'sampler' : SamplerEngine,
+    'fluidsynth' : FluidsynthEngine,
+    'stream_player' : StreamPlayerEngine
+}
 
 class DocInstrument(DocObj):
     def __init__(self, uuid):
