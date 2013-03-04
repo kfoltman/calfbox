@@ -199,6 +199,8 @@ class Document:
             raise
         o = Document.classmap[oclass](uuid)
         Document.objmap[uuid] = o
+        if hasattr(o, 'init_object'):
+            o.init_object()
         return o
 
 class SetterMaker():
@@ -208,8 +210,27 @@ class SetterMaker():
     def set(self, value):
         self.obj.cmd(self.path, None, value)
 
-class DocObj(object):
+class NonDocObj(object):
+    def __init__(self, path):
+        self.path = path
+
+    def cmd(self, cmd, fb = None, *args):
+        do_cmd(self.path + cmd, fb, list(args))
+
+    def cmd_makeobj(self, cmd, *args):
+        fb = GetUUID()
+        do_cmd(self.path + cmd, fb, list(args))
+        return Document.map_uuid(fb.uuid)
+
+    def get_things(self, cmd, fields, *args):
+        return GetThings.by_uuid(self.uuid, cmd, fields, list(args))
+
+    def make_path(self, path):
+        return self.path + path
+
+class DocObj(NonDocObj):
     def __init__(self, uuid, status_field_list):
+        NonDocObj.__init__(self, Document.uuid_cmd(uuid, ''))
         self.uuid = uuid
         self.status_fields = []
         for sf in status_field_list:
@@ -217,20 +238,6 @@ class DocObj(object):
                 sf = sf[1:]
                 self.__dict__['set_' + sf] = SetterMaker(self, "/" + sf).set
             self.status_fields.append(sf)
-        
-    def cmd(self, cmd, fb = None, *args):
-        do_cmd(Document.uuid_cmd(self.uuid, cmd), fb, list(args))
-        
-    def cmd_makeobj(self, cmd, *args):
-        fb = GetUUID()
-        do_cmd(Document.uuid_cmd(self.uuid, cmd), fb, list(args))
-        return Document.map_uuid(fb.uuid)
-        
-    def get_things(self, cmd, fields, *args):
-        return GetThings.by_uuid(self.uuid, cmd, fields, list(args))
-        
-    def make_path(self, path):
-        return Document.uuid_cmd(self.uuid, path)
 
     def status(self):
         return self.transform_status(self.get_things("/status", self.status_fields))
@@ -344,9 +351,31 @@ class DocLayer(DocObj):
         return Document.map_uuid(self.status().instrument_uuid)
 Document.classmap['cbox_layer'] = DocLayer
 
+class SamplerEngine(NonDocObj):
+    def load_patch_from_string(self, patch_no, sample_dir, sfz_data, display_name):
+        return self.cmd_makeobj("/load_patch_from_string", int(patch_no), sample_dir, sfz_data, display_name)
+    def load_patch_from_file(self, patch_no, sfz_name, display_name):
+        return self.cmd_makeobj("/load_patch_from_file", int(patch_no), sfz_name, display_name)
+    def set_patch(self, channel, patch_no):
+        do_cmd(self.path + "/set_patch", None, [int(channel), int(patch_no)])
+
+class FluidsynthEngine(NonDocObj):
+    def __init__(self, path):
+        self.path = path
+    def load_soundfont(self, filename):
+        return self.cmd_makeobj("/load_soundfont", filename)
+    def set_patch(self, channel, patch_no):
+        do_cmd(self.path + "/set_patch", None, [int(channel), int(patch_no)])
+
+engine_classes = {'sampler' : SamplerEngine, 'fluidsynth' : FluidsynthEngine}
+
 class DocInstrument(DocObj):
     def __init__(self, uuid):
-        DocObj.__init__(self, uuid, ["name", "outputs", "aux_offset"])
+        DocObj.__init__(self, uuid, ["name", "outputs", "aux_offset", "engine"])
+    def init_object(self):
+        engine = self.status().engine
+        if engine in engine_classes:
+            self.engine = engine_classes[engine]("/doc/uuid/" + self.uuid + "/engine")
 Document.classmap['cbox_instrument'] = DocInstrument
 
 class DocScene(DocObj):

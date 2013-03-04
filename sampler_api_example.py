@@ -15,8 +15,8 @@ scene = Document.get_scene()
 scene.clear()
 instrument = scene.add_new_instrument_layer("test_sampler", "sampler").get_instrument()
 
-npfs = instrument.cmd_makeobj("/engine/load_patch_from_string", 0, '.', '', 'new_patch')
-instrument.cmd("/engine/set_patch", None, 1, 0)
+npfs = instrument.engine.load_patch_from_string(0, '.', '', 'new_patch')
+instrument.engine.set_patch(1, 0)
 
 g1 = npfs.new_group()
 g1.set_param("cutoff", "100")
@@ -45,4 +45,4 @@ r2.set_param("gain_cc17", "-12")
 print("Ready!")
 
 while True:
-    cbox.do_cmd("/on_idle", None, [])
+    cbox.call_on_idle()
