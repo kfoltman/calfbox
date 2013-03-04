@@ -926,7 +926,7 @@ static void swap_program(struct sampler_module *m, int index, struct sampler_pro
         CBOX_DELETE(old_program);
 }
 
-static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, GError **error)
+static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, struct sampler_program **ppgm, GError **error)
 {
     struct sampler_program *pgm = NULL;
     int index = find_program(m, prog_no);
@@ -943,6 +943,8 @@ static gboolean load_program_at(struct sampler_module *m, const char *cfg_sectio
     struct sampler_program **programs = malloc(sizeof(struct sampler_program *) * (m->program_count + 1));
     memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
     programs[m->program_count] = pgm;
+    if (ppgm)
+        *ppgm = pgm;
     free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));
     return TRUE;
 }
@@ -1060,7 +1062,22 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     }
     else if (!strcmp(cmd->command, "/load_patch") && !strcmp(cmd->arg_types, "iss"))
     {
-        return load_program_at(m, CBOX_ARG_S(cmd, 1), CBOX_ARG_S(cmd, 2), CBOX_ARG_I(cmd, 0), error);
+        struct sampler_program *pgm = NULL;
+        if (!load_program_at(m, CBOX_ARG_S(cmd, 1), CBOX_ARG_S(cmd, 2), CBOX_ARG_I(cmd, 0), &pgm, error))
+            return FALSE;
+        if (fb)
+            return cbox_execute_on(fb, NULL, "/uuid", "o", error, pgm);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/load_patch_from_file") && !strcmp(cmd->arg_types, "iss"))
+    {
+        struct sampler_program *pgm = NULL;
+        char *cfg_section = g_strdup_printf("spgm:!%s", CBOX_ARG_S(cmd, 1));
+        gboolean res = load_program_at(m, cfg_section, CBOX_ARG_S(cmd, 2), CBOX_ARG_I(cmd, 0), &pgm, error);
+        g_free(cfg_section);
+        if (res && pgm && fb)
+            return cbox_execute_on(fb, NULL, "/uuid", "o", error, pgm);
+        return res;
     }
     else if (!strcmp(cmd->command, "/load_patch_from_string") && !strcmp(cmd->arg_types, "isss"))
     {

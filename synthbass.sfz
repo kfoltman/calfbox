@@ -1,0 +1,11 @@
+<region>
+sample=*sine loop_mode=loop_continuous tune=0 transpose=0 volume=-12 amp_velcurve_1=1 amp_velcurve_127=1 ampeg_release=0.1
+
+<group>
+sample=*saw loop_mode=loop_continuous cutoff=220 cutoff_cc74=3600 resonance=14 fileg_sustain=10 fileg_decay=0.5 fileg_depth=3600 volume=-18 amp_velcurve_1=1 amp_velcurve_127=1 ampeg_release=0.1 fil_keytrack=100
+
+<region>
+tune=-5 fil_veltrack=1200
+
+<region>
+tune=+5 transpose=+12
