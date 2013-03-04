@@ -120,7 +120,31 @@ class FluidsynthWindow(Gtk.VBox, WithPatchTable):
         
         WithPatchTable.__init__(self, attribs)
         panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True, 5)
+
+        hpanel = Gtk.HBox(spacing = 5)
+        self.filebutton = Gtk.FileChooserButton("Soundfont")
+        self.filebutton.set_action(Gtk.FileChooserAction.OPEN)
+        self.filebutton.set_local_only(True)
+        self.filebutton.set_filename(cbox.GetThings("%s/status" % self.path, ['soundfont'], []).soundfont)
+        self.filebutton.add_filter(standard_filter(["*.sf2", "*.SF2"], "SF2 Soundfonts"))
+        self.filebutton.add_filter(standard_filter(["*"], "All files"))
+        hpanel.pack_start(Gtk.Label.new_with_mnemonic("_Load SF2:"), False, False, 5)
+        hpanel.pack_start(self.filebutton, True, True, 5)
+        unload = Gtk.Button.new_with_mnemonic("_Unload")
+        hpanel.pack_start(unload, False, False, 5)
+        unload.connect('clicked', self.unload)
+        panel.pack_start(hpanel, False, False, 5)
+
+        self.filebutton.connect('file-set', self.file_set)
+
         self.add(panel)
+    def file_set(self, button):
+        cbox.do_cmd("%s/load_soundfont" % self.path, None, [button.get_filename()])
+        self.update_model()
+    def unload(self, button):
+        self.filebutton.set_filename('')
+        #cbox.do_cmd("%s/load_soundfont" % self.path, None, [''])
+        #self.update_model()
 
 class LoadProgramDialog(SelectObjectDialog):
     title = "Load a sampler program"

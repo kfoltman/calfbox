@@ -49,6 +49,7 @@ struct fluidsynth_module
 
     fluid_settings_t *settings;
     fluid_synth_t *synth;
+    char *bank_name;
     int sfid;
     int output_pairs;
     int is_multi;
@@ -92,11 +93,6 @@ MODULE_CREATE_FUNCTION(fluidsynth)
     {
         inited = 1;
     }
-    if (!bankname)
-    {
-        g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "No bank specified (section=%s, key=sf2)", cfg_section);
-        return NULL;
-    }
     
     struct fluidsynth_module *m = malloc(sizeof(struct fluidsynth_module));
     int pairs = cbox_config_get_int(cfg_section, "output_pairs", 0);
@@ -129,31 +125,41 @@ MODULE_CREATE_FUNCTION(fluidsynth)
     fluid_settings_setint(m->settings, "synth.audio-channels", m->output_pairs);
     fluid_settings_setint(m->settings, "synth.audio-groups", m->output_pairs);
     m->synth = new_fluid_synth(m->settings);
-    g_message("Loading soundfont %s", bankname);
-    result = fluid_synth_sfload(m->synth, bankname, 1);
-    if (result == FLUID_FAILED)
-    {
-        g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Failed to load the default bank %s", bankname);
-        return NULL;
-    }
-    g_message("Soundfont %s loaded", bankname);
-    m->sfid = result;
     fluid_synth_set_reverb_on(m->synth, cbox_config_get_int(cfg_section, "reverb", 1));
     fluid_synth_set_chorus_on(m->synth, cbox_config_get_int(cfg_section, "chorus", 1));
-    for (i = 0; i < 16; i++)
+
+    m->bank_name = NULL;
+    m->sfid = -1;
+    if (bankname)
     {
-        gchar *key = g_strdup_printf("channel%d", i + 1);
-        gchar *preset = cbox_config_get_string(cfg_section, key);
-        fluid_synth_sfont_select(m->synth, i, m->sfid);
-        if (preset)
+        m->bank_name = g_strdup(bankname);
+        g_message("Loading soundfont %s", bankname);
+        result = fluid_synth_sfload(m->synth, bankname, 1);
+        if (result == FLUID_FAILED)
         {
-            if (!select_patch_by_name(m, i, preset, error))
-            {
-                CBOX_DELETE(&m->module);
-                return NULL;
-            }
+            g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Failed to load the default bank %s: %s", bankname, fluid_synth_error(m->synth));
+            return NULL;
         }
-        g_free(key);
+        m->sfid = result;
+        g_message("Soundfont %s loaded", bankname);
+    }
+    if (bankname)
+    {
+        for (i = 0; i < 16; i++)
+        {
+            gchar *key = g_strdup_printf("channel%d", i + 1);
+            gchar *preset = cbox_config_get_string(cfg_section, key);
+            fluid_synth_sfont_select(m->synth, i, m->sfid);
+            if (preset)
+            {
+                if (!select_patch_by_name(m, i, preset, error))
+                {
+                    CBOX_DELETE(&m->module);
+                    return NULL;
+                }
+            }
+            g_free(key);
+        }
     }
     
     return &m->module;
@@ -217,6 +223,39 @@ void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, u
     }
 }
 
+gboolean fluidsynth_process_load_patch(struct fluidsynth_module *m, const char *bank_name, GError **error)
+{
+    if (bank_name && !*bank_name)
+        bank_name = NULL;
+    int old_sfid = m->sfid;
+    char *old_bank_name = m->bank_name;
+    if (bank_name)
+    {
+        int result = fluid_synth_sfload(m->synth, bank_name, 1);
+        if (result == FLUID_FAILED)
+        {
+            g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Failed to load the bank %s: %s", bank_name, fluid_synth_error(m->synth));
+            return FALSE;
+        }
+        g_message("Soundfont %s loaded at ID %d", bank_name, result);
+        m->sfid = result;
+    }
+    else
+        m->sfid = -1;
+    if (old_sfid != -1)
+    {
+        free(old_bank_name);
+        fluid_synth_sfunload(m->synth, old_sfid, 1);
+    }
+    if (m->sfid != -1)
+    {
+        for (int i = 0; i < 16; i++)
+            fluid_synth_sfont_select(m->synth, i, m->sfid);
+    }
+    m->bank_name = bank_name ? g_strdup(bank_name) : NULL;
+    return TRUE;
+}
+
 gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct fluidsynth_module *m = (struct fluidsynth_module *)ct->user_data;
@@ -226,6 +265,8 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         if (!cbox_execute_on(fb, NULL, "/polyphony", "i", error, fluid_synth_get_polyphony(m->synth)))
+            return FALSE;
+        if (!cbox_execute_on(fb, NULL, "/soundfont", "s", error, m->bank_name ? m->bank_name : ""))
             return FALSE;
         for (int i = 0; i < 16; i++)
         {
@@ -240,6 +281,8 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
+        if (m->sfid == -1)
+            return TRUE;
         fluid_sfont_t* sfont = fluid_synth_get_sfont(m->synth, 0);
         fluid_preset_t tmp;
 
@@ -254,6 +297,11 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     }
     else if (!strcmp(cmd->command, "/set_patch") && !strcmp(cmd->arg_types, "ii"))
     {
+        if (m->sfid == -1)
+        {
+            g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "No soundfont loaded");
+            return FALSE;
+        }
         int channel = CBOX_ARG_I(cmd, 0);
         if (channel < 1 || channel > 16)
         {
@@ -273,6 +321,10 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         }
         return fluid_synth_set_polyphony(m->synth, polyphony) == FLUID_OK;
     }
+    else if (!strcmp(cmd->command, "/load_soundfont") && !strcmp(cmd->arg_types, "s"))
+    {
+        return fluidsynth_process_load_patch(m, CBOX_ARG_S(cmd, 0), error);
+    }
     else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
     return TRUE;
@@ -287,6 +339,7 @@ void fluidsynth_destroyfunc(struct cbox_module *module)
         free(m->left_outputs);
         free(m->right_outputs);
     }
+    free(m->bank_name);
     
     delete_fluid_settings(m->settings);
     delete_fluid_synth(m->synth);
