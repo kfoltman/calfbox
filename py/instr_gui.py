@@ -12,7 +12,7 @@ class StreamWindow(Gtk.VBox):
         self.filebutton = Gtk.FileChooserButton("Streamed file")
         self.filebutton.set_action(Gtk.FileChooserAction.OPEN)
         self.filebutton.set_local_only(True)
-        self.filebutton.set_filename(cbox.GetThings("%s/status" % self.path, ['filename'], []).filename)
+        self.filebutton.set_filename(self.engine.status().filename)
         self.filebutton.add_filter(standard_filter(["*.wav", "*.WAV", "*.ogg", "*.OGG", "*.flac", "*.FLAC"], "All loadable audio files"))
         self.filebutton.add_filter(standard_filter(["*.wav", "*.WAV"], "RIFF WAVE files"))
         self.filebutton.add_filter(standard_filter(["*.ogg", "*.OGG"], "OGG container files"))
@@ -252,7 +252,7 @@ class TonewheelOrganWindow(Gtk.VBox):
                 model.append((oval, oname))
             combo = standard_combo(model, column = 1)
             self.hboxes[row].pack_start(combo, False, False, 5)
-            combo.update_handler = combo.connect('changed', lambda w, path: cbox.do_cmd(path, None, [w.get_model()[w.get_active()][0]]), path + '/' + flag)
+            combo.update_handler = combo.connect('changed', lambda w, setter: setter(w.get_model()[w.get_active()][0]), getattr(self.engine, 'set_' + flag))
             self.combos[flag] = combo
         panel.pack_start(self.hboxes[1], False, False, 5)
         panel.pack_start(self.hboxes[2], False, False, 5)
@@ -263,18 +263,18 @@ class TonewheelOrganWindow(Gtk.VBox):
             slider.props.digits = 0
             table.attach(slider, i + 1, i + 2, 0, 1)
             self.drawbars['u%d' % i] = slider.get_adjustment()
-            slider.get_adjustment().connect('value-changed', lambda adj, path, drawbar: cbox.do_cmd(path + '/upper_drawbar', None, [drawbar, int(adj.get_value())]), self.path, i)
+            slider.get_adjustment().connect('value-changed', lambda adj, drawbar: self.engine.set_upper_drawbar(drawbar, int(adj.get_value())), i)
             slider = Gtk.VScale(adjustment = Gtk.Adjustment(0, 0, 8, 1, 1))
             slider.props.digits = 0
             table.attach(slider, i + 1, i + 2, 1, 2)
             self.drawbars['l%d' % i] = slider.get_adjustment()
-            slider.get_adjustment().connect('value-changed', lambda adj, path, drawbar: cbox.do_cmd(path + '/lower_drawbar', None, [drawbar, int(adj.get_value())]), self.path, i)
+            slider.get_adjustment().connect('value-changed', lambda adj, drawbar: self.engine.set_lower_drawbar(drawbar, int(adj.get_value())), i)
         panel.add(table)
         self.add(panel)
         self.refresh()
         
     def refresh(self):
-        attribs = cbox.GetThings("%s/status" % self.path, ['%upper_drawbar', '%lower_drawbar', '%pedal_drawbar'], [])
+        attribs = self.engine.status()
         for i in range(9):
             self.drawbars['u%d' % i].set_value(attribs.upper_drawbar[i])
             self.drawbars['l%d' % i].set_value(attribs.lower_drawbar[i])

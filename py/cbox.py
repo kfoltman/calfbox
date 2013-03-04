@@ -209,10 +209,22 @@ class SetterMaker():
         self.path = path
     def set(self, value):
         self.obj.cmd(self.path, None, value)
+    def set2(self, key, value):
+        self.obj.cmd(self.path, None, key, value)
 
 class NonDocObj(object):
-    def __init__(self, path):
+    def __init__(self, path, status_field_list):
         self.path = path
+        self.status_fields = []
+        for sf in status_field_list:
+            if sf.startswith("="):
+                sf = sf[1:]
+                if sf.startswith("%"):
+                    sf2 = sf[1:]
+                    self.__dict__['set_' + sf2] = SetterMaker(self, "/" + sf2).set2
+                else:
+                    self.__dict__['set_' + sf] = SetterMaker(self, "/" + sf).set
+            self.status_fields.append(sf)
 
     def cmd(self, cmd, fb = None, *args):
         do_cmd(self.path + cmd, fb, list(args))
@@ -236,14 +248,8 @@ class NonDocObj(object):
 
 class DocObj(NonDocObj):
     def __init__(self, uuid, status_field_list):
-        NonDocObj.__init__(self, Document.uuid_cmd(uuid, ''))
+        NonDocObj.__init__(self, Document.uuid_cmd(uuid, ''), status_field_list)
         self.uuid = uuid
-        self.status_fields = []
-        for sf in status_field_list:
-            if sf.startswith("="):
-                sf = sf[1:]
-                self.__dict__['set_' + sf] = SetterMaker(self, "/" + sf).set
-            self.status_fields.append(sf)
 
     def delete(self):
         self.cmd("/delete")
@@ -352,7 +358,8 @@ class DocLayer(DocObj):
 Document.classmap['cbox_layer'] = DocLayer
 
 class SamplerEngine(NonDocObj):
-    status_fields = ['polyphony', 'active_voices', '%volume', '%patch', '%pan']
+    def __init__(self, path):
+        NonDocObj.__init__(self, path, ['polyphony', 'active_voices', '%volume', '%patch', '%pan'])
     def load_patch_from_cfg(self, patch_no, cfg_section, display_name):
         return self.cmd_makeobj("/load_patch", int(patch_no), cfg_section, display_name)
     def load_patch_from_string(self, patch_no, sample_dir, sfz_data, display_name):
@@ -372,7 +379,8 @@ class SamplerEngine(NonDocObj):
         return status
 
 class FluidsynthEngine(NonDocObj):
-    status_fields = ['polyphony', 'soundfont', '%patch']
+    def __init__(self, path):
+        NonDocObj.__init__(self, path, ['polyphony', 'soundfont', '%patch'])
     def load_soundfont(self, filename):
         return self.cmd_makeobj("/load_soundfont", filename)
     def set_patch(self, channel, patch_no):
@@ -386,6 +394,8 @@ class FluidsynthEngine(NonDocObj):
         return status
 
 class StreamPlayerEngine(NonDocObj):
+    def __init__(self, path):
+        NonDocObj.__init__(self, path, ['filename', 'pos', 'length', 'playing'])
     def play(self):
         self.cmd('/play')
     def stop(self):
@@ -397,10 +407,17 @@ class StreamPlayerEngine(NonDocObj):
     def unload(self, filename, loop_start = -1):
         self.cmd('/unload')
 
+class TonewheelOrganEngine(NonDocObj):
+    def __init__(self, path):
+        NonDocObj.__init__(self, path, ['=%upper_drawbar', '=%lower_drawbar', '=%pedal_drawbar', 
+            '=upper_vibrato', '=lower_vibrato', '=vibrato_mode', '=vibrato_chorus', 
+            '=percussion_enable', '=percussion_3rd'])
+        
 engine_classes = {
     'sampler' : SamplerEngine,
     'fluidsynth' : FluidsynthEngine,
-    'stream_player' : StreamPlayerEngine
+    'stream_player' : StreamPlayerEngine,
+    'tonewheel_organ' : TonewheelOrganEngine,
 }
 
 class DocInstrument(DocObj):

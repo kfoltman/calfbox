@@ -484,7 +484,7 @@ class MainWindow(Gtk.Window):
             self.nb.remove_page(self.nb.get_n_pages() - 1)
             
     def update(self):
-        cbox.do_cmd("/on_idle", None, [])
+        cbox.call_on_idle()
         master = cbox.GetThings("/master/status", ['pos', 'pos_ppqn', 'tempo', 'timesig', 'sample_rate'], [])
         if master.tempo is not None:
             self.master_info.set_markup('%s (%s)' % (master.pos, master.pos_ppqn))
