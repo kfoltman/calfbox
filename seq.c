@@ -500,7 +500,7 @@ int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, stru
     for(int i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *trk = spb->tracks[i];
-        if (!cbox_midi_playback_active_notes_release(&trk->active_notes, buf))
+        if (cbox_midi_playback_active_notes_release(&trk->active_notes, buf) < 0)
             return 0;
     }
     return 1;
