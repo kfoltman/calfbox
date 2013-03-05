@@ -138,6 +138,7 @@ struct usbaudio_feature_unit_descriptor1
 // Unit/Terminal Descriptor header from the spec
 #include <stdio.h>
 
+#if 0
 // termt10.pdf
 static const char *get_terminal_type_name(int type)
 {
@@ -199,6 +200,7 @@ static const char *get_terminal_type_name(int type)
             return "Unknown";
     }
 }
+#endif
 
 static gboolean parse_audio_control_class(struct cbox_usb_audio_info *uai, const struct libusb_interface_descriptor *asdescr, gboolean other_config)
 {
@@ -477,15 +479,13 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         udi->last_probe_time = time(NULL);
     }
 
-    int active_config = 0, alt_config = -1;
-
     struct cbox_usb_audio_info uainf;
     cbox_usb_audio_info_init(&uainf, udi);
 
     struct cbox_usb_midi_info uminf;
     cbox_usb_midi_info_init(&uminf, udi);
 
-    gboolean is_midi = FALSE, is_audio = FALSE;
+    gboolean is_audio = FALSE;
 
     // printf("%03d:%03d Device %04X:%04X\n", bus, devadr, dev_descr.idVendor, dev_descr.idProduct);
     for (int ci = 0; ci < (int)dev_descr.bNumConfigurations; ci++)

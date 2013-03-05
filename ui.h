@@ -27,8 +27,8 @@ struct cbox_ui_page
     int (*on_idle)(struct cbox_ui_page *page);
 };
 
-extern void cbox_ui_start();
+extern void cbox_ui_start(void);
 extern int cbox_ui_run(struct cbox_ui_page *page);
-extern void cbox_ui_stop();
+extern void cbox_ui_stop(void);
 
 #endif

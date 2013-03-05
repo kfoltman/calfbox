@@ -146,6 +146,7 @@ static void *engine_thread(void *user_data)
     }
     
     usbio_stop_midi_capture(uii);
+    return NULL;
 }
 
 gboolean cbox_usbio_start(struct cbox_io_impl *impl, GError **error)

@@ -48,6 +48,6 @@ extern struct cbox_sectref *cbox_config_get_sectref(struct cbox_sectref *sect, c
 extern struct cbox_sectref *cbox_config_get_sectref_n(struct cbox_sectref *sect, const char *prefix, const char *key, int index);
 extern struct cbox_sectref *cbox_config_get_sectref_suffix(struct cbox_sectref *sect, const char *prefix, const char *key, const char *suffix);
 
-extern void cbox_config_close();
+extern void cbox_config_close(void);
 
 #endif

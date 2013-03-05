@@ -53,15 +53,15 @@ struct cbox_waveform
 
 extern struct cbox_command_target cbox_waves_cmd_target;
 
-extern void cbox_wavebank_init();
+extern void cbox_wavebank_init(void);
 extern struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *filename, GError **error);
 extern struct cbox_waveform *cbox_wavebank_peek_waveform_by_id(int id);
 extern void cbox_wavebank_foreach(void (*cb)(void *user_data, struct cbox_waveform *waveform), void *user_data);
 extern void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, void *user_data), void *user_data, int levels);
-extern int cbox_wavebank_get_count();
-extern int64_t cbox_wavebank_get_bytes();
-extern int64_t cbox_wavebank_get_maxbytes();
-extern void cbox_wavebank_close();
+extern int cbox_wavebank_get_count(void);
+extern int64_t cbox_wavebank_get_bytes(void);
+extern int64_t cbox_wavebank_get_maxbytes(void);
+extern void cbox_wavebank_close(void);
 
 extern void cbox_waveform_ref(struct cbox_waveform *waveform);
 extern void cbox_waveform_unref(struct cbox_waveform *waveform);

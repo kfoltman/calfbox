@@ -68,7 +68,7 @@ extern gboolean cbox_object_default_status(struct cbox_objhdr *objhdr, struct cb
 
 extern void cbox_object_destroy(struct cbox_objhdr *hdr_ptr);
 
-extern struct cbox_document *cbox_document_new();
+extern struct cbox_document *cbox_document_new(void);
 extern void cbox_document_dump(struct cbox_document *);
 extern struct cbox_command_target *cbox_document_get_cmd_target(struct cbox_document *);
 extern struct cbox_objhdr *cbox_document_get_service(struct cbox_document *doc, const char *name);
@@ -77,8 +77,8 @@ extern struct cbox_objhdr *cbox_document_get_object_by_uuid(struct cbox_document
 extern struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *doc, const char *uuid, const struct cbox_class *class_ptr, GError **error);
 extern void cbox_document_destroy(struct cbox_document *);
 
-extern void cbox_dom_init();
-extern void cbox_dom_close();
+extern void cbox_dom_init(void);
+extern void cbox_dom_close(void);
 
 // must be the first field in the object-compatible struct
 #define CBOX_OBJECT_HEADER() \

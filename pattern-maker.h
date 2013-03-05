@@ -27,7 +27,7 @@ struct cbox_midi_pattern;
 struct cbox_midi_pattern_maker;
 struct cbox_song;
 
-extern struct cbox_midi_pattern_maker *cbox_midi_pattern_maker_new();
+extern struct cbox_midi_pattern_maker *cbox_midi_pattern_maker_new(void);
 extern void cbox_midi_pattern_maker_destroy(struct cbox_midi_pattern_maker *maker);
 
 extern gboolean cbox_midi_pattern_maker_load_smf(struct cbox_midi_pattern_maker *maker, const char *filename, int *length, GError **error);

@@ -184,7 +184,5 @@ struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *u
     devinfo->status = CBOX_DEVICE_STATUS_OPENED;
     
     return umi;
-error:
-    return NULL;
 }
 

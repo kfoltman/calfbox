@@ -30,7 +30,7 @@ CBOX_CLASS_DEFINITION_ROOT(cbox_midi_pattern)
 
 struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_song *song, int ts)
 {
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(song);
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
     
     int length = PPQN;
     int channel = cbox_config_get_int("metronome", "channel", 10);
@@ -268,7 +268,7 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
 
 struct cbox_midi_pattern *cbox_midi_pattern_load(struct cbox_song *song, const char *name, int is_drum)
 {
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(song);
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
     
     int length = 0;
     if (is_drum)
@@ -286,7 +286,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_load(struct cbox_song *song, const c
 struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_song *song, const char *name, int is_drum)
 {
     int length = 0;
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(song);
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
     
     gchar *cfg_section = g_strdup_printf(is_drum ? "drumtrack:%s" : "track:%s", name);
     
@@ -371,7 +371,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_song *song, c
 
 struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(struct cbox_song *song, const struct cbox_blob *blob, int length)
 {
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(song);
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
     
     struct cbox_blob_serialized_event event;
     for (size_t i = 0; i < blob->size; i += sizeof(event))

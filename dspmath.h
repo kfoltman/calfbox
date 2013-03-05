@@ -25,6 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <math.h>
 #include <memory.h>
 
+#ifndef M_PI
+#include <glib.h>
+#define M_PI G_PI
+#endif
+
 typedef float cbox_sample_t;
 
 static inline float hz2w(float hz, float sr)

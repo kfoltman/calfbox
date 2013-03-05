@@ -16,12 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <pthread.h>
+#include <time.h>
 #include "usbio_impl.h"
 
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
-#include <time.h>
 
 #define NUM_SYNC_PACKETS 10
 

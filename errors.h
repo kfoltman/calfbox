@@ -33,7 +33,7 @@ enum CboxModuleError
 
 struct cbox_osc_command;
 
-extern GQuark cbox_module_error_quark();
+extern GQuark cbox_module_error_quark(void);
 extern void cbox_force_error(GError **error);
 extern void cbox_print_error(GError *error);
 extern void cbox_print_error_if(GError *error);

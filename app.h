@@ -41,8 +41,8 @@ struct cbox_menu;
 
 extern struct cbox_app app;
 
-struct cbox_menu *create_main_menu();
+struct cbox_menu *create_main_menu(void);
 
-extern void cbox_app_on_idle();
+extern void cbox_app_on_idle(void);
 
 #endif
