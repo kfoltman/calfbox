@@ -147,8 +147,6 @@ static void calc_output_buffer(struct cbox_usb_io_impl *uii)
 
 static void fill_playback_buffer(struct cbox_usb_io_impl *uii, struct libusb_transfer *transfer)
 {
-    static double phase = 0;
-    static int phase2 = 0;
     struct cbox_io *io = uii->ioi.pio;
     uint8_t *data8 = (uint8_t*)transfer->buffer;
     int16_t *data = (int16_t*)transfer->buffer;
@@ -288,7 +286,7 @@ static void play_callback_adaptive(struct libusb_transfer *transfer)
 void usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii)
 {
     struct usbio_transfer *t;
-    int i, err;
+    int err;
     int packets = uii->iso_packets;
     t = usbio_transfer_new(uii->usbctx, "play", uii->playback_counter, packets, uii);
     int tsize = uii->sample_rate * 2 * uii->output_resolution / 1000;
@@ -333,7 +331,6 @@ static int calc_packet_lengths(struct cbox_usb_io_impl *uii, struct libusb_trans
 
 void play_callback_asynchronous(struct libusb_transfer *transfer)
 {
-    int i;
     struct usbio_transfer *xf = transfer->user_data;
     struct cbox_usb_io_impl *uii = xf->user_data;
     xf->pending = FALSE;
@@ -446,7 +443,7 @@ static void sync_callback(struct libusb_transfer *transfer)
     struct usbio_transfer *xf = transfer->user_data;
     struct cbox_usb_io_impl *uii = xf->user_data;
     uint8_t *data = transfer->buffer;
-    int i, j, ofs, size, pkts;
+    int i, ofs, size, pkts;
     xf->pending = FALSE;
 
     if (transfer->status == LIBUSB_TRANSFER_CANCELLED)

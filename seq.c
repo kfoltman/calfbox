@@ -369,7 +369,6 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
 
 static void cbox_song_playback_set_tempo(struct cbox_song_playback *spb, double tempo)
 {
-    int opos = spb->song_pos_samples;
     int ppos = spb->song_pos_ppqn;
     int pos1 = cbox_master_ppqn_to_samples(spb->master, ppos);
     int pos2 = cbox_master_ppqn_to_samples(spb->master, ppos + 1);
