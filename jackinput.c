@@ -39,7 +39,7 @@ struct jack_input_module
 
 void jack_input_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct jack_input_module *m = module->user_data;
+    // struct jack_input_module *m = module->user_data;
 }
 
 void jack_input_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)

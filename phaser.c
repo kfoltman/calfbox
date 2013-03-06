@@ -88,7 +88,7 @@ gboolean phaser_process_cmd(struct cbox_command_target *ct, struct cbox_command_
 
 void phaser_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct phaser_module *m = (struct phaser_module *)module;
+    // struct phaser_module *m = (struct phaser_module *)module;
 }
 
 static inline float clip_w(float w)
@@ -105,7 +105,6 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     int s, c, i;
     int stages = p->stages;
     float fb_amt = p->fb_amt;
-    float phase = 0;
     if (stages < 0 || stages > NO_STAGES)
         stages = 0;
 
