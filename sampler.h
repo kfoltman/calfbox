@@ -115,7 +115,7 @@ struct sampler_module
     gboolean deleting;
 };
 
-extern GQuark cbox_sampler_error_quark();
+extern GQuark cbox_sampler_error_quark(void);
 
 extern gboolean sampler_select_program(struct sampler_module *m, int channel, const gchar *preset, GError **error);
 extern void sampler_update_layer(struct sampler_module *m, struct sampler_layer *l);
