@@ -156,7 +156,7 @@ static void port_connect_cb(jack_port_id_t port, int registered, void *arg)
     {
         jack_port_t *portobj = jack_port_by_id(jii->client, port);
         
-        jack_ringbuffer_write(jii->rb_autoconnect, (uint8_t *)&portobj, sizeof(portobj));
+        jack_ringbuffer_write(jii->rb_autoconnect, (char *)&portobj, sizeof(portobj));
     }
 }
 
@@ -243,7 +243,7 @@ void cbox_jackio_poll_ports(struct cbox_io_impl *impl)
     while (jack_ringbuffer_read_space(jii->rb_autoconnect) >= sizeof(jack_port_t *))
     {
         jack_port_t *portobj;
-        jack_ringbuffer_read(jii->rb_autoconnect, (uint8_t *)&portobj, sizeof(portobj));
+        jack_ringbuffer_read(jii->rb_autoconnect, (char *)&portobj, sizeof(portobj));
         port_autoconnect(jii, portobj);
     }
 }
