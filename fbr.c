@@ -150,10 +150,10 @@ static int find_peaks(complex float *spectrum, float srate, float peak_freqs[16]
             sum += bin;
             sumf += f * bin;
         }
-        pki[i].avg = sum / (2 * PEAK_REGION_RADIUS + 1);
-        pki[i].peak = peak;
-        pki[i].centre = sumf / sum;
-        pki[i].dist = (sumf / sum - i);
+        pi->avg = sum / (2 * PEAK_REGION_RADIUS + 1);
+        pi->peak = peak;
+        pi->centre = sumf / sum;
+        pi->dist = (sumf / sum - i);
         if (peak > gmax)
             gmax = peak;
         // printf("Bin %d sumf/sum %f avg %f peak %f p/a %f dist %f val %f\n", i, sumf / sum, pki[i].avg, peak, peak / pki[i].avg, sumf/sum - i, cabs(spectrum[i]));

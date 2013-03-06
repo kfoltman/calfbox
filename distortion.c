@@ -65,7 +65,7 @@ gboolean distortion_process_cmd(struct cbox_command_target *ct, struct cbox_comm
 
 void distortion_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct distortion_module *m = module->user_data;
+    // struct distortion_module *m = module->user_data;
 }
 
 void distortion_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)

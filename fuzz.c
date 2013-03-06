@@ -86,7 +86,7 @@ gboolean fuzz_process_cmd(struct cbox_command_target *ct, struct cbox_command_ta
 
 void fuzz_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct fuzz_module *m = module->user_data;
+    // struct fuzz_module *m = module->user_data;
 }
 
 void fuzz_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
@@ -113,7 +113,6 @@ void fuzz_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox
             float in = inputs[c][i];
             
             float val = splitbuf[c][i];
-            float other = in - val;
             
             val *= drive;
             

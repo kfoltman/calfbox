@@ -33,7 +33,7 @@ enum CboxFluidsynthError
     CBOX_FLUIDSYNTH_ERROR_FAILED,
 };
 
-GQuark cbox_fluidsynth_error_quark()
+GQuark cbox_fluidsynth_error_quark(void)
 {
     return g_quark_from_string("cbox-fluidsynth-error-quark");
 }
@@ -58,8 +58,6 @@ struct fluidsynth_module
 
 static gboolean select_patch_by_name(struct fluidsynth_module *m, int channel, const gchar *preset, GError **error)
 {
-    int found = 0;
-    
     fluid_sfont_t* sfont = fluid_synth_get_sfont(m->synth, 0);
     fluid_preset_t tmp;
 

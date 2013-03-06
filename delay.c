@@ -71,7 +71,7 @@ MODULE_PROCESSCMD_FUNCTION(delay)
 
 void delay_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct delay_module *m = (struct delay_module *)module;
+    // struct delay_module *m = (struct delay_module *)module;
 }
 
 void delay_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
