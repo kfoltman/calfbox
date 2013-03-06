@@ -99,7 +99,7 @@ static void *stream_recorder_thread(void *user_data)
             sf_command(self->sndfile, SFC_UPDATE_HEADER_NOW, NULL, 0);
         }
     } while(1);
-    
+    return NULL;
 }
 
 static gboolean stream_recorder_attach(struct cbox_recorder *handler, struct cbox_recording_source *src, GError **error)

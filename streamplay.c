@@ -217,7 +217,7 @@ static void *sample_preload_thread(void *user_data)
         // fprintf(stderr, "Preloaded\n", (int)buf_idx, (long long)m->cp_readahead[buf_idx].position);
         jack_ringbuffer_write(ss->rb_just_read, (char *)&buf_idx, 1);
     } while(1);
-        
+    return NULL;
 }
 
 void stream_player_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
