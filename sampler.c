@@ -1021,7 +1021,6 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         for (int i = 0; i < m->program_count; i++)
         {
             struct sampler_program *prog = m->programs[i];
-            gboolean result;
             if (!cbox_execute_on(fb, NULL, "/patch", "isoi", error, prog->prog_no, prog->name, prog, prog->in_use))
                 return FALSE;
         }
@@ -1115,7 +1114,6 @@ gboolean sampler_select_program(struct sampler_module *m, int channel, const gch
 
 MODULE_CREATE_FUNCTION(sampler)
 {
-    int result = 0;
     int i;
     static int inited = 0;
     if (!inited)

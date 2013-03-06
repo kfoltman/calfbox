@@ -134,12 +134,11 @@ static void cbox_rt_on_reconnected(void *user_data)
 static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
 {
     struct cbox_rt *rt = user_data;
-    struct cbox_scene *scene = NULL;
     struct cbox_module *effect = rt->effect;
     struct cbox_rt_cmd_instance cmd;
     struct cbox_midi_buffer midibuf_jack, midibuf_song, midibuf_total, *midibufsrcs[3];
     int cost;
-    uint32_t i, j, n;
+    uint32_t i, j;
     
     cbox_midi_buffer_init(&rt->midibuf_aux);
     cbox_midi_buffer_init(&midibuf_jack);

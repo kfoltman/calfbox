@@ -150,7 +150,7 @@ gboolean reverb_process_cmd(struct cbox_command_target *ct, struct cbox_command_
 
 void reverb_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct reverb_module *m = (struct reverb_module *)module;
+    // struct reverb_module *m = (struct reverb_module *)module;
 }
 
 static void cbox_reverb_process_leg(struct reverb_module *m, int u)
@@ -159,7 +159,6 @@ static void cbox_reverb_process_leg(struct reverb_module *m, int u)
     int dv;
     float *storage;
     
-    struct reverb_params *p = m->params;
     struct reverb_state *state = m->state;
     struct cbox_reverb_leg *b = &state->legs[u];
     int uprev = u ? (u - 1) : (state->leg_count - 1);
@@ -288,7 +287,6 @@ static struct reverb_state *create_reverb_state(int leg_count, ...)
 MODULE_CREATE_FUNCTION(reverb)
 {
     static int inited = 0;
-    int i;
     if (!inited)
     {
         inited = 1;
@@ -340,8 +338,6 @@ MODULE_CREATE_FUNCTION(reverb)
             1147, 0.55,
             393, 0.5);
 #endif
-    
-    float tpdsr = 2 * M_PI * m->module.srate_inv;
     
     m->params->lowpass = cbox_config_get_float(cfg_section, "lowpass", 8000.f);
     m->params->highpass = cbox_config_get_float(cfg_section, "highpass", 35.f);

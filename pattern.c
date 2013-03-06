@@ -39,7 +39,6 @@ struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_song *song
     
     for (int i = 0; i < ts; i++)
     {
-        int e = 2 * i;
         int accent = !i && ts != 1;
         cbox_midi_pattern_maker_add(m, length * i, 0x90 + channel - 1, accent ? accnote : note, accent ? 127 : 100);
         cbox_midi_pattern_maker_add(m, length * i + 1, 0x80 + channel - 1, accent ? accnote : note, 0);
@@ -125,7 +124,7 @@ static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m
                 g_error("Invalid track %s", trkname);
             }
             const char *s = notes;
-            int i = 0, t = 0;
+            int t = 0;
             while(1)
             {
                 if (!*s)

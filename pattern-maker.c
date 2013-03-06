@@ -47,7 +47,7 @@ static gint event_entry_compare(gconstpointer a, gconstpointer b, gpointer unuse
 static void event_entry_destroy(gpointer p)
 {
     struct event_entry *e = p;
-    free(p);
+    free(e);
 }
 
 struct cbox_midi_pattern_maker

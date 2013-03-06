@@ -263,37 +263,4 @@ static inline void cbox_envelope_modify_dahdsr(struct cbox_envelope_shape *env, 
     }
 }
 
-static void cbox_config_get_dahdsr(const char *cfg_section, const char *prefix, struct cbox_dahdsr *env)
-{
-    gchar *v;
-    
-    v = g_strdup_printf("%s_start", prefix);
-    env->start = cbox_config_get_float(cfg_section, v, env->start);
-    g_free(v);
-    
-    v = g_strdup_printf("%s_delay", prefix);
-    env->delay = cbox_config_get_float(cfg_section, v, env->delay);
-    g_free(v);
-    
-    v = g_strdup_printf("%s_attack", prefix);
-    env->attack = cbox_config_get_float(cfg_section, v, env->attack);
-    g_free(v);
-    
-    v = g_strdup_printf("%s_attack", prefix);
-    env->hold = cbox_config_get_float(cfg_section, v, env->hold);
-    g_free(v);
-    
-    v = g_strdup_printf("%s_decay", prefix);
-    env->decay = cbox_config_get_float(cfg_section, v, env->decay);
-    g_free(v);
-    
-    v = g_strdup_printf("%s_sustain", prefix);
-    env->sustain = cbox_config_get_float(cfg_section, v, env->sustain);
-    g_free(v);
-    
-    v = g_strdup_printf("%s_release", prefix);
-    env->release = cbox_config_get_float(cfg_section, v, env->release);
-    g_free(v);
-}
-
 #endif
