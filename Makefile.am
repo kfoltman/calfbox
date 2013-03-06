@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I$(srcdir)
+AM_CPPFLAGS = -I$(srcdir) -Wall
 
 bin_PROGRAMS = calfbox
 

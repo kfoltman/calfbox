@@ -47,6 +47,7 @@ struct cbox_menu *cbox_menu_new()
 struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, struct cbox_menu_item *item)
 {    
     g_ptr_array_add(menu->items, item);
+    return item;
 }
 
 void cbox_menu_destroy(struct cbox_menu *menu)
@@ -118,7 +119,7 @@ void cbox_menu_state_size(struct cbox_menu_state *menu_state)
 void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
 {
     struct cbox_menu *menu = menu_state->menu;
-    int i, x, y;
+    int i;
     
     werase(menu_state->window);
     box(menu_state->window, 0, 0);

@@ -249,7 +249,6 @@ int cmd_stream_load(struct cbox_menu_item_command *item, void *context)
 struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *menu_context)
 {
     struct cbox_menu *menu = cbox_menu_new();
-    struct cbox_config_section_cb_data cb = { .menu = menu };
 
     cbox_menu_add_item(menu, cbox_menu_item_new_static("Module commands", NULL, NULL));
     cbox_menu_add_item(menu, cbox_menu_item_new_command("Play stream", cmd_stream_play, NULL));

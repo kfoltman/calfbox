@@ -116,7 +116,6 @@ static int on_idle_with_ui_poll(struct cbox_ui_page *page)
 
 void run_ui()
 {
-    int var1 = 42;
     struct cbox_menu_state *st = NULL;
     struct cbox_menu_page *page = cbox_menu_page_new();
     cbox_ui_start();
@@ -138,8 +137,6 @@ void run_ui()
 int main(int argc, char *argv[])
 {
     struct cbox_open_params params;
-    const char *module = NULL;
-    struct cbox_module_manifest *mptr;
     struct cbox_layer *layer;
     const char *config_name = NULL;
     const char *instrument_name = NULL;
