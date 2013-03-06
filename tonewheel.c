@@ -261,8 +261,6 @@ void tonewheel_organ_process_block(struct cbox_module *module, cbox_sample_t **i
 {
     struct tonewheel_organ_module *m = (struct tonewheel_organ_module *)module;
     int n, i;
-    //float a01, b1, x1, y1, x, q;
-    int a01, b1, x1, y1;
     
     static const uint32_t frac_mask = (1 << 21) - 1;
     
@@ -283,7 +281,7 @@ void tonewheel_organ_process_block(struct cbox_module *module, cbox_sample_t **i
     {
         if (tonegens[0][n] > 0 || tonegens[1][n])
         {
-            int iamp1, iamp2, scaling;
+            int iamp1, iamp2;
             
             iamp1 = tonegens[0][n];
             iamp2 = tonegens[1][n];
@@ -356,7 +354,6 @@ void tonewheel_organ_process_block(struct cbox_module *module, cbox_sample_t **i
     {
         int value = filtered[i] >> 9;
         int sign = (value >= 0 ? 1 : -1);
-        int result;
         int a, b, idx;
         
         value = abs(value);
@@ -369,7 +366,6 @@ void tonewheel_organ_process_block(struct cbox_module *module, cbox_sample_t **i
         //internal_out[i] = 32767 * value2;
     }
     
-    int prev = internal_out[0];
     cbox_onepole_process(&m->filter_anticlick, &m->filter_anticlick_coeffs, internal_out);
     
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)

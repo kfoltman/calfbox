@@ -162,15 +162,18 @@ void request_load(struct stream_state *ss, int buf_idx, uint64_t pos)
 {
     unsigned char cidx = (unsigned char)buf_idx;
     struct stream_player_cue_point *pt = &ss->cp_readahead[buf_idx];
-    int wlen = 0;
     
     ss->cp_readahead_ready[buf_idx] = 0;    
     pt->position = pos;
     pt->length = 0;
     pt->queued = 1;
 
-    wlen = jack_ringbuffer_write(ss->rb_for_reading, (char *)&cidx, 1);
+#ifdef NDEBUG
+    jack_ringbuffer_write(ss->rb_for_reading, (char *)&cidx, 1);
+#else
+    int wlen = jack_ringbuffer_write(ss->rb_for_reading, (char *)&cidx, 1);
     assert(wlen);
+#endif
 }
 
 int get_unused_buffer(struct stream_state *ss)

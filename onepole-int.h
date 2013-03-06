@@ -78,7 +78,6 @@ static inline void cbox_onepole_process(struct cbox_onepole_state *state, struct
     int shift = coeffs->shift;
     int64_t maxint = ((int64_t)0x7FFFFFF) << shift;
     int32_t round = 1 << (shift - 1);
-    int hround = round / 2;
     
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
