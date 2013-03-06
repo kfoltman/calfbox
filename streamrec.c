@@ -73,7 +73,7 @@ static void *stream_recorder_thread(void *user_data)
     
     do {
         int8_t buf_idx;
-        if (!jack_ringbuffer_read(self->rb_for_writing, &buf_idx, 1))
+        if (!jack_ringbuffer_read(self->rb_for_writing, (char *)&buf_idx, 1))
         {
             usleep(10000);
             continue;
@@ -95,7 +95,7 @@ static void *stream_recorder_thread(void *user_data)
         {
             sf_write_float(self->sndfile, self->buffers[buf_idx].data, self->buffers[buf_idx].write_ptr);
             self->buffers[buf_idx].write_ptr = 0;
-            jack_ringbuffer_write(self->rb_just_written, &buf_idx, 1);
+            jack_ringbuffer_write(self->rb_just_written, (char *)&buf_idx, 1);
             sf_command(self->sndfile, SFC_UPDATE_HEADER_NOW, NULL, 0);
         }
     } while(1);
@@ -143,13 +143,13 @@ void stream_recorder_record_block(struct cbox_recorder *handler, const float **b
     if (self->cur_buffer && (self->cur_buffer->write_ptr + numsamples * self->info.channels) * sizeof(float) >= STREAM_BUFFER_SIZE)
     {
         int8_t idx = self->cur_buffer - self->buffers;
-        jack_ringbuffer_write(self->rb_for_writing, &idx, 1);
+        jack_ringbuffer_write(self->rb_for_writing, (char *)&idx, 1);
         self->cur_buffer = NULL;
     }
     if (!self->cur_buffer)
     {
         int8_t buf_idx = -1;
-        if (!jack_ringbuffer_read(self->rb_just_written, &buf_idx, 1)) // underrun
+        if (!jack_ringbuffer_read(self->rb_just_written, (char *)&buf_idx, 1)) // underrun
             return;
         self->cur_buffer = &self->buffers[buf_idx];
     }
@@ -175,7 +175,7 @@ gboolean stream_recorder_detach(struct cbox_recorder *handler, GError **error)
     }
 
     int8_t cmd = STREAM_CMD_SYNC;
-    jack_ringbuffer_write(self->rb_for_writing, &cmd, 1);
+    jack_ringbuffer_write(self->rb_for_writing, (char *)&cmd, 1);
     sem_wait(&self->sem_sync_completed);
     return TRUE;
 }
@@ -187,7 +187,7 @@ void stream_recorder_destroy(struct cbox_recorder *handler)
     if (self->sndfile)
     {
         int8_t cmd = STREAM_CMD_QUIT;
-        jack_ringbuffer_write(self->rb_for_writing, &cmd, 1);
+        jack_ringbuffer_write(self->rb_for_writing, (char *)&cmd, 1);
         pthread_join(self->thr_writeout, NULL);
     }
     
@@ -234,7 +234,7 @@ struct cbox_recorder *cbox_recorder_new_stream(struct cbox_rt *rt, const char *f
     CBOX_OBJECT_REGISTER(&self->iface);
 
     for (uint8_t i = 0; i < STREAM_BUFFER_COUNT; i++)
-        jack_ringbuffer_write(self->rb_just_written, &i, 1);
+        jack_ringbuffer_write(self->rb_just_written, (char *)&i, 1);
     
     return &self->iface;
 }

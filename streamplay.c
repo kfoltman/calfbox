@@ -169,7 +169,7 @@ void request_load(struct stream_state *ss, int buf_idx, uint64_t pos)
     pt->length = 0;
     pt->queued = 1;
 
-    wlen = jack_ringbuffer_write(ss->rb_for_reading, &cidx, 1);
+    wlen = jack_ringbuffer_write(ss->rb_for_reading, (char *)&cidx, 1);
     assert(wlen);
 }
 
@@ -205,7 +205,7 @@ static void *sample_preload_thread(void *user_data)
     
     do {
         unsigned char buf_idx;
-        if (!jack_ringbuffer_read(ss->rb_for_reading, &buf_idx, 1))
+        if (!jack_ringbuffer_read(ss->rb_for_reading, (char *)&buf_idx, 1))
         {
             usleep(5000);
             continue;
@@ -215,14 +215,14 @@ static void *sample_preload_thread(void *user_data)
         // fprintf(stderr, "Preload: %d, %lld\n", (int)buf_idx, (long long)m->cp_readahead[buf_idx].position);
         load_at_cue(ss, &ss->cp_readahead[buf_idx]);
         // fprintf(stderr, "Preloaded\n", (int)buf_idx, (long long)m->cp_readahead[buf_idx].position);
-        jack_ringbuffer_write(ss->rb_just_read, &buf_idx, 1);
+        jack_ringbuffer_write(ss->rb_just_read, (char *)&buf_idx, 1);
     } while(1);
         
 }
 
 void stream_player_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct stream_player_module *m = (struct stream_player_module *)module;
+    // struct stream_player_module *m = (struct stream_player_module *)module;
 }
 
 static void request_next(struct stream_state *ss, uint64_t pos)
@@ -338,7 +338,7 @@ void stream_player_process_block(struct cbox_module *module, cbox_sample_t **inp
     }
 
     // receive buffer completion messages from the queue
-    while(jack_ringbuffer_read(ss->rb_just_read, &buf_idx, 1))
+    while(jack_ringbuffer_read(ss->rb_just_read, (char *)&buf_idx, 1))
     {
         ss->cp_readahead_ready[buf_idx] = 1;
     }
@@ -406,7 +406,7 @@ static void stream_state_destroy(struct stream_state *ss)
     
     if (ss->rb_for_reading && ss->thread_started)
     {
-        jack_ringbuffer_write(ss->rb_for_reading, &cmd, 1);
+        jack_ringbuffer_write(ss->rb_for_reading, (char *)&cmd, 1);
         pthread_join(ss->thr_preload, NULL);
     }
     
@@ -682,7 +682,6 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
 
 MODULE_CREATE_FUNCTION(stream_player)
 {
-    int rest;
     static int inited = 0;
     
     if (!inited)
