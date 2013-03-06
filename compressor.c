@@ -78,7 +78,7 @@ MODULE_PROCESSCMD_FUNCTION(compressor)
 
 void compressor_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct compressor_module *m = module->user_data;
+    // struct compressor_module *m = module->user_data;
 }
 
 void compressor_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)

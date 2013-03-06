@@ -104,7 +104,6 @@ void fuzz_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox
     float splitbuf[2][CBOX_BLOCK_SIZE];
     float drive = m->params->drive;
     float sdrive = pow(drive, -0.7);
-    float nthr = -1 + m->params->rectify;
     for (int c = 0; c < 2; c++)
     {
         cbox_biquadf_process_to(&m->split_state[c], &m->split_coeffs, inputs[c], splitbuf[c]);

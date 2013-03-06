@@ -95,13 +95,12 @@ gboolean parametric_eq_process_cmd(struct cbox_command_target *ct, struct cbox_c
 
 void parametric_eq_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct parametric_eq_module *m = (struct parametric_eq_module *)module;
+    // struct parametric_eq_module *m = (struct parametric_eq_module *)module;
 }
 
 void parametric_eq_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct parametric_eq_module *m = (struct parametric_eq_module *)module;
-    int b, c;
     
     if (m->params != m->old_params)
         redo_filters(m);

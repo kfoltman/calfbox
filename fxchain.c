@@ -126,7 +126,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
 
 void fxchain_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct fxchain_module *m = module->user_data;
+    // struct fxchain_module *m = module->user_data;
 }
 
 void fxchain_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
