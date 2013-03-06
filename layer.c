@@ -221,8 +221,9 @@ struct cbox_layer *cbox_layer_new(struct cbox_scene *scene)
 struct cbox_layer *cbox_layer_new_with_instrument(struct cbox_scene *scene, const char *instrument_name, GError **error)
 {
     struct cbox_layer *layer = cbox_layer_new(scene);
+    struct cbox_instrument *instr = NULL;
     if (!layer) goto error;
-    struct cbox_instrument *instr = cbox_scene_get_instrument_by_name(scene, instrument_name, TRUE, error);
+    instr = cbox_scene_get_instrument_by_name(scene, instrument_name, TRUE, error);
     if (!instr)
     {
         cbox_force_error(error);
@@ -235,7 +236,8 @@ struct cbox_layer *cbox_layer_new_with_instrument(struct cbox_scene *scene, cons
 
 error:
     CBOX_DELETE(layer);
-    cbox_instrument_destroy_if_unused(instr);
+    if (instr)
+        cbox_instrument_destroy_if_unused(instr);
     return NULL;
 }
 
