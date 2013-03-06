@@ -26,7 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "scripting.h"
 #include <assert.h>
 #include <glib.h>
+
+// This is a workaround for what I consider a defect in pyconfig.h
+#undef _XOPEN_SOURCE
+#undef _POSIX_C_SOURCE
+
 #include <Python.h>
+
+static gboolean engine_initialised = FALSE;
 
 struct PyCboxCallback 
 {
@@ -55,6 +62,7 @@ PyCboxCallback_Init(struct PyCboxCallback *self, PyObject *args, PyObject *kwds)
         return -1;
     
     self->target = PyCapsule_GetPointer(cobj, NULL);
+    return 0;
 }
 
 static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject *self, PyObject *args);
@@ -68,7 +76,7 @@ PyCboxCallback_Call(PyObject *_self, PyObject *args, PyObject *kwds)
 }
 
 PyTypeObject CboxCallbackType = {
-    PyObject_HEAD_INIT(NULL)
+    PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "_cbox.Callback",
     .tp_basicsize = sizeof(struct PyCboxCallback),
     .tp_flags = Py_TPFLAGS_DEFAULT,
@@ -279,11 +287,105 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
 
 static PyObject *cbox_python_do_cmd(PyObject *self, PyObject *args)
 {
+    if (!engine_initialised)
+        return PyErr_Format(PyExc_Exception, "Engine not initialised");
     return cbox_python_do_cmd_on(&app.cmd_target, self, args);
 }
 
+#if CALFBOX_AS_MODULE
+
+#include "config-api.h"
+#include "wavebank.h"
+#include "scene.h"
+
+static gboolean audio_running = FALSE;
+
+static PyObject *cbox_python_init_engine(PyObject *self, PyObject *args)
+{
+    const char *config_file = NULL;
+    if (!PyArg_ParseTuple(args, "|z:init_engine", &config_file))
+        return NULL;
+    if (engine_initialised)
+        return PyErr_Format(PyExc_Exception, "Engine already initialised");
+ 
+    cbox_dom_init();
+    app.document = cbox_document_new();
+    app.rt = cbox_rt_new(app.document);    
+    cbox_config_init(config_file);
+    cbox_wavebank_init();
+    engine_initialised = 1;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *cbox_python_shutdown_engine(PyObject *self, PyObject *args)
+{
+    if (!PyArg_ParseTuple(args, ":shutdown_engine"))
+        return NULL;
+    if (!engine_initialised)
+        return PyErr_Format(PyExc_Exception, "Engine not initialised");
+    
+    cbox_rt_destroy(app.rt);
+    cbox_wavebank_close();
+    cbox_config_close();
+    cbox_dom_close();
+    engine_initialised = FALSE;
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *cbox_python_start_audio(PyObject *self, PyObject *args)
+{
+    if (!PyArg_ParseTuple(args, ":start_audio"))
+        return NULL;
+    if (!engine_initialised)
+        return PyErr_Format(PyExc_Exception, "Engine not initialised");
+    if (audio_running)
+        return PyErr_Format(PyExc_Exception, "Audio already started");
+
+    struct cbox_open_params params;
+    GError *error = NULL;
+    if (!cbox_io_init(&app.io, &params, &error))
+        return PyErr_Format(PyExc_IOError, "Cannot initialise sound I/O: %s", (error && error->message) ? error->message : "Unknown error");
+
+    cbox_rt_set_io(app.rt, &app.io);
+    cbox_rt_set_scene(app.rt, cbox_scene_new(app.document, app.rt, FALSE));
+    cbox_rt_start(app.rt);
+    audio_running = TRUE;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *cbox_python_stop_audio(PyObject *self, PyObject *args)
+{
+    if (!PyArg_ParseTuple(args, ":stop_audio"))
+        return NULL;
+    if (!engine_initialised)
+        return PyErr_Format(PyExc_Exception, "Engine not initialised");
+    if (!audio_running)
+        return PyErr_Format(PyExc_Exception, "Audio not running");
+
+    cbox_rt_set_scene(app.rt, NULL);
+    cbox_rt_stop(app.rt);
+    cbox_io_close(&app.io);
+    audio_running = FALSE;
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+#endif
+
 static PyMethodDef CboxMethods[] = {
     {"do_cmd", cbox_python_do_cmd, METH_VARARGS, "Execute a CalfBox command using a global path."},
+#if CALFBOX_AS_MODULE
+    {"init_engine", cbox_python_init_engine, METH_VARARGS, "Initialise the CalfBox engine using optional config file."},
+    {"shutdown_engine", cbox_python_shutdown_engine, METH_VARARGS, "Shutdown the CalfBox engine."},
+    {"start_audio", cbox_python_start_audio, METH_VARARGS, "Start real-time audio processing using I/O settings from the current config."},
+    {"stop_audio", cbox_python_stop_audio, METH_VARARGS, "Stop real-time audio processing."},
+#endif    
     {NULL, NULL, 0, NULL}
 };
 
@@ -292,7 +394,25 @@ static PyModuleDef CboxModule = {
     NULL, NULL, NULL, NULL
 };
 
-static PyObject*
+#if CALFBOX_AS_MODULE
+
+PyMODINIT_FUNC
+PyInit__cbox(void)
+{    
+    PyObject *m = PyModule_Create(&CboxModule);
+    if (!m)
+        return NULL;
+    Py_INCREF(&CboxCallbackType);
+    if (PyType_Ready(&CboxCallbackType) < 0)
+        return NULL;
+    PyModule_AddObject(m, "Callback", (PyObject *)&CboxCallbackType);
+    
+    return m;
+}
+
+#else
+
+PyObject*
 PyInit_cbox(void)
 {
     PyObject *m = PyModule_Create(&CboxModule);
@@ -316,6 +436,7 @@ void cbox_script_run(const char *name)
         return;
     }
     Py_INCREF(&CboxCallbackType);
+    engine_initialised = TRUE;
     
     if (PyRun_SimpleFile(fp, name) == 1)
     {
@@ -326,4 +447,5 @@ void cbox_script_run(const char *name)
     Py_Finalize();
 }
 
+#endif
 #endif

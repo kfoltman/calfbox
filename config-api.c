@@ -42,10 +42,18 @@ void cbox_config_init(const char *override_file)
 
     cfg_strings = g_string_chunk_new(100);
     config_keyfile = g_key_file_new();
+
+    // Allow virtual (in-memory) config by passing empty string
+    if (override_file && !*override_file)
+    {
+        keyfile_name = g_strdup("");
+        return;
+    }
+
     keyfiledirs[0] = getenv("HOME");
     keyfiledirs[1] = NULL;
     // XXXKF add proper error handling
-    
+
     if (override_file)
     {
         if (!g_key_file_load_from_file(config_keyfile, override_file, flags, &error))

@@ -1,12 +1,7 @@
-import os
-import sys
-import struct
-import time
-import unittest
+from calfbox import cbox
 
-sys.path = ["./py"] + sys.path
-
-import cbox
+cbox.init_engine()
+cbox.start_audio()
 
 global Document
 Document = cbox.Document
