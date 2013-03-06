@@ -166,11 +166,13 @@ static int find_peaks(complex float *spectrum, float srate, float peak_freqs[16]
             continue;
         pki[(int)tpi->centre].points += 1;
     }
+    #if 0
     for (int i = 0; i <= ANALYSIS_BUFFER_SIZE / 2; i++)
     {
         float freq = i * srate / ANALYSIS_BUFFER_SIZE;
-        // printf("Bin %d freq %f points %f\n", i, freq, pki[i].points);
+        printf("Bin %d freq %f points %f\n", i, freq, pki[i].points);
     }
+    #endif
     qsort(pki, ANALYSIS_BUFFER_SIZE / 2 + 1, sizeof(struct potential_peak_info), peak_compare);
     
     float peaks[16];
@@ -273,7 +275,7 @@ gboolean feedback_reducer_process_cmd(struct cbox_command_target *ct, struct cbo
 
 void feedback_reducer_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct feedback_reducer_module *m = module->user_data;
+    // struct feedback_reducer_module *m = module->user_data;
 }
 
 void feedback_reducer_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)

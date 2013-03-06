@@ -130,8 +130,10 @@ gboolean cbox_osc_command_dump(const struct cbox_osc_command *cmd)
             default:
                 g_error("Invalid format character '%c' for command '%s'", cmd->arg_types[i], cmd->command);
                 assert(0);
+                return FALSE;
         }
     }
+    return TRUE;
 }
 
 gboolean cbox_check_fb_channel(struct cbox_command_target *fb, const char *command, GError **error)

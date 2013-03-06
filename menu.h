@@ -41,7 +41,7 @@ struct cbox_menu_state
     int menu_is_temporary;
 };
 
-extern struct cbox_menu *cbox_menu_new();
+extern struct cbox_menu *cbox_menu_new(void);
 extern struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, struct cbox_menu_item *item);
 extern void cbox_menu_destroy(struct cbox_menu *menu);
 
@@ -54,7 +54,7 @@ struct cbox_menu_page
     struct cbox_menu_state *state;
 };
 
-extern struct cbox_menu_page *cbox_menu_page_new();
+extern struct cbox_menu_page *cbox_menu_page_new(void);
 extern void cbox_menu_page_destroy(struct cbox_menu_page *st);
 
 #endif

@@ -81,7 +81,7 @@ MODULE_PROCESSCMD_FUNCTION(chorus)
 
 void chorus_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct chorus_module *m = (struct chorus_module *)module;
+    // struct chorus_module *m = (struct chorus_module *)module;
 }
 
 void chorus_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)

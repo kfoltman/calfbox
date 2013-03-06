@@ -61,7 +61,6 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     const char *pos = strchr(obj, '/');
     if (pos)
     {
-        int len = pos - obj;
         if (!strncmp(obj, "master/", 7))
             return cbox_execute_sub(&app.rt->master->cmd_target, fb, cmd, pos, error);
         else
@@ -147,6 +146,8 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
                 struct cbox_blob *blob = cbox_midi_pattern_to_blob(pattern, &length);
                 gboolean res = cbox_execute_on(fb, NULL, "/pattern", "bi", error, blob, length);
                 cbox_blob_destroy(blob);
+                if (!res)
+                    return FALSE;
             }
         }
         return TRUE;

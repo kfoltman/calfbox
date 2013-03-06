@@ -275,7 +275,9 @@ struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *
 
 static void iter_func(gpointer key, gpointer value, gpointer doc_)
 {
+#ifndef NDEBUG
     struct cbox_document *doc = (struct cbox_document *)doc_;
+#endif
     struct cbox_class *class_ptr = key;
     struct cbox_class_per_document *cpd = value;
     int first = 1;
@@ -305,7 +307,6 @@ static void iter_func2(gpointer key, gpointer value, gpointer document)
     struct cbox_objhdr *oh = value;
     char buf[40];
     uuid_unparse(oh->instance_uuid.uuid, buf);
-    int first = 1;
     printf("Service %s: %p", (const char *)key, value);
     fflush(stdout);
     printf("[%s]", buf);
