@@ -199,7 +199,7 @@ void cbox_usbio_poll_ports(struct cbox_io_impl *impl)
 
 gboolean cbox_usbio_cycle(struct cbox_io_impl *impl, GError **error)
 {
-    struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
+    // struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
     // XXXKF: this is for restarting the thing; not implemented for now,
     // the implementation will be something like in case of JACK - close and
     // reopen.

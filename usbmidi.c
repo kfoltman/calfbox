@@ -177,7 +177,7 @@ struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *u
     
     // Drain the output buffer of the device - otherwise playing a few notes and running the program will cause
     // those notes to play.
-    char flushbuf[256];
+    unsigned char flushbuf[256];
     int transferred = 0;
     while(0 == libusb_bulk_transfer(handle, umi->endpoint, flushbuf, umi->max_packet_size, &transferred, 10) && transferred > 0)
         usleep(1000);

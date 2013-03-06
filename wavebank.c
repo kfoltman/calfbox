@@ -39,7 +39,7 @@ static complex float euler_table[STD_WAVEFORM_FRAMES];
 static int map_table[STD_WAVEFORM_FRAMES];
 
 // Initialise tables using for FFT
-static void init_tables()
+static void init_tables(void)
 {
     int rev = 1 << (STD_WAVEFORM_BITS - 1);
     for (int i = 0; i < STD_WAVEFORM_FRAMES; i++)
@@ -125,7 +125,7 @@ struct wave_bank
 
 static struct wave_bank bank;
 
-GQuark cbox_waveform_error_quark()
+GQuark cbox_waveform_error_quark(void)
 {
     return g_quark_from_string("cbox-waveform-error-quark");
 }

@@ -107,7 +107,7 @@ void cbox_midi_buffer_merge(struct cbox_midi_buffer *output, struct cbox_midi_bu
 {
     while(1)
     {
-        int first_event_time = 0, first_event_input = -1;
+        int first_event_input = -1;
         struct cbox_midi_event *first_event = NULL;
         for (int i = 0; i < count; i++)
         {

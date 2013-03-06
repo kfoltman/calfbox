@@ -308,7 +308,6 @@ gboolean cbox_scene_load(struct cbox_scene *s, const char *name, GError **error)
     for (i = 1; ; i++)
     {
         struct cbox_layer *l = NULL;
-        int j;
         
         gchar *sn = g_strdup_printf("layer%d", i);
         cv = cbox_config_get_string(section, sn);
@@ -703,7 +702,6 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_m
 
 void cbox_scene_clear(struct cbox_scene *scene)
 {
-    int i;
     g_free(scene->name);
     g_free(scene->title);
     scene->name = g_strdup("");
