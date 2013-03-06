@@ -23,6 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * Autodetect JACK config based on cbox configuration vs ALSA devices present.
  * @retval 1 if OK
  */
-extern int cbox_hwcfg_setup_jack();
+extern int cbox_hwcfg_setup_jack(void);
 
 #endif

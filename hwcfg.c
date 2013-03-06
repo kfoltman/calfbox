@@ -98,7 +98,6 @@ static int try_soundcard(const char *name)
             g_error("Invalid VID:PID value: %s", id);
             return 0;
         }
-        int i;
         for (int i = 0; ; i++)
         {
             struct stat s;
@@ -140,7 +139,7 @@ static int try_soundcard(const char *name)
     return 0;
 }
 
-int cbox_hwcfg_setup_jack()
+int cbox_hwcfg_setup_jack(void)
 {
     int i;
     if (!cbox_config_has_section("autojack"))
