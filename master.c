@@ -219,16 +219,13 @@ static int seek_transport_execute(void *arg_)
     if (arg->master->state != CMTS_STOP)
         return 0;
     
-    if (arg->master->state == CMTS_STOP)
-    {
-        if (arg->is_ppqn)
-            cbox_song_playback_seek_ppqn(arg->master->spb, arg->target_pos, FALSE);
-        else
-            cbox_song_playback_seek_samples(arg->master->spb, arg->target_pos);
-        if (arg->was_rolling)
-            arg->master->state = CMTS_ROLLING;
-        return 1;
-    }
+    if (arg->is_ppqn)
+        cbox_song_playback_seek_ppqn(arg->master->spb, arg->target_pos, FALSE);
+    else
+        cbox_song_playback_seek_samples(arg->master->spb, arg->target_pos);
+    if (arg->was_rolling)
+        arg->master->state = CMTS_ROLLING;
+    return 1;
 }
 
 void cbox_master_seek_ppqn(struct cbox_master *master, uint32_t pos_ppqn)
