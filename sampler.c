@@ -908,8 +908,7 @@ static void swap_program(struct sampler_module *m, int index, struct sampler_pro
 {
     static struct cbox_rt_cmd_definition release_program_voices = { NULL, release_program_voices_execute, NULL };
     
-    
-    struct sampler_program *old_program;
+    struct sampler_program *old_program = NULL;
     if (pgm)
         old_program = cbox_rt_swap_pointers(m->module.rt, (void **)&m->programs[index], pgm);
     else
@@ -922,7 +921,7 @@ static void swap_program(struct sampler_module *m, int index, struct sampler_pro
 
     cbox_rt_execute_cmd_sync(m->module.rt, &release_program_voices, &data);
     
-    if (delete_old)
+    if (delete_old && old_program)
         CBOX_DELETE(old_program);
 }
 
