@@ -41,7 +41,7 @@ enum CboxStreamPlayerError
     CBOX_STREAM_PLAYER_ERROR_FAILED,
 };
 
-GQuark cbox_stream_player_error_quark()
+GQuark cbox_stream_player_error_quark(void)
 {
     return g_quark_from_string("cbox-stream-player-error-quark");
 }

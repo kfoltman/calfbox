@@ -81,7 +81,6 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
 {
     struct sfz_load_state *ls = client->user_data;
     struct sampler_layer *l = ls->region ? ls->region : ls->group;
-    int unhandled = 0;
     if (!ls->region && !ls->group)
     {
         g_warning("Cannot use parameter '%s' outside of region or group", key);

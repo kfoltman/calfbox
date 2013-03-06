@@ -200,7 +200,7 @@ gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
         return FALSE;
     }
     fclose(f);
-    gboolean result = load_sfz_from_string(buf, len, c, error);
+    gboolean result = load_sfz_from_string((char *)buf, len, c, error);
     free(buf);
     return result;
 }
@@ -234,7 +234,7 @@ gboolean load_sfz_from_string(const char *buf, int len, struct sfz_parser_client
     return TRUE;
 }
 
-GQuark cbox_sfz_parser_error_quark()
+GQuark cbox_sfz_parser_error_quark(void)
 {
     return g_quark_from_string("cbox-sfz-parser-error-quark");
 }

@@ -71,7 +71,7 @@ gboolean tone_control_process_cmd(struct cbox_command_target *ct, struct cbox_co
 
 void tone_control_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
-    struct tone_control_module *m = (struct tone_control_module *)module;
+    // struct tone_control_module *m = (struct tone_control_module *)module;
 }
 
 void tone_control_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
