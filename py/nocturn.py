@@ -68,7 +68,7 @@ class NocturnHandler(threading.Thread):
                     continue
                 handler(data[i], data[i + 1])
                 i += 2
-        except IOError, e:
+        except IOError as e:
             pass
     def get_poll_fd(self):
         return self.rpipefd
@@ -113,7 +113,7 @@ class Nocturn:
         try:
             data = self.ep2.read(8, None)
             return buffer(data)
-        except usb.core.USBError, e:
+        except usb.core.USBError as e:
             return None
     def poll(self, handler):
         return self.reader.poll(handler)
