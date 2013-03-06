@@ -30,14 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <memory.h>
 #include <stdio.h>
 
+// #define LOW_QUALITY_INTERPOLATION
+
 #define PREPARE_LOOP \
-    uint32_t loop_end = v->layer->loop_end ? v->layer->loop_end : v->cur_sample_end; \
+    uint32_t __attribute__((unused)) loop_end = v->layer->loop_end ? v->layer->loop_end : v->cur_sample_end; \
     gboolean post_sustain = v->released && v->loop_mode == slm_loop_sustain; \
     if (post_sustain) \
         loop_end = v->cur_sample_end; \
 
 #define IS_LOOP_FINISHED \
     v->loop_mode == slm_no_loop || v->loop_mode == slm_one_shot || v->loop_mode == slm_one_shot_chokeable || post_sustain
+
+
+#if LOW_QUALITY_INTERPOLATION
 
 static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
 {
@@ -78,6 +83,8 @@ static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
     }
     return CBOX_BLOCK_SIZE;
 }
+
+#else
 
 static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
 {
@@ -153,6 +160,10 @@ static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
     return CBOX_BLOCK_SIZE;
 }
 
+#endif
+
+#if LOW_QUALITY_INTERPOLATION
+
 static uint32_t process_voice_stereo_lerp(struct sampler_voice *v, float **output)
 {
     float lgain = v->last_lgain;
@@ -193,6 +204,8 @@ static uint32_t process_voice_stereo_lerp(struct sampler_voice *v, float **outpu
     }
     return CBOX_BLOCK_SIZE;
 }
+
+#else
 
 static inline uint32_t process_voice_stereo_noloop(struct sampler_voice *v, float **output)
 {
@@ -314,12 +327,20 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
     return CBOX_BLOCK_SIZE;
 }
 
+#endif
 
 uint32_t sampler_voice_sample_playback(struct sampler_voice *v, float **tmp_outputs)
 {
+#if LOW_QUALITY_INTERPOLATION    
+    if (v->mode == spt_stereo16)
+        return process_voice_stereo_lerp(v, tmp_outputs);
+    else
+        return process_voice_mono_lerp(v, tmp_outputs);
+#else
     if (v->mode == spt_stereo16)
         return process_voice_stereo(v, tmp_outputs);
     else
         return process_voice_mono(v, tmp_outputs);
+#endif
 }
 
