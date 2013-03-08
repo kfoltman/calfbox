@@ -182,7 +182,7 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
         g_free(config_key);
     }
     gchar *cbox_port = g_strdup_printf("%s:midi", jii->client_name);
-    autoconnect(jii->client, "%s:midi", "midi", 1, 1, portobj);     
+    autoconnect(jii->client, cbox_port, "midi", 1, 1, portobj);     
     free(cbox_port);
 }
 
