@@ -42,6 +42,7 @@ struct cbox_jack_io_impl
     jack_port_t **outputs;
     jack_port_t *midi;
     char *error_str; // set to non-NULL if client has been booted out by JACK
+    char *client_name;
 
     jack_ringbuffer_t *rb_autoconnect;    
 };
@@ -166,7 +167,7 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
 
     for (int i = 0; i < io->output_count; i++)
     {
-        gchar *cbox_port = g_strdup_printf("cbox:out_%d", 1 + i);
+        gchar *cbox_port = g_strdup_printf("%s:out_%d", jii->client_name, 1 + i);
         gchar *config_key = g_strdup_printf("out_%d", 1 + i);
         autoconnect(jii->client, cbox_port, config_key, 0, 0, portobj);
         g_free(cbox_port);
@@ -174,13 +175,15 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
     }
     for (int i = 0; i < io->input_count; i++)
     {
-        gchar *cbox_port = g_strdup_printf("cbox:in_%d", 1 + i);
+        gchar *cbox_port = g_strdup_printf("%s:in_%d", jii->client_name, 1 + i);
         gchar *config_key = g_strdup_printf("in_%d", 1 + i);
         autoconnect(jii->client, cbox_port, config_key, 1, 0, portobj);
         g_free(cbox_port);
         g_free(config_key);
     }
-    autoconnect(jii->client, "cbox:midi", "midi", 1, 1, portobj);        
+    gchar *cbox_port = g_strdup_printf("%s:midi", jii->client_name);
+    autoconnect(jii->client, "%s:midi", "midi", 1, 1, portobj);     
+    free(cbox_port);
 }
 
 int cbox_jackio_get_sample_rate(struct cbox_io_impl *impl)
@@ -297,10 +300,16 @@ void cbox_jackio_destroy(struct cbox_io_impl *impl)
             if (jii->midi)
                 jack_port_unregister(jii->client, jii->midi);
         }
+        if (jii->client_name)
+        {
+            free(jii->client_name);
+            jii->client_name = NULL;
+        }
         
         jack_ringbuffer_free(jii->rb_autoconnect);
         jack_client_close(jii->client);
     }
+    free(jii);
 }
 
 gboolean cbox_jackio_cycle(struct cbox_io_impl *impl, GError **error)
@@ -325,9 +334,11 @@ gboolean cbox_jackio_cycle(struct cbox_io_impl *impl, GError **error)
 
 gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
 {
+    const char *client_name = cbox_config_get_string_with_default("io", "client_name", "cbox");
+    
     jack_client_t *client = NULL;
     jack_status_t status = 0;
-    client = jack_client_open("cbox", JackNoStartServer, &status);
+    client = jack_client_open(client_name, JackNoStartServer, &status);
     if (client == NULL)
     {
         if (!cbox_hwcfg_setup_jack())
@@ -337,7 +348,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
         }
         
         status = 0;
-        client = jack_client_open("cbox", 0, &status);
+        client = jack_client_open(client_name, 0, &status);
     }
     if (client == NULL)
     {
@@ -366,6 +377,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     jii->ioi.getmidifunc = cbox_jackio_get_midi_data;
     jii->ioi.destroyfunc = cbox_jackio_destroy;
     
+    jii->client_name = g_strdup(jack_get_client_name(client));
     jii->client = client;
     jii->rb_autoconnect = jack_ringbuffer_create(sizeof(jack_port_t *) * 128);
     jii->error_str = NULL;
@@ -425,6 +437,8 @@ cleanup:
             free(jii->outputs[i]);
         free(jii->outputs);
     }
+    if (jii->client_name)
+        free(jii->client_name);
     jack_client_close(jii->client);
     free(jii);
     io->impl = NULL;
