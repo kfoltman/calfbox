@@ -40,11 +40,11 @@ struct cbox_io_impl
     struct cbox_io *pio;
 
     int (*getsampleratefunc)(struct cbox_io_impl *ioi);
-    gboolean (*startfunc)(struct cbox_io_impl *ioi, GError **error);
+    gboolean (*startfunc)(struct cbox_io_impl *ioi, struct cbox_command_target *fb, GError **error);
     gboolean (*stopfunc)(struct cbox_io_impl *ioi, GError **error);
-    gboolean (*cyclefunc)(struct cbox_io_impl *ioi, GError **error);
+    gboolean (*cyclefunc)(struct cbox_io_impl *ioi, struct cbox_command_target *fb, GError **error);
     gboolean (*getstatusfunc)(struct cbox_io_impl *ioi, GError **error);
-    void (*pollfunc)(struct cbox_io_impl *ioi);
+    void (*pollfunc)(struct cbox_io_impl *ioi, struct cbox_command_target *fb);
     int (*getmidifunc)(struct cbox_io_impl *ioi, struct cbox_midi_buffer *destination);
     void (*destroyfunc)(struct cbox_io_impl *ioi);
 };
@@ -71,11 +71,11 @@ struct cbox_io_callbacks
     void (*on_reconnected)(void *user_data);
 };
 
-extern gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, GError **error);
-extern gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, GError **error);
-extern gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, GError **error);
+extern gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error);
+extern gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error);
+extern gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error);
 
-extern int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb);
+extern int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb, struct cbox_command_target *fb);
 extern int cbox_io_stop(struct cbox_io *io);
 extern int cbox_io_get_sample_rate(struct cbox_io *io);
 static inline int cbox_io_get_buffer_size(struct cbox_io *io)
@@ -84,8 +84,8 @@ static inline int cbox_io_get_buffer_size(struct cbox_io *io)
 }
 extern int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *destination);
 extern gboolean cbox_io_get_disconnect_status(struct cbox_io *io, GError **error);
-extern gboolean cbox_io_cycle(struct cbox_io *io, GError **error);
-extern void cbox_io_poll_ports(struct cbox_io *io);
+extern gboolean cbox_io_cycle(struct cbox_io *io, struct cbox_command_target *fb, GError **error);
+extern void cbox_io_poll_ports(struct cbox_io *io, struct cbox_command_target *fb);
 extern void cbox_io_close(struct cbox_io *io);
 
 extern const char *cbox_io_section;

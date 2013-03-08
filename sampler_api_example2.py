@@ -1,7 +1,10 @@
 from calfbox import cbox
 
+def cmd_dumper(cmd, fb, args):
+    print ("%s(%s)" % (cmd, ",".join(list(map(repr,args)))))
+
 cbox.init_engine()
-cbox.start_audio()
+cbox.start_audio(cmd_dumper)
 
 global Document
 Document = cbox.Document
@@ -21,4 +24,4 @@ for i in pgm.get_groups():
 print("Ready!")
 
 while True:
-    cbox.call_on_idle()
+    cbox.call_on_idle(cmd_dumper)

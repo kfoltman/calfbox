@@ -338,7 +338,8 @@ static PyObject *cbox_python_shutdown_engine(PyObject *self, PyObject *args)
 
 static PyObject *cbox_python_start_audio(PyObject *self, PyObject *args)
 {
-    if (!PyArg_ParseTuple(args, ":start_audio"))
+    PyObject *callback = NULL;
+    if (!PyArg_ParseTuple(args, "|O:start_audio", &callback))
         return NULL;
     if (!engine_initialised)
         return PyErr_Format(PyExc_Exception, "Engine not initialised");
@@ -347,12 +348,17 @@ static PyObject *cbox_python_start_audio(PyObject *self, PyObject *args)
 
     struct cbox_open_params params;
     GError *error = NULL;
-    if (!cbox_io_init(&app.io, &params, &error))
+    
+    struct cbox_command_target target;
+    if (callback && callback != Py_None)
+        cbox_command_target_init(&target, bridge_to_python_callback, callback);
+
+    if (!cbox_io_init(&app.io, &params, (callback && callback != Py_None) ? &target : NULL, &error))
         return PyErr_Format(PyExc_IOError, "Cannot initialise sound I/O: %s", (error && error->message) ? error->message : "Unknown error");
 
     cbox_rt_set_io(app.rt, &app.io);
     cbox_rt_set_scene(app.rt, cbox_scene_new(app.document, app.rt, FALSE));
-    cbox_rt_start(app.rt);
+    cbox_rt_start(app.rt, (callback && callback != Py_None) ? &target : NULL);
     audio_running = TRUE;
 
     Py_INCREF(Py_None);

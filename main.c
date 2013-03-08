@@ -106,7 +106,7 @@ static int (*old_menu_on_idle)(struct cbox_ui_page *page);
 
 static int on_idle_with_ui_poll(struct cbox_ui_page *page)
 {
-    cbox_app_on_idle();
+    cbox_app_on_idle(NULL);
     
     if (old_menu_on_idle)
         return old_menu_on_idle(page);
@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
     else
     {
         GError *error = NULL;
-        if (!cbox_io_init(&app.io, &params, &error))
+        if (!cbox_io_init(&app.io, &params, NULL, &error))
         {
             fprintf(stderr, "Cannot initialise sound I/O: %s\n", (error && error->message) ? error->message : "Unknown error");
             return 1;
@@ -302,7 +302,7 @@ int main(int argc, char *argv[])
         if (!cbox_recording_source_attach(&scene->rec_stereo_outputs[0], cbox_recorder_new_stream(app.rt, output_name), &error))
             cbox_print_error(error);
     }
-    cbox_rt_start(app.rt);
+    cbox_rt_start(app.rt, NULL);
     if (drum_pattern_name)
         cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load(app.rt->master->song, drum_pattern_name, 1));
     else if (drum_track_name)
@@ -330,7 +330,7 @@ int main(int argc, char *argv[])
             if (ch == 10 || (ch == -1 && errno != EWOULDBLOCK))
                 break;
             usleep(100000);
-            cbox_app_on_idle();
+            cbox_app_on_idle(NULL);
         } while(1);
         fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) &~ O_NONBLOCK);
     }

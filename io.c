@@ -32,11 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 const char *cbox_io_section = "io";
 
-gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
+gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error)
 {
     if (cbox_config_get_int(cbox_io_section, "use_usb", 0))
-        return cbox_io_init_usb(io, params, error);
-    return cbox_io_init_jack(io, params, error);
+        return cbox_io_init_usb(io, params, fb, error);
+    return cbox_io_init_jack(io, params, fb, error);
 }
 
 int cbox_io_get_sample_rate(struct cbox_io *io)
@@ -44,9 +44,9 @@ int cbox_io_get_sample_rate(struct cbox_io *io)
     return io->impl->getsampleratefunc(io->impl);
 }
 
-void cbox_io_poll_ports(struct cbox_io *io)
+void cbox_io_poll_ports(struct cbox_io *io, struct cbox_command_target *fb)
 {
-    io->impl->pollfunc(io->impl);
+    io->impl->pollfunc(io->impl, fb);
 }
 
 int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *destination)
@@ -54,10 +54,10 @@ int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *destinati
     return io->impl->getmidifunc(io->impl, destination);
 }
 
-int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb)
+int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb, struct cbox_command_target *fb)
 {
     io->cb = cb;
-    return io->impl->startfunc(io->impl, NULL);
+    return io->impl->startfunc(io->impl, fb, NULL);
 }
 
 gboolean cbox_io_get_disconnect_status(struct cbox_io *io, GError **error)
@@ -65,9 +65,9 @@ gboolean cbox_io_get_disconnect_status(struct cbox_io *io, GError **error)
     return io->impl->getstatusfunc(io->impl, error);
 }
 
-gboolean cbox_io_cycle(struct cbox_io *io, GError **error)
+gboolean cbox_io_cycle(struct cbox_io *io, struct cbox_command_target *fb, GError **error)
 {
-    return io->impl->cyclefunc(io->impl, error);
+    return io->impl->cyclefunc(io->impl, fb, error);
 }
 
 int cbox_io_stop(struct cbox_io *io)

@@ -73,7 +73,7 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
     {
         if (rt->io && !cbox_io_get_disconnect_status(rt->io, NULL))
         {
-            return cbox_io_cycle(rt->io, error);
+            return cbox_io_cycle(rt->io, fb, error);
         }
         else
         {
@@ -225,7 +225,7 @@ void cbox_rt_set_offline(struct cbox_rt *rt, int sample_rate, int buffer_size)
     cbox_master_set_sample_rate(rt->master, rt->srate);
 }
 
-void cbox_rt_start(struct cbox_rt *rt)
+void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
 {
     if (rt->io)
     {
@@ -236,7 +236,7 @@ void cbox_rt_start(struct cbox_rt *rt)
         rt->cbs->on_disconnected = cbox_rt_on_disconnected;
         rt->cbs->on_reconnected = cbox_rt_on_reconnected;
 
-        cbox_io_start(rt->io, rt->cbs);
+        cbox_io_start(rt->io, rt->cbs, fb);
     }
 }
 

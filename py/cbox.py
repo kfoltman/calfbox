@@ -116,8 +116,8 @@ class Transport:
     def tell():
         return GetThings("/master/tell", ['pos', 'pos_ppqn', 'playing'], [])
 
-def call_on_idle():
-    do_cmd("/on_idle", None, [])
+def call_on_idle(callback = None):
+    do_cmd("/on_idle", callback, [])
         
 class CfgSection:
     def __init__(self, name):

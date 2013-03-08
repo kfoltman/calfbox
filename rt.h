@@ -69,7 +69,7 @@ extern struct cbox_rt *cbox_rt_new(struct cbox_document *doc);
 
 extern void cbox_rt_set_io(struct cbox_rt *rt, struct cbox_io *io);
 extern void cbox_rt_set_offline(struct cbox_rt *rt, int sample_rate, int buffer_size);
-extern void cbox_rt_start(struct cbox_rt *rt);
+extern void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb);
 extern void cbox_rt_handle_cmd_queue(struct cbox_rt *rt);
 extern void cbox_rt_stop(struct cbox_rt *rt);
 

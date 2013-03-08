@@ -149,7 +149,7 @@ static void *engine_thread(void *user_data)
     return NULL;
 }
 
-gboolean cbox_usbio_start(struct cbox_io_impl *impl, GError **error)
+gboolean cbox_usbio_start(struct cbox_io_impl *impl, struct cbox_command_target *fb, GError **error)
 {
     struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
 
@@ -182,7 +182,7 @@ gboolean cbox_usbio_stop(struct cbox_io_impl *impl, GError **error)
     return TRUE;
 }
 
-void cbox_usbio_poll_ports(struct cbox_io_impl *impl)
+void cbox_usbio_poll_ports(struct cbox_io_impl *impl, struct cbox_command_target *fb)
 {
     struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
 
@@ -193,11 +193,11 @@ void cbox_usbio_poll_ports(struct cbox_io_impl *impl)
         cbox_usbio_stop(&uii->ioi, NULL);
         // Re-scan, this time actually create the MIDI inputs
         usbio_scan_devices(uii, FALSE);
-        cbox_usbio_start(&uii->ioi, NULL);
+        cbox_usbio_start(&uii->ioi, fb, NULL);
     }
 }
 
-gboolean cbox_usbio_cycle(struct cbox_io_impl *impl, GError **error)
+gboolean cbox_usbio_cycle(struct cbox_io_impl *impl, struct cbox_command_target *fb, GError **error)
 {
     // struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
     // XXXKF: this is for restarting the thing; not implemented for now,
@@ -295,7 +295,7 @@ void usbio_transfer_destroy(struct usbio_transfer *xfer)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
+gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error)
 {
     struct cbox_usb_io_impl *uii = malloc(sizeof(struct cbox_usb_io_impl));
     if (libusb_init(&uii->usbctx))

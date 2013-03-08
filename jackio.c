@@ -70,7 +70,7 @@ static int process_cb(jack_nframes_t nframes, void *arg)
     return 0;
 }
 
-static void autoconnect_port(jack_client_t *client, const char *port, const char *use_name, int is_cbox_input, const jack_port_t *only_connect_port)
+static void autoconnect_port(jack_client_t *client, const char *port, const char *use_name, int is_cbox_input, const jack_port_t *only_connect_port, struct cbox_command_target *fb)
 {
     int res;
     if (only_connect_port)
@@ -81,14 +81,23 @@ static void autoconnect_port(jack_client_t *client, const char *port, const char
             return;
     }
     
-    if (is_cbox_input)
-        res = jack_connect(client, use_name, port);
-    else
-        res = jack_connect(client, port, use_name);    
-    g_message("Connect: %s %s %s (%s)", port, is_cbox_input ? "<-" : "->", use_name, res == 0 ? "success" : (res == EEXIST ? "already connected" : "failed"));
+    const char *pfrom = is_cbox_input ? use_name : port;
+    const char *pto = !is_cbox_input ? use_name : port;
+    
+    res = jack_connect(client, pfrom, pto);
+    gboolean suppressed = FALSE;
+    if (fb)
+    {
+        if (!res)
+            suppressed = cbox_execute_on(fb, NULL, "/io/jack/connected", "ss", NULL, pfrom, pto);
+        else
+            suppressed = cbox_execute_on(fb, NULL, "/io/jack/connect_failed", "sss", NULL, pfrom, pto, (res == EEXIST ? "already connected" : "failed"));
+    }
+    if (!suppressed)
+        g_message("Connect: %s %s %s (%s)", port, is_cbox_input ? "<-" : "->", use_name, res == 0 ? "success" : (res == EEXIST ? "already connected" : "failed"));
 }
 
-static void autoconnect(jack_client_t *client, const char *port, const char *config_var, int is_cbox_input, int is_midi, const jack_port_t *only_connect_port)
+static void autoconnect(jack_client_t *client, const char *port, const char *config_var, int is_cbox_input, int is_midi, const jack_port_t *only_connect_port, struct cbox_command_target *fb)
 {
     char *name, *orig_name, *dpos;
     const char *use_name;
@@ -115,7 +124,7 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
                         ;
                     
                     if (names[i])
-                        autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port);
+                        autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port, fb);
                     else
                         g_message("Connect: unmatched port index %d", (int)portidx);
                     
@@ -132,17 +141,17 @@ static void autoconnect(jack_client_t *client, const char *port, const char *con
                     {
                         int i;
                         for (i = 0; names[i]; i++)
-                            autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port);
+                            autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port, fb);
                     }
                     else
-                        autoconnect_port(client, port, names[0], is_cbox_input, only_connect_port);
+                        autoconnect_port(client, port, names[0], is_cbox_input, only_connect_port, fb);
                 }
                 else
                     g_message("Connect: unmatched port regexp %s", use_name);
                 jack_free(names);
             }
             else
-                autoconnect_port(client, port, use_name, is_cbox_input, only_connect_port);
+                autoconnect_port(client, port, use_name, is_cbox_input, only_connect_port, fb);
 
             if (dpos)
                 name = dpos + 1;
@@ -161,7 +170,7 @@ static void port_connect_cb(jack_port_id_t port, int registered, void *arg)
     }
 }
 
-static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj)
+static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj, struct cbox_command_target *fb)
 {
     struct cbox_io *io = jii->ioi.pio;
 
@@ -169,7 +178,7 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
     {
         gchar *cbox_port = g_strdup_printf("%s:out_%d", jii->client_name, 1 + i);
         gchar *config_key = g_strdup_printf("out_%d", 1 + i);
-        autoconnect(jii->client, cbox_port, config_key, 0, 0, portobj);
+        autoconnect(jii->client, cbox_port, config_key, 0, 0, portobj, fb);
         g_free(cbox_port);
         g_free(config_key);
     }
@@ -177,12 +186,12 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
     {
         gchar *cbox_port = g_strdup_printf("%s:in_%d", jii->client_name, 1 + i);
         gchar *config_key = g_strdup_printf("in_%d", 1 + i);
-        autoconnect(jii->client, cbox_port, config_key, 1, 0, portobj);
+        autoconnect(jii->client, cbox_port, config_key, 1, 0, portobj, fb);
         g_free(cbox_port);
         g_free(config_key);
     }
     gchar *cbox_port = g_strdup_printf("%s:midi", jii->client_name);
-    autoconnect(jii->client, cbox_port, "midi", 1, 1, portobj);     
+    autoconnect(jii->client, cbox_port, "midi", 1, 1, portobj, fb);
     free(cbox_port);
 }
 
@@ -211,7 +220,7 @@ static void client_shutdown_cb(jack_status_t code, const char *reason, void *arg
         (io->cb->on_disconnected)(io->cb->user_data);
 }
 
-gboolean cbox_jackio_start(struct cbox_io_impl *impl, GError **error)
+gboolean cbox_jackio_start(struct cbox_io_impl *impl, struct cbox_command_target *fb, GError **error)
 {
     struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
     
@@ -221,7 +230,7 @@ gboolean cbox_jackio_start(struct cbox_io_impl *impl, GError **error)
     jack_activate(jii->client);
 
     if (cbox_config_has_section(cbox_io_section))
-        port_autoconnect(jii, NULL);
+        port_autoconnect(jii, NULL, fb);
     
     return TRUE;
 }
@@ -239,7 +248,7 @@ gboolean cbox_jackio_stop(struct cbox_io_impl *impl, GError **error)
     return TRUE;
 }
 
-void cbox_jackio_poll_ports(struct cbox_io_impl *impl)
+void cbox_jackio_poll_ports(struct cbox_io_impl *impl, struct cbox_command_target *fb)
 {
     struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
 
@@ -247,7 +256,7 @@ void cbox_jackio_poll_ports(struct cbox_io_impl *impl)
     {
         jack_port_t *portobj;
         jack_ringbuffer_read(jii->rb_autoconnect, (char *)&portobj, sizeof(portobj));
-        port_autoconnect(jii, portobj);
+        port_autoconnect(jii, portobj, fb);
     }
 }
 
@@ -312,17 +321,17 @@ void cbox_jackio_destroy(struct cbox_io_impl *impl)
     free(jii);
 }
 
-gboolean cbox_jackio_cycle(struct cbox_io_impl *impl, GError **error)
+gboolean cbox_jackio_cycle(struct cbox_io_impl *impl, struct cbox_command_target *fb, GError **error)
 {
     struct cbox_io *io = impl->pio;
     struct cbox_io_callbacks *cb = io->cb;
     cbox_io_close(io);
     
     // XXXKF use params structure some day
-    if (!cbox_io_init_jack(io, NULL, error))
+    if (!cbox_io_init_jack(io, NULL, fb, error))
         return FALSE;
     
-    cbox_io_start(io, cb);
+    cbox_io_start(io, cb, fb);
     if (cb->on_reconnected)
         (cb->on_reconnected)(cb->user_data);
     return TRUE;
@@ -332,7 +341,7 @@ gboolean cbox_jackio_cycle(struct cbox_io_impl *impl, GError **error)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, GError **error)
+gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error)
 {
     const char *client_name = cbox_config_get_string_with_default("io", "client_name", "cbox");
     
@@ -419,8 +428,10 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create MIDI port");
         return FALSE;
     }
-
-    cbox_io_poll_ports(io);
+    if (fb)
+        cbox_execute_on(fb, NULL, "/io/jack_client_name", "s", NULL, jii->client_name);
+    
+    cbox_io_poll_ports(io, fb);
 
     return TRUE;
 

@@ -90,7 +90,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     else
     if (!strcmp(obj, "on_idle") && !strcmp(cmd->arg_types, ""))
     {
-        cbox_app_on_idle();
+        cbox_app_on_idle(fb);
         return TRUE;
     }
     else
@@ -295,13 +295,13 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void cbox_app_on_idle()
+void cbox_app_on_idle(struct cbox_command_target *fb)
 {
     if (app.rt->io)
     {
         GError *error = NULL;
         if (cbox_io_get_disconnect_status(&app.io, &error))
-            cbox_io_poll_ports(&app.io);
+            cbox_io_poll_ports(&app.io, fb);
         else
         {
             if (error)
@@ -311,8 +311,19 @@ void cbox_app_on_idle()
             {
                 sleep(auto_reconnect);
                 GError *error = NULL;
-                if (!cbox_io_cycle(&app.io, &error))
-                    g_warning("Cannot cycle the I/O: %s", (error && error->message) ? error->message : "Unknown error");
+                if (!cbox_io_cycle(&app.io, fb, &error))
+                {
+                    gboolean suppress = FALSE;
+                    if (fb)
+                        suppress = cbox_execute_on(fb, NULL, "/io/cycle_failed", "s", NULL, error->message);
+                    if (!suppress)
+                        g_warning("Cannot cycle the I/O: %s", (error && error->message) ? error->message : "Unknown error");
+                }
+                else
+                {
+                    if (fb)
+                        cbox_execute_on(fb, NULL, "/io/cycled", "", NULL);
+                }
             }
         }
     }
