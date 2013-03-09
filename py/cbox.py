@@ -86,6 +86,18 @@ class Config:
             do_cmd('/config/save', None, [])
         else:
             do_cmd('/config/save', None, [str(filename)])
+            
+    @staticmethod
+    def add_section(section, content):
+        for line in content.splitlines():
+            line = line.strip()
+            if line == '' or line.startswith('#'):
+                continue
+            try:
+                key, value = line.split("=", 2)
+            except ValueError as err:
+                raise ValueError("Cannot parse config line '%s'" % line)
+            Config.set(section, key.strip(), value.strip())
 
 class Transport:
     @staticmethod
