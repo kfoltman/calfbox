@@ -33,6 +33,7 @@ try at breaking it up into manageable parts.
 #include "errors.h"
 #include "io.h"
 #include "midi.h"
+#include "mididest.h"
 
 struct usbio_endpoint_descriptor
 {
@@ -84,9 +85,12 @@ struct cbox_usb_io_impl
     
     GList *midi_input_ports;
     GList *rt_midi_input_ports;
+    struct cbox_midi_merger midi_input_merger;
+    /*
     struct cbox_midi_buffer **midi_input_port_buffers;
     int *midi_input_port_pos;
     int midi_input_port_count;
+    */
     void (*play_function)(struct cbox_usb_io_impl *uii);
     int8_t audio_output_endpoint;
     int8_t audio_sync_endpoint;

@@ -93,20 +93,14 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
 void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
 {
     uii->rt_midi_input_ports = g_list_copy(uii->midi_input_ports);
-    uii->midi_input_port_count = 0;
 
-    for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
-        uii->midi_input_port_count++;
-    uii->midi_input_port_buffers = calloc(uii->midi_input_port_count, sizeof(struct cbox_midi_buffer *));
-    uii->midi_input_port_pos = calloc(uii->midi_input_port_count, sizeof(int));
-    int pn = 0;
     for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
         struct cbox_usb_midi_input *umi = p->data;
         cbox_midi_buffer_clear(&umi->midi_buffer);
+        cbox_midi_merger_connect(&uii->midi_input_merger, &umi->midi_buffer, NULL);
         umi->transfer = usbio_transfer_new(uii->usbctx,  "MIDI In", 0, 0, umi);
         libusb_fill_bulk_transfer(umi->transfer->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, umi->max_packet_size, midi_transfer_cb, umi->transfer, 0);
-        uii->midi_input_port_buffers[pn++] = &umi->midi_buffer;
     }
     for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
@@ -134,8 +128,6 @@ void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii)
         umi->transfer = NULL;
         cbox_midi_buffer_clear(&umi->midi_buffer);
     }
-    free(uii->midi_input_port_buffers);
-    free(uii->midi_input_port_pos);
     g_list_free(uii->rt_midi_input_ports);
 }
 

@@ -327,11 +327,13 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
     spb->min_time_ppqn = 0;
     spb->loop_start_ppqn = song->loop_start_ppqn;
     spb->loop_end_ppqn = song->loop_end_ppqn;
+    cbox_midi_merger_init(&spb->track_merger, NULL);
     int pos = 0;
     for (GList *p = song->tracks; p != NULL; p = g_list_next(p))
     {
         struct cbox_track *trk = p->data;
         spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master, spb);
+        cbox_midi_merger_connect(&spb->track_merger, &spb->tracks[pos - 1]->output_buffer, NULL);
     }
     
     spb->tempo_map_item_count = g_list_length(song->master_track_items);
@@ -484,13 +486,7 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
             }
             rpos = rend;
         }
-        int bpos[MAX_TRACKS];
-        for(int i = 0; i < spb->track_count; i++)
-        {
-            midibufsrcs[i] = &spb->tracks[i]->output_buffer;
-            bpos[i] = 0;
-        }
-        cbox_midi_buffer_merge(output, midibufsrcs, spb->track_count, bpos);
+        cbox_midi_merger_render_to(&spb->track_merger, output);
     }
 }
 

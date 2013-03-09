@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010-2011 Krzysztof Foltman
+Copyright (C) 2010-2013 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -117,8 +117,6 @@ extern int cbox_midi_buffer_write_event(struct cbox_midi_buffer *buffer, uint32_
 extern int cbox_midi_buffer_write_inline(struct cbox_midi_buffer *buffer, uint32_t time, ...);
 
 extern int cbox_midi_buffer_copy_event(struct cbox_midi_buffer *buffer, const struct cbox_midi_event *event, int new_time);
-
-extern void cbox_midi_buffer_merge(struct cbox_midi_buffer *output, struct cbox_midi_buffer **inputs, int count, int *positions);
 
 extern int note_from_string(const char *note);
 

@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 
 #include "midi.h"
+#include "mididest.h"
 
 struct cbox_midi_pattern;
 struct cbox_track;
@@ -122,6 +123,7 @@ struct cbox_song_playback
     uint32_t song_pos_samples, song_pos_ppqn, min_time_ppqn;
     uint32_t loop_start_ppqn, loop_end_ppqn;
     GHashTable *pattern_map;
+    struct cbox_midi_merger track_merger;
 };
 
 extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master);

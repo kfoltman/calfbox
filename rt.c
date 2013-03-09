@@ -103,6 +103,16 @@ struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
     rt->disconnected = FALSE;
     rt->srate = 0;
     rt->buffer_size = 0;
+    cbox_midi_buffer_init(&rt->midibuf_aux);
+    cbox_midi_buffer_init(&rt->midibuf_jack);
+    cbox_midi_buffer_init(&rt->midibuf_song);
+    cbox_midi_buffer_init(&rt->midibuf_total);
+    cbox_midi_merger_init(&rt->scene_input_merger, &rt->midibuf_total);
+    
+    cbox_midi_merger_connect(&rt->scene_input_merger, &rt->midibuf_aux, NULL);
+    cbox_midi_merger_connect(&rt->scene_input_merger, &rt->midibuf_jack, NULL);
+    cbox_midi_merger_connect(&rt->scene_input_merger, &rt->midibuf_song, NULL);
+
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
     CBOX_OBJECT_REGISTER(rt);
     cbox_document_set_service(doc, "rt", &rt->_obj_hdr);
@@ -136,15 +146,13 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     struct cbox_rt *rt = user_data;
     struct cbox_module *effect = rt->effect;
     struct cbox_rt_cmd_instance cmd;
-    struct cbox_midi_buffer midibuf_jack, midibuf_song, midibuf_total, *midibufsrcs[3];
     int cost;
     uint32_t i, j;
     
-    cbox_midi_buffer_init(&rt->midibuf_aux);
-    cbox_midi_buffer_init(&midibuf_jack);
-    cbox_midi_buffer_init(&midibuf_song);
-    cbox_midi_buffer_init(&midibuf_total);
-    cbox_io_get_midi_data(io, &midibuf_jack);
+    cbox_midi_buffer_clear(&rt->midibuf_aux);
+    cbox_midi_buffer_clear(&rt->midibuf_song);
+    cbox_midi_buffer_clear(&rt->midibuf_total);
+    cbox_io_get_midi_data(io, &rt->midibuf_jack);
     
     // Process command queue, needs MIDI aux buf to work
     cost = 0;
@@ -162,23 +170,13 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     }
     
     // Combine various sources of events (song, non-RT thread, JACK input)
-    int pos[3] = {0, 0, 0};
-    int cnt = 0;
-    if (cbox_midi_buffer_get_count(&midibuf_jack))
-        midibufsrcs[cnt++] = &midibuf_jack;
     if (rt->scene && rt->scene->spb)
-    {
-        cbox_song_playback_render(rt->scene->spb, &midibuf_song, nframes);
-        if (cbox_midi_buffer_get_count(&midibuf_song))
-            midibufsrcs[cnt++] = &midibuf_song;
-    }
-    if (cbox_midi_buffer_get_count(&rt->midibuf_aux))
-        midibufsrcs[cnt++] = &rt->midibuf_aux;
-    if (cnt > 0)
-        cbox_midi_buffer_merge(&midibuf_total, midibufsrcs, cnt, pos);
+        cbox_song_playback_render(rt->scene->spb, &rt->midibuf_song, nframes);
+
+    cbox_midi_merger_render(&rt->scene_input_merger);
 
     if (rt->scene)
-        cbox_scene_render(rt->scene, nframes, &midibuf_total, io->output_buffers);
+        cbox_scene_render(rt->scene, nframes, &rt->midibuf_total, io->output_buffers);
     
     // Process "master" effect
     if (effect)

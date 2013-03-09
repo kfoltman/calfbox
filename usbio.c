@@ -210,10 +210,7 @@ int cbox_usbio_get_midi_data(struct cbox_io_impl *impl, struct cbox_midi_buffer 
 {
     struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
 
-    cbox_midi_buffer_clear(destination);
-    memset(uii->midi_input_port_pos, 0, sizeof(int) * uii->midi_input_port_count);
-
-    cbox_midi_buffer_merge(destination, uii->midi_input_port_buffers, uii->midi_input_port_count, uii->midi_input_port_pos);
+    cbox_midi_merger_render_to(&uii->midi_input_merger, destination);
     return 0;
 }
 
@@ -328,6 +325,7 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     uii->output_resolution = cbox_config_get_int(cbox_io_section, "output_resolution", 16) / 8;
     uii->output_channels = 2;
     uii->handle_audiodev = NULL;
+    cbox_midi_merger_init(&uii->midi_input_merger, NULL);
     
     // fixed processing buffer size, as we have to deal with packetisation anyway
     io->buffer_size = 64;

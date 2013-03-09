@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "cmd.h"
 #include "dom.h"
 #include "midi.h"
+#include "mididest.h"
 
 #define RT_CMD_QUEUE_ITEMS 1024
 #define RT_MAX_COST_PER_CALL 100
@@ -55,7 +56,8 @@ struct cbox_rt
     struct cbox_io *io;
     struct cbox_io_callbacks *cbs;
     struct cbox_master *master;
-    struct cbox_midi_buffer midibuf_aux;
+    struct cbox_midi_buffer midibuf_aux, midibuf_jack, midibuf_song, midibuf_total;
+    struct cbox_midi_merger scene_input_merger;
     
     jack_ringbuffer_t *rb_execute, *rb_cleanup;
     

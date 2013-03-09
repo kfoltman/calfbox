@@ -33,6 +33,7 @@ calfbox_SOURCES = \
     menuitem.c \
     meter.c \
     midi.c \
+    mididest.c \
     module.c \
     pattern.c \
     pattern-maker.c \
@@ -87,6 +88,7 @@ noinst_HEADERS = \
     menuitem.h \
     meter.h \
     midi.h \
+    mididest.h \
     module.h \
     onepole-int.h \
     onepole-float.h \

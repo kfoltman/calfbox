@@ -103,34 +103,6 @@ int note_from_string(const char *note)
     return -1;
 }
 
-void cbox_midi_buffer_merge(struct cbox_midi_buffer *output, struct cbox_midi_buffer **inputs, int count, int *positions)
-{
-    while(1)
-    {
-        int first_event_input = -1;
-        struct cbox_midi_event *first_event = NULL;
-        for (int i = 0; i < count; i++)
-        {
-            if (positions[i] < inputs[i]->count)
-            {
-                struct cbox_midi_event *event = cbox_midi_buffer_get_event(inputs[i], positions[i]);
-                if (first_event == NULL || event->time < first_event->time)
-                {
-                    first_event_input = i;
-                    first_event = event;
-                }
-            }
-        }
-        if (first_event)
-        {
-            cbox_midi_buffer_copy_event(output, first_event, first_event->time);
-            positions[first_event_input]++;
-        }
-        else
-            break;
-    }
-}
-
 int cbox_config_get_note(const char *cfg_section, const char *key, int def_value)
 {
     const char *cv = cbox_config_get_string(cfg_section, key);
