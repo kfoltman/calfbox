@@ -561,5 +561,7 @@ void cbox_rt_destroy(struct cbox_rt *rt)
     cbox_master_destroy(rt->master);
     rt->master = NULL;
 
+    cbox_midi_merger_close(&rt->scene_input_merger);
+    
     free(rt);
 }

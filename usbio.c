@@ -230,6 +230,7 @@ void cbox_usbio_destroy(struct cbox_io_impl *impl)
     
     libusb_exit(uii->usbctx_probe);
     libusb_exit(uii->usbctx);
+    cbox_midi_merger_close(&uii->midi_input_merger);
     free(uii);
 }
 

@@ -367,8 +367,6 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
     return spb;
 }
 
-#define MAX_TRACKS 16
-
 static void cbox_song_playback_set_tempo(struct cbox_song_playback *spb, double tempo)
 {
     int ppos = spb->song_pos_ppqn;
@@ -412,8 +410,6 @@ int cbox_song_playback_get_next_tempo_change(struct cbox_song_playback *spb)
 
 void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, int nsamples)
 {
-    struct cbox_midi_buffer *midibufsrcs[MAX_TRACKS];
-    
     cbox_midi_buffer_clear(output);
     
     if (spb->master->new_tempo != 0 && spb->master->new_tempo != spb->master->tempo)
@@ -582,5 +578,6 @@ void cbox_song_playback_destroy(struct cbox_song_playback *spb)
     free(spb->tempo_map_items);
     free(spb->tracks);
     g_hash_table_destroy(spb->pattern_map);
+    cbox_midi_merger_close(&spb->track_merger);
     free(spb);
 }
