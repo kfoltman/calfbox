@@ -365,6 +365,30 @@ static PyObject *cbox_python_start_audio(PyObject *self, PyObject *args)
     return Py_None;
 }
 
+static PyObject *cbox_python_start_noaudio(PyObject *self, PyObject *args)
+{
+    PyObject *callback = NULL;
+    int sample_rate = 0;
+    if (!PyArg_ParseTuple(args, "i|O:start_noaudio", &sample_rate, &callback))
+        return NULL;
+    if (!engine_initialised)
+        return PyErr_Format(PyExc_Exception, "Engine not initialised");
+    if (audio_running)
+        return PyErr_Format(PyExc_Exception, "Audio already started");
+
+    struct cbox_command_target target;
+    if (callback && callback != Py_None)
+        cbox_command_target_init(&target, bridge_to_python_callback, callback);
+
+    cbox_rt_set_offline(app.rt, sample_rate, 1024);
+    cbox_rt_set_scene(app.rt, cbox_scene_new(app.document, app.rt, FALSE));
+    cbox_rt_start(app.rt, (callback && callback != Py_None) ? &target : NULL);
+    audio_running = TRUE;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static PyObject *cbox_python_stop_audio(PyObject *self, PyObject *args)
 {
     if (!PyArg_ParseTuple(args, ":stop_audio"))
@@ -390,6 +414,7 @@ static PyMethodDef CboxMethods[] = {
     {"init_engine", cbox_python_init_engine, METH_VARARGS, "Initialise the CalfBox engine using optional config file."},
     {"shutdown_engine", cbox_python_shutdown_engine, METH_VARARGS, "Shutdown the CalfBox engine."},
     {"start_audio", cbox_python_start_audio, METH_VARARGS, "Start real-time audio processing using I/O settings from the current config."},
+    {"start_noaudio", cbox_python_start_noaudio, METH_VARARGS, "Start dummy audio processing using sample rate specified as argument."},
     {"stop_audio", cbox_python_stop_audio, METH_VARARGS, "Stop real-time audio processing."},
 #endif    
     {NULL, NULL, 0, NULL}
