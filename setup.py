@@ -39,6 +39,7 @@ csources = [
     "master.c",
     "meter.c",
     "midi.c",
+    "mididest.c",
     "module.c",
     "pattern.c",
     "pattern-maker.c",
