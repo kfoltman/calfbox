@@ -127,12 +127,23 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
     {
         if (!subcommand)
             return FALSE;
+        if (index < 1 || index > 1 + instr->module->aux_offset)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d)", index, instr->module->aux_offset);
+            return FALSE;
+        }
         return cbox_instrument_output_process_cmd(instr, &instr->outputs[index - 1], fb, cmd, subcommand, error);
     }
     else if (cbox_parse_path_part_int(cmd, "/aux/", &subcommand, &index, 1, instr->aux_output_count, error))
     {
         if (!subcommand)
             return FALSE;
+        int acount = 1 + instr->module->outputs - instr->module->aux_offset;
+        if (index < 1 || index > acount)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d)", index, acount);
+            return FALSE;
+        }
         return cbox_instrument_aux_process_cmd(instr, &instr->outputs[aux_offset + index - 1], index - 1, fb, cmd, subcommand, error);
     }
     else

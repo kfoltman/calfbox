@@ -731,11 +731,7 @@ static struct cbox_instrument *create_instrument(struct cbox_scene *scene, struc
     instr->aux_output_count = auxes;
 
     for (int i = 0; i < module->outputs / 2; i ++)
-    {
-        instr->outputs[i].output_bus = 0;
-        instr->outputs[i].gain = 1.0;
-        instr->outputs[i].insert = NULL;
-    }
+        cbox_instrument_output_init(&instr->outputs[i], scene, cbox_rt_get_buffer_size(module->rt));
     
     return instr;
 }
@@ -831,7 +827,6 @@ struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *sce
     for (int i = 0; i < module->outputs / 2; i ++)
     {
         struct cbox_instrument_output *oobj = instr->outputs + i;
-        cbox_instrument_output_init(oobj, scene, cbox_rt_get_buffer_size(module->rt));
         
         gchar *key = i == 0 ? g_strdup("output_bus") : g_strdup_printf("output%d_bus", 1 + i);
         oobj->output_bus = cbox_config_get_int(instr_section, key, 1) - 1;
