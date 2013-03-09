@@ -1235,10 +1235,12 @@ void sampler_destroyfunc(struct cbox_module *module)
     struct sampler_module *m = (struct sampler_module *)module;
     m->deleting = TRUE;
     
-    for (int i = 0; i < m->program_count; i++)
+    for (int i = 0; i < m->program_count;)
     {
-        assert(m->programs[i]);
-        CBOX_DELETE(m->programs[i]);
+        if (m->programs[i])
+            CBOX_DELETE(m->programs[i]);
+        else
+            i++;
     }
     free(m->programs);
 }
