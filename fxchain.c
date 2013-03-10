@@ -165,6 +165,7 @@ static void fxchain_destroyfunc(struct cbox_module *module)
         CBOX_DELETE(m->modules[i]);
         m->modules[i] = NULL;
     }
+    free(m->modules);
 }
 
 MODULE_CREATE_FUNCTION(fxchain)
