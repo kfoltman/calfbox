@@ -326,7 +326,8 @@ static PyObject *cbox_python_shutdown_engine(PyObject *self, PyObject *args)
     if (!engine_initialised)
         return PyErr_Format(PyExc_Exception, "Engine not initialised");
     
-    cbox_rt_destroy(app.rt);
+    CBOX_DELETE(app.rt);
+    cbox_document_destroy(app.document);
     cbox_wavebank_close();
     cbox_config_close();
     cbox_dom_close();

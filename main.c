@@ -353,10 +353,12 @@ ok:
     if (scene)
         CBOX_DELETE(scene);
     
-    cbox_rt_destroy(app.rt);
+    CBOX_DELETE(app.rt);
     
     if (cbox_wavebank_get_maxbytes() > 0)
         g_message("Max waveform usage: %f MB", (float)(cbox_wavebank_get_maxbytes() / 1048576.0));
+    
+    cbox_document_destroy(app.document);
     cbox_wavebank_close();
     cbox_config_close();
     

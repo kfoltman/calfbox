@@ -221,7 +221,7 @@ static gboolean document_process_cmd(struct cbox_command_target *ct, struct cbox
 struct cbox_document *cbox_document_new()
 {
     struct cbox_document *res = malloc(sizeof(struct cbox_document));
-    res->classes_per_document = g_hash_table_new(NULL, NULL);
+    res->classes_per_document = g_hash_table_new_full(NULL, NULL, NULL, g_free);
     res->services_per_document = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     res->uuids_per_document = g_hash_table_new(cbox_uuid_hash, cbox_uuid_equal);
     res->cmd_target.process_cmd = document_process_cmd;
