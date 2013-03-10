@@ -344,9 +344,7 @@ void cbox_song_use_looped_pattern(struct cbox_song *song, struct cbox_midi_patte
 void cbox_song_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_song *song = CBOX_H2O(objhdr);
-    g_list_free_full(song->master_track_items, (GDestroyNotify)cbox_master_track_item_destroy);
-    g_list_free_full(song->tracks, (GDestroyNotify)cbox_object_destroy);
-    g_list_free_full(song->patterns, (GDestroyNotify)cbox_object_destroy);
+    cbox_song_clear(song);
     free(song);
 }
 
