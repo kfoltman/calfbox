@@ -360,8 +360,12 @@ void cbox_jackio_destroy(struct cbox_io_impl *impl)
         }
         else
         {
+            for (int i = 0; i < io->input_count; i++)
+                jack_port_unregister(jii->client, jii->inputs[i]);
+            free(jii->inputs);
             for (int i = 0; i < io->output_count; i++)
                 jack_port_unregister(jii->client, jii->outputs[i]);
+            free(jii->outputs);
             if (jii->midi)
                 jack_port_unregister(jii->client, jii->midi);
         }
