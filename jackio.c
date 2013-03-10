@@ -248,7 +248,7 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
     }
     gchar *cbox_port = g_strdup_printf("%s:midi", jii->client_name);
     autoconnect(jii->client, cbox_port, "midi", 1, 1, portobj, fb);
-    free(cbox_port);
+    g_free(cbox_port);
 }
 
 int cbox_jackio_get_sample_rate(struct cbox_io_impl *impl)
@@ -372,7 +372,9 @@ void cbox_jackio_destroy(struct cbox_io_impl *impl)
         }
         while(jii->extra_midi_ports)
         {
-            free(jii->extra_midi_ports->data);
+            struct cbox_jack_midi_output *jmo = jii->extra_midi_ports->data;
+            jack_port_unregister(jii->client, jmo->port);
+            free(jmo);
             jii->extra_midi_ports = g_slist_remove(jii->extra_midi_ports, jii->extra_midi_ports->data);
         }
         
