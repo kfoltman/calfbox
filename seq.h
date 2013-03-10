@@ -47,6 +47,8 @@ struct cbox_midi_pattern_playback
     int event_count;
 };
 
+extern void cbox_midi_pattern_playback_destroy(struct cbox_midi_pattern_playback *mppb);
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct cbox_midi_clip_playback

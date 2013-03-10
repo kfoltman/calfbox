@@ -210,6 +210,14 @@ void cbox_track_playback_destroy(struct cbox_track_playback *pb)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void cbox_midi_pattern_playback_destroy(struct cbox_midi_pattern_playback *mppb)
+{
+    free(mppb->events);
+    free(mppb);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void cbox_midi_clip_playback_init(struct cbox_midi_clip_playback *pb, struct cbox_midi_playback_active_notes *active_notes, struct cbox_master *master)
 {
     pb->pattern = NULL;
@@ -334,7 +342,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
 {
     struct cbox_song_playback *spb = calloc(1, sizeof(struct cbox_song_playback));
     spb->rt = rt;
-    spb->pattern_map = g_hash_table_new_full(NULL, NULL, NULL, free);
+    spb->pattern_map = g_hash_table_new_full(NULL, NULL, NULL, cbox_midi_pattern_playback_destroy);
     spb->master = master;
     spb->track_count = g_list_length(song->tracks);
     spb->tracks = malloc(spb->track_count * sizeof(struct cbox_track_playback *));
