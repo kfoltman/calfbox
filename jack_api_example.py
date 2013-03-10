@@ -28,8 +28,11 @@ cbox.start_audio(cmd_dumper)
 global Document
 Document = cbox.Document
 
-client_name = cbox.JackIO.status().client_name
+status = cbox.JackIO.status()
+client_name = status.client_name
 print ("Client name: %s" % client_name)
+print ("Audio inputs: %d, outputs: %d" % (status.audio_inputs, status.audio_outputs))
+print ("JACK period: %d frames" % (status.buffer_size))
 cbox.JackIO.create_midi_output('drums')
 
 scene = Document.get_scene()

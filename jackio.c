@@ -408,31 +408,39 @@ gboolean cbox_jackio_cycle(struct cbox_io_impl *impl, struct cbox_command_target
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static gboolean cbox_jack_io_create_midi_output(struct cbox_jack_io_impl *jii, const char *name, GError **error)
+{
+    jack_port_t *port = jack_port_register(jii->client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
+    if (!port)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create output MIDI port '%s'", name);
+        return FALSE;
+    }
+    struct cbox_jack_midi_output *output = calloc(1, sizeof(struct cbox_jack_midi_output));
+    output->name = g_strdup(name);
+    output->port = port;
+    cbox_midi_buffer_init(&output->buffer);
+    cbox_midi_merger_init(&output->merger, &output->buffer);
+    jii->extra_midi_ports = g_slist_append(jii->extra_midi_ports, output);
+    return TRUE;
+}
+
 static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)ct->user_data;
+    struct cbox_io *io = jii->ioi.pio;
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        return cbox_execute_on(fb, NULL, "/client_name", "s", error, jii->client_name);
+        return cbox_execute_on(fb, NULL, "/client_name", "s", error, jii->client_name) &&
+            cbox_execute_on(fb, NULL, "/audio_inputs", "i", error, io->input_count) &&
+            cbox_execute_on(fb, NULL, "/audio_outputs", "i", error, io->output_count) &&
+            cbox_execute_on(fb, NULL, "/buffer_size", "i", error, io->buffer_size);
     }
     else if (!strcmp(cmd->command, "/create_midi_output") && !strcmp(cmd->arg_types, "s"))
     {
-        const char *name = CBOX_ARG_S(cmd, 0);
-        jack_port_t *port = jack_port_register(jii->client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
-        if (!port)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create output MIDI port '%s'", name);
-            return FALSE;
-        }
-        struct cbox_jack_midi_output *output = calloc(1, sizeof(struct cbox_jack_midi_output));
-        output->name = g_strdup(name);
-        output->port = port;
-        cbox_midi_buffer_init(&output->buffer);
-        cbox_midi_merger_init(&output->merger, &output->buffer);
-        jii->extra_midi_ports = g_slist_append(jii->extra_midi_ports, output);
-        return TRUE;
+        return cbox_jack_io_create_midi_output(jii, CBOX_ARG_S(cmd, 0), error);
     }
     else
     {
