@@ -132,9 +132,8 @@ class JackIO:
     @staticmethod
     def status():
         return GetThings("/io/status", ['client_name', 'audio_inputs', 'audio_outputs', 'buffer_size'], [])
-    def create_midi_output(name):
-        do_cmd("/io/create_midi_output", None, [name])
-
+    def create_midi_output(name, autoconnect_spec = None):
+        do_cmd("/io/create_midi_output", None, [name, autoconnect_spec if autoconnect_spec is not None else ''])
 
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])

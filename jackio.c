@@ -54,6 +54,7 @@ struct cbox_jack_io_impl
 struct cbox_jack_midi_output
 {
     gchar *name;
+    gchar *autoconnect_spec;
     jack_port_t *port;
     struct cbox_midi_buffer buffer;
     struct cbox_midi_merger merger;
@@ -69,6 +70,13 @@ static struct cbox_midi_merger *cbox_jackio_get_midi_out(struct cbox_io_impl *im
             return &midiout->merger;
     }
     return NULL;
+}
+
+void cbox_jack_midi_output_destroy(struct cbox_jack_midi_output *jmo)
+{
+    g_free(jmo->name);
+    g_free(jmo->autoconnect_spec);
+    free(jmo);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -153,66 +161,71 @@ static void autoconnect_port(jack_client_t *client, const char *port, const char
         g_message("Connect: %s %s %s (%s)", port, is_cbox_input ? "<-" : "->", use_name, res == 0 ? "success" : (res == EEXIST ? "already connected" : "failed"));
 }
 
-static void autoconnect(jack_client_t *client, const char *port, const char *config_var, int is_cbox_input, int is_midi, const jack_port_t *only_connect_port, struct cbox_command_target *fb)
+static void autoconnect_by_spec(jack_client_t *client, const char *port, const char *orig_spec, int is_cbox_input, int is_midi, const jack_port_t *only_connect_port, struct cbox_command_target *fb)
 {
-    char *name, *orig_name, *dpos;
+    char *name, *copy_spec, *dpos;
     const char *use_name;
     
-    orig_name = cbox_config_get_string(cbox_io_section, config_var);
-    if (orig_name)
-    {
-        name = orig_name;
-        do {
-            dpos = strchr(name, ';');
-            if (dpos)
-                *dpos = '\0';
-            
-            use_name = name;
-            if (use_name[0] == '#')
+    copy_spec = g_strdup(orig_spec);
+    name = copy_spec;
+    do {
+        dpos = strchr(name, ';');
+        if (dpos)
+            *dpos = '\0';
+        
+        use_name = name;
+        if (use_name[0] == '#')
+        {
+            char *endptr = NULL;
+            long portidx = strtol(use_name + 1, &endptr, 10) - 1;
+            if (endptr == use_name + strlen(use_name))
             {
-                char *endptr = NULL;
-                long portidx = strtol(use_name + 1, &endptr, 10) - 1;
-                if (endptr == use_name + strlen(use_name))
-                {
-                    const char **names = jack_get_ports(client, ".*", is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
-                    int i;
-                    for (i = 0; i < portidx && names[i]; i++)
-                        ;
-                    
-                    if (names[i])
-                        autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port, fb);
-                    else
-                        g_message("Connect: unmatched port index %d", (int)portidx);
-                    
-                    jack_free(names);
-                }
-            }
-            else if (use_name[0] == '~' || use_name[0] == '*')
-            {
-                const char **names = jack_get_ports(client, use_name + 1, is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
+                const char **names = jack_get_ports(client, ".*", is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
+                int i;
+                for (i = 0; i < portidx && names[i]; i++)
+                    ;
                 
-                if (names && names[0])
-                {
-                    if (use_name[0] == '*')
-                    {
-                        int i;
-                        for (i = 0; names[i]; i++)
-                            autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port, fb);
-                    }
-                    else
-                        autoconnect_port(client, port, names[0], is_cbox_input, only_connect_port, fb);
-                }
+                if (names[i])
+                    autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port, fb);
                 else
-                    g_message("Connect: unmatched port regexp %s", use_name);
+                    g_message("Connect: unmatched port index %d", (int)portidx);
+                
                 jack_free(names);
             }
+        }
+        else if (use_name[0] == '~' || use_name[0] == '*')
+        {
+            const char **names = jack_get_ports(client, use_name + 1, is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
+            
+            if (names && names[0])
+            {
+                if (use_name[0] == '*')
+                {
+                    int i;
+                    for (i = 0; names[i]; i++)
+                        autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port, fb);
+                }
+                else
+                    autoconnect_port(client, port, names[0], is_cbox_input, only_connect_port, fb);
+            }
             else
-                autoconnect_port(client, port, use_name, is_cbox_input, only_connect_port, fb);
+                g_message("Connect: unmatched port regexp %s", use_name);
+            jack_free(names);
+        }
+        else
+            autoconnect_port(client, port, use_name, is_cbox_input, only_connect_port, fb);
 
-            if (dpos)
-                name = dpos + 1;
-        } while(dpos);
-    }
+        if (dpos)
+            name = dpos + 1;
+    } while(dpos);
+    g_free(copy_spec);
+}
+
+static void autoconnect_by_var(jack_client_t *client, const char *port, const char *config_var, int is_cbox_input, int is_midi, const jack_port_t *only_connect_port, struct cbox_command_target *fb)
+{
+    const char *orig_spec = cbox_config_get_string(cbox_io_section, config_var);
+    if (orig_spec)
+        autoconnect_by_spec(client, port, orig_spec, is_cbox_input, is_midi, only_connect_port, fb);
 }
 
 static void port_connect_cb(jack_port_id_t port, int registered, void *arg)
@@ -234,7 +247,7 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
     {
         gchar *cbox_port = g_strdup_printf("%s:out_%d", jii->client_name, 1 + i);
         gchar *config_key = g_strdup_printf("out_%d", 1 + i);
-        autoconnect(jii->client, cbox_port, config_key, 0, 0, portobj, fb);
+        autoconnect_by_var(jii->client, cbox_port, config_key, 0, 0, portobj, fb);
         g_free(cbox_port);
         g_free(config_key);
     }
@@ -242,12 +255,22 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
     {
         gchar *cbox_port = g_strdup_printf("%s:in_%d", jii->client_name, 1 + i);
         gchar *config_key = g_strdup_printf("in_%d", 1 + i);
-        autoconnect(jii->client, cbox_port, config_key, 1, 0, portobj, fb);
+        autoconnect_by_var(jii->client, cbox_port, config_key, 1, 0, portobj, fb);
         g_free(cbox_port);
         g_free(config_key);
     }
+    for (GSList *p = jii->extra_midi_ports; p; p = g_slist_next(p))
+    {
+        struct cbox_jack_midi_output *midiout = p->data;
+        if (midiout->autoconnect_spec)
+        {
+            gchar *cbox_port = g_strdup_printf("%s:%s", jii->client_name, midiout->name);
+            autoconnect_by_spec(jii->client, cbox_port, midiout->autoconnect_spec, 0, 1, portobj, fb);
+            g_free(cbox_port);
+        }
+    }
     gchar *cbox_port = g_strdup_printf("%s:midi", jii->client_name);
-    autoconnect(jii->client, cbox_port, "midi", 1, 1, portobj, fb);
+    autoconnect_by_var(jii->client, cbox_port, "midi", 1, 1, portobj, fb);
     g_free(cbox_port);
 }
 
@@ -378,7 +401,7 @@ void cbox_jackio_destroy(struct cbox_io_impl *impl)
         {
             struct cbox_jack_midi_output *jmo = jii->extra_midi_ports->data;
             jack_port_unregister(jii->client, jmo->port);
-            free(jmo);
+            cbox_jack_midi_output_destroy(jmo);
             jii->extra_midi_ports = g_slist_remove(jii->extra_midi_ports, jii->extra_midi_ports->data);
         }
         
@@ -408,7 +431,7 @@ gboolean cbox_jackio_cycle(struct cbox_io_impl *impl, struct cbox_command_target
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static gboolean cbox_jack_io_create_midi_output(struct cbox_jack_io_impl *jii, const char *name, GError **error)
+static gboolean cbox_jack_io_create_midi_output(struct cbox_jack_io_impl *jii, const char *name, const char *autoconnect_spec, GError **error)
 {
     jack_port_t *port = jack_port_register(jii->client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
     if (!port)
@@ -418,10 +441,18 @@ static gboolean cbox_jack_io_create_midi_output(struct cbox_jack_io_impl *jii, c
     }
     struct cbox_jack_midi_output *output = calloc(1, sizeof(struct cbox_jack_midi_output));
     output->name = g_strdup(name);
+    output->autoconnect_spec = autoconnect_spec && *autoconnect_spec ? g_strdup(autoconnect_spec) : NULL;
     output->port = port;
     cbox_midi_buffer_init(&output->buffer);
     cbox_midi_merger_init(&output->merger, &output->buffer);
     jii->extra_midi_ports = g_slist_append(jii->extra_midi_ports, output);
+
+    if (*output->autoconnect_spec)
+    {
+        gchar *cbox_port = g_strdup_printf("%s:%s", jii->client_name, name);
+        autoconnect_by_spec(jii->client, cbox_port, output->autoconnect_spec, 0, 1, NULL, NULL);
+        g_free(cbox_port);
+    }
     return TRUE;
 }
 
@@ -438,9 +469,9 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             cbox_execute_on(fb, NULL, "/audio_outputs", "i", error, io->output_count) &&
             cbox_execute_on(fb, NULL, "/buffer_size", "i", error, io->buffer_size);
     }
-    else if (!strcmp(cmd->command, "/create_midi_output") && !strcmp(cmd->arg_types, "s"))
+    else if (!strcmp(cmd->command, "/create_midi_output") && !strcmp(cmd->arg_types, "ss"))
     {
-        return cbox_jack_io_create_midi_output(jii, CBOX_ARG_S(cmd, 0), error);
+        return cbox_jack_io_create_midi_output(jii, CBOX_ARG_S(cmd, 0), CBOX_ARG_S(cmd, 1), error);
     }
     else
     {
@@ -563,7 +594,7 @@ cleanup:
     }
     while(jii->extra_midi_ports)
     {
-        free(jii->extra_midi_ports->data);
+        cbox_jack_midi_output_destroy((struct cbox_jack_midi_output *)jii->extra_midi_ports->data);
         jii->extra_midi_ports = g_slist_remove(jii->extra_midi_ports, jii->extra_midi_ports->data);
     }
     if (jii->client_name)

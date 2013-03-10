@@ -33,7 +33,7 @@ client_name = status.client_name
 print ("Client name: %s" % client_name)
 print ("Audio inputs: %d, outputs: %d" % (status.audio_inputs, status.audio_outputs))
 print ("JACK period: %d frames" % (status.buffer_size))
-cbox.JackIO.create_midi_output('drums')
+cbox.JackIO.create_midi_output('drums', '*alsa_pcm:.*')
 
 scene = Document.get_scene()
 scene.clear()
