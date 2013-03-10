@@ -294,6 +294,27 @@ void usbio_transfer_destroy(struct usbio_transfer *xfer)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static gboolean cbox_usb_io_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)ct->user_data;
+    struct cbox_io *io = uii->ioi.pio;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        return cbox_execute_on(fb, NULL, "/audio_inputs", "i", error, io->input_count) &&
+            cbox_execute_on(fb, NULL, "/audio_outputs", "i", error, io->output_count) &&
+            cbox_execute_on(fb, NULL, "/buffer_size", "i", error, io->buffer_size);
+    }
+    else
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+        return FALSE;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error)
 {
     struct cbox_usb_io_impl *uii = malloc(sizeof(struct cbox_usb_io_impl));
@@ -343,6 +364,7 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     for (int i = 0; i < io->output_count; i++)
         io->output_buffers[i] = calloc(io->buffer_size, sizeof(float));
     io->impl = &uii->ioi;
+    cbox_command_target_init(&io->cmd_target, cbox_usb_io_process_cmd, uii);
 
     uii->ioi.pio = io;
     uii->ioi.getsampleratefunc = cbox_usbio_get_sample_rate;
