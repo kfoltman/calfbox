@@ -92,6 +92,7 @@ extern struct cbox_song *cbox_rt_set_song(struct cbox_rt *rt, struct cbox_song *
 extern struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos);
 extern void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_pattern *pattern);
 extern void cbox_rt_send_events(struct cbox_rt *rt, struct cbox_midi_buffer *buffer);
+extern struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, const char *name);
 
 extern int cbox_rt_get_sample_rate(struct cbox_rt *rt);
 extern int cbox_rt_get_buffer_size(struct cbox_rt *rt);

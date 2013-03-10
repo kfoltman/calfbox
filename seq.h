@@ -90,6 +90,8 @@ struct cbox_track_playback
     struct cbox_midi_buffer output_buffer;
     struct cbox_midi_clip_playback playback;
     struct cbox_midi_playback_active_notes active_notes;
+    struct cbox_midi_merger *external_merger;
+    struct cbox_song_playback *spb;
 };
 
 extern struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master, struct cbox_song_playback *spb);
@@ -124,9 +126,10 @@ struct cbox_song_playback
     uint32_t loop_start_ppqn, loop_end_ppqn;
     GHashTable *pattern_map;
     struct cbox_midi_merger track_merger;
+    struct cbox_rt *rt;
 };
 
-extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master);
+extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_rt *rt);
 extern void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, int nsamples);
 extern int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf);
 extern void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int skip_this_pos);

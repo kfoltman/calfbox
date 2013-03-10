@@ -296,16 +296,18 @@ Document.classmap['cbox_track_item'] = DocTrackClip
 class DocTrackStatus:
     name = None
     clips = None
+    external_output = None
     
 class DocTrack(DocObj):
     def __init__(self, uuid):
-        DocObj.__init__(self, uuid, ["*clip", "=name"])
+        DocObj.__init__(self, uuid, ["*clip", "=name", "=external_output"])
     def add_clip(self, pos, offset, length, pattern):
         return self.cmd_makeobj("/add_clip", int(pos), int(offset), int(length), pattern.uuid)
     def transform_status(self, status):
         res = DocTrackStatus()
         res.name = status.name
         res.clips = [ClipItem(*c) for c in status.clip]
+        res.external_output = status.external_output
         return res
 Document.classmap['cbox_track'] = DocTrack
 

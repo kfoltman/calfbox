@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "io.h"
 #include "meter.h"
 #include "midi.h"
+#include "mididest.h"
 #include "recsrc.h"
 
 #include <errno.h>
@@ -43,9 +44,34 @@ struct cbox_jack_io_impl
     jack_port_t *midi;
     char *error_str; // set to non-NULL if client has been booted out by JACK
     char *client_name;
+    GSList *extra_midi_ports;
 
     jack_ringbuffer_t *rb_autoconnect;    
 };
+
+///////////////////////////////////////////////////////////////////////////////
+
+struct cbox_jack_midi_output
+{
+    gchar *name;
+    jack_port_t *port;
+    struct cbox_midi_buffer buffer;
+    struct cbox_midi_merger merger;
+};
+
+static struct cbox_midi_merger *cbox_jackio_get_midi_out(struct cbox_io_impl *impl, const char *name)
+{
+    struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
+    for (GSList *p = jii->extra_midi_ports; p; p = g_slist_next(p))
+    {
+        struct cbox_jack_midi_output *midiout = p->data;
+        if (!strcmp(midiout->name, name))
+            return &midiout->merger;
+    }
+    return NULL;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 static int process_cb(jack_nframes_t nframes, void *arg)
 {
@@ -67,6 +93,36 @@ static int process_cb(jack_nframes_t nframes, void *arg)
         io->input_buffers[i] = NULL;
     for (int i = 0; i < io->output_count; i++)
         io->output_buffers[i] = NULL;
+    for (GSList *p = jii->extra_midi_ports; p; p = g_slist_next(p))
+    {
+        struct cbox_jack_midi_output *midiout = p->data;
+
+        void *pbuf = jack_port_get_buffer(midiout->port, nframes);
+        jack_midi_clear_buffer(pbuf);
+
+        cbox_midi_merger_render(&midiout->merger);
+        if (midiout->buffer.count)
+        {
+            uint8_t tmp_data[4];
+            for (int i = 0; i < midiout->buffer.count; i++)
+            {
+                struct cbox_midi_event *event = cbox_midi_buffer_get_event(&midiout->buffer, i);
+                uint8_t *pdata = cbox_midi_event_get_data(event);
+                if ((pdata[0] & 0xF0) == 0x90 && !pdata[2] && event->size == 3)
+                {
+                    tmp_data[0] = pdata[0] & ~0x10;
+                    tmp_data[1] = pdata[1];
+                    tmp_data[2] = pdata[2];
+                    pdata = tmp_data;
+                }
+                if (jack_midi_event_write(pbuf, event->time, pdata, event->size))
+                {
+                    g_warning("MIDI buffer overflow on JACK output port '%s'", midiout->name);
+                    break;
+                }
+            }
+        }
+    }
     return 0;
 }
 
@@ -314,6 +370,11 @@ void cbox_jackio_destroy(struct cbox_io_impl *impl)
             free(jii->client_name);
             jii->client_name = NULL;
         }
+        while(jii->extra_midi_ports)
+        {
+            free(jii->extra_midi_ports->data);
+            jii->extra_midi_ports = g_slist_remove(jii->extra_midi_ports, jii->extra_midi_ports->data);
+        }
         
         jack_ringbuffer_free(jii->rb_autoconnect);
         jack_client_close(jii->client);
@@ -338,6 +399,41 @@ gboolean cbox_jackio_cycle(struct cbox_io_impl *impl, struct cbox_command_target
 }
 
 
+
+///////////////////////////////////////////////////////////////////////////////
+
+static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        return cbox_execute_on(fb, NULL, "/client_name", "s", error, jii->client_name);
+    }
+    else if (!strcmp(cmd->command, "/create_midi_output") && !strcmp(cmd->arg_types, "s"))
+    {
+        const char *name = CBOX_ARG_S(cmd, 0);
+        jack_port_t *port = jack_port_register(jii->client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
+        if (!port)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create output MIDI port '%s'", name);
+            return FALSE;
+        }
+        struct cbox_jack_midi_output *output = calloc(1, sizeof(struct cbox_jack_midi_output));
+        output->name = g_strdup(name);
+        output->port = port;
+        cbox_midi_buffer_init(&output->buffer);
+        cbox_midi_merger_init(&output->merger, &output->buffer);
+        jii->extra_midi_ports = g_slist_append(jii->extra_midi_ports, output);
+        return TRUE;
+    }
+    else
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+        return FALSE;
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -376,6 +472,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     struct cbox_jack_io_impl *jii = malloc(sizeof(struct cbox_jack_io_impl));
     io->impl = &jii->ioi;
 
+    cbox_command_target_init(&io->cmd_target, cbox_jack_io_process_cmd, jii);
     jii->ioi.pio = io;
     jii->ioi.getsampleratefunc = cbox_jackio_get_sample_rate;
     jii->ioi.startfunc = cbox_jackio_start;
@@ -384,12 +481,14 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     jii->ioi.pollfunc = cbox_jackio_poll_ports;
     jii->ioi.cyclefunc = cbox_jackio_cycle;
     jii->ioi.getmidifunc = cbox_jackio_get_midi_data;
+    jii->ioi.getmidioutfunc = cbox_jackio_get_midi_out;
     jii->ioi.destroyfunc = cbox_jackio_destroy;
     
     jii->client_name = g_strdup(jack_get_client_name(client));
     jii->client = client;
     jii->rb_autoconnect = jack_ringbuffer_create(sizeof(jack_port_t *) * 128);
     jii->error_str = NULL;
+    jii->extra_midi_ports = NULL;
     
     jii->inputs = malloc(sizeof(jack_port_t *) * io->input_count);
     jii->outputs = malloc(sizeof(jack_port_t *) * io->output_count);
@@ -447,6 +546,11 @@ cleanup:
         for (int i = 0; i < io->output_count; i++)
             free(jii->outputs[i]);
         free(jii->outputs);
+    }
+    while(jii->extra_midi_ports)
+    {
+        free(jii->extra_midi_ports->data);
+        jii->extra_midi_ports = g_slist_remove(jii->extra_midi_ports, jii->extra_midi_ports->data);
     }
     if (jii->client_name)
         free(jii->client_name);

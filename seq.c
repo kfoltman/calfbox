@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "pattern.h"
+#include "rt.h"
 #include "seq.h"
 #include "song.h"
 #include "track.h"
@@ -48,7 +49,9 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     struct cbox_track_playback *pb = malloc(sizeof(struct cbox_track_playback));
     pb->master = master;
     int len = g_list_length(track->items);
-    pb->items = malloc(len * sizeof(struct cbox_track_playback_item));
+    pb->items = calloc(len, sizeof(struct cbox_track_playback_item));
+    pb->external_merger = NULL;
+    pb->spb = spb;
     
     GList *it = track->items;
     struct cbox_track_playback_item *p = pb->items;
@@ -92,6 +95,16 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     cbox_midi_playback_active_notes_init(&pb->active_notes);
     cbox_midi_buffer_init(&pb->output_buffer);
     cbox_track_playback_start_item(pb, 0, FALSE, 0);
+
+    if (track->external_output)
+    {
+        struct cbox_midi_merger *merger = cbox_rt_get_midi_output(spb->rt, track->external_output);
+        if (merger)
+        {
+            cbox_midi_merger_connect(merger, &pb->output_buffer, spb->rt);
+            pb->external_merger = merger;
+        }
+    }
     
     return pb;
 }
@@ -188,6 +201,9 @@ void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int 
 
 void cbox_track_playback_destroy(struct cbox_track_playback *pb)
 {
+    if (pb->external_merger)
+        cbox_midi_merger_disconnect(pb->external_merger, &pb->output_buffer, pb->spb->rt);
+
     free(pb->items);
     free(pb);
 }
@@ -314,10 +330,10 @@ int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_not
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master)
+struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_rt *rt)
 {
-    struct cbox_song_playback *spb = malloc(sizeof(struct cbox_song_playback));
-    memset(spb, 0, sizeof(struct cbox_song_playback));
+    struct cbox_song_playback *spb = calloc(1, sizeof(struct cbox_song_playback));
+    spb->rt = rt;
     spb->pattern_map = g_hash_table_new_full(NULL, NULL, NULL, free);
     spb->master = master;
     spb->track_count = g_list_length(song->tracks);
@@ -333,7 +349,8 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
     {
         struct cbox_track *trk = p->data;
         spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master, spb);
-        cbox_midi_merger_connect(&spb->track_merger, &spb->tracks[pos - 1]->output_buffer, NULL);
+        if (!trk->external_output)
+            cbox_midi_merger_connect(&spb->track_merger, &spb->tracks[pos - 1]->output_buffer, NULL);
     }
     
     spb->tempo_map_item_count = g_list_length(song->master_track_items);

@@ -382,7 +382,7 @@ void cbox_rt_update_song(struct cbox_rt *rt, int new_pos_ppqn)
 {
     static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = set_song_command_execute, .cleanup = NULL };
     
-    struct set_song_command cmd = { rt, cbox_song_playback_new(rt->master->song, rt->master), NULL, new_pos_ppqn };
+    struct set_song_command cmd = { rt, cbox_song_playback_new(rt->master->song, rt->master, rt), NULL, new_pos_ppqn };
     cbox_rt_execute_cmd_sync(rt, &def, &cmd);
     if (cmd.old_song)
         cbox_song_playback_destroy(cmd.old_song);
@@ -547,6 +547,16 @@ int cbox_rt_get_buffer_size(struct cbox_rt *rt)
 {
     assert(rt->buffer_size);
     return rt->buffer_size;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, const char *name)
+{
+    if (!rt->io)
+        return NULL;
+    
+    return cbox_io_get_midi_output(rt->io, name);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

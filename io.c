@@ -75,6 +75,14 @@ int cbox_io_stop(struct cbox_io *io)
     return io->impl->stopfunc(io->impl, NULL);
 }
 
+struct cbox_midi_merger *cbox_io_get_midi_output(struct cbox_io *io, const char *name)
+{
+    if (!io->impl->getmidioutfunc)
+        return NULL;
+    
+    return io->impl->getmidioutfunc(io->impl, name);
+}
+
 void cbox_io_close(struct cbox_io *io)
 {
     io->impl->destroyfunc(io->impl);

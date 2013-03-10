@@ -43,6 +43,7 @@ struct cbox_track
     CBOX_OBJECT_HEADER()
     struct cbox_command_target cmd_target;
     gchar *name;
+    gchar *external_output;
     GList *items;
     struct cbox_song *owner;
     struct cbox_track_playback *pb;
