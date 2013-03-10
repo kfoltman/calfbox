@@ -275,6 +275,13 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static void restart_song()
+{
+    cbox_master_stop(app.rt->master);
+    cbox_master_seek_ppqn(app.rt->master, 0);
+    cbox_master_play(app.rt->master);
+}
+
 int cmd_pattern_none(struct cbox_menu_item_command *item, void *context)
 {
     cbox_song_clear(app.rt->master->song);
@@ -285,36 +292,42 @@ int cmd_pattern_none(struct cbox_menu_item_command *item, void *context)
 int cmd_pattern_simple(struct cbox_menu_item_command *item, void *context)
 {
     cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_new_metronome(app.rt->master->song, 1));
+    restart_song();
     return 0;
 }
 
 int cmd_pattern_normal(struct cbox_menu_item_command *item, void *context)
 {
     cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_new_metronome(app.rt->master->song, app.rt->master->timesig_nom));
+    restart_song();
     return 0;
 }
 
 int cmd_load_drumpattern(struct cbox_menu_item_command *item, void *context)
 {
     cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load(app.rt->master->song, item->item.item_context, 1));
+    restart_song();
     return 0;
 }
 
 int cmd_load_drumtrack(struct cbox_menu_item_command *item, void *context)
 {
     cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load_track(app.rt->master->song, item->item.item_context, 1));
+    restart_song();
     return 0;
 }
 
 int cmd_load_pattern(struct cbox_menu_item_command *item, void *context)
 {
     cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load(app.rt->master->song, item->item.item_context, 0));
+    restart_song();
     return 0;
 }
 
 int cmd_load_track(struct cbox_menu_item_command *item, void *context)
 {
     cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load_track(app.rt->master->song, item->item.item_context, 0));
+    restart_song();
     return 0;
 }
 
