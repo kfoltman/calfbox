@@ -139,6 +139,7 @@ static void *engine_thread(void *user_data)
     }
     else
     {
+        uii->no_resubmit = TRUE;
         g_message("No audio device found - running idle loop.");
         // notify the UI thread that the (fake) audio loop is running
         uii->playback_counter = uii->playback_buffers;
