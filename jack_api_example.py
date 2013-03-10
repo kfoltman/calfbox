@@ -28,9 +28,9 @@ cbox.start_audio(cmd_dumper)
 global Document
 Document = cbox.Document
 
-client_name = cbox.GetThings("/io/status", ['client_name'], []).client_name
+client_name = cbox.JackIO.status().client_name
 print ("Client name: %s" % client_name)
-cbox.do_cmd("/io/create_midi_output", None, ['drums'])
+cbox.JackIO.create_midi_output('drums')
 
 scene = Document.get_scene()
 scene.clear()

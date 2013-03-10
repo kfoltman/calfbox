@@ -128,6 +128,14 @@ class Transport:
     def tell():
         return GetThings("/master/tell", ['pos', 'pos_ppqn', 'playing'], [])
 
+class JackIO:
+    @staticmethod
+    def status():
+        return GetThings("/io/status", ['client_name'], [])
+    def create_midi_output(name):
+        do_cmd("/io/create_midi_output", None, [name])
+
+
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])
         
