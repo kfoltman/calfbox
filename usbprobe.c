@@ -543,9 +543,17 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
     if (!uminf.epdesc.found && udi->configs_with_midi)
         g_warning("%03d:%03d - MIDI port available on different configs: mask=0x%x", bus, devadr, udi->configs_with_midi);
 
-    if (uainf.epdesc.found) // Class-compliant USB audio device
-        is_audio = TRUE;
     if (udi->vid == 0x13b2 && udi->pid == 0x0030) // Alesis Multimix 8
+    {
+        // Do not auto-detect, just use hard-wired values
+        uainf.udi = udi;
+        uainf.intf = 0;
+        uainf.alt_setting = 1;
+        uainf.epdesc.found = TRUE;
+        uainf.epdesc.bEndpointAddress = 0x02;
+        uainf.epdesc.wMaxPacketSize = 156;
+    }
+    if (uainf.epdesc.found) // Class-compliant USB audio device
         is_audio = TRUE;
     
     // All configs/interfaces/alts scanned, nothing interesting found -> mark as unsupported
