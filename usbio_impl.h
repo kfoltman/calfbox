@@ -189,7 +189,7 @@ static inline gboolean configure_usb_interface(struct libusb_device_handle *hand
         err = libusb_detach_kernel_driver(handle, ifno);
         if (err)
         {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot detach kernel driver from device %d: %s. Please rmmod snd-usb-audio as root.", ifno, libusb_error_name(err));
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot detach kernel driver from interface %d on device %03d:%03d: %s. Please rmmod snd-usb-audio as root.", ifno, bus, devadr, libusb_error_name(err));
             return FALSE;
         }            
     }
