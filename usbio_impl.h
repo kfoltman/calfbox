@@ -181,10 +181,10 @@ extern void usbio_run_idle_loop(struct cbox_usb_io_impl *uii);
 
 #define USB_DEVICE_SETUP_TIMEOUT 2000
 
-static inline gboolean configure_usb_interface(struct libusb_device_handle *handle, int bus, int devadr, int ifno, int altset, GError **error)
+static inline gboolean configure_usb_interface(struct libusb_device_handle *handle, int bus, int devadr, int ifno, int altset, const char *purpose, GError **error)
 {
     int err = 0;
-    if (libusb_kernel_driver_active(handle, ifno))
+    if (libusb_kernel_driver_active(handle, ifno) == 1)
     {
         err = libusb_detach_kernel_driver(handle, ifno);
         if (err)
@@ -196,13 +196,13 @@ static inline gboolean configure_usb_interface(struct libusb_device_handle *hand
     err = libusb_claim_interface(handle, ifno);
     if (err)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot claim interface %d on device %03d:%03d for MIDI input: %s", ifno, bus, devadr, libusb_error_name(err));
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot claim interface %d on device %03d:%03d for %s: %s", ifno, bus, devadr, purpose, libusb_error_name(err));
         return FALSE;
     }
     err = altset ? libusb_set_interface_alt_setting(handle, ifno, altset) : 0;
     if (err)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set alt-setting %d for interface %d on device %03d:%03d for MIDI input: %s", altset, ifno, bus, devadr, libusb_error_name(err));
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set alt-setting %d for interface %d on device %03d:%03d for %s: %s", altset, ifno, bus, devadr, purpose, libusb_error_name(err));
         return FALSE;
     }
     return TRUE;

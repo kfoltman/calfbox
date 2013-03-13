@@ -60,7 +60,7 @@ gboolean usbio_open_audio_interface(struct cbox_usb_io_impl *uii, struct cbox_us
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Only 16-bit or 24-bit output resolution is supported.");
         return FALSE;
     }
-    if (!configure_usb_interface(handle, uainf->udi->bus, uainf->udi->devadr, uainf->intf, uainf->alt_setting, error))
+    if (!configure_usb_interface(handle, uainf->udi->bus, uainf->udi->devadr, uainf->intf, uainf->alt_setting, "audio (class driver)", error))
         return FALSE;
     if (!set_endpoint_sample_rate(handle, uii->sample_rate, uainf->epdesc.bEndpointAddress))
     {
@@ -79,11 +79,9 @@ gboolean usbio_open_audio_interface(struct cbox_usb_io_impl *uii, struct cbox_us
 
 static gboolean claim_multimix_interfaces(struct cbox_usb_io_impl *uii, struct libusb_device_handle *handle, int bus, int devadr, GError **error)
 {
-    static int interfaces[] = { 0, 1 };
-    for (int i = 0; i < sizeof(interfaces) / sizeof(int); i++)
+    for (int ifno = 0; ifno < 2; ifno++)
     {
-        int ifno = interfaces[i];
-        if (!configure_usb_interface(handle, bus, devadr, ifno, 1, error))
+        if (!configure_usb_interface(handle, bus, devadr, ifno, 1, "audio (MultiMix driver)", error))
             return FALSE;
     }
     return TRUE;

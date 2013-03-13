@@ -147,7 +147,7 @@ struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *u
     GError *error = NULL;
     // printf("Has MIDI port\n");
     // printf("Output endpoint address = %02x\n", ep->bEndpointAddress);
-    if (!configure_usb_interface(handle, bus, devadr, uminf->intf, uminf->alt_setting, &error))
+    if (!configure_usb_interface(handle, bus, devadr, uminf->intf, uminf->alt_setting, "MIDI (class driver)", &error))
     {
         g_warning("%s", error->message);
         g_error_free(error);
