@@ -37,6 +37,9 @@ uuid = cbox.JackIO.create_midi_output('drums')
 cbox.JackIO.autoconnect_midi_output(uuid, '*alsa_pcm:.*')
 cbox.JackIO.rename_midi_output(uuid, 'kettles')
 
+uuid2 = cbox.JackIO.create_midi_output('violins')
+cbox.JackIO.delete_midi_output(uuid2)
+
 scene = Document.get_scene()
 scene.clear()
 instrument = scene.add_new_instrument_layer("test_sampler", "sampler").get_instrument()

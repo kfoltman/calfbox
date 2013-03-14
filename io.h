@@ -49,6 +49,7 @@ struct cbox_io_impl
     void (*pollfunc)(struct cbox_io_impl *ioi, struct cbox_command_target *fb);
     int (*getmidifunc)(struct cbox_io_impl *ioi, struct cbox_midi_buffer *destination);
     struct cbox_midi_output *(*createmidioutfunc)(struct cbox_io_impl *ioi, const char *name, GError **error);
+    void (*destroymidioutfunc)(struct cbox_io_impl *ioi, struct cbox_midi_output *midiout);
     void (*destroyfunc)(struct cbox_io_impl *ioi);
 };
 
@@ -83,6 +84,9 @@ struct cbox_midi_output
     struct cbox_uuid uuid;
     struct cbox_midi_buffer buffer;
     struct cbox_midi_merger merger;
+    // This is set if the output is in process of being removed and should not
+    // be used for output.
+    gboolean removing;
 };
 
 extern gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error);
@@ -102,6 +106,7 @@ extern gboolean cbox_io_cycle(struct cbox_io *io, struct cbox_command_target *fb
 extern void cbox_io_poll_ports(struct cbox_io *io, struct cbox_command_target *fb);
 extern struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
 extern struct cbox_midi_output *cbox_io_create_midi_output(struct cbox_io *io, const char *name, GError **error);
+extern void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *midiout);
 extern void cbox_io_close(struct cbox_io *io);
 
 extern const char *cbox_io_section;

@@ -82,7 +82,7 @@ struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char 
         for (GSList *p = io->midi_outputs; p; p = g_slist_next(p))
         {
             struct cbox_midi_output *midiout = p->data;
-            if (cbox_uuid_equal(&midiout->uuid, uuid))
+            if (!midiout->removing && cbox_uuid_equal(&midiout->uuid, uuid))
                 return midiout;
         }
     }
@@ -91,7 +91,7 @@ struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char 
         for (GSList *p = io->midi_outputs; p; p = g_slist_next(p))
         {
             struct cbox_midi_output *midiout = p->data;
-            if (!strcmp(midiout->name, name))
+            if (!midiout->removing && !strcmp(midiout->name, name))
                 return midiout;
         }
     }
@@ -114,6 +114,28 @@ struct cbox_midi_output *cbox_io_create_midi_output(struct cbox_io *io, const ch
     if (io->cb->on_midi_outputs_changed)
         io->cb->on_midi_outputs_changed(io->cb->user_data);
     return midiout;
+}
+
+void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *midiout)
+{
+    midiout->removing = TRUE;
+    
+    // This is not a very efficient way to do it. However, in this case,
+    // the list will rarely contain more than 10 elements, so simplicity
+    // and correctness may be more important.
+    GSList *copy = g_slist_copy(io->midi_outputs);
+    copy = g_slist_remove(copy, midiout);
+
+    GSList *old = io->midi_outputs;
+    io->midi_outputs = copy;
+
+    // Notify client code to disconnect the output and to make sure the RT code
+    // is not using the old list anymore
+    if (io->cb->on_midi_outputs_changed)
+        io->cb->on_midi_outputs_changed(io->cb->user_data);
+    
+    g_slist_free(old);
+    io->impl->destroymidioutfunc(io->impl, midiout);
 }
 
 void cbox_io_close(struct cbox_io *io)

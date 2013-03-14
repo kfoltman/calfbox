@@ -149,6 +149,9 @@ class JackIO:
     @staticmethod
     def rename_midi_output(uuid, new_name):
         do_cmd("/io/rename_midi_output", None, [uuid, new_name])
+    @staticmethod
+    def delete_midi_output(uuid):
+        do_cmd("/io/delete_midi_output", None, [uuid])
 
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])
