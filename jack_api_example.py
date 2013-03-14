@@ -38,7 +38,13 @@ cbox.JackIO.autoconnect_midi_output(uuid, '*alsa_pcm:.*')
 cbox.JackIO.rename_midi_output(uuid, 'kettles')
 
 uuid2 = cbox.JackIO.create_midi_output('violins')
+
+status = cbox.JackIO.status()
+print ("Before deleting, MIDI outputs: %s" % status.midi_output)
+
 cbox.JackIO.delete_midi_output(uuid2)
+status = cbox.JackIO.status()
+print ("After deleting, MIDI outputs: %s" % status.midi_output)
 
 scene = Document.get_scene()
 scene.clear()

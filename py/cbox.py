@@ -131,7 +131,7 @@ class Transport:
 class JackIO:
     @staticmethod
     def status():
-        return GetThings("/io/status", ['client_name', 'audio_inputs', 'audio_outputs', 'buffer_size'], [])
+        return GetThings("/io/status", ['client_name', 'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output'], [])
     @staticmethod
     def create_midi_output(name, autoconnect_spec = None):
         fb = GetUUID()

@@ -472,6 +472,15 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
+        for (GSList *p = io->midi_outputs; p; p = g_slist_next(p))
+        {
+            struct cbox_jack_midi_output *midiout = p->data;
+            if (!midiout->hdr.removing)
+            {
+                if (!cbox_execute_on(fb, NULL, "/midi_output", "su", error, midiout->hdr.name, &midiout->hdr.uuid))
+                    return FALSE;
+            }
+        }
         return cbox_execute_on(fb, NULL, "/client_name", "s", error, jii->client_name) &&
             cbox_execute_on(fb, NULL, "/audio_inputs", "i", error, io->input_count) &&
             cbox_execute_on(fb, NULL, "/audio_outputs", "i", error, io->output_count) &&
