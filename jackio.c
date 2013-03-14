@@ -498,6 +498,7 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
     else if (!strcmp(cmd->command, "/rename_midi_output") && !strcmp(cmd->arg_types, "ss"))
     {
         const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        const char *new_name = CBOX_ARG_S(cmd, 1);
         struct cbox_uuid uuid;
         if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
             return FALSE;
@@ -507,7 +508,13 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
             return FALSE;
         }
-        jack_port_set_name(((struct cbox_jack_midi_output *)midiout)->port, CBOX_ARG_S(cmd, 1));
+        if (0 != jack_port_set_name(((struct cbox_jack_midi_output *)midiout)->port, new_name))
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set port name to '%s'", new_name);
+            return FALSE;
+        }
+        g_free(midiout->name);
+        midiout->name = g_strdup(new_name);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/delete_midi_output") && !strcmp(cmd->arg_types, "s"))
