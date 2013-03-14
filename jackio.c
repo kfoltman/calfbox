@@ -447,7 +447,7 @@ static gboolean cbox_jack_io_create_midi_output(struct cbox_jack_io_impl *jii, c
     cbox_midi_merger_init(&output->merger, &output->buffer);
     jii->extra_midi_ports = g_slist_append(jii->extra_midi_ports, output);
 
-    if (*output->autoconnect_spec)
+    if (output->autoconnect_spec)
     {
         gchar *cbox_port = g_strdup_printf("%s:%s", jii->client_name, name);
         autoconnect_by_spec(jii->client, cbox_port, output->autoconnect_spec, 0, 1, NULL, NULL);
