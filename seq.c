@@ -442,6 +442,10 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
         cbox_song_playback_set_tempo(spb, spb->master->new_tempo);
         spb->master->new_tempo = 0;
     }
+    for(int i = 0; i < spb->track_count; i++)
+    {
+        cbox_midi_buffer_clear(&spb->tracks[i]->output_buffer);
+    }
     if (spb->master->state == CMTS_STOPPING)
     {
         if (cbox_song_playback_active_notes_release(spb, output) > 0)
@@ -449,12 +453,7 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
     }
     else
     if (spb->master->state == CMTS_ROLLING)
-    {        
-        for(int i = 0; i < spb->track_count; i++)
-        {
-            cbox_midi_buffer_clear(&spb->tracks[i]->output_buffer);
-        }
-        
+    {                
         int end_samples = cbox_master_ppqn_to_samples(spb->master, spb->loop_end_ppqn);
         
         int rpos = 0;
@@ -516,7 +515,8 @@ int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, stru
     for(int i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *trk = spb->tracks[i];
-        if (cbox_midi_playback_active_notes_release(&trk->active_notes, buf) < 0)
+        struct cbox_midi_buffer *output = trk->external_merger ? &trk->output_buffer : buf;
+        if (cbox_midi_playback_active_notes_release(&trk->active_notes, output) < 0)
             return 0;
     }
     return 1;
