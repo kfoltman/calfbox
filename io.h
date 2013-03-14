@@ -22,7 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib.h>
 #include <jack/jack.h>
 #include <jack/ringbuffer.h>
+#include "dom.h"
 #include "master.h"
+#include "mididest.h"
 
 struct cbox_io;
 struct cbox_io_callbacks;
@@ -46,7 +48,7 @@ struct cbox_io_impl
     gboolean (*getstatusfunc)(struct cbox_io_impl *ioi, GError **error);
     void (*pollfunc)(struct cbox_io_impl *ioi, struct cbox_command_target *fb);
     int (*getmidifunc)(struct cbox_io_impl *ioi, struct cbox_midi_buffer *destination);
-    struct cbox_midi_merger *(*getmidioutfunc)(struct cbox_io_impl *ioi, const char *name);
+    struct cbox_midi_output *(*createmidioutfunc)(struct cbox_io_impl *ioi, const char *name, GError **error);
     void (*destroyfunc)(struct cbox_io_impl *ioi);
 };
 
@@ -62,6 +64,7 @@ struct cbox_io
     int buffer_size;
     
     struct cbox_io_callbacks *cb;
+    GSList *midi_outputs;
 };
 
 struct cbox_io_callbacks
@@ -71,6 +74,15 @@ struct cbox_io_callbacks
     void (*process)(void *user_data, struct cbox_io *io, uint32_t nframes);
     void (*on_disconnected)(void *user_data);
     void (*on_reconnected)(void *user_data);
+    void (*on_midi_outputs_changed)(void *user_data);
+};
+
+struct cbox_midi_output
+{
+    gchar *name;
+    struct cbox_uuid uuid;
+    struct cbox_midi_buffer buffer;
+    struct cbox_midi_merger merger;
 };
 
 extern gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error);
@@ -88,7 +100,8 @@ extern int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *de
 extern gboolean cbox_io_get_disconnect_status(struct cbox_io *io, GError **error);
 extern gboolean cbox_io_cycle(struct cbox_io *io, struct cbox_command_target *fb, GError **error);
 extern void cbox_io_poll_ports(struct cbox_io *io, struct cbox_command_target *fb);
-extern struct cbox_midi_merger *cbox_io_get_midi_output(struct cbox_io *io, const char *name);
+extern struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
+extern struct cbox_midi_output *cbox_io_create_midi_output(struct cbox_io *io, const char *name, GError **error);
 extern void cbox_io_close(struct cbox_io *io);
 
 extern const char *cbox_io_section;

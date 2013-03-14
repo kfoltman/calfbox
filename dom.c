@@ -25,9 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <malloc.h>
 #include <string.h>
 
-static guint cbox_uuid_hash(gconstpointer v);
-static gboolean cbox_uuid_equal(gconstpointer v1, gconstpointer v2);
-
 static GHashTable *class_name_hash = NULL;
 
 struct cbox_class_per_document
@@ -98,6 +95,35 @@ gboolean cbox_uuid_equal(gconstpointer v1, gconstpointer v2)
     return !uuid_compare(p1->uuid, p2->uuid);
 }
 
+gboolean cbox_uuid_report_as(struct cbox_uuid *uuid, const char *cmd, struct cbox_command_target *fb, GError **error)
+{
+    if (!fb)
+        return TRUE;
+    char buf[40];
+    uuid_unparse(uuid->uuid, buf);
+    return cbox_execute_on(fb, NULL, cmd, "s", error, buf);    
+}
+
+gboolean cbox_uuid_report(struct cbox_uuid *uuid, struct cbox_command_target *fb, GError **error)
+{
+    return cbox_uuid_report_as(uuid, "/uuid", fb, error);
+}
+
+gboolean cbox_uuid_fromstring(struct cbox_uuid *uuid, const char *str, GError **error)
+{
+    if (uuid_parse(str, uuid->uuid))
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Malformed UUID: '%s'", str);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+void cbox_uuid_generate(struct cbox_uuid *uuid)
+{
+    uuid_generate(&uuid->uuid);   
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////
 
 void cbox_object_register_instance(struct cbox_document *doc, struct cbox_objhdr *obj)
@@ -145,9 +171,7 @@ gboolean cbox_object_try_default_process_cmd(struct cbox_command_target *ct, str
             return TRUE;
         }
         
-        char buf[40];
-        uuid_unparse(obj->instance_uuid.uuid, buf);
-        *result = cbox_execute_on(fb, NULL, "/uuid", "s", error, buf);
+        *result = cbox_uuid_report(&obj->instance_uuid, fb, error);
         return TRUE;
     }
     if (!strcmp(subcmd, "/get_class_name") && !strcmp(cmd->arg_types, ""))
@@ -254,11 +278,8 @@ struct cbox_objhdr *cbox_document_get_object_by_uuid(struct cbox_document *doc, 
 struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *doc, const char *uuid, const struct cbox_class *class_ptr, GError **error)
 {
     struct cbox_uuid uuidv;
-    if (uuid_parse(uuid, uuidv.uuid))
-    {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Malformed UUID: '%s'", uuid);
+    if (!cbox_uuid_fromstring(&uuidv, uuid, error))
         return NULL;
-    }
     struct cbox_objhdr *obj = cbox_document_get_object_by_uuid(doc, &uuidv);
     if (!obj)
     {

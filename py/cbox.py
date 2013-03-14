@@ -132,8 +132,23 @@ class JackIO:
     @staticmethod
     def status():
         return GetThings("/io/status", ['client_name', 'audio_inputs', 'audio_outputs', 'buffer_size'], [])
+    @staticmethod
     def create_midi_output(name, autoconnect_spec = None):
-        do_cmd("/io/create_midi_output", None, [name, autoconnect_spec if autoconnect_spec is not None else ''])
+        fb = GetUUID()
+        do_cmd("/io/create_midi_output", fb, [name])
+        uuid = fb.uuid
+        if autoconnect_spec is not None and autoconnect_spec != '':
+            JackIO.autoconnect(uuid, autoconnect_spec)
+        return uuid
+    @staticmethod
+    def autoconnect_midi_output(uuid, autoconnect_spec = None):
+        if autoconnect_spec is not None:
+            do_cmd("/io/autoconnect", None, [uuid, autoconnect_spec])
+        else:
+            do_cmd("/io/autoconnect", None, [uuid, ''])
+    @staticmethod
+    def rename_midi_output(uuid, new_name):
+        do_cmd("/io/rename_midi_output", None, [uuid, new_name])
 
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])

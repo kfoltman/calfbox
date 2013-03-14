@@ -48,7 +48,7 @@ struct cbox_track *cbox_track_new(struct cbox_document *document)
     p->items = NULL;
     p->pb = NULL;
     p->owner = NULL;
-    p->external_output = NULL;
+    p->external_output_set = FALSE;
 
     cbox_command_target_init(&p->cmd_target, cbox_track_process_cmd, p);
     CBOX_OBJECT_REGISTER(p);
@@ -118,7 +118,7 @@ gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         }
 
         return cbox_execute_on(fb, NULL, "/name", "s", error, track->name) &&
-            (track->external_output ? cbox_execute_on(fb, NULL, "/external_output", "s", error, track->external_output) : TRUE) &&
+            (track->external_output_set ? cbox_uuid_report_as(&track->external_output, "/external_output", fb, error) : TRUE) &&
             CBOX_OBJECT_DEFAULT_STATUS(track, fb, error);
     }
     else if (!strcmp(cmd->command, "/add_clip") && !strcmp(cmd->arg_types, "iiis"))
@@ -159,12 +159,13 @@ gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     }
     else if (!strcmp(cmd->command, "/external_output") && !strcmp(cmd->arg_types, "s"))
     {
-        char *old_name = track->external_output;
         if (*CBOX_ARG_S(cmd, 0))
-            track->external_output = g_strdup(CBOX_ARG_S(cmd, 0));
+        {
+            if (cbox_uuid_fromstring(&track->external_output, CBOX_ARG_S(cmd, 0), error))
+                track->external_output_set = TRUE;
+        }
         else
-            track->external_output = NULL;
-        g_free(old_name);
+            track->external_output_set = FALSE;
         return TRUE;
     }
     else

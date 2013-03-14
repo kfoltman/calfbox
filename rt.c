@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "auxbus.h"
+#include "dom.h"
 #include "instr.h"
 #include "io.h"
 #include "layer.h"
@@ -141,6 +142,12 @@ static void cbox_rt_on_reconnected(void *user_data)
     rt->disconnected = FALSE;
 }
 
+static void cbox_rt_on_midi_outputs_changed(void *user_data)
+{
+    struct cbox_rt *rt = user_data;
+    cbox_rt_update_song_playback(rt);
+}
+
 static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
 {
     struct cbox_rt *rt = user_data;
@@ -233,6 +240,7 @@ void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
         rt->cbs->process = cbox_rt_process;
         rt->cbs->on_disconnected = cbox_rt_on_disconnected;
         rt->cbs->on_reconnected = cbox_rt_on_reconnected;
+        rt->cbs->on_midi_outputs_changed = cbox_rt_on_midi_outputs_changed;
 
         cbox_io_start(rt->io, rt->cbs, fb);
     }
@@ -551,12 +559,13 @@ int cbox_rt_get_buffer_size(struct cbox_rt *rt)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, const char *name)
+struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, struct cbox_uuid *uuid)
 {
     if (!rt->io)
         return NULL;
     
-    return cbox_io_get_midi_output(rt->io, name);
+    struct cbox_midi_output *midiout = cbox_io_get_midi_output(rt->io, NULL, uuid);    
+    return midiout ? &midiout->merger : NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

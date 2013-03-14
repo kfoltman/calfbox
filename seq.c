@@ -96,9 +96,9 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     cbox_midi_buffer_init(&pb->output_buffer);
     cbox_track_playback_start_item(pb, 0, FALSE, 0);
 
-    if (track->external_output)
+    if (track->external_output_set)
     {
-        struct cbox_midi_merger *merger = cbox_rt_get_midi_output(spb->rt, track->external_output);
+        struct cbox_midi_merger *merger = cbox_rt_get_midi_output(spb->rt, &track->external_output);
         if (merger)
         {
             cbox_midi_merger_connect(merger, &pb->output_buffer, spb->rt);
@@ -342,7 +342,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
 {
     struct cbox_song_playback *spb = calloc(1, sizeof(struct cbox_song_playback));
     spb->rt = rt;
-    spb->pattern_map = g_hash_table_new_full(NULL, NULL, NULL, cbox_midi_pattern_playback_destroy);
+    spb->pattern_map = g_hash_table_new_full(NULL, NULL, NULL, (GDestroyNotify)cbox_midi_pattern_playback_destroy);
     spb->master = master;
     spb->track_count = g_list_length(song->tracks);
     spb->tracks = malloc(spb->track_count * sizeof(struct cbox_track_playback *));
@@ -357,7 +357,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
     {
         struct cbox_track *trk = p->data;
         spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master, spb);
-        if (!trk->external_output)
+        if (!trk->external_output_set)
             cbox_midi_merger_connect(&spb->track_merger, &spb->tracks[pos - 1]->output_buffer, NULL);
     }
     

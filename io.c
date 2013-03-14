@@ -75,12 +75,45 @@ int cbox_io_stop(struct cbox_io *io)
     return io->impl->stopfunc(io->impl, NULL);
 }
 
-struct cbox_midi_merger *cbox_io_get_midi_output(struct cbox_io *io, const char *name)
+struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid)
 {
-    if (!io->impl->getmidioutfunc)
+    if (uuid)
+    {
+        for (GSList *p = io->midi_outputs; p; p = g_slist_next(p))
+        {
+            struct cbox_midi_output *midiout = p->data;
+            if (cbox_uuid_equal(&midiout->uuid, uuid))
+                return midiout;
+        }
+    }
+    if (name)
+    {
+        for (GSList *p = io->midi_outputs; p; p = g_slist_next(p))
+        {
+            struct cbox_midi_output *midiout = p->data;
+            if (!strcmp(midiout->name, name))
+                return midiout;
+        }
+    }
+    return NULL;
+}
+
+struct cbox_midi_output *cbox_io_create_midi_output(struct cbox_io *io, const char *name, GError **error)
+{
+    struct cbox_midi_output *midiout = cbox_io_get_midi_output(io, name, NULL);
+    if (midiout)
+        return midiout;
+    
+    midiout = io->impl->createmidioutfunc(io->impl, name, error);
+    if (!midiout)
         return NULL;
     
-    return io->impl->getmidioutfunc(io->impl, name);
+    io->midi_outputs = g_slist_prepend(io->midi_outputs, midiout);
+
+    // Notify client code to connect to new outputs if needed
+    if (io->cb->on_midi_outputs_changed)
+        io->cb->on_midi_outputs_changed(io->cb->user_data);
+    return midiout;
 }
 
 void cbox_io_close(struct cbox_io *io)
