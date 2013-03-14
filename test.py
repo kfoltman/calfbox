@@ -271,4 +271,13 @@ class TestCbox(unittest.TestCase):
         song.set_mti(90, 0.0, 0, 0)
         self.assertEqual(song.status().mtis, [(0, 0, 0, 0)])
         
+    def test_error(self):
+        thrown = False
+        try:
+            Document.get_scene().cmd('transpose', None, cbox)
+        except ValueError as ve:
+            self.assertTrue("class 'module'" in str(ve))
+            thrown = True
+        self.assertTrue(thrown)
+
 unittest.main()

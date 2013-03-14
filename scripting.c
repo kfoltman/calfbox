@@ -256,11 +256,11 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
             PyObject *ob_type = (PyObject *)value->ob_type;
             PyObject *typename_unicode = PyObject_Str(ob_type);
             PyObject *typename_bytes = PyUnicode_AsUTF8String(typename_unicode);
-            g_error("Cannot serialize Python type '%s'", PyBytes_AsString(typename_bytes));
+            PyObject *exc = PyErr_Format(PyExc_ValueError, "Cannot decode Python type '%s' to execute '%s'", PyBytes_AsString(typename_bytes), command);
             Py_DECREF(typename_bytes);
             Py_DECREF(typename_unicode);
             
-            assert(0);
+            return exc;
         }
     }
     arg_types[len] = '\0';
