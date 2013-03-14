@@ -129,9 +129,16 @@ class Transport:
         return GetThings("/master/tell", ['pos', 'pos_ppqn', 'playing'], [])
 
 class JackIO:
+    AUDIO_TYPE = "32 bit float mono audio"
+    MIDI_TYPE = "8 bit raw midi"
+    PORT_IS_SINK = 0x1
+    PORT_IS_SOURCE = 0x2
+    PORT_IS_PHYSICAL = 0x4
+    PORT_CAN_MONITOR = 0x8
+    PORT_IS_TERMINAL = 0x10
     @staticmethod
     def status():
-        return GetThings("/io/status", ['client_name', 'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output'], [])
+        return GetThings("/io/status", ['client_type', 'client_name', 'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output'], [])
     @staticmethod
     def create_midi_output(name, autoconnect_spec = None):
         fb = GetUUID()
@@ -150,8 +157,20 @@ class JackIO:
     def rename_midi_output(uuid, new_name):
         do_cmd("/io/rename_midi_output", None, [uuid, new_name])
     @staticmethod
+    def disconnect_midi_output(uuid):
+        do_cmd("/io/disconnect_midi_output", None, [uuid])
+    @staticmethod
     def delete_midi_output(uuid):
         do_cmd("/io/delete_midi_output", None, [uuid])
+    @staticmethod
+    def port_connect(pfrom, pto):
+        do_cmd("/io/port_connect", None, [pfrom, pto])
+    @staticmethod
+    def port_disconnect(pfrom, pto):
+        do_cmd("/io/port_disconnect", None, [pfrom, pto])
+    @staticmethod
+    def get_ports(name_mask = ".*", type_mask = ".*", flag_mask = 0):
+        return GetThings("/io/get_ports", ['*port'], [name_mask, type_mask, int(flag_mask)]).port
 
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])

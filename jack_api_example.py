@@ -46,6 +46,16 @@ cbox.JackIO.delete_midi_output(uuid2)
 status = cbox.JackIO.status()
 print ("After deleting, MIDI outputs: %s" % status.midi_output)
 
+print ("Physical audio inputs: %s" % (",".join(cbox.JackIO.get_ports(".*", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SOURCE | cbox.JackIO.PORT_IS_PHYSICAL))))
+print ("Physical audio outputs: %s" % (",".join(cbox.JackIO.get_ports(".*", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SINK | cbox.JackIO.PORT_IS_PHYSICAL))))
+print ("Physical MIDI inputs: %s" % (",".join(cbox.JackIO.get_ports(".*", cbox.JackIO.MIDI_TYPE, cbox.JackIO.PORT_IS_SOURCE | cbox.JackIO.PORT_IS_PHYSICAL))))
+print ("Physical MIDI outputs: %s" % (",".join(cbox.JackIO.get_ports(".*", cbox.JackIO.MIDI_TYPE, cbox.JackIO.PORT_IS_SINK | cbox.JackIO.PORT_IS_PHYSICAL))))
+
+inputs = cbox.JackIO.get_ports(".*", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SOURCE | cbox.JackIO.PORT_IS_PHYSICAL)
+outputs = cbox.JackIO.get_ports(".*", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SINK | cbox.JackIO.PORT_IS_PHYSICAL)
+cbox.JackIO.port_connect(inputs[0], outputs[0])
+cbox.JackIO.port_connect(inputs[1], outputs[1])
+
 scene = Document.get_scene()
 scene.clear()
 instrument = scene.add_new_instrument_layer("test_sampler", "sampler").get_instrument()

@@ -481,7 +481,8 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
                     return FALSE;
             }
         }
-        return cbox_execute_on(fb, NULL, "/client_name", "s", error, jii->client_name) &&
+        return cbox_execute_on(fb, NULL, "/client_type", "s", error, "JACK") &&
+            cbox_execute_on(fb, NULL, "/client_name", "s", error, jii->client_name) &&
             cbox_execute_on(fb, NULL, "/audio_inputs", "i", error, io->input_count) &&
             cbox_execute_on(fb, NULL, "/audio_outputs", "i", error, io->output_count) &&
             cbox_execute_on(fb, NULL, "/buffer_size", "i", error, io->buffer_size);
@@ -538,6 +539,55 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             return FALSE;
         }
         cbox_jack_midi_output_set_autoconnect((struct cbox_jack_midi_output *)midiout, spec);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/disconnect_midi_port") && !strcmp(cmd->arg_types, "s"))
+    {
+        const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        struct cbox_uuid uuid;
+        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+            return FALSE;
+        struct cbox_midi_output *midiout = cbox_io_get_midi_output(io, NULL, &uuid);
+        if (!midiout)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+            return FALSE;
+        }
+        jack_port_disconnect(jii->client, ((struct cbox_jack_midi_output *)midiout)->port);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/port_connect") && !strcmp(cmd->arg_types, "ss"))
+    {
+        const char *port_from = CBOX_ARG_S(cmd, 0);
+        const char *port_to = CBOX_ARG_S(cmd, 1);
+        int res = jack_connect(jii->client, port_from, port_to);
+        if (res)
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot connect port '%s' to '%s'", port_from, port_to);
+        return res == 0;
+    }
+    else if (!strcmp(cmd->command, "/port_disconnect") && !strcmp(cmd->arg_types, "ss"))
+    {
+        const char *port_from = CBOX_ARG_S(cmd, 0);
+        const char *port_to = CBOX_ARG_S(cmd, 1);
+        int res = jack_disconnect(jii->client, port_from, port_to);
+        if (res)
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot disconnect port '%s' from '%s'", port_from, port_to);
+        return res == 0;
+    }
+    else if (!strcmp(cmd->command, "/get_ports") && !strcmp(cmd->arg_types, "ssi"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        const char *mask = CBOX_ARG_S(cmd, 0);
+        const char *type = CBOX_ARG_S(cmd, 1);
+        uint32_t flags = CBOX_ARG_I(cmd, 2);
+        const char** ports = jack_get_ports(jii->client, mask, type, flags);
+        for (int i = 0; ports && ports[i]; i++)
+        {
+            if (!cbox_execute_on(fb, NULL, "/port", "s", error, ports[i]))
+                return FALSE;
+            
+        }
         return TRUE;
     }
     else
