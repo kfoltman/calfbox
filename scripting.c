@@ -123,7 +123,15 @@ static gboolean bridge_to_python_callback(struct cbox_command_target *ct, struct
         {
             struct cbox_objhdr *oh = cmd->arg_values[i];
             char buf[40];
-            uuid_unparse(oh->instance_uuid.uuid, buf);
+            cbox_uuid_tostring(&oh->instance_uuid, buf);
+            PyList_SetItem(arg_values, i, PyUnicode_FromString(buf));
+        }
+        else
+        if (cmd->arg_types[i] == 'u')
+        {
+            struct cbox_uuid *uuid = cmd->arg_values[i];
+            char buf[40];
+            cbox_uuid_tostring(uuid, buf);
             PyList_SetItem(arg_values, i, PyUnicode_FromString(buf));
         }
         else

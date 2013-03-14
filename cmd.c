@@ -87,6 +87,9 @@ gboolean cbox_execute_on_v(struct cbox_command_target *ct, struct cbox_command_t
             case 'o':
                 cmd.arg_values[i] = va_arg(av, struct cbox_objhdr *);
                 break;
+            case 'u':
+                cmd.arg_values[i] = va_arg(av, struct cbox_uuid *);
+                break;
             default:
                 g_error("Invalid format character '%c' for command '%s'", args[i], cmd_name);
                 assert(0);

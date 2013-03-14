@@ -99,9 +99,7 @@ gboolean cbox_uuid_report_as(struct cbox_uuid *uuid, const char *cmd, struct cbo
 {
     if (!fb)
         return TRUE;
-    char buf[40];
-    uuid_unparse(uuid->uuid, buf);
-    return cbox_execute_on(fb, NULL, cmd, "s", error, buf);    
+    return cbox_execute_on(fb, NULL, cmd, "u", error, uuid->uuid);    
 }
 
 gboolean cbox_uuid_report(struct cbox_uuid *uuid, struct cbox_command_target *fb, GError **error)
@@ -119,9 +117,14 @@ gboolean cbox_uuid_fromstring(struct cbox_uuid *uuid, const char *str, GError **
     return TRUE;
 }
 
+void cbox_uuid_tostring(struct cbox_uuid *uuid, char str[40])
+{
+    uuid_unparse(uuid->uuid, str);
+}
+
 void cbox_uuid_generate(struct cbox_uuid *uuid)
 {
-    uuid_generate(&uuid->uuid);   
+    uuid_generate(uuid->uuid);   
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
