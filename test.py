@@ -281,3 +281,6 @@ class TestCbox(unittest.TestCase):
         self.assertTrue(thrown)
 
 unittest.main()
+
+cbox.stop_audio()
+cbox.shutdown_engine()
