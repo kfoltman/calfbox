@@ -46,6 +46,7 @@ static const struct libusb_endpoint_descriptor *get_audio_output_endpoint(const 
 static void fill_endpoint_desc(struct usbio_endpoint_descriptor *epdesc, const struct libusb_endpoint_descriptor *ep)
 {
     epdesc->found = TRUE;
+    epdesc->interrupt = FALSE;
     epdesc->bEndpointAddress = ep->bEndpointAddress;
     epdesc->wMaxPacketSize = ep->wMaxPacketSize;
 }
