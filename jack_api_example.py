@@ -32,6 +32,7 @@ status = cbox.JackIO.status()
 client_name = status.client_name
 print ("Client name: %s" % client_name)
 print ("Audio inputs: %d, outputs: %d" % (status.audio_inputs, status.audio_outputs))
+print ("Sample rate: %d frames/sec" % (status.sample_rate))
 print ("JACK period: %d frames" % (status.buffer_size))
 uuid = cbox.JackIO.create_midi_output('drums')
 cbox.JackIO.autoconnect_midi_output(uuid, '*alsa_pcm:.*')

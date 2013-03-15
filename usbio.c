@@ -303,7 +303,19 @@ static gboolean cbox_usb_io_process_cmd(struct cbox_command_target *ct, struct c
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        return cbox_io_process_cmd(io, fb, cmd, error, &handled);
+        
+        for (GList *p = uii->midi_input_ports; p; p = g_list_next(p))
+        {
+            struct cbox_usb_midi_input *midi_in = p->data;
+            char buf[40], buf2[60];
+            sprintf(buf, "usb:%03d:%03d", midi_in->devinfo->bus, midi_in->devinfo->devadr);
+            sprintf(buf2, "vendor=%04x product=%04x", midi_in->devinfo->vid, midi_in->devinfo->pid);
+            if (!cbox_execute_on(fb, NULL, "/midi_input", "ss", error, buf, buf2))
+                return FALSE;
+        }
+        
+        return cbox_execute_on(fb, NULL, "/output_resolution", "i", error, 8 * uii->output_resolution) &&
+            cbox_io_process_cmd(io, fb, cmd, error, &handled);
     }
     else
     {

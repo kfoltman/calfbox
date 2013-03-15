@@ -128,6 +128,8 @@ class Transport:
     def tell():
         return GetThings("/master/tell", ['pos', 'pos_ppqn', 'playing'], [])
 
+# Currently responsible for both JACK and USB I/O - not all functionality is
+# supported by both.
 class JackIO:
     AUDIO_TYPE = "32 bit float mono audio"
     MIDI_TYPE = "8 bit raw midi"
@@ -138,7 +140,8 @@ class JackIO:
     PORT_IS_TERMINAL = 0x10
     @staticmethod
     def status():
-        return GetThings("/io/status", ['client_type', 'client_name', 'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output'], [])
+        # Some of these only make sense for 
+        return GetThings("/io/status", ['client_type', 'client_name', 'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output', '*midi_input', 'sample_rate', 'output_resolution'], [])
     @staticmethod
     def create_midi_output(name, autoconnect_spec = None):
         fb = GetUUID()
