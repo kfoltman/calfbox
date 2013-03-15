@@ -1,4 +1,5 @@
 from calfbox import cbox
+import time
 
 def cmd_dumper(cmd, fb, args):
     print ("%s(%s)" % (cmd, ",".join(list(map(repr,args)))))
@@ -78,4 +79,7 @@ cbox.Transport.play()
 print("Ready!")
 
 while True:
-    cbox.call_on_idle(cmd_dumper)
+    events = cbox.get_new_events()
+    if events:
+        print (events)
+    time.sleep(0.05)

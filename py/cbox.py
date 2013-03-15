@@ -178,6 +178,9 @@ class JackIO:
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])
         
+def get_new_events():
+    return GetThings("/on_idle", [], []).seq
+        
 class CfgSection:
     def __init__(self, name):
         self.name = name
