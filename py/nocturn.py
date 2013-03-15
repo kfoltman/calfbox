@@ -61,7 +61,7 @@ class NocturnHandler(threading.Thread):
         try:
             data = array.array('B', self.rpipe.read())
             i = 0
-            # For longer sequencer, Nocturn skips the control change message
+            # For longer sequences, Nocturn skips the control change message
             while i < len(data):
                 if data[i] == 176:
                     i += 1
