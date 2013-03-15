@@ -144,6 +144,8 @@ struct cbox_usb_midi_info
     struct usbio_endpoint_descriptor epdesc;
 };
 
+#define MAX_SYSEX_SIZE CBOX_MIDI_MAX_LONG_DATA
+
 struct cbox_usb_midi_input
 {
     struct cbox_usb_io_impl *uii;
@@ -156,6 +158,8 @@ struct cbox_usb_midi_input
     struct usbio_transfer *transfer;
     struct cbox_midi_buffer midi_buffer;
     uint8_t midi_recv_data[256];
+    uint8_t sysex_data[MAX_SYSEX_SIZE];
+    uint32_t current_sysex_length;
 };
 
 extern struct usbio_transfer *usbio_transfer_new(struct libusb_context *usbctx, const char *transfer_type, int index, int isopackets, void *user_data);

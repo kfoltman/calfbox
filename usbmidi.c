@@ -97,7 +97,8 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
         for (int i = 0; i + 3 < transfer->actual_length; i += 4)
         {
             uint8_t *data = &transfer->buffer[i];
-            if ((data[0] & 15) >= 0x08)
+            uint8_t etype = data[0] & 15;
+            if (etype >= 8)
             {
                 // normalise: note on with vel 0 -> note off
                 if ((data[1] & 0xF0) == 0x90 && data[3] == 0)
@@ -105,6 +106,34 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
                 else
                     cbox_midi_buffer_write_event(&umi->midi_buffer, 0, data + 1, midi_cmd_size(data[1]));
             }
+            else
+            if (etype == 2 || etype == 3)
+            {
+                cbox_midi_buffer_write_event(&umi->midi_buffer, 0, data + 1, etype);
+            }
+            else
+            if (etype == 4)
+            {
+                if (umi->current_sysex_length + 3 <= MAX_SYSEX_SIZE)
+                    memcpy(&umi->sysex_data[umi->current_sysex_length], data + 1, 3);
+                umi->current_sysex_length += 3;
+            }
+            else
+            if (etype >= 5 && etype <= 7)
+            {
+                int len = etype - 4;
+                if (umi->current_sysex_length + len <= MAX_SYSEX_SIZE)
+                    memcpy(&umi->sysex_data[umi->current_sysex_length], data + 1, len);
+                umi->current_sysex_length += len;
+                if (umi->current_sysex_length <= MAX_SYSEX_SIZE)
+                    cbox_midi_buffer_write_event(&umi->midi_buffer, 0, umi->sysex_data, umi->current_sysex_length);
+                else
+                    g_warning("Dropping oversized SysEx: length %d", umi->current_sysex_length);
+                umi->current_sysex_length = 0;
+                
+            }
+            else
+                printf("data[0] = %02x\n", data[0]);
         }
     }
     if (umi->uii->no_resubmit)
@@ -121,6 +150,7 @@ void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
         struct cbox_usb_midi_input *umi = p->data;
         cbox_midi_buffer_clear(&umi->midi_buffer);
         cbox_midi_merger_connect(&uii->midi_input_merger, &umi->midi_buffer, NULL);
+        umi->current_sysex_length = 0;
         umi->transfer = usbio_transfer_new(uii->usbctx,  "MIDI In", 0, 0, umi);
         if (umi->interrupt)
             libusb_fill_interrupt_transfer(umi->transfer->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, umi->max_packet_size, midi_transfer_cb, umi->transfer, 0);

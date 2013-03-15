@@ -351,7 +351,13 @@ gboolean cbox_app_on_idle(struct cbox_command_target *fb, GError **error)
                         return FALSE;
                 }
                 else
-                    g_warning("Propagating 'long' events not implemented yet.");
+                {
+                    struct cbox_blob blob;
+                    blob.data = (uint8_t *)data;
+                    blob.size = event->size;
+                    if (!cbox_execute_on(fb, NULL, "/io/midi/long_event", "b", error, &blob))
+                        return FALSE;
+                }
             }
         }
     }
