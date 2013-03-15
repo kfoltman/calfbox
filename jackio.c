@@ -349,13 +349,7 @@ int cbox_jackio_get_midi_data(struct cbox_io_impl *impl, struct cbox_midi_buffer
         
         if (!jack_midi_event_get(&event, midi, i))
         {
-            // XXXKF ignore sysex for now
-            if (event.size >= 4)
-                continue;
-            
-            uint8_t data[4];
-            memcpy(data, event.buffer, event.size);
-            if (!cbox_midi_buffer_write_event(destination, event.time, data, event.size))
+            if (!cbox_midi_buffer_write_event(destination, event.time, event.buffer, event.size))
                 return -i;
         }
         else
