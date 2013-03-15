@@ -288,7 +288,7 @@ void usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii)
     int packets = uii->iso_packets;
     t = usbio_transfer_new(uii->usbctx, "play", uii->playback_counter, packets, uii);
     int tsize = uii->sample_rate * 2 * uii->output_resolution / 1000;
-    uint8_t *buf = (uint8_t *)calloc(1, uii->audio_output_pktsize);
+    uint8_t *buf = (uint8_t *)calloc(packets, uii->audio_output_pktsize);
     
     libusb_fill_iso_transfer(t->transfer, uii->handle_audiodev, uii->audio_output_endpoint, buf, tsize * packets, packets, play_callback_adaptive, t, 20000);
     libusb_set_iso_packet_lengths(t->transfer, tsize);
