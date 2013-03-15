@@ -113,6 +113,10 @@ struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
     cbox_midi_merger_connect(&rt->scene_input_merger, &rt->midibuf_aux, NULL);
     cbox_midi_merger_connect(&rt->scene_input_merger, &rt->midibuf_jack, NULL);
     cbox_midi_merger_connect(&rt->scene_input_merger, &rt->midibuf_song, NULL);
+    
+    cbox_midi_buffer_init(&rt->midibufs_appsink[0]);
+    cbox_midi_buffer_init(&rt->midibufs_appsink[1]);
+    rt->current_appsink_buffer = 0;
 
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
     CBOX_OBJECT_REGISTER(rt);
@@ -160,6 +164,19 @@ static void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframe
     cbox_midi_buffer_clear(&rt->midibuf_song);
     cbox_midi_buffer_clear(&rt->midibuf_total);
     cbox_io_get_midi_data(io, &rt->midibuf_jack);
+    
+    // Copy MIDI input to the app-sink with no timing information
+    struct cbox_midi_buffer *appsink = &rt->midibufs_appsink[rt->current_appsink_buffer];
+    for (int i = 0; i < rt->midibuf_jack.count; i++)
+    {
+        const struct cbox_midi_event *event = cbox_midi_buffer_get_event(&rt->midibuf_jack, i);
+        if (event)
+        {
+            if (!cbox_midi_buffer_can_store_msg(appsink, event->size))
+                break;
+            cbox_midi_buffer_copy_event(appsink, event, 0);
+        }
+    }
     
     // Process command queue, needs MIDI aux buf to work
     cost = 0;
@@ -425,7 +442,7 @@ static int send_events_command_execute(void *user_data)
     int last_time = cbox_midi_buffer_get_last_event_time(&cmd->rt->midibuf_aux);
     while (cmd->pos < cbox_midi_buffer_get_count(cmd->buffer))
     {
-        struct cbox_midi_event *event = cbox_midi_buffer_get_event(cmd->buffer, cmd->pos);
+        const struct cbox_midi_event *event = cbox_midi_buffer_get_event(cmd->buffer, cmd->pos);
         int time = event->time - cmd->time_delta;
         if (time < last_time)
             time = last_time;
@@ -566,6 +583,46 @@ struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, struct cbox
     
     struct cbox_midi_output *midiout = cbox_io_get_midi_output(rt->io, NULL, uuid);    
     return midiout ? &midiout->merger : NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+struct get_midi_input_buffer_command
+{
+    struct cbox_rt *rt;
+    struct cbox_midi_buffer *buffer;
+};
+
+static int get_midi_input_buffer_command_execute(void *user_data)
+{
+    struct get_midi_input_buffer_command *cmd = user_data;
+    struct cbox_rt *rt = cmd->rt;
+    
+    if (rt->midibufs_appsink[rt->current_appsink_buffer].count)
+    {
+        // return the current buffer, switch to the new, empty one
+        cmd->buffer = &rt->midibufs_appsink[rt->current_appsink_buffer];
+        rt->current_appsink_buffer = 1 - rt->current_appsink_buffer;
+        cbox_midi_buffer_clear(&rt->midibufs_appsink[rt->current_appsink_buffer]);
+    }
+    else
+        cmd->buffer = NULL;
+    
+    return 1;
+}
+
+const struct cbox_midi_buffer *cbox_rt_get_input_midi_data(struct cbox_rt *rt)
+{
+    // This checks the counter from the 'wrong' thread, but that's OK, it's
+    // just to avoid doing any RT work when input buffer is completely empty.
+    // Any further access/manipulation is done via RT cmd.
+    if (!rt->midibufs_appsink[rt->current_appsink_buffer].count)
+        return NULL;
+    
+    static struct cbox_rt_cmd_definition gmibdef = { .prepare = NULL, .execute = get_midi_input_buffer_command_execute, .cleanup = NULL };
+    struct get_midi_input_buffer_command cmd = { rt, NULL };
+    cbox_rt_execute_cmd_sync(rt, &gmibdef, &cmd);
+    return cmd.buffer;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

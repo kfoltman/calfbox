@@ -43,6 +43,6 @@ extern struct cbox_app app;
 
 struct cbox_menu *create_main_menu(void);
 
-extern void cbox_app_on_idle(struct cbox_command_target *fb);
+extern gboolean cbox_app_on_idle(struct cbox_command_target *fb, GError **error);
 
 #endif

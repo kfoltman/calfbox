@@ -55,7 +55,7 @@ void cbox_midi_merger_render_to(struct cbox_midi_merger *dest, struct cbox_midi_
             struct cbox_midi_buffer *data = src->data;
             if (src->bpos < data->count)
             {
-                struct cbox_midi_event *event = cbox_midi_buffer_get_event(data, src->bpos);
+                const struct cbox_midi_event *event = cbox_midi_buffer_get_event(data, src->bpos);
                 if (event->time < earliest_time)
                 {
                     earliest_source = src;

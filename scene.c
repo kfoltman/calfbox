@@ -483,7 +483,7 @@ static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbo
     uint32_t event_count = cbox_midi_buffer_get_count(source);
     for (i = 0; i < event_count; i++)
     {
-        struct cbox_midi_event *event = cbox_midi_buffer_get_event(source, i);
+        const struct cbox_midi_event *event = cbox_midi_buffer_get_event(source, i);
         
         // XXXKF ignore sysex for now
         if (event->size >= 4)
@@ -595,7 +595,7 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_m
             {
                 while(cur_event < event_count)
                 {
-                    struct cbox_midi_event *event = cbox_midi_buffer_get_event(&module->midi_input, cur_event);
+                    const struct cbox_midi_event *event = cbox_midi_buffer_get_event(&module->midi_input, cur_event);
                     if (event)
                     {
                         if (event->time <= i)
@@ -650,7 +650,7 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_m
         }
         while(cur_event < event_count)
         {
-            struct cbox_midi_event *event = cbox_midi_buffer_get_event(&module->midi_input, cur_event);
+            const struct cbox_midi_event *event = cbox_midi_buffer_get_event(&module->midi_input, cur_event);
             if (event)
             {
                 (*module->process_event)(module, cbox_midi_event_get_data(event), event->size);

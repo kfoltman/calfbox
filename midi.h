@@ -92,14 +92,14 @@ static inline int cbox_midi_buffer_can_store_msg(struct cbox_midi_buffer *buffer
     return buffer->long_data_size + size <= CBOX_MIDI_MAX_LONG_DATA;
 }
 
-static inline struct cbox_midi_event *cbox_midi_buffer_get_event(struct cbox_midi_buffer *buffer, uint32_t pos)
+static inline const struct cbox_midi_event *cbox_midi_buffer_get_event(const struct cbox_midi_buffer *buffer, uint32_t pos)
 {
     if (pos >= buffer->count)
         return NULL;
     return &buffer->events[pos];
 }
 
-static inline uint8_t *cbox_midi_event_get_data(struct cbox_midi_event *evt)
+static inline const uint8_t *cbox_midi_event_get_data(const struct cbox_midi_event *evt)
 {
     return evt->size > 4 ? evt->data_ext : evt->data_inline;
 }

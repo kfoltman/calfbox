@@ -60,6 +60,8 @@ struct cbox_rt
     struct cbox_midi_merger scene_input_merger;
     
     jack_ringbuffer_t *rb_execute, *rb_cleanup;
+    struct cbox_midi_buffer midibufs_appsink[2];
+    int current_appsink_buffer;
     
     struct cbox_command_target cmd_target;
     int started, disconnected;
@@ -93,6 +95,7 @@ extern struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_mid
 extern void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_pattern *pattern);
 extern void cbox_rt_send_events(struct cbox_rt *rt, struct cbox_midi_buffer *buffer);
 extern struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, struct cbox_uuid *uuid);
+extern const struct cbox_midi_buffer *cbox_rt_get_input_midi_data(struct cbox_rt *rt);
 
 extern int cbox_rt_get_sample_rate(struct cbox_rt *rt);
 extern int cbox_rt_get_buffer_size(struct cbox_rt *rt);

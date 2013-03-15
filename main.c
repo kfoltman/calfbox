@@ -106,7 +106,7 @@ static int (*old_menu_on_idle)(struct cbox_ui_page *page);
 
 static int on_idle_with_ui_poll(struct cbox_ui_page *page)
 {
-    cbox_app_on_idle(NULL);
+    cbox_app_on_idle(NULL, NULL);
     
     if (old_menu_on_idle)
         return old_menu_on_idle(page);
@@ -330,7 +330,7 @@ int main(int argc, char *argv[])
             if (ch == 10 || (ch == -1 && errno != EWOULDBLOCK))
                 break;
             usleep(100000);
-            cbox_app_on_idle(NULL);
+            cbox_app_on_idle(NULL, NULL);
         } while(1);
         fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) &~ O_NONBLOCK);
     }

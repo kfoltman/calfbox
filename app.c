@@ -93,8 +93,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     else
     if (!strcmp(obj, "on_idle") && !strcmp(cmd->arg_types, ""))
     {
-        cbox_app_on_idle(fb);
-        return TRUE;
+        return cbox_app_on_idle(fb, error);
     }
     else
     if (!strcmp(obj, "send_event") && (!strcmp(cmd->arg_types, "iii") || !strcmp(cmd->arg_types, "ii") || !strcmp(cmd->arg_types, "i")))
@@ -298,29 +297,30 @@ static gboolean config_process_cmd(struct cbox_command_target *ct, struct cbox_c
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void cbox_app_on_idle(struct cbox_command_target *fb)
+gboolean cbox_app_on_idle(struct cbox_command_target *fb, GError **error)
 {
     if (app.rt->io)
     {
-        GError *error = NULL;
-        if (cbox_io_get_disconnect_status(&app.io, &error))
+        GError *error2 = NULL;
+        if (cbox_io_get_disconnect_status(&app.io, &error2))
             cbox_io_poll_ports(&app.io, fb);
         else
         {
-            if (error)
-                g_error_free(error);
+            if (error2)
+                g_error_free(error2);
             int auto_reconnect = cbox_config_get_int("io", "auto_reconnect", 0);
             if (auto_reconnect > 0)
             {
                 sleep(auto_reconnect);
-                GError *error = NULL;
-                if (!cbox_io_cycle(&app.io, fb, &error))
+                GError *error2 = NULL;
+                if (!cbox_io_cycle(&app.io, fb, &error2))
                 {
                     gboolean suppress = FALSE;
                     if (fb)
-                        suppress = cbox_execute_on(fb, NULL, "/io/cycle_failed", "s", NULL, error->message);
+                        suppress = cbox_execute_on(fb, NULL, "/io/cycle_failed", "s", NULL, error2->message);
                     if (!suppress)
-                        g_warning("Cannot cycle the I/O: %s", (error && error->message) ? error->message : "Unknown error");
+                        g_warning("Cannot cycle the I/O: %s", (error2 && error2->message) ? error2->message : "Unknown error");
+                    g_error_free(error2);
                 }
                 else
                 {
@@ -331,7 +331,31 @@ void cbox_app_on_idle(struct cbox_command_target *fb)
         }
     }
     if (app.rt)
-        cbox_rt_handle_cmd_queue(app.rt);    
+    {
+        // Process results of asynchronous commands
+        cbox_rt_handle_cmd_queue(app.rt);
+        
+        const struct cbox_midi_buffer *midi_in = cbox_rt_get_input_midi_data(app.rt);
+        // If no feedback, the input events are lost - probably better than if
+        // they filled up the input buffer needlessly.
+        if (fb && midi_in)
+        {
+            for (int i = 0; i < midi_in->count; i++)
+            {
+                const struct cbox_midi_event *event = cbox_midi_buffer_get_event(midi_in, i);
+                const uint8_t *data = cbox_midi_event_get_data(event);
+                // XXXKF doesn't handle SysEx properly yet, only 3-byte values
+                if (event->size <= 3)
+                {
+                    if (!cbox_execute_on(fb, NULL, "/io/midi/simple_event", "iii" + (3 - event->size), error, data[0], data[1], data[2]))
+                        return FALSE;
+                }
+                else
+                    g_warning("Propagating 'long' events not implemented yet.");
+            }
+        }
+    }
+    return TRUE;
 }
 
 struct cbox_app app =

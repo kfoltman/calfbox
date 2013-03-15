@@ -109,8 +109,8 @@ static int process_cb(jack_nframes_t nframes, void *arg)
             uint8_t tmp_data[4];
             for (int i = 0; i < midiout->hdr.buffer.count; i++)
             {
-                struct cbox_midi_event *event = cbox_midi_buffer_get_event(&midiout->hdr.buffer, i);
-                uint8_t *pdata = cbox_midi_event_get_data(event);
+                const struct cbox_midi_event *event = cbox_midi_buffer_get_event(&midiout->hdr.buffer, i);
+                const uint8_t *pdata = cbox_midi_event_get_data(event);
                 if ((pdata[0] & 0xF0) == 0x90 && !pdata[2] && event->size == 3)
                 {
                     tmp_data[0] = pdata[0] & ~0x10;
