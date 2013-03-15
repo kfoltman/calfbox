@@ -53,6 +53,7 @@ static void fill_endpoint_desc(struct usbio_endpoint_descriptor *epdesc, const s
 static gboolean fill_endpoint_by_address(const struct libusb_interface_descriptor *asdescr, uint8_t addr, struct usbio_endpoint_descriptor *epdesc)
 {
     epdesc->found = FALSE;
+    epdesc->interrupt = FALSE;
     for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
     {
         const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
@@ -535,6 +536,13 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
                     uminf.intf = asdescr->bInterfaceNumber;
                     uminf.alt_setting = asdescr->bAlternateSetting;
                     fill_endpoint_by_address(asdescr, 0x82, &uminf.epdesc);
+                }
+                else if (udi->vid == 0x1235 && udi->pid == 0x000a) // Novation Nocturn
+                {
+                    uminf.intf = asdescr->bInterfaceNumber;
+                    uminf.alt_setting = asdescr->bAlternateSetting;
+                    fill_endpoint_by_address(asdescr, 0x81, &uminf.epdesc);
+                    uminf.epdesc.interrupt = TRUE;
                 }
             }
         }

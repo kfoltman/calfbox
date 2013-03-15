@@ -58,7 +58,7 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
     }
 
     const struct cbox_usb_device_info *udi = umi->devinfo;
-    if (udi->vid == 0x09e8 && udi->pid == 0x0062)
+    if (udi->vid == 0x09e8 && udi->pid == 0x0062) // MPD16
     {
         for (int i = 0; i < transfer->actual_length;)
         {
@@ -68,6 +68,28 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
                 break;
             cbox_midi_buffer_write_inline(&umi->midi_buffer, 0, data[1], len > 1 ? data[2] : 0, len > 2 ? data[3] : 0);
             i += len + 1;
+        }
+    }
+    else
+    if (udi->vid == 0x1235 && udi->pid == 0x000a) // Nocturn
+    {
+        uint8_t control = 0;
+        for (int i = 0; i < transfer->actual_length;)
+        {
+            uint8_t *data = &transfer->buffer[i];
+            if (*data >= 128)
+            {
+                control = *data;
+                i++;
+                continue;
+            }
+            if (control != 176 || i + 2 > transfer->actual_length)
+            {
+                g_warning("Unrecognized combination of control, data and length: %02x %02x %02x", control, data[0], transfer->actual_length - i);
+                break;
+            }
+            cbox_midi_buffer_write_inline(&umi->midi_buffer, 0, control, data[0], data[1]);
+            i += 2;
         }
     }
     else
@@ -100,7 +122,10 @@ void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
         cbox_midi_buffer_clear(&umi->midi_buffer);
         cbox_midi_merger_connect(&uii->midi_input_merger, &umi->midi_buffer, NULL);
         umi->transfer = usbio_transfer_new(uii->usbctx,  "MIDI In", 0, 0, umi);
-        libusb_fill_bulk_transfer(umi->transfer->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, umi->max_packet_size, midi_transfer_cb, umi->transfer, 0);
+        if (umi->interrupt)
+            libusb_fill_interrupt_transfer(umi->transfer->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, umi->max_packet_size, midi_transfer_cb, umi->transfer, 0);
+        else
+            libusb_fill_bulk_transfer(umi->transfer->transfer, umi->handle, umi->endpoint, umi->midi_recv_data, umi->max_packet_size, midi_transfer_cb, umi->transfer, 0);
     }
     for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
     {
@@ -160,6 +185,7 @@ struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *u
     umi->handle = handle;
     umi->busdevadr = devinfo->busdevadr;
     umi->endpoint = uminf->epdesc.bEndpointAddress;
+    umi->interrupt = uminf->epdesc.interrupt;
     cbox_midi_buffer_init(&umi->midi_buffer);
     uii->midi_input_ports = g_list_prepend(uii->midi_input_ports, umi);
     int len = uminf->epdesc.wMaxPacketSize;
@@ -171,8 +197,16 @@ struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *u
     // those notes to play.
     unsigned char flushbuf[256];
     int transferred = 0;
-    while(0 == libusb_bulk_transfer(handle, umi->endpoint, flushbuf, umi->max_packet_size, &transferred, 10) && transferred > 0)
-        usleep(1000);
+    if (umi->interrupt)
+    {
+        while(0 == libusb_interrupt_transfer(handle, umi->endpoint, flushbuf, umi->max_packet_size, &transferred, 10) && transferred > 0)
+            usleep(1000);
+    }
+    else
+    {
+        while(0 == libusb_bulk_transfer(handle, umi->endpoint, flushbuf, umi->max_packet_size, &transferred, 10) && transferred > 0)
+            usleep(1000);
+    }
     devinfo->status = CBOX_DEVICE_STATUS_OPENED;
     
     return umi;

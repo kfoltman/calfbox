@@ -37,7 +37,9 @@ try at breaking it up into manageable parts.
 
 struct usbio_endpoint_descriptor
 {
-    uint8_t found;
+    uint8_t found:1;
+    uint8_t interrupt:1;
+    uint8_t reserved:6;
     uint8_t bEndpointAddress;
     uint16_t wMaxPacketSize;
 };
@@ -149,6 +151,7 @@ struct cbox_usb_midi_input
     struct libusb_device_handle *handle;
     int busdevadr;
     int endpoint;
+    gboolean interrupt;
     int max_packet_size;
     struct usbio_transfer *transfer;
     struct cbox_midi_buffer midi_buffer;
