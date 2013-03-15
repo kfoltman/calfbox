@@ -138,6 +138,56 @@ void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *mi
     io->impl->destroymidioutfunc(io->impl, midiout);
 }
 
+gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error, gboolean *cmd_handled)
+{
+    *cmd_handled = FALSE;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        *cmd_handled = TRUE;
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (GSList *p = io->midi_outputs; p; p = g_slist_next(p))
+        {
+            struct cbox_midi_output *midiout = p->data;
+            if (!midiout->removing)
+            {
+                if (!cbox_execute_on(fb, NULL, "/midi_output", "su", error, midiout->name, &midiout->uuid))
+                    return FALSE;
+            }
+        }
+        return cbox_execute_on(fb, NULL, "/client_type", "s", error, "JACK") &&
+            cbox_execute_on(fb, NULL, "/audio_inputs", "i", error, io->input_count) &&
+            cbox_execute_on(fb, NULL, "/audio_outputs", "i", error, io->output_count) &&
+            cbox_execute_on(fb, NULL, "/buffer_size", "i", error, io->buffer_size);
+    }
+    else if (io->impl->createmidioutfunc && !strcmp(cmd->command, "/create_midi_output") && !strcmp(cmd->arg_types, "s"))
+    {
+        *cmd_handled = TRUE;
+        struct cbox_midi_output *midiout;
+        midiout = cbox_io_create_midi_output(io, CBOX_ARG_S(cmd, 0), error);
+        if (!midiout)
+            return FALSE;
+        return cbox_uuid_report(&midiout->uuid, fb, error);
+    }
+    else if (io->impl->destroymidioutfunc && !strcmp(cmd->command, "/delete_midi_output") && !strcmp(cmd->arg_types, "s"))
+    {
+        *cmd_handled = TRUE;
+        const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        struct cbox_uuid uuid;
+        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+            return FALSE;
+        struct cbox_midi_output *midiout = cbox_io_get_midi_output(io, NULL, &uuid);
+        if (!midiout)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+            return FALSE;
+        }
+        cbox_io_destroy_midi_output(io, midiout);
+        return TRUE;
+    }
+    return FALSE;
+}
+
 void cbox_io_close(struct cbox_io *io)
 {
     io->impl->destroyfunc(io->impl);
