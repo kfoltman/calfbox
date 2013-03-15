@@ -473,7 +473,8 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        return cbox_execute_on(fb, NULL, "/client_name", "s", error, jii->client_name) &&
+        return cbox_execute_on(fb, NULL, "/client_type", "s", error, "JACK") &&
+            cbox_execute_on(fb, NULL, "/client_name", "s", error, jii->client_name) &&
             cbox_io_process_cmd(io, fb, cmd, error, &handled);
     }
     else if (!strcmp(cmd->command, "/rename_midi_output") && !strcmp(cmd->arg_types, "ss"))

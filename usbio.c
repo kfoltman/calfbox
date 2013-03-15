@@ -298,18 +298,19 @@ static gboolean cbox_usb_io_process_cmd(struct cbox_command_target *ct, struct c
 {
     struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)ct->user_data;
     struct cbox_io *io = uii->ioi.pio;
+    gboolean handled = FALSE;
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        return cbox_execute_on(fb, NULL, "/audio_inputs", "i", error, io->input_count) &&
-            cbox_execute_on(fb, NULL, "/audio_outputs", "i", error, io->output_count) &&
-            cbox_execute_on(fb, NULL, "/buffer_size", "i", error, io->buffer_size);
+        return cbox_io_process_cmd(io, fb, cmd, error, &handled);
     }
     else
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
-        return FALSE;
+        gboolean result = cbox_io_process_cmd(io, fb, cmd, error, &handled);
+        if (!handled)
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
+        return result;
     }
 }
 
