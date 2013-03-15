@@ -133,7 +133,7 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
                 
             }
             else
-                printf("data[0] = %02x\n", data[0]);
+                g_warning("Unrecognized USB MIDI initiating byte %02x\n", data[0]);
         }
     }
     if (umi->uii->no_resubmit)
@@ -182,6 +182,11 @@ void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii)
         usbio_transfer_destroy(umi->transfer);
         umi->transfer = NULL;
         cbox_midi_buffer_clear(&umi->midi_buffer);
+    }
+    for(GList *p = uii->rt_midi_input_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_input *umi = p->data;
+        cbox_midi_merger_disconnect(&uii->midi_input_merger, &umi->midi_buffer, NULL);
     }
     g_list_free(uii->rt_midi_input_ports);
 }
