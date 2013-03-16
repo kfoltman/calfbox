@@ -78,11 +78,17 @@ gboolean cbox_usbio_get_status(struct cbox_io_impl *impl, GError **error)
 static void run_audio_loop(struct cbox_usb_io_impl *uii)
 {
     while(!uii->stop_engine && !uii->device_removed) {
+        struct cbox_io *io = uii->ioi.pio;
         struct timeval tv = {
             .tv_sec = 0,
             .tv_usec = 1000
         };
         libusb_handle_events_timeout(uii->usbctx, &tv);
+        for (GSList *p = io->midi_outputs; p; p = p->next)
+        {
+            struct cbox_usb_midi_output *umo = p->data;
+            usbio_send_midi_to_output(umo);
+        }
     }
 }
 
@@ -94,10 +100,15 @@ void usbio_run_idle_loop(struct cbox_usb_io_impl *uii)
         for (int b = 0; b < uii->output_channels; b++)
             memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
         io->cb->process(io->cb->user_data, io, io->buffer_size);
-        for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
+        for (GList *p = uii->rt_midi_ports; p; p = p->next)
         {
-            struct cbox_usb_midi_input *umi = p->data;
+            struct cbox_usb_midi_interface *umi = p->data;
             cbox_midi_buffer_clear(&umi->midi_buffer);
+        }
+        for (GSList *p = io->midi_outputs; p; p = p->next)
+        {
+            struct cbox_usb_midi_output *umo = p->data;
+            usbio_send_midi_to_output(umo);
         }
         
         struct timeval tv = {
@@ -150,6 +161,47 @@ static void *engine_thread(void *user_data)
     return NULL;
 }
 
+static void cbox_usbio_destroy_midi_out(struct cbox_io_impl *ioi, struct cbox_midi_output *midiout)
+{
+    g_free(midiout->name);
+    free(midiout);
+}
+
+static struct cbox_usb_midi_interface *cur_midi_interface = NULL;
+
+struct cbox_midi_output *cbox_usbio_create_midi_out(struct cbox_io_impl *impl, const char *name, GError **error)
+{
+    // struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
+    struct cbox_usb_midi_output *output = calloc(1, sizeof(struct cbox_usb_midi_output));
+    output->hdr.name = g_strdup(name);
+    output->hdr.removing = FALSE;
+    cbox_uuid_generate(&output->hdr.uuid);
+    cbox_midi_buffer_init(&output->hdr.buffer);
+    cbox_midi_merger_init(&output->hdr.merger, &output->hdr.buffer);
+    output->ifptr = cur_midi_interface;
+
+    return (struct cbox_midi_output *)output;
+}
+
+static void create_midi_outputs(struct cbox_usb_io_impl *uii)
+{
+    uii->ioi.createmidioutfunc = cbox_usbio_create_midi_out;
+    for (GList *p = uii->midi_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_interface *umi = p->data;
+        if (umi->epdesc_out.found)
+        {
+            char buf[80];
+            sprintf(buf, "usb:%03d:%03d", umi->devinfo->bus, umi->devinfo->devadr);
+            
+            cur_midi_interface = umi;
+            cbox_io_create_midi_output(uii->ioi.pio, buf, NULL);
+        }
+    }
+    uii->ioi.createmidioutfunc = NULL;
+    cur_midi_interface = NULL;
+}
+
 gboolean cbox_usbio_start(struct cbox_io_impl *impl, struct cbox_command_target *fb, GError **error)
 {
     struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)impl;
@@ -159,7 +211,7 @@ gboolean cbox_usbio_start(struct cbox_io_impl *impl, struct cbox_command_target 
     uii->stop_engine = FALSE;
     uii->setup_error = FALSE;
     uii->playback_counter = 0;
-    
+
     if (pthread_create(&uii->thr_engine, NULL, engine_thread, uii))
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "cannot create engine thread: %s", strerror(errno));
@@ -168,6 +220,8 @@ gboolean cbox_usbio_start(struct cbox_io_impl *impl, struct cbox_command_target 
     while(!uii->setup_error && uii->playback_counter < uii->playback_buffers)
         usleep(10000);
 
+    create_midi_outputs(uii);
+    
     return TRUE;
 }
 
@@ -304,13 +358,13 @@ static gboolean cbox_usb_io_process_cmd(struct cbox_command_target *ct, struct c
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        for (GList *p = uii->midi_input_ports; p; p = g_list_next(p))
+        for (GList *p = uii->midi_ports; p; p = g_list_next(p))
         {
-            struct cbox_usb_midi_input *midi_in = p->data;
-            char buf[40], buf2[60];
-            sprintf(buf, "usb:%03d:%03d", midi_in->devinfo->bus, midi_in->devinfo->devadr);
-            sprintf(buf2, "vendor=%04x product=%04x", midi_in->devinfo->vid, midi_in->devinfo->pid);
-            if (!cbox_execute_on(fb, NULL, "/midi_input", "ss", error, buf, buf2))
+            struct cbox_usb_midi_interface *midi = p->data;
+            struct cbox_usb_device_info *di = midi->devinfo;
+            if (midi->epdesc_in.found && !cbox_execute_on(fb, NULL, "/usb_midi_input", "iiii", error, di->bus, di->devadr, di->vid, di->pid))
+                return FALSE;
+            if (midi->epdesc_out.found && !cbox_execute_on(fb, NULL, "/usb_midi_output", "iiii", error, di->bus, di->devadr, di->vid, di->pid))
                 return FALSE;
         }
         
@@ -387,8 +441,9 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     uii->ioi.pollfunc = cbox_usbio_poll_ports;
     uii->ioi.cyclefunc = cbox_usbio_cycle;
     uii->ioi.getmidifunc = cbox_usbio_get_midi_data;
+    uii->ioi.destroymidioutfunc = cbox_usbio_destroy_midi_out;
     uii->ioi.destroyfunc = cbox_usbio_destroy;
-    uii->midi_input_ports = NULL;
+    uii->midi_ports = NULL;
     
     usbio_scan_devices(uii, FALSE);
     

@@ -124,10 +124,15 @@ static void calc_output_buffer(struct cbox_usb_io_impl *uii)
     for (int b = 0; b < uii->output_channels; b++)
         memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
     io->cb->process(io->cb->user_data, io, io->buffer_size);
-    for (GList *p = uii->rt_midi_input_ports; p; p = p->next)
+    for (GList *p = uii->rt_midi_ports; p; p = p->next)
     {
-        struct cbox_usb_midi_input *umi = p->data;
+        struct cbox_usb_midi_interface *umi = p->data;
         cbox_midi_buffer_clear(&umi->midi_buffer);
+    }
+    for (GSList *p = io->midi_outputs; p; p = p->next)
+    {
+        struct cbox_usb_midi_output *umo = p->data;
+        usbio_fill_midi_output_buffer(umo);
     }
     if (register_cpu_time)
     {

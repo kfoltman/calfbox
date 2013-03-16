@@ -138,6 +138,30 @@ void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *mi
     io->impl->destroymidioutfunc(io->impl, midiout);
 }
 
+void cbox_io_destroy_all_midi_outputs(struct cbox_io *io)
+{
+    for (GSList *p = io->midi_outputs; p; p = g_slist_next(p))
+    {
+        struct cbox_midi_output *midiout = p->data;
+        midiout->removing = TRUE;
+    }
+    
+    GSList *old = io->midi_outputs;
+    io->midi_outputs = NULL;
+    // Notify client code to disconnect the output and to make sure the RT code
+    // is not using the old list anymore
+    if (io->cb->on_midi_outputs_changed)
+        io->cb->on_midi_outputs_changed(io->cb->user_data);
+    
+    while(old)
+    {
+        struct cbox_midi_output *midiout = io->midi_outputs->data;
+        io->impl->destroymidioutfunc(io->impl, midiout);
+        old = g_slist_remove(old, midiout);
+    }
+    g_slist_free(old);
+}
+
 gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error, gboolean *cmd_handled)
 {
     *cmd_handled = FALSE;

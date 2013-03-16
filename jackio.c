@@ -386,12 +386,7 @@ void cbox_jackio_destroy(struct cbox_io_impl *impl)
             free(jii->client_name);
             jii->client_name = NULL;
         }
-        while(io->midi_outputs)
-        {
-            struct cbox_jack_midi_output *jmo = io->midi_outputs->data;
-            cbox_jack_midi_output_destroy(jmo);
-            io->midi_outputs = g_slist_remove(io->midi_outputs, io->midi_outputs->data);
-        }
+        cbox_io_destroy_all_midi_outputs(io);
         
         jack_ringbuffer_free(jii->rb_autoconnect);
         jack_client_close(jii->client);
@@ -679,11 +674,7 @@ cleanup:
             free(jii->outputs[i]);
         free(jii->outputs);
     }
-    while(io->midi_outputs)
-    {
-        cbox_jack_midi_output_destroy((struct cbox_jack_midi_output *)io->midi_outputs->data);
-        io->midi_outputs = g_slist_remove(io->midi_outputs, io->midi_outputs->data);
-    }
+    cbox_io_destroy_all_midi_outputs(io);
     if (jii->client_name)
         free(jii->client_name);
     jack_client_close(jii->client);

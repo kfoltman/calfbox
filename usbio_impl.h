@@ -85,8 +85,8 @@ struct cbox_usb_io_impl
     struct usbio_transfer **sync_transfers;
     int read_ptr;
     
-    GList *midi_input_ports;
-    GList *rt_midi_input_ports;
+    GList *midi_ports;
+    GList *rt_midi_ports;
     struct cbox_midi_merger midi_input_merger;
     /*
     struct cbox_midi_buffer **midi_input_port_buffers;
@@ -136,30 +136,49 @@ struct cbox_usb_audio_info
     struct usbio_endpoint_descriptor epdesc;
 };
 
+enum usb_midi_protocol_type
+{
+    USBMIDI_PROTOCOL_CLASS,
+    USBMIDI_PROTOCOL_MPD16,
+    USBMIDI_PROTOCOL_NOCTURN,
+};
+
 struct cbox_usb_midi_info
 {
     struct cbox_usb_device_info *udi;
     int intf;
     int alt_setting;
-    struct usbio_endpoint_descriptor epdesc;
+    struct usbio_endpoint_descriptor epdesc_in;
+    struct usbio_endpoint_descriptor epdesc_out;
+    enum usb_midi_protocol_type protocol;
 };
 
+#define MAX_MIDI_PACKET_SIZE 256
 #define MAX_SYSEX_SIZE CBOX_MIDI_MAX_LONG_DATA
 
-struct cbox_usb_midi_input
+struct cbox_usb_midi_interface
 {
     struct cbox_usb_io_impl *uii;
     struct cbox_usb_device_info *devinfo;
     struct libusb_device_handle *handle;
     int busdevadr;
-    int endpoint;
-    gboolean interrupt;
-    int max_packet_size;
-    struct usbio_transfer *transfer;
+    struct usbio_endpoint_descriptor epdesc_in, epdesc_out;
+    struct usbio_transfer *transfer_in, *transfer_out;
     struct cbox_midi_buffer midi_buffer;
-    uint8_t midi_recv_data[256];
+    uint8_t midi_recv_data[MAX_MIDI_PACKET_SIZE];
     uint8_t sysex_data[MAX_SYSEX_SIZE];
     uint32_t current_sysex_length;
+    enum usb_midi_protocol_type protocol;
+};
+
+#define USB_MIDI_OUTPUT_QUEUE 256
+
+struct cbox_usb_midi_output
+{
+    struct cbox_midi_output hdr;
+    struct cbox_usb_midi_interface *ifptr;
+    uint8_t endpoint_buffer[USB_MIDI_OUTPUT_QUEUE];
+    uint32_t endpoint_buffer_pos;
 };
 
 extern struct usbio_transfer *usbio_transfer_new(struct libusb_context *usbctx, const char *transfer_type, int index, int isopackets, void *user_data);
@@ -170,8 +189,10 @@ extern void usbio_transfer_destroy(struct usbio_transfer *xfer);
 extern void cbox_usb_midi_info_init(struct cbox_usb_midi_info *umi, struct cbox_usb_device_info *udi);
 extern void usbio_start_midi_capture(struct cbox_usb_io_impl *uii);
 extern void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii);
-extern struct cbox_usb_midi_input *usbio_open_midi_interface(struct cbox_usb_io_impl *uii,
+extern struct cbox_usb_midi_interface *usbio_open_midi_interface(struct cbox_usb_io_impl *uii,
     const struct cbox_usb_midi_info *uminf, struct libusb_device_handle *handle);
+extern void usbio_send_midi_to_output(struct cbox_usb_midi_output *umo);
+extern void usbio_fill_midi_output_buffer(struct cbox_usb_midi_output *umo);
 
 extern void cbox_usb_audio_info_init(struct cbox_usb_audio_info *uai, struct cbox_usb_device_info *udi);
 extern void usbio_start_audio_playback(struct cbox_usb_io_impl *uii);

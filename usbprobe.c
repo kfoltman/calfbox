@@ -21,12 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static const struct libusb_endpoint_descriptor *get_midi_input_endpoint(const struct libusb_interface_descriptor *asdescr)
+static const struct libusb_endpoint_descriptor *get_midi_endpoint(const struct libusb_interface_descriptor *asdescr, gboolean is_output)
 {
     for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
     {
         const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
-        if (ep->bEndpointAddress >= 0x80)
+        if ((ep->bEndpointAddress >= 0x80) == !is_output)
             return ep;
     }
     return NULL;
@@ -411,20 +411,22 @@ static gboolean parse_audio_class(struct cbox_usb_io_impl *uii, struct cbox_usb_
     return FALSE;
 }
 
-static gboolean parse_midi_class(struct cbox_usb_midi_info *umi, const struct libusb_interface_descriptor *asdescr, gboolean other_config)
+static gboolean parse_midi_class(struct cbox_usb_midi_info *umi, const struct libusb_interface_descriptor *asdescr, gboolean other_config, gboolean is_output)
 {
-    const struct libusb_endpoint_descriptor *ep = get_midi_input_endpoint(asdescr);
+    const struct libusb_endpoint_descriptor *ep = get_midi_endpoint(asdescr, is_output);
     if (!ep)
         return FALSE;
     
     if (other_config)
         return TRUE;
     
-    if (umi->epdesc.found)
+    struct usbio_endpoint_descriptor *epd = is_output ? &umi->epdesc_out : &umi->epdesc_in;
+    
+    if (epd->found)
         return FALSE;
     umi->intf = asdescr->bInterfaceNumber;
     umi->alt_setting = asdescr->bAlternateSetting;
-    fill_endpoint_desc(&umi->epdesc, ep);
+    fill_endpoint_desc(epd, ep);
     return TRUE;
 }
 
@@ -517,39 +519,46 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
             for (int as = 0; as < idescr->num_altsetting; as++)
             {
                 const struct libusb_interface_descriptor *asdescr = &idescr->altsetting[as];
-                if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 1)
+                if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 1) // Audio control
                 {
                     if (parse_audio_control_class(&uainf, asdescr, other_config) && other_config)
                         udi->configs_with_audio |= config_mask;
                 }
-                else if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 2)
+                else if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 2) // Audio streaming
                 {
                     if (parse_audio_class(uii, &uainf, asdescr, other_config) && other_config)
                         udi->configs_with_audio |= config_mask;
                 }
-                else if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 3)
+                else if (asdescr->bInterfaceClass == LIBUSB_CLASS_AUDIO && asdescr->bInterfaceSubClass == 3) // MIDI streaming
                 {
-                    if (parse_midi_class(&uminf, asdescr, other_config) && other_config)
+                    if (parse_midi_class(&uminf, asdescr, other_config, FALSE) && other_config)
                         udi->configs_with_midi |= config_mask;
+                    if (parse_midi_class(&uminf, asdescr, other_config, TRUE) && other_config)
+                        udi->configs_with_midi |= config_mask;
+                    uminf.protocol = USBMIDI_PROTOCOL_CLASS;
                 }
                 else if (udi->vid == 0x09e8 && udi->pid == 0x0062) // Akai MPD16
                 {
                     uminf.intf = asdescr->bInterfaceNumber;
                     uminf.alt_setting = asdescr->bAlternateSetting;
-                    fill_endpoint_by_address(asdescr, 0x82, &uminf.epdesc);
+                    uminf.protocol = USBMIDI_PROTOCOL_MPD16;
+                    fill_endpoint_by_address(asdescr, 0x82, &uminf.epdesc_in);
                 }
                 else if (udi->vid == 0x1235 && udi->pid == 0x000a) // Novation Nocturn
                 {
                     uminf.intf = asdescr->bInterfaceNumber;
                     uminf.alt_setting = asdescr->bAlternateSetting;
-                    fill_endpoint_by_address(asdescr, 0x81, &uminf.epdesc);
-                    uminf.epdesc.interrupt = TRUE;
+                    fill_endpoint_by_address(asdescr, 0x81, &uminf.epdesc_in);
+                    fill_endpoint_by_address(asdescr, 0x02, &uminf.epdesc_out);
+                    uminf.epdesc_in.interrupt = TRUE;
+                    uminf.epdesc_out.interrupt = TRUE;
+                    uminf.protocol = USBMIDI_PROTOCOL_NOCTURN;
                 }
             }
         }
         libusb_free_config_descriptor(cfg_descr);
     }
-    if (!uminf.epdesc.found && udi->configs_with_midi)
+    if (!uminf.epdesc_in.found && !uminf.epdesc_out.found && udi->configs_with_midi)
         g_warning("%03d:%03d - MIDI port available on different configs: mask=0x%x", bus, devadr, udi->configs_with_midi);
 
     if (uainf.epdesc.found) // Class-compliant USB audio device
@@ -558,7 +567,7 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         is_audio = TRUE;
     
     // All configs/interfaces/alts scanned, nothing interesting found -> mark as unsupported
-    udi->is_midi = uminf.epdesc.found;
+    udi->is_midi = uminf.epdesc_in.found || uminf.epdesc_out.found;
     udi->is_audio = is_audio;
     if (!udi->is_midi && !udi->is_audio)
     {
@@ -585,7 +594,7 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
         return udi->is_midi || udi->is_audio;
     }
     
-    if (uminf.epdesc.found)
+    if (uminf.epdesc_in.found || uminf.epdesc_out.found)
     {
         g_debug("Found MIDI device %03d:%03d, trying to open", bus, devadr);
         if (0 != usbio_open_midi_interface(uii, &uminf, handle))
@@ -685,13 +694,13 @@ gboolean usbio_scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only)
 void usbio_forget_device(struct cbox_usb_io_impl *uii, struct cbox_usb_device_info *devinfo)
 {
     g_hash_table_remove(uii->device_table, GINT_TO_POINTER(devinfo->busdevadr));
-    for (GList *p = uii->midi_input_ports, *pNext = NULL; p; p = pNext)
+    for (GList *p = uii->midi_ports, *pNext = NULL; p; p = pNext)
     {
         pNext = p->next;
-        struct cbox_usb_midi_input *umi = p->data;
+        struct cbox_usb_midi_interface *umi = p->data;
         if (umi->busdevadr == devinfo->busdevadr)
         {
-            uii->midi_input_ports = g_list_delete_link(uii->midi_input_ports, p);
+            uii->midi_ports = g_list_delete_link(uii->midi_ports, p);
             free(umi);
         }
     }

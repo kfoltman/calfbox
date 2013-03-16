@@ -107,6 +107,7 @@ extern void cbox_io_poll_ports(struct cbox_io *io, struct cbox_command_target *f
 extern struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
 extern struct cbox_midi_output *cbox_io_create_midi_output(struct cbox_io *io, const char *name, GError **error);
 extern void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *midiout);
+extern void cbox_io_destroy_all_midi_outputs(struct cbox_io *io);
 extern gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error, gboolean *cmd_handled);
 extern void cbox_io_close(struct cbox_io *io);
 
