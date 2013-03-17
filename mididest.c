@@ -36,7 +36,10 @@ void cbox_midi_merger_render_to(struct cbox_midi_merger *dest, struct cbox_midi_
         return;
     cbox_midi_buffer_clear(output);
     for (int i = 0; i < dest->input_count; i++)
-        dest->inputs[i]->bpos = 0;
+    {
+        if (dest->inputs[i]->streaming)
+            dest->inputs[i]->bpos = 0;
+    }
 
     while(1)
     {
@@ -98,9 +101,8 @@ void cbox_midi_merger_connect(struct cbox_midi_merger *dest, struct cbox_midi_bu
     struct cbox_midi_source *src = calloc(1, sizeof(struct cbox_midi_source));
     src->data = buffer;
     src->bpos = 0;
-    void **new_array = stm_array_clone_insert((void **)dest->inputs, dest->input_count, dest->input_count, src);
-    void **old_array = cbox_rt_swap_pointers_and_update_count(rt, (void **)&dest->inputs, new_array, &dest->input_count, dest->input_count + 1);
-    free(old_array);
+    src->streaming = TRUE;
+    cbox_rt_array_insert(rt, (void ***)&dest->inputs, &dest->input_count, dest->input_count, src);
 }
 
 void cbox_midi_merger_disconnect(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt)
@@ -109,11 +111,21 @@ void cbox_midi_merger_disconnect(struct cbox_midi_merger *dest, struct cbox_midi
     if (pos == -1)
         return;
 
-    struct cbox_midi_source *src = dest->inputs[pos];
-    void **new_array = stm_array_clone_remove((void **)dest->inputs, dest->input_count, pos);
-    void **old_array = cbox_rt_swap_pointers_and_update_count(rt, (void **)&dest->inputs, new_array, &dest->input_count, dest->input_count - 1);
-    free(old_array);
-    free(src);
+    cbox_rt_array_remove(rt, (void ***)&dest->inputs, &dest->input_count, pos);
+}
+
+void cbox_midi_merger_push(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt)
+{
+    if (!buffer->count)
+        return;
+    struct cbox_midi_source src;
+    src.data = buffer;
+    src.bpos = 0;
+    src.streaming = FALSE;
+    cbox_rt_array_insert(rt, (void ***)&dest->inputs, &dest->input_count, dest->input_count, &src);
+    while(src.bpos < buffer->count)
+        cbox_rt_handle_cmd_queue(rt); 
+    cbox_rt_array_remove(rt, (void ***)&dest->inputs, &dest->input_count, dest->input_count - 1);
 }
 
 void cbox_midi_merger_close(struct cbox_midi_merger *dest)

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_MIDIDEST_H
 
 #include "midi.h"
+#include <glib.h>
 
 struct cbox_rt;
 
@@ -27,6 +28,7 @@ struct cbox_midi_source
 {
     struct cbox_midi_buffer *data;
     int bpos;
+    gboolean streaming;
 };
 
 struct cbox_midi_merger
@@ -46,6 +48,7 @@ static inline void cbox_midi_merger_render(struct cbox_midi_merger *dest)
 int cbox_midi_merger_find_source(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer);
 void cbox_midi_merger_connect(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt);
 void cbox_midi_merger_disconnect(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt);
+void cbox_midi_merger_push(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt);
 void cbox_midi_merger_close(struct cbox_midi_merger *dest);
 
 #endif

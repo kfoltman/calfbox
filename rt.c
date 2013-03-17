@@ -431,40 +431,11 @@ struct send_events_command
     int time_delta;
 };
 
-static int send_events_command_execute(void *user_data)
-{
-    struct send_events_command *cmd = user_data;
-    
-    // all done?
-    if (cmd->pos >= cbox_midi_buffer_get_count(cmd->buffer))
-        return 1;
-    
-    int last_time = cbox_midi_buffer_get_last_event_time(&cmd->rt->midibuf_aux);
-    while (cmd->pos < cbox_midi_buffer_get_count(cmd->buffer))
-    {
-        const struct cbox_midi_event *event = cbox_midi_buffer_get_event(cmd->buffer, cmd->pos);
-        int time = event->time - cmd->time_delta;
-        if (time < last_time)
-            time = last_time;
-        cbox_midi_buffer_copy_event(&cmd->rt->midibuf_aux, event, time);
-        cmd->pos++;
-    }
-    assert(cmd->rt->buffer_size);
-    cmd->time_delta += cmd->rt->buffer_size;
-    
-    return (cmd->pos >= cbox_midi_buffer_get_count(cmd->buffer)) ? 1 : 0;
-}
-
 void cbox_rt_send_events(struct cbox_rt *rt, struct cbox_midi_buffer *buffer)
 {
-    if (cbox_midi_buffer_get_count(buffer) == 0)
+    if (!rt || !buffer)
         return;
-    
-    static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = send_events_command_execute, .cleanup = NULL };
-    
-    struct send_events_command cmd = { rt, buffer, 0, 0 };
-    
-    cbox_rt_execute_cmd_sync(rt, &def, &cmd);
+    cbox_midi_merger_push(&rt->scene_input_merger, buffer, rt);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
