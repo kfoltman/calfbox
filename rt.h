@@ -93,7 +93,7 @@ extern struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scen
 extern struct cbox_song *cbox_rt_set_song(struct cbox_rt *rt, struct cbox_song *song, int new_pos);
 extern struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos);
 extern void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_pattern *pattern);
-extern void cbox_rt_send_events(struct cbox_rt *rt, struct cbox_midi_buffer *buffer);
+extern void cbox_rt_send_events_to(struct cbox_rt *rt, struct cbox_midi_merger *merger, struct cbox_midi_buffer *buffer);
 extern struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, struct cbox_uuid *uuid);
 extern const struct cbox_midi_buffer *cbox_rt_get_input_midi_data(struct cbox_rt *rt);
 

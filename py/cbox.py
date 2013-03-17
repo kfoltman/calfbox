@@ -180,6 +180,9 @@ def call_on_idle(callback = None):
         
 def get_new_events():
     return GetThings("/on_idle", [], []).seq
+    
+def send_midi_event(*data, output = None):
+    do_cmd('/send_event_to', None, [output if output is not None else ''] + list(data))
         
 class CfgSection:
     def __init__(self, name):

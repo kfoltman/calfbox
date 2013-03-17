@@ -422,20 +422,22 @@ void cbox_rt_update_song_playback(struct cbox_rt *rt)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct send_events_command
-{
-    struct cbox_rt *rt;
-    
-    struct cbox_midi_buffer *buffer;
-    int pos;
-    int time_delta;
-};
-
-void cbox_rt_send_events(struct cbox_rt *rt, struct cbox_midi_buffer *buffer)
+void cbox_rt_send_events_to(struct cbox_rt *rt, struct cbox_midi_merger *merger, struct cbox_midi_buffer *buffer)
 {
     if (!rt || !buffer)
         return;
-    cbox_midi_merger_push(&rt->scene_input_merger, buffer, rt);
+    if (merger)
+        cbox_midi_merger_push(merger, buffer, rt);
+    else
+    {
+        cbox_midi_merger_push(&rt->scene_input_merger, buffer, rt);
+        for (GSList *p = rt->io->midi_outputs; p; p = p->next)
+        {
+            struct cbox_midi_output *midiout = p->data;
+            cbox_midi_merger_push(&midiout->merger, buffer, rt);
+            
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

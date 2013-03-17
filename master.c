@@ -259,7 +259,8 @@ void cbox_master_panic(struct cbox_master *master)
         cbox_midi_buffer_write_inline(&buf, ch, 0xB0 + ch, 123, 0);
         cbox_midi_buffer_write_inline(&buf, ch, 0xB0 + ch, 121, 0);
     }
-    cbox_rt_send_events(master->rt, &buf);
+    // Send to all outputs
+    cbox_rt_send_events_to(master->rt, NULL, &buf);
 }
 
 int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn)

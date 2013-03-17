@@ -96,20 +96,35 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return cbox_app_on_idle(fb, error);
     }
     else
-    if (!strcmp(obj, "send_event") && (!strcmp(cmd->arg_types, "iii") || !strcmp(cmd->arg_types, "ii") || !strcmp(cmd->arg_types, "i")))
+    if (!strcmp(obj, "send_event_to") && (!strcmp(cmd->arg_types, "siii") || !strcmp(cmd->arg_types, "sii") || !strcmp(cmd->arg_types, "si")))
     {
-        int mcmd = CBOX_ARG_I(cmd, 0);
+        const char *output = CBOX_ARG_S(cmd, 0);
+        struct cbox_midi_merger *merger = &app.rt->scene_input_merger;
+        if (*output)
+        {
+            struct cbox_uuid uuid;
+            if (!cbox_uuid_fromstring(&uuid, output, error))
+                return FALSE;
+            
+            merger = cbox_rt_get_midi_output(app.rt, &uuid);
+            if (!merger)
+            {
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown MIDI output UUID: '%s'", output);
+                return FALSE;
+            }
+        }
+        int mcmd = CBOX_ARG_I(cmd, 1);
         int arg1 = 0, arg2 = 0;
         if (cmd->arg_types[1] == 'i')
         {
-            arg1 = CBOX_ARG_I(cmd, 1);
+            arg1 = CBOX_ARG_I(cmd, 2);
             if (cmd->arg_types[2] == 'i')
-                arg2 = CBOX_ARG_I(cmd, 2);
+                arg2 = CBOX_ARG_I(cmd, 3);
         }
         struct cbox_midi_buffer buf;
         cbox_midi_buffer_init(&buf);
         cbox_midi_buffer_write_inline(&buf, 0, mcmd, arg1, arg2);
-        cbox_rt_send_events(app.rt, &buf);
+        cbox_rt_send_events_to(app.rt, merger, &buf);
         return TRUE;
     }
     else
@@ -122,7 +137,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         cbox_midi_buffer_init(&buf);
         cbox_midi_buffer_write_inline(&buf, 0, 0x90 + ((channel - 1) & 15), note & 127, velocity & 127);
         cbox_midi_buffer_write_inline(&buf, 1, 0x80 + ((channel - 1) & 15), note & 127, velocity & 127);
-        cbox_rt_send_events(app.rt, &buf);
+        cbox_rt_send_events_to(app.rt, &app.rt->scene_input_merger, &buf);
         return TRUE;
     }
     else

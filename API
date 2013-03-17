@@ -109,9 +109,9 @@
 /waves/list() -> [/waveform(int id)]
 /waves/info(int id) -> /filename(string), /name(string), /bytes(int)
 /on_idle() -> {any}
-/send_event(int)
-/send_event(int, int)
-/send_event(int, int, int)
+/send_event_to(string output, int)
+/send_event_to(string output, int, int)
+/send_event_to(string output, int, int, int)
 /play_note(int ch, int note, int velocity) (plays a note with duration=1 on the next buffer)
 /play_drum_pattern(string pattern)
 /play_drum_track(string track)
