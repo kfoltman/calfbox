@@ -155,7 +155,7 @@ void cbox_io_destroy_all_midi_outputs(struct cbox_io *io)
     
     while(old)
     {
-        struct cbox_midi_output *midiout = io->midi_outputs->data;
+        struct cbox_midi_output *midiout = old->data;
         io->impl->destroymidioutfunc(io->impl, midiout);
         old = g_slist_remove(old, midiout);
     }
