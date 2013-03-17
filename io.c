@@ -98,6 +98,29 @@ struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char 
     return NULL;
 }
 
+struct cbox_midi_input *cbox_io_get_midi_input(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid)
+{
+    if (uuid)
+    {
+        for (GSList *p = io->midi_inputs; p; p = g_slist_next(p))
+        {
+            struct cbox_midi_input *midiin = p->data;
+            if (!midiin->removing && cbox_uuid_equal(&midiin->uuid, uuid))
+                return midiin;
+        }
+    }
+    if (name)
+    {
+        for (GSList *p = io->midi_inputs; p; p = g_slist_next(p))
+        {
+            struct cbox_midi_input *midiin = p->data;
+            if (!midiin->removing && !strcmp(midiin->name, name))
+                return midiin;
+        }
+    }
+    return NULL;
+}
+
 struct cbox_midi_output *cbox_io_create_midi_output(struct cbox_io *io, const char *name, GError **error)
 {
     struct cbox_midi_output *midiout = cbox_io_get_midi_output(io, name, NULL);
@@ -138,28 +161,84 @@ void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *mi
     io->impl->destroymidioutfunc(io->impl, midiout);
 }
 
-void cbox_io_destroy_all_midi_outputs(struct cbox_io *io)
+struct cbox_midi_input *cbox_io_create_midi_input(struct cbox_io *io, const char *name, GError **error)
+{
+    struct cbox_midi_input *midiin = cbox_io_get_midi_input(io, name, NULL);
+    if (midiin)
+        return midiin;
+    
+    midiin = io->impl->createmidiinfunc(io->impl, name, error);
+    if (!midiin)
+        return NULL;
+    
+    io->midi_inputs = g_slist_prepend(io->midi_inputs, midiin);
+
+    // Notify client code to connect to new inputs if needed
+    if (io->cb->on_midi_inputs_changed)
+        io->cb->on_midi_inputs_changed(io->cb->user_data);
+    return midiin;
+}
+
+void cbox_io_destroy_midi_input(struct cbox_io *io, struct cbox_midi_input *midiin)
+{
+    midiin->removing = TRUE;
+    
+    // This is not a very efficient way to do it. However, in this case,
+    // the list will rarely contain more than 10 elements, so simplicity
+    // and correctness may be more important.
+    GSList *copy = g_slist_copy(io->midi_inputs);
+    copy = g_slist_remove(copy, midiin);
+
+    GSList *old = io->midi_inputs;
+    io->midi_inputs = copy;
+
+    // Notify client code to disconnect the input and to make sure the RT code
+    // is not using the old list anymore
+    if (io->cb->on_midi_inputs_changed)
+        io->cb->on_midi_inputs_changed(io->cb->user_data);
+    
+    g_slist_free(old);
+    io->impl->destroymidiinfunc(io->impl, midiin);
+}
+
+void cbox_io_destroy_all_midi_ports(struct cbox_io *io)
 {
     for (GSList *p = io->midi_outputs; p; p = g_slist_next(p))
     {
         struct cbox_midi_output *midiout = p->data;
         midiout->removing = TRUE;
     }
+    for (GSList *p = io->midi_inputs; p; p = g_slist_next(p))
+    {
+        struct cbox_midi_output *midiin = p->data;
+        midiin->removing = TRUE;
+    }
     
-    GSList *old = io->midi_outputs;
+    GSList *old_i = io->midi_inputs, *old_o = io->midi_outputs;
     io->midi_outputs = NULL;
+    io->midi_inputs = NULL;
     // Notify client code to disconnect the output and to make sure the RT code
     // is not using the old list anymore
     if (io->cb->on_midi_outputs_changed)
         io->cb->on_midi_outputs_changed(io->cb->user_data);
+    if (io->cb->on_midi_inputs_changed)
+        io->cb->on_midi_inputs_changed(io->cb->user_data);
     
-    while(old)
+    while(old_o)
     {
-        struct cbox_midi_output *midiout = old->data;
+        struct cbox_midi_output *midiout = old_o->data;
         io->impl->destroymidioutfunc(io->impl, midiout);
-        old = g_slist_remove(old, midiout);
+        old_o = g_slist_remove(old_o, midiout);
     }
-    g_slist_free(old);
+    g_slist_free(old_o);
+
+    while(old_i)
+    {
+        struct cbox_midi_input *midiin = old_i->data;
+        io->impl->destroymidiinfunc(io->impl, midiin);
+        old_i = g_slist_remove(old_i, midiin);
+    }
+    g_slist_free(old_i);
 }
 
 gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error, gboolean *cmd_handled)
@@ -170,6 +249,15 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
         *cmd_handled = TRUE;
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
+        for (GSList *p = io->midi_inputs; p; p = g_slist_next(p))
+        {
+            struct cbox_midi_input *midiin = p->data;
+            if (!midiin->removing)
+            {
+                if (!cbox_execute_on(fb, NULL, "/midi_input", "su", error, midiin->name, &midiin->uuid))
+                    return FALSE;
+            }
+        }
         for (GSList *p = io->midi_outputs; p; p = g_slist_next(p))
         {
             struct cbox_midi_output *midiout = p->data;
@@ -185,6 +273,15 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
             cbox_execute_on(fb, NULL, "/sample_rate", "i", error, cbox_io_get_sample_rate(io)) &&
             cbox_execute_on(fb, NULL, "/buffer_size", "i", error, io->buffer_size);
     }
+    else if (io->impl->createmidiinfunc && !strcmp(cmd->command, "/create_midi_input") && !strcmp(cmd->arg_types, "s"))
+    {
+        *cmd_handled = TRUE;
+        struct cbox_midi_input *midiin;
+        midiin = cbox_io_create_midi_input(io, CBOX_ARG_S(cmd, 0), error);
+        if (!midiin)
+            return FALSE;
+        return cbox_uuid_report(&midiin->uuid, fb, error);
+    }
     else if (io->impl->createmidioutfunc && !strcmp(cmd->command, "/create_midi_output") && !strcmp(cmd->arg_types, "s"))
     {
         *cmd_handled = TRUE;
@@ -193,6 +290,22 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
         if (!midiout)
             return FALSE;
         return cbox_uuid_report(&midiout->uuid, fb, error);
+    }
+    else if (io->impl->destroymidioutfunc && !strcmp(cmd->command, "/delete_midi_input") && !strcmp(cmd->arg_types, "s"))
+    {
+        *cmd_handled = TRUE;
+        const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        struct cbox_uuid uuid;
+        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+            return FALSE;
+        struct cbox_midi_input *midiin = cbox_io_get_midi_input(io, NULL, &uuid);
+        if (!midiin)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+            return FALSE;
+        }
+        cbox_io_destroy_midi_input(io, midiin);
+        return TRUE;
     }
     else if (io->impl->destroymidioutfunc && !strcmp(cmd->command, "/delete_midi_output") && !strcmp(cmd->arg_types, "s"))
     {

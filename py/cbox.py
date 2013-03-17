@@ -143,6 +143,14 @@ class JackIO:
         # Some of these only make sense for 
         return GetThings("/io/status", ['client_type', 'client_name', 'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output', '*midi_input', 'sample_rate', 'output_resolution'], [])
     @staticmethod
+    def create_midi_input(name, autoconnect_spec = None):
+        fb = GetUUID()
+        do_cmd("/io/create_midi_input", fb, [name])
+        uuid = fb.uuid
+        if autoconnect_spec is not None and autoconnect_spec != '':
+            JackIO.autoconnect(uuid, autoconnect_spec)
+        return uuid
+    @staticmethod
     def create_midi_output(name, autoconnect_spec = None):
         fb = GetUUID()
         do_cmd("/io/create_midi_output", fb, [name])
@@ -156,12 +164,21 @@ class JackIO:
             do_cmd("/io/autoconnect", None, [uuid, autoconnect_spec])
         else:
             do_cmd("/io/autoconnect", None, [uuid, ''])
+    autoconnect_midi_input = autoconnect_midi_output
     @staticmethod
     def rename_midi_output(uuid, new_name):
-        do_cmd("/io/rename_midi_output", None, [uuid, new_name])
+        do_cmd("/io/rename_midi_port", None, [uuid, new_name])
+    rename_midi_input = rename_midi_output
+    @staticmethod
+    def disconnect_midi_output(uuid):
+        do_cmd("/io/disconnect_midi_port", None, [uuid])
+    disconnect_midi_input = disconnect_midi_output
     @staticmethod
     def disconnect_midi_output(uuid):
         do_cmd("/io/disconnect_midi_output", None, [uuid])
+    @staticmethod
+    def delete_midi_input(uuid):
+        do_cmd("/io/delete_midi_input", None, [uuid])
     @staticmethod
     def delete_midi_output(uuid):
         do_cmd("/io/delete_midi_output", None, [uuid])

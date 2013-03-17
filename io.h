@@ -50,6 +50,8 @@ struct cbox_io_impl
     int (*getmidifunc)(struct cbox_io_impl *ioi, struct cbox_midi_buffer *destination);
     struct cbox_midi_output *(*createmidioutfunc)(struct cbox_io_impl *ioi, const char *name, GError **error);
     void (*destroymidioutfunc)(struct cbox_io_impl *ioi, struct cbox_midi_output *midiout);
+    struct cbox_midi_input *(*createmidiinfunc)(struct cbox_io_impl *ioi, const char *name, GError **error);
+    void (*destroymidiinfunc)(struct cbox_io_impl *ioi, struct cbox_midi_input *midiout);
     void (*destroyfunc)(struct cbox_io_impl *ioi);
 };
 
@@ -65,6 +67,7 @@ struct cbox_io
     int buffer_size;
     
     struct cbox_io_callbacks *cb;
+    GSList *midi_inputs;
     GSList *midi_outputs;
 };
 
@@ -75,7 +78,16 @@ struct cbox_io_callbacks
     void (*process)(void *user_data, struct cbox_io *io, uint32_t nframes);
     void (*on_disconnected)(void *user_data);
     void (*on_reconnected)(void *user_data);
+    void (*on_midi_inputs_changed)(void *user_data);
     void (*on_midi_outputs_changed)(void *user_data);
+};
+
+struct cbox_midi_input
+{
+    gchar *name;
+    struct cbox_uuid uuid;
+    struct cbox_midi_buffer buffer;
+    gboolean removing;
 };
 
 struct cbox_midi_output
@@ -104,10 +116,13 @@ extern int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *de
 extern gboolean cbox_io_get_disconnect_status(struct cbox_io *io, GError **error);
 extern gboolean cbox_io_cycle(struct cbox_io *io, struct cbox_command_target *fb, GError **error);
 extern void cbox_io_poll_ports(struct cbox_io *io, struct cbox_command_target *fb);
+extern struct cbox_midi_input *cbox_io_get_midi_input(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
 extern struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
 extern struct cbox_midi_output *cbox_io_create_midi_output(struct cbox_io *io, const char *name, GError **error);
 extern void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *midiout);
-extern void cbox_io_destroy_all_midi_outputs(struct cbox_io *io);
+extern struct cbox_midi_input *cbox_io_create_midi_input(struct cbox_io *io, const char *name, GError **error);
+extern void cbox_io_destroy_midi_input(struct cbox_io *io, struct cbox_midi_input *midiin);
+extern void cbox_io_destroy_all_midi_ports(struct cbox_io *io);
 extern gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error, gboolean *cmd_handled);
 extern void cbox_io_close(struct cbox_io *io);
 

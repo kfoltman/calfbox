@@ -39,6 +39,10 @@ uuid = cbox.JackIO.create_midi_output('drums')
 cbox.JackIO.autoconnect_midi_output(uuid, '*alsa_pcm:.*')
 cbox.JackIO.rename_midi_output(uuid, 'kettles')
 
+uuid_in = cbox.JackIO.create_midi_input('extra')
+cbox.JackIO.autoconnect_midi_input(uuid_in, '*alsa_pcm:.*')
+cbox.JackIO.rename_midi_input(uuid_in, 'extra_port')
+
 uuid2 = cbox.JackIO.create_midi_output('violins')
 
 status = cbox.JackIO.status()
