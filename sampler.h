@@ -78,6 +78,7 @@ struct sampler_gen
 
 struct sampler_voice
 {
+    struct sampler_voice *prev, *next;
     struct sampler_layer_data *layer;
     // Note: may be NULL when program is being deleted
     struct sampler_program *program;
@@ -110,7 +111,7 @@ struct sampler_module
 {
     struct cbox_module module;
 
-    struct sampler_voice voices[MAX_SAMPLER_VOICES];
+    struct sampler_voice *voices_running, *voices_free;
     struct sampler_channel channels[16];
     struct sampler_program **programs;
     int program_count;
