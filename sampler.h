@@ -53,6 +53,7 @@ struct sampler_channel
     int previous_note;
     uint8_t cc[smsrc_perchan_count];
     struct sampler_program *program;
+    struct sampler_voice *voices_running;
     uint8_t prev_note_velocity[128];
     uint32_t prev_note_start_time[128];
 };
@@ -111,7 +112,7 @@ struct sampler_module
 {
     struct cbox_module module;
 
-    struct sampler_voice *voices_running, *voices_free, voices_all[MAX_SAMPLER_VOICES];
+    struct sampler_voice *voices_free, voices_all[MAX_SAMPLER_VOICES];
     struct sampler_channel channels[16];
     struct sampler_program **programs;
     int program_count;

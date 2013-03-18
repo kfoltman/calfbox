@@ -213,7 +213,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
         c->previous_note = note;
     if (exgroupcount)
     {
-        FOREACH_VOICE(m->voices_running, v)
+        FOREACH_VOICE(c->voices_running, v)
         {
             for (int j = 0; j < exgroupcount; j++)
             {
@@ -271,8 +271,9 @@ void sampler_voice_unlink(struct sampler_voice **pv, struct sampler_voice *v)
 void sampler_voice_inactivate(struct sampler_voice *v, gboolean expect_active)
 {
     assert((v->gen.mode != spt_inactive) == expect_active);
-    sampler_voice_unlink(&v->program->module->voices_running, v);
+    sampler_voice_unlink(&v->channel->voices_running, v);
     v->gen.mode = spt_inactive;
+    v->channel = NULL;
     sampler_voice_link(&v->program->module->voices_free, v);
 }
 
@@ -281,8 +282,9 @@ void sampler_voice_activate(struct sampler_voice *v, enum sampler_player_type mo
     assert(v->gen.mode == spt_inactive);
     sampler_voice_unlink(&v->program->module->voices_free, v);
     assert(mode != spt_inactive);
+    assert(v->channel);
     v->gen.mode = mode;
-    sampler_voice_link(&v->program->module->voices_running, v);
+    sampler_voice_link(&v->channel->voices_running, v);
 }
 
 void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
@@ -304,9 +306,9 @@ void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
 void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel, gboolean is_polyaft)
 {
     c->switchmask[note >> 5] &= ~(1 << (note & 31));
-    FOREACH_VOICE(m->voices_running, v)
+    FOREACH_VOICE(c->voices_running, v)
     {
-        if (v->channel == c && v->note == note && v->layer->trigger != stm_release)
+        if (v->note == note && v->layer->trigger != stm_release)
         {
             if (v->captured_sostenuto)
                 v->released_with_sostenuto = 1;
@@ -325,7 +327,7 @@ void sampler_stop_note(struct sampler_module *m, struct sampler_channel *c, int 
 
 void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
 {
-    FOREACH_VOICE(m->voices_running, v)
+    FOREACH_VOICE(c->voices_running, v)
     {
         if (v->channel == c && v->released_with_sustain && v->layer->trigger != stm_release)
         {
@@ -347,9 +349,9 @@ void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
 
 void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
 {
-    FOREACH_VOICE(m->voices_running, v)
+    FOREACH_VOICE(c->voices_running, v)
     {
-        if (v->channel == c && v->released_with_sostenuto && v->layer->trigger != stm_release)
+        if (v->released_with_sostenuto && v->layer->trigger != stm_release)
         {
             sampler_channel_start_release_triggered_voices(c, v->note);
             sampler_voice_release(v, FALSE);
@@ -371,9 +373,9 @@ void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
 
 void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel *c)
 {
-    FOREACH_VOICE(m->voices_running, v)
+    FOREACH_VOICE(c->voices_running, v)
     {
-        if (v->channel == c && !v->released && v->loop_mode != slm_one_shot && v->loop_mode != slm_one_shot_chokeable)
+        if (!v->released && v->loop_mode != slm_one_shot && v->loop_mode != slm_one_shot_chokeable)
         {
             // XXXKF unsure what to do with sustain
             v->captured_sostenuto = 1;
@@ -384,15 +386,12 @@ void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel 
 
 void sampler_stop_all(struct sampler_module *m, struct sampler_channel *c)
 {
-    FOREACH_VOICE(m->voices_running, v)
+    FOREACH_VOICE(c->voices_running, v)
     {
-        if (v->channel == c)
-        {
-            sampler_voice_release(v, v->loop_mode == slm_one_shot_chokeable);
-            v->released_with_sustain = 0;
-            v->released_with_sostenuto = 0;
-            v->captured_sostenuto = 0;
-        }
+        sampler_voice_release(v, v->loop_mode == slm_one_shot_chokeable);
+        v->released_with_sustain = 0;
+        v->released_with_sostenuto = 0;
+        v->captured_sostenuto = 0;
     }
 }
 
@@ -400,20 +399,23 @@ void sampler_steal_voice(struct sampler_module *m)
 {
     int max_age = 0;
     struct sampler_voice *voice_found = NULL;
-    FOREACH_VOICE(m->voices_running, v)
+    for (int i = 0; i < 16; i++)
     {
-        if (v->amp_env.cur_stage == 15)
-            continue;
-        int age = m->serial_no - v->serial_no;
-        if (v->gen.loop_start == -1)
-            age += (int)(v->gen.pos * 100.0 / v->gen.cur_sample_end);
-        else
-        if (v->released)
-            age += 10;
-        if (age > max_age)
+        FOREACH_VOICE(m->channels[i].voices_running, v)
         {
-            max_age = age;
-            voice_found = v;
+            if (v->amp_env.cur_stage == 15)
+                continue;
+            int age = m->serial_no - v->serial_no;
+            if (v->gen.loop_start == -1)
+                age += (int)(v->gen.pos * 100.0 / v->gen.cur_sample_end);
+            else
+            if (v->released)
+                age += 10;
+            if (age > max_age)
+            {
+                max_age = age;
+                voice_found = v;
+            }
         }
     }
     if (voice_found)
@@ -709,13 +711,16 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     }
     
     int vcount = 0, vrel = 0;
-    FOREACH_VOICE(m->voices_running, v)
+    for (int i = 0; i < 16; i++)
     {
-        sampler_voice_process(v, m, outputs);
+        FOREACH_VOICE(m->channels[i].voices_running, v)
+        {
+            sampler_voice_process(v, m, outputs);
 
-        if (v->amp_env.cur_stage == 15)
-            vrel++;
-        vcount++;
+            if (v->amp_env.cur_stage == 15)
+                vrel++;
+            vcount++;
+        }
     }
     m->active_voices = vcount;
     if (vcount - vrel > m->max_voices)
@@ -838,6 +843,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
 static void init_channel(struct sampler_module *m, struct sampler_channel *c)
 {
     c->module = m;
+    c->voices_running = NULL;
     c->pitchbend = 0;
     c->pbrange = 200; // cents
     memset(c->cc, 0, sizeof(c->cc));
@@ -904,19 +910,19 @@ static int release_program_voices_execute(void *data)
     
     for (int i = 0; i < 16; i++)
     {
-        if (m->channels[i].program == rpv->old_pgm || m->channels[i].program == NULL)
-            m->channels[i].program = rpv->new_pgm;
-    }
-    FOREACH_VOICE(m->voices_running, v)
-    {
-        if (v->program == rpv->old_pgm)
+        struct sampler_channel *c = &m->channels[i];
+        if (c->program == rpv->old_pgm || c->program == NULL)
         {
-            if (!m->deleting)
-                finished = 0;
-            if (v->amp_env.cur_stage != 15)
+            c->program = rpv->new_pgm;
+            FOREACH_VOICE(c->voices_running, v)
             {
-                v->released = 1;
-                cbox_envelope_go_to(&v->amp_env, 15);
+                if (!m->deleting)
+                    finished = 0;
+                if (v->amp_env.cur_stage != 15)
+                {
+                    v->released = 1;
+                    cbox_envelope_go_to(&v->amp_env, 15);
+                }
             }
         }
     }
@@ -1223,7 +1229,6 @@ MODULE_CREATE_FUNCTION(sampler)
         free(m);
         return NULL;
     }
-    m->voices_running = NULL;
     m->voices_free = NULL;
     memset(m->voices_all, 0, sizeof(m->voices_all));
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
@@ -1326,10 +1331,13 @@ static int sampler_update_layer_cmd_execute(void *data)
 {
     struct sampler_update_layer_cmd *cmd = data;
     
-    FOREACH_VOICE(cmd->module->voices_running, v)
+    for (int i = 0; i < 16; i++)
     {
-        if (v->layer == cmd->old_data)
-            v->layer = cmd->new_data;
+        FOREACH_VOICE(cmd->module->channels[i].voices_running, v)
+        {
+            if (v->layer == cmd->old_data)
+                v->layer = cmd->new_data;
+        }
     }
     cmd->layer->runtime = cmd->new_data;
     return 10;
