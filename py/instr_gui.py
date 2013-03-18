@@ -165,7 +165,7 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         self.engine = iobj.engine
         self.path = self.engine.path
         
-        attribs = cbox.GetThings("%s/status" % self.path, ['%patch', 'polyphony', 'active_voices'], [])
+        attribs = cbox.GetThings("%s/status" % self.path, ['%patch', 'polyphony', 'active_voices', '%channel_voices'], [])
 
         panel = Gtk.VBox(spacing=5)
         table = Gtk.Table(2, 2)
@@ -181,10 +181,14 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         load_button.connect('clicked', self.load)
         panel.pack_start(load_button, False, True, 5)
         set_timer(self, 200, self.voices_update)
+        self.polyphony_labels = {}
         for i in range(16):
             button = Gtk.Button("Dump SFZ")
             button.connect("clicked", self.dump_sfz, i + 1)
             self.table.attach(button, 2, 3, i, i + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
+            label = Gtk.Label("")
+            self.table.attach(label, 3, 4, i, i + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
+            self.polyphony_labels[i + 1] = label
 
     def dump_sfz(self, w, channel):
         attribs = cbox.GetThings("%s/status" % self.path, ['%patch', 'polyphony', 'active_voices'], [])
@@ -213,8 +217,11 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
             d.destroy()        
         
     def voices_update(self):
-        attribs = self.engine.status().active_voices()
-        self.voices_widget.set_text(str(attribs.active_voices))
+        status = self.engine.status()
+        self.voices_widget.set_text(str(status.active_voices))
+        for i in range(16):
+            self.polyphony_labels[i + 1].set_text("%d voices" % (status.channel_voices[i + 1],))
+            
         return True
 
     def fmt_patch_name(self, patch, id):

@@ -54,6 +54,7 @@ struct sampler_channel
     uint8_t cc[smsrc_perchan_count];
     struct sampler_program *program;
     struct sampler_voice *voices_running;
+    int active_voices;
     uint8_t prev_note_velocity[128];
     uint32_t prev_note_start_time[128];
 };

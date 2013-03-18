@@ -443,7 +443,7 @@ Document.classmap['cbox_layer'] = DocLayer
 
 class SamplerEngine(NonDocObj):
     def __init__(self, path):
-        NonDocObj.__init__(self, path, ['polyphony', 'active_voices', '%volume', '%patch', '%pan'])
+        NonDocObj.__init__(self, path, ['polyphony', 'active_voices', '%volume', '%patch', '%pan', '%channel_voices'])
     def load_patch_from_cfg(self, patch_no, cfg_section, display_name):
         return self.cmd_makeobj("/load_patch", int(patch_no), cfg_section, display_name)
     def load_patch_from_string(self, patch_no, sample_dir, sfz_data, display_name):

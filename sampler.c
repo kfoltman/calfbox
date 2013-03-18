@@ -713,14 +713,17 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     int vcount = 0, vrel = 0;
     for (int i = 0; i < 16; i++)
     {
+        int cvcount = 0;
         FOREACH_VOICE(m->channels[i].voices_running, v)
         {
             sampler_voice_process(v, m, outputs);
 
             if (v->amp_env.cur_stage == 15)
                 vrel++;
-            vcount++;
+            cvcount++;
         }
+        m->channels[i].active_voices = cvcount;
+        vcount += cvcount;
     }
     m->active_voices = vcount;
     if (vcount - vrel > m->max_voices)
@@ -844,6 +847,7 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
 {
     c->module = m;
     c->voices_running = NULL;
+    c->active_voices = 0;
     c->pitchbend = 0;
     c->pbrange = 200; // cents
     memset(c->cc, 0, sizeof(c->cc));
@@ -1030,7 +1034,8 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
                 result = cbox_execute_on(fb, NULL, "/patch", "iis", error, i + 1, -1, "");
             if (!result)
                 return FALSE;
-            if (!(cbox_execute_on(fb, NULL, "/volume", "ii", error, i + 1, addcc(channel, 7)) &&
+            if (!(cbox_execute_on(fb, NULL, "/channel_voices", "ii", error, i + 1, channel->active_voices) &&
+                cbox_execute_on(fb, NULL, "/volume", "ii", error, i + 1, addcc(channel, 7)) &&
                 cbox_execute_on(fb, NULL, "/pan", "ii", error, i + 1, addcc(channel, 10))))
                 return FALSE;
         }
