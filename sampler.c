@@ -1225,9 +1225,10 @@ MODULE_CREATE_FUNCTION(sampler)
     }
     m->voices_running = NULL;
     m->voices_free = NULL;
+    memset(m->voices_all, 0, sizeof(m->voices_all));
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
-        struct sampler_voice *v = calloc(1, sizeof(struct sampler_voice));
+        struct sampler_voice *v = &m->voices_all[i];
         v->gen.mode = spt_inactive;
         sampler_voice_link(&m->voices_free, v);
     }
