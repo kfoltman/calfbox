@@ -62,6 +62,7 @@ static void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft);
 
 static void sampler_start_voice(struct sampler_module *m, struct sampler_channel *c, struct sampler_voice *v, struct sampler_layer_data *l, int note, int vel, int *exgroups, int *pexgroupcount)
 {
+    sampler_gen_reset(&v->gen);
     v->age = 0;
     if (l->trigger == stm_release)
     {
@@ -76,17 +77,21 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     if (l->end != 0)
         end = (l->end == -1) ? 0 : l->end;
     v->last_waveform = l->waveform;
-    v->cur_sample_end = end;
+    v->gen.cur_sample_end = end;
     if (end > l->waveform->info.frames)
         end = l->waveform->info.frames;
     
     v->output_pair_no = l->output % m->output_pairs;
     v->serial_no = m->serial_no;
-    v->pos = l->offset;
+    
+    uint32_t pos = l->offset;
+    pos = l->offset;
     if (l->offset_random)
-        v->pos += ((uint32_t)(rand() + (rand() << 16))) % l->offset_random;
-    if (v->pos >= end)
-        v->pos = end;
+        pos += ((uint32_t)(rand() + (rand() << 16))) % l->offset_random;
+    if (pos >= end)
+        pos = end;
+    v->gen.pos = pos;
+    
     float delay = l->delay;
     if (l->delay_random)
         delay += rand() * (1.0 / RAND_MAX) * l->delay_random;
@@ -94,15 +99,13 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
         v->delay = (int)(delay * m->module.srate);
     else
         v->delay = 0;
-    v->frac_pos = 0;
-    v->loop_start = l->loop_start;
-    v->loop_overlap = l->loop_overlap;
-    v->loop_overlap_step = 1.0 / l->loop_overlap;    
+    v->gen.loop_overlap = l->loop_overlap;
+    v->gen.loop_overlap_step = 1.0 / l->loop_overlap;    
+    v->gen.mode = l->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
     v->gain_fromvel = 1.0 + (l->eff_velcurve[vel] - 1.0) * l->amp_veltrack * 0.01;
     v->gain_shift = 0.0;
     v->note = note;
     v->vel = vel;
-    v->mode = l->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
     v->pitch_shift = 0;
     v->released = 0;
     v->released_with_sustain = 0;
@@ -114,8 +117,7 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     v->amp_env.shape = &l->amp_env_shape;
     v->filter_env.shape = &l->filter_env_shape;
     v->pitch_env.shape = &l->pitch_env_shape;
-    v->last_lgain = 0;
-    v->last_rgain = 0;
+    
     v->cutoff_shift = vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack;
     v->loop_mode = l->loop_mode;
     v->off_by = l->off_by;
@@ -194,7 +196,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
     
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
-        if (m->voices[i].mode == spt_inactive)
+        if (m->voices[i].gen.mode == spt_inactive)
         {
             struct sampler_voice *v = &m->voices[i];
             struct sampler_layer *l = next_layer->data;
@@ -213,7 +215,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
         for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
         {
             struct sampler_voice *v = &m->voices[i];
-            if (v->mode == spt_inactive)
+            if (v->gen.mode == spt_inactive)
                 continue;
 
             for (int j = 0; j < exgroupcount; j++)
@@ -255,14 +257,12 @@ void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
     if (v->delay >= v->age + CBOX_BLOCK_SIZE)
     {
         v->released = 1;
-        v->mode = spt_inactive;
+        v->gen.mode = spt_inactive;
     }
     else
     {
         if (v->loop_mode != slm_one_shot)
             v->released = 1;
-        else
-            v->loop_start = -1; // should be guaranteed by layer settings anyway
     }
 }
 
@@ -296,7 +296,7 @@ void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
         struct sampler_voice *v = &m->voices[i];
         if (v->channel == c && v->released_with_sustain && v->layer->trigger != stm_release)
         {
-            if (v->mode != spt_inactive)
+            if (v->gen.mode != spt_inactive)
             {
                 sampler_voice_release(v, FALSE);
                 v->released_with_sustain = 0;
@@ -320,7 +320,7 @@ void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
-        if (v->mode != spt_inactive && v->channel == c && v->released_with_sostenuto && v->layer->trigger != stm_release)
+        if (v->gen.mode != spt_inactive && v->channel == c && v->released_with_sostenuto && v->layer->trigger != stm_release)
         {
             sampler_channel_start_release_triggered_voices(c, v->note);
             sampler_voice_release(v, FALSE);
@@ -345,7 +345,7 @@ void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel 
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
-        if (v->mode != spt_inactive && v->channel == c && !v->released && v->loop_mode != slm_one_shot && v->loop_mode != slm_one_shot_chokeable)
+        if (v->gen.mode != spt_inactive && v->channel == c && !v->released && v->loop_mode != slm_one_shot && v->loop_mode != slm_one_shot_chokeable)
         {
             // XXXKF unsure what to do with sustain
             v->captured_sostenuto = 1;
@@ -359,7 +359,7 @@ void sampler_stop_all(struct sampler_module *m, struct sampler_channel *c)
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
-        if (v->mode != spt_inactive && v->channel == c)
+        if (v->gen.mode != spt_inactive && v->channel == c)
         {
             sampler_voice_release(v, v->loop_mode == slm_one_shot_chokeable);
             v->released_with_sustain = 0;
@@ -375,13 +375,13 @@ void sampler_steal_voice(struct sampler_module *m)
     for (int i = 0; i < MAX_SAMPLER_VOICES; i++)
     {
         struct sampler_voice *v = &m->voices[i];
-        if (v->mode == spt_inactive)
+        if (v->gen.mode == spt_inactive)
             continue;
         if (v->amp_env.cur_stage == 15)
             continue;
         int age = m->serial_no - v->serial_no;
-        if (v->loop_start == -1)
-            age += (int)(v->pos * 100.0 / v->cur_sample_end);
+        if (v->gen.loop_start == -1)
+            age += (int)(v->gen.pos * 100.0 / v->gen.cur_sample_end);
         else
         if (v->released)
             age += 10;
@@ -492,12 +492,12 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->last_waveform = v->layer->waveform;
         if (v->layer->waveform)
         {
-            v->mode = v->layer->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-            v->cur_sample_end = v->layer->waveform->info.frames;
+            v->gen.mode = v->layer->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+            v->gen.cur_sample_end = v->layer->waveform->info.frames;
         }
         else
         {
-            v->mode = spt_inactive;
+            v->gen.mode = spt_inactive;
             return;
         }        
     }
@@ -521,7 +521,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     {
         if (is_tail_finished(v))
         {
-            v->mode = spt_inactive;
+            v->gen.mode = spt_inactive;
             return;
         }
     }
@@ -564,7 +564,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     double maxv = 127 << 7;
     double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;
     uint64_t freq64 = (uint64_t)(freq * 65536.0 * 65536.0 * m->module.srate_inv);
-    v->sample_data = v->last_waveform->data;
+    v->gen.sample_data = v->last_waveform->data;
     if (v->last_waveform->levels)
     {
         // XXXKF: optimise later by caching last lookup value
@@ -573,13 +573,18 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         {
             if (freq64 <= v->last_waveform->levels[i].max_rate)
             {
-                v->sample_data = v->last_waveform->levels[i].data;
+                v->gen.sample_data = v->last_waveform->levels[i].data;
                 break;
             }
         }
     }
-    v->delta = freq64 >> 32;
-    v->frac_delta = freq64 & 0xFFFFFFFF;
+    gboolean post_sustain = v->released && v->loop_mode == slm_loop_sustain;
+    gboolean loop_finished = v->loop_mode == slm_no_loop || v->loop_mode == slm_one_shot || v->loop_mode == slm_one_shot_chokeable || post_sustain;
+    gboolean play_loop = v->layer->loop_end && !loop_finished;
+    v->gen.loop_start = play_loop ? v->layer->loop_start : (uint32_t)-1;
+    v->gen.loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
+    v->gen.delta = freq64 >> 32;
+    v->gen.frac_delta = freq64 & 0xFFFFFFFF;
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
     if (moddests[smdest_gain] != 0.0)
         gain *= dB2gain(moddests[smdest_gain]);
@@ -588,8 +593,8 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         pan = 0;
     if (pan > 1)
         pan = 1;
-    v->lgain = gain * (1 - pan)  / 32768.0;
-    v->rgain = gain * pan / 32768.0;
+    v->gen.lgain = gain * (1 - pan)  / 32768.0;
+    v->gen.rgain = gain * pan / 32768.0;
     if (l->cutoff != -1)
     {
         float cutoff = l->cutoff * cent2factor(moddests[smdest_cutoff]);
@@ -634,7 +639,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
     float *tmp_outputs[2] = {left, right};
     uint32_t samples = 0;
-    samples = sampler_voice_sample_playback(v, tmp_outputs);
+    samples = sampler_gen_sample_playback(&v->gen, tmp_outputs);
     for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
         left[i] = right[i] = 0.f;
     if (l->cutoff != -1)
@@ -660,9 +665,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             mix_block_into_with_gain(outputs, oofs, left, right, v->send2gain);
         }
     }
-    
-    v->last_lgain = v->lgain;
-    v->last_rgain = v->rgain;
 }
 
 void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
@@ -683,7 +685,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     {
         struct sampler_voice *v = &m->voices[i];
         
-        if (v->mode != spt_inactive)
+        if (v->gen.mode != spt_inactive)
         {
             sampler_voice_process(v, m, outputs);
 
@@ -886,7 +888,7 @@ static int release_program_voices_execute(void *data)
     {
         struct sampler_voice *v = &m->voices[i];
         
-        if (v->mode != spt_inactive)
+        if (v->gen.mode != spt_inactive)
         {
             if (v->program == rpv->old_pgm)
             {
@@ -1205,7 +1207,7 @@ MODULE_CREATE_FUNCTION(sampler)
     }
     memset(m->voices, 0, sizeof(m->voices));
     for (i = 0; i < MAX_SAMPLER_VOICES; i++)
-        m->voices[i].mode = spt_inactive;
+        m->voices[i].gen.mode = spt_inactive;
     m->active_voices = 0;
     
     for (i = 0; i < 16; i++)

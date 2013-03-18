@@ -63,18 +63,26 @@ struct sampler_lfo
     uint32_t age, delay, fade;
 };
 
-struct sampler_voice
+struct sampler_gen
 {
     enum sampler_player_type mode;
+    int16_t *sample_data;
+    
+    uint32_t pos, delta, loop_start, loop_end, cur_sample_end;
+    uint32_t frac_pos, frac_delta;
+    uint32_t loop_overlap;
+    float loop_overlap_step;
+    float lgain, rgain;
+    float last_lgain, last_rgain;
+};
+
+struct sampler_voice
+{
     struct sampler_layer_data *layer;
     // Note: may be NULL when program is being deleted
     struct sampler_program *program;
     struct cbox_waveform *last_waveform;
-    int16_t *sample_data;
-    uint32_t pos, delta, loop_start, cur_sample_end;
-    uint32_t frac_pos, frac_delta;
-    uint32_t loop_overlap;
-    float loop_overlap_step;
+    struct sampler_gen gen;
     int note;
     int vel;
     int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;
@@ -84,8 +92,6 @@ struct sampler_voice
     float pitch_shift;
     float cutoff_shift;
     float gain_shift, gain_fromvel;
-    float lgain, rgain;
-    float last_lgain, last_rgain;
     struct cbox_biquadf_state filter_left, filter_right;
     struct cbox_biquadf_state filter_left2, filter_right2;
     struct cbox_biquadf_coeffs filter_coeffs;

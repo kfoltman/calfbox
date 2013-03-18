@@ -33,18 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // #define LOW_QUALITY_INTERPOLATION
 
 #define PREPARE_LOOP \
-    uint32_t __attribute__((unused)) loop_end = v->layer->loop_end ? v->layer->loop_end : v->cur_sample_end; \
-    gboolean post_sustain = v->released && v->loop_mode == slm_loop_sustain; \
-    if (post_sustain) \
-        loop_end = v->cur_sample_end; \
+    uint32_t __attribute__((unused)) loop_end = v->loop_end; \
 
 #define IS_LOOP_FINISHED \
-    v->loop_mode == slm_no_loop || v->loop_mode == slm_one_shot || v->loop_mode == slm_one_shot_chokeable || post_sustain
+    (v->loop_start == (uint32_t)-1)
 
 
 #if LOW_QUALITY_INTERPOLATION
 
-static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
+static uint32_t process_voice_mono_lerp(struct sampler_gen *v, float **output)
 {
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
@@ -86,7 +83,7 @@ static uint32_t process_voice_mono_lerp(struct sampler_voice *v, float **output)
 
 #else
 
-static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
+static uint32_t process_voice_mono(struct sampler_gen *v, float **output)
 {
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
@@ -123,7 +120,7 @@ static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
             {
                 if (nextsample >= loop_end)
                 {
-                    if (v->loop_start == (uint32_t)-1 || post_sustain)
+                    if (v->loop_start == (uint32_t)-1)
                         break;
                     nextsample -= loop_end - v->loop_start;
                 }
@@ -164,7 +161,7 @@ static uint32_t process_voice_mono(struct sampler_voice *v, float **output)
 
 #if LOW_QUALITY_INTERPOLATION
 
-static uint32_t process_voice_stereo_lerp(struct sampler_voice *v, float **output)
+static uint32_t process_voice_stereo_lerp(struct sampler_gen *v, float **output)
 {
     float lgain = v->last_lgain;
     float rgain = v->last_rgain;
@@ -207,7 +204,7 @@ static uint32_t process_voice_stereo_lerp(struct sampler_voice *v, float **outpu
 
 #else
 
-static inline uint32_t process_voice_stereo_noloop(struct sampler_voice *v, float **output)
+static inline uint32_t process_voice_stereo_noloop(struct sampler_gen *v, float **output)
 {
     float ffrac = 1.0f / 6.0f;
     float lgain = v->last_lgain * ffrac;
@@ -237,7 +234,7 @@ static inline uint32_t process_voice_stereo_noloop(struct sampler_voice *v, floa
     return CBOX_BLOCK_SIZE;
 }
 
-static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
+static uint32_t process_voice_stereo(struct sampler_gen *v, float **output)
 {
     PREPARE_LOOP
 
@@ -329,18 +326,30 @@ static uint32_t process_voice_stereo(struct sampler_voice *v, float **output)
 
 #endif
 
-uint32_t sampler_voice_sample_playback(struct sampler_voice *v, float **tmp_outputs)
+void sampler_gen_reset(struct sampler_gen *v)
 {
+    v->mode = spt_inactive;
+    v->frac_pos = 0;
+    v->last_lgain = 0.f;
+    v->last_rgain = 0.f;
+}
+
+uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float **tmp_outputs)
+{
+    uint32_t result;
 #if LOW_QUALITY_INTERPOLATION    
     if (v->mode == spt_stereo16)
-        return process_voice_stereo_lerp(v, tmp_outputs);
+        result = process_voice_stereo_lerp(v, tmp_outputs);
     else
-        return process_voice_mono_lerp(v, tmp_outputs);
+        result = process_voice_mono_lerp(v, tmp_outputs);
 #else
     if (v->mode == spt_stereo16)
-        return process_voice_stereo(v, tmp_outputs);
+        result = process_voice_stereo(v, tmp_outputs);
     else
-        return process_voice_mono(v, tmp_outputs);
+        result = process_voice_mono(v, tmp_outputs);
 #endif
+    v->last_lgain = v->lgain;
+    v->last_rgain = v->rgain;
+    return result;
 }
 
