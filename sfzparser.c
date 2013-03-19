@@ -29,7 +29,7 @@ struct sfz_parser_state
     gboolean (*handler)(struct sfz_parser_state *state, int ch);
     const char *filename;
     const char *buf;
-    int pos;
+    int pos, len;
     int token_start;
     int key_start, key_end;
     int value_start, value_end;
@@ -38,31 +38,9 @@ struct sfz_parser_state
 
 static gboolean handle_char(struct sfz_parser_state *state, int ch);
 
-static gboolean handle_2ndslash(struct sfz_parser_state *state, int ch)
-{
-    if (ch == '\r' || ch == '\n')
-    {
-        state->handler = handle_char;
-        state->token_start = state->pos;
-    }
-    // otherwise, consume
-    return TRUE;
-}
-
 static void unexpected_char(struct sfz_parser_state *state, int ch)
 {
     g_set_error(state->error, CBOX_SFZPARSER_ERROR, CBOX_SFZ_PARSER_ERROR_INVALID_CHAR, "Unexpected character '%c' (%d)", ch, ch);
-}
-
-static gboolean handle_postslash(struct sfz_parser_state *state, int ch)
-{
-    if (ch == '/')
-    {
-        state->handler = handle_2ndslash;
-        return TRUE;
-    }
-    unexpected_char(state, ch);
-    return FALSE;
 }
 
 static gboolean handle_header(struct sfz_parser_state *state, int ch)
@@ -97,8 +75,15 @@ static gboolean handle_header(struct sfz_parser_state *state, int ch)
 static void scan_for_value(struct sfz_parser_state *state)
 {
     state->value_start = state->pos;
-    while(1)
+    while(state->pos < state->len)
     {
+        if (state->pos < state->len + 2 && state->buf[state->pos] == '/' && state->buf[state->pos + 1] == '/')
+        {
+            state->pos += 2;
+            while (state->pos < state->len && state->buf[state->pos] != '\r' && state->buf[state->pos] != '\n')
+                state->pos++;
+            continue;
+        }
         int ch = state->buf[state->pos];
         if (ch == 0 || ch == '\r' || ch == '\n' || ch == '<')
         {
@@ -122,6 +107,7 @@ static void scan_for_value(struct sfz_parser_state *state)
         }
         state->pos++;
     }
+    state->value_end = state->pos;
 }
 
 static gboolean handle_key(struct sfz_parser_state *state, int ch)
@@ -164,9 +150,6 @@ static gboolean handle_char(struct sfz_parser_state *state, int ch)
     case '\t':
     case -1:
         return TRUE;
-    case '/':
-        state->handler = handle_postslash;
-        return TRUE;
     case '<':
         state->token_start = state->pos;
         state->handler = handle_header;
@@ -204,7 +187,7 @@ gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
     free(buf);
     return result;
 }
-    
+
 gboolean load_sfz_from_string(const char *buf, int len, struct sfz_parser_client *c, GError **error)
 {
     struct sfz_parser_state s;
@@ -212,6 +195,7 @@ gboolean load_sfz_from_string(const char *buf, int len, struct sfz_parser_client
     s.buf = buf;
     s.handler = handle_char;
     s.pos = 0;
+    s.len = len;
     s.token_start = 0;
     s.client = c;
     s.error = error;
@@ -222,6 +206,13 @@ gboolean load_sfz_from_string(const char *buf, int len, struct sfz_parser_client
     }
     while(s.pos < len && s.handler != NULL)
     {
+        if (s.pos < len + 2 && buf[s.pos] == '/' && buf[s.pos + 1] == '/')
+        {
+            s.pos += 2;
+            while (s.pos < len && buf[s.pos] != '\r' && buf[s.pos] != '\n')
+                s.pos++;
+            continue;
+        }
         if (!(*s.handler)(&s, buf[s.pos++]))
             return FALSE;
     }
