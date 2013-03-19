@@ -72,7 +72,9 @@ gboolean cbox_io_cycle(struct cbox_io *io, struct cbox_command_target *fb, GErro
 
 int cbox_io_stop(struct cbox_io *io)
 {
-    return io->impl->stopfunc(io->impl, NULL);
+    int result = io->impl->stopfunc(io->impl, NULL);
+    io->cb = NULL;
+    return result;
 }
 
 struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid)
@@ -219,9 +221,9 @@ void cbox_io_destroy_all_midi_ports(struct cbox_io *io)
     io->midi_inputs = NULL;
     // Notify client code to disconnect the output and to make sure the RT code
     // is not using the old list anymore
-    if (io->cb->on_midi_outputs_changed)
+    if (io->cb && io->cb->on_midi_outputs_changed)
         io->cb->on_midi_outputs_changed(io->cb->user_data);
-    if (io->cb->on_midi_inputs_changed)
+    if (io->cb && io->cb->on_midi_inputs_changed)
         io->cb->on_midi_inputs_changed(io->cb->user_data);
     
     while(old_o)
