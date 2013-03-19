@@ -608,21 +608,20 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         }
     }
     gboolean post_sustain = v->released && v->loop_mode == slm_loop_sustain;
-    gboolean play_loop;
-    if (!v->layer->loop_end)
-        play_loop = FALSE;
-    else if (v->layer->count > 0)
+    if (v->layer->count > 0)
     {
         // End the loop on the last time
-        play_loop = (v->play_count < v->layer->count - 1);
+        gboolean play_loop = (v->play_count < v->layer->count - 1);
+        v->gen.loop_start = play_loop ? 0 : (uint32_t)-1;
+        v->gen.loop_end = v->gen.cur_sample_end;
     }
     else
     {
-        play_loop = (v->loop_mode == slm_loop_continuous || (v->loop_mode == slm_loop_sustain && !post_sustain));
+        gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || (v->loop_mode == slm_loop_sustain && !post_sustain));
+        v->gen.loop_start = play_loop ? v->layer->loop_start : (uint32_t)-1;
+        v->gen.loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
     }
-
-    v->gen.loop_start = play_loop ? v->layer->loop_start : (uint32_t)-1;
-    v->gen.loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
+        
     v->gen.delta = freq64 >> 32;
     v->gen.frac_delta = freq64 & 0xFFFFFFFF;
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
