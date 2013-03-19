@@ -45,8 +45,7 @@ struct sampler_voice;
 struct sampler_channel
 {
     struct sampler_module *module;
-    float pitchbend;
-    float pbrange;
+    int pitchwheel;
     uint32_t switchmask[4];
     uint32_t sustainmask[4];
     uint32_t sostenutomask[4];

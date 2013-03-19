@@ -562,12 +562,16 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     
     float moddests[smdestcount];
     moddests[smdest_gain] = 0;
-    moddests[smdest_pitch] = pitch + c->pitchbend;
+    moddests[smdest_pitch] = pitch;
     moddests[smdest_cutoff] = v->cutoff_shift;
     moddests[smdest_resonance] = 0;
     GSList *mod = l->modulations;
     if (l->trigger == stm_release)
         moddests[smdest_gain] -= v->age * l->rt_decay * m->module.srate_inv;
+    
+    if (c->pitchwheel)
+        moddests[smdest_pitch] += c->pitchwheel * (c->pitchwheel > 0 ? l->bend_up : l->bend_down) >> 13;
+    
     static const int modoffset[4] = {0, -1, -1, 1 };
     static const int modscale[4] = {1, 1, 2, -2 };
     while(mod)
@@ -807,7 +811,7 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
             sampler_process_cc(m, c, 66, 0);
             c->cc[11] = 127;
             c->cc[1] = 0;
-            c->pitchbend = 0;
+            c->pitchwheel = 0;
             c->cc[smsrc_chanaft] = 0;
             // XXXKF reset polyphonic pressure values when supported
             return;
@@ -881,7 +885,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 break;
 
             case 14:
-                c->pitchbend = (data[1] + 128 * data[2] - 8192) * c->pbrange / 8192;
+                c->pitchwheel = data[1] + 128 * data[2] - 8192;
                 break;
 
             }
@@ -893,8 +897,7 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->module = m;
     c->voices_running = NULL;
     c->active_voices = 0;
-    c->pitchbend = 0;
-    c->pbrange = 200; // cents
+    c->pitchwheel = 0;
     memset(c->cc, 0, sizeof(c->cc));
     c->cc[7] = 100;
     c->cc[10] = 64;
