@@ -166,6 +166,8 @@ static void autoconnect_port(jack_client_t *client, const char *port, const char
     const char *pto = !is_cbox_input ? use_name : port;
     
     res = jack_connect(client, pfrom, pto);
+    if (res == EEXIST)
+        res = 0;
     gboolean suppressed = FALSE;
     if (fb)
     {
@@ -607,6 +609,8 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         const char *port_from = CBOX_ARG_S(cmd, 0);
         const char *port_to = CBOX_ARG_S(cmd, 1);
         int res = jack_connect(jii->client, port_from, port_to);
+        if (res == EEXIST)
+            res = 0;
         if (res)
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot connect port '%s' to '%s'", port_from, port_to);
         return res == 0;
