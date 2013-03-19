@@ -238,6 +238,7 @@ typedef int midi_note_t;
     MACRO##_lfo(amp_lfo, amplfo, 0) \
     MACRO##_lfo(filter_lfo, fillfo, 1) \
     MACRO##_lfo(pitch_lfo, pitchlfo, 2) \
+    MACRO##_ccrange(on_) \
 
 // XXXKF: consider making send1gain the dBamp type... except it's
 // a linear percentage value in SFZ spec - bit weird!
@@ -288,7 +289,11 @@ struct sampler_lfo_has_fields
     struct cbox_dahdsr name; \
     struct cbox_envelope_shape name##_shape;
 #define PROC_FIELDS_TO_STRUCT_lfo(name, parname, index) \
-    struct sampler_lfo_params name; \
+    struct sampler_lfo_params name;
+#define PROC_FIELDS_TO_STRUCT_ccrange(name) \
+    int8_t name##locc; \
+    int8_t name##hicc; \
+    int8_t name##cc_number;
 
 #define PROC_HAS_FIELD(type, name, def_value) \
     unsigned int has_##name:1;
@@ -302,6 +307,10 @@ struct sampler_lfo_has_fields
 
 #define PROC_HAS_FIELD_lfo(name, parname, index) \
     struct sampler_lfo_has_fields has_##name;
+
+#define PROC_HAS_FIELD_ccrange(name) \
+    unsigned int has_##name##locc:1; \
+    unsigned int has_##name##hicc:1;
 
 CBOX_EXTERN_CLASS(sampler_layer)
 

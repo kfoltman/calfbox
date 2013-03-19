@@ -176,6 +176,32 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
 #define FOREACH_VOICE(var, p) \
     for (struct sampler_voice *p = (var), *p##_next = NULL; p && (p##_next = p->next, TRUE); p = p##_next)
 
+static void sampler_release_groups(struct sampler_module *m, struct sampler_channel *c, int note, int exgroups[MAX_RELEASED_GROUPS], int exgroupcount)
+{
+    if (exgroupcount)
+    {
+        FOREACH_VOICE(c->voices_running, v)
+        {
+            for (int j = 0; j < exgroupcount; j++)
+            {
+                if (v->off_by == exgroups[j] && v->note != note)
+                {
+                    if (v->layer->off_mode == som_fast)
+                    {
+                        v->released = 1;
+                        cbox_envelope_go_to(&v->amp_env, 15);
+                    }
+                    else
+                    {
+                        v->released = 1;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
 void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int note, int vel, gboolean is_release_trigger)
 {
     float random = rand() * 1.0 / (RAND_MAX + 1.0);
@@ -212,28 +238,7 @@ void sampler_start_note(struct sampler_module *m, struct sampler_channel *c, int
     }
     if (!is_release_trigger)
         c->previous_note = note;
-    if (exgroupcount)
-    {
-        FOREACH_VOICE(c->voices_running, v)
-        {
-            for (int j = 0; j < exgroupcount; j++)
-            {
-                if (v->off_by == exgroups[j] && v->note != note)
-                {
-                    if (v->layer->off_mode == som_fast)
-                    {
-                        v->released = 1;
-                        cbox_envelope_go_to(&v->amp_env, 15);
-                    }
-                    else
-                    {
-                        v->released = 1;
-                    }
-                    break;
-                }
-            }
-        }
-    }
+    sampler_release_groups(m, c, note, exgroups, exgroupcount);
 }
 
 void sampler_channel_start_release_triggered_voices(struct sampler_channel *c, int note)
@@ -617,7 +622,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     else
     {
-        gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || (v->loop_mode == slm_loop_sustain && !post_sustain));
+        gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || (v->loop_mode == slm_loop_sustain && !post_sustain)) && v->layer->on_cc_number == -1;
         v->gen.loop_start = play_loop ? v->layer->loop_start : (uint32_t)-1;
         v->gen.loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
     }
@@ -749,6 +754,31 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
 
 void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int cc, int val)
 {
+    // Handle CC triggering.
+    if (c->program && c->program->rll && c->program->rll->layers_oncc && m->voices_free)
+    {
+        struct sampler_rll *rll = c->program->rll;
+        if (!(rll->cc_trigger_bitmask[cc >> 5] & (1 << (cc & 31))))
+            return;
+        int old_value = c->cc[cc];
+        for (GSList *p = rll->layers_oncc; p; p = p->next)
+        {
+            struct sampler_layer *layer = p->data;
+            assert(layer->runtime);
+            // Only trigger on transition between 'out of range' and 'in range' values.
+            // XXXKF I'm not sure if it's what is expected here, but don't have
+            // the reference implementation handy.
+            if (layer->runtime->on_cc_number == cc && 
+                (val >= layer->runtime->on_locc && val <= layer->runtime->on_hicc) &&
+                !(old_value >= layer->runtime->on_locc && old_value <= layer->runtime->on_hicc))
+            {
+                struct sampler_voice *v = m->voices_free;
+                int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
+                sampler_start_voice(m, c, v, layer->runtime, layer->runtime->pitch_keycenter, 127, exgroups, &exgroupcount);
+                sampler_release_groups(m, c, -1, exgroups, exgroupcount);
+            }
+        }        
+    }
     int was_enabled = c->cc[cc] >= 64;
     int enabled = val >= 64;
     switch(cc)
@@ -1149,7 +1179,6 @@ gboolean sampler_select_program(struct sampler_module *m, int channel, const gch
     {
         if (!strcmp(m->programs[i]->name, preset))
         {
-            printf("Selecting %s in channel %d\n", preset, channel + 1);
             sampler_program_change_byidx(m, &m->channels[channel], i);
             return TRUE;
         }

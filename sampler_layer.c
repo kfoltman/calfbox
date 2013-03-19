@@ -188,6 +188,12 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
 #define PROC_FIELDS_INITIALISER_lfo(name, parname, index) \
     LFO_FIELDS(PROC_SUBSTRUCT_RESET_FIELD, name, ld); \
     LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, ld)
+#define PROC_FIELDS_INITIALISER_ccrange(name) \
+    ld->name##locc = 0; \
+    ld->name##hicc = 127; \
+    ld->name##cc_number = 0; \
+    ld->has_##name##locc = 0; \
+    ld->has_##name##hicc = 0;
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_layer)
 
@@ -225,6 +231,9 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
         ld->velcurve[i] = -1;
     ld->modulations = NULL;
     ld->nifs = NULL;
+    ld->on_locc = 0;
+    ld->on_hicc = 127;
+    ld->on_cc_number = -1;
 
     ld->eff_use_keyswitch = 0;
     l->last_key = -1;
@@ -253,6 +262,12 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
         LFO_FIELDS(PROC_SUBSTRUCT_CLONE, name, dst, src) \
         if (!copy_hasattr) \
             LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst)
+#define PROC_FIELDS_CLONE_ccrange(name) \
+    dst->name##locc = src->name##locc; \
+    dst->name##hicc = src->name##hicc; \
+    dst->name##cc_number = src->name##cc_number; \
+    dst->has_##name##locc = copy_hasattr ? src->has_##name##locc : FALSE; \
+    dst->has_##name##hicc = copy_hasattr ? src->has_##name##hicc : FALSE;
 
 void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampler_layer_data *src, gboolean copy_hasattr)
 {
@@ -292,6 +307,13 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
         DAHDSR_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
 #define PROC_FIELDS_CLONEPARENT_lfo(name, parname, index) \
         LFO_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
+#define PROC_FIELDS_CLONEPARENT_ccrange(name) \
+    if (!l->has_##name##locc) \
+        l->name##locc = parent ? parent->name##locc : 0; \
+    if (!l->has_##name##hicc) \
+        l->name##hicc = parent ? parent->name##hicc : 127; \
+    if (!l->has_##name##locc && !l->has_##name##hicc) \
+        l->name##cc_number = parent->name##cc_number;
 
 static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct sampler_layer_data *parent)
 {
@@ -329,6 +351,7 @@ void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *w
 #define PROC_FIELDS_FINALISER_dahdsr(name, parname, index) \
     cbox_envelope_init_dahdsr(&l->name##_shape, &l->name, m->module.srate / CBOX_BLOCK_SIZE, 100.f, &l->name##_shape == &l->amp_env_shape);
 #define PROC_FIELDS_FINALISER_lfo(name, parname, index) /* no finaliser required */
+#define PROC_FIELDS_FINALISER_ccrange(name) /* no finaliser required */
 
 void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_layer_data *parent, struct sampler_module *m)
 {
@@ -575,6 +598,7 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
 #define PROC_APPLY_PARAM_lfo(name, parname, index) \
     if (!strncmp(key, #parname "_", sizeof(#parname))) \
         return parse_lfo_param(l, &l->data.name, &l->data.has_##name, index, key + sizeof(#parname), value);
+#define PROC_APPLY_PARAM_ccrange(name)  /* handled separately in apply_param */
 
 static void sampler_layer_apply_unknown(struct sampler_layer *l, const char *key, const char *value)
 {
@@ -684,6 +708,35 @@ try_now:
         else
             goto unknown_key;
     }
+    else if (!strncmp(key, "on_locc", 7) || !strncmp(key, "on_hicc", 7))
+    {
+        int cc = atoi(key + 7);
+        if (cc > 0 && cc < 120)
+        {
+            if (*value)
+            {
+                l->data.on_cc_number = cc;
+                if (key[3] == 'l')
+                {
+                    l->data.on_locc = atoi(value);
+                    l->data.has_on_locc = TRUE;
+                }
+                else
+                {
+                    l->data.on_hicc = atoi(value);
+                    l->data.has_on_hicc = TRUE;
+                }
+            }
+            else
+            {
+                l->data.on_cc_number = -1;
+                l->data.has_on_locc = FALSE;
+                l->data.has_on_hicc = FALSE;
+            }
+        }
+        else
+            return FALSE;
+    }
     else
         goto unknown_key;
     
@@ -729,6 +782,11 @@ unknown_key:
     DAHDSR_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
 #define PROC_FIELDS_TO_FILEPTR_lfo(name, parname, index) \
     LFO_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
+#define PROC_FIELDS_TO_FILEPTR_ccrange(name) \
+    if (l->has_##name##locc) \
+        g_string_append_printf(outstr, " on_locc%d=%d", l->name##cc_number, l->name##locc); \
+    if (l->has_##name##hicc) \
+        g_string_append_printf(outstr, " on_hicc%d=%d", l->name##cc_number, l->name##hicc);
 
 gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited)
 {

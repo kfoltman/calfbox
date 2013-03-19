@@ -29,8 +29,10 @@ CBOX_EXTERN_CLASS(sampler_program)
 // Runtime layer lists; in future, I might something more clever, like a tree
 struct sampler_rll
 {
-    GSList *layers;
-    GSList *layers_release;
+    GSList *layers; // of sampler_layer
+    GSList *layers_release; // of sampler_layer
+    GSList *layers_oncc;
+    uint32_t cc_trigger_bitmask[4]; // one bit per CC
 };
 
 struct sampler_program
