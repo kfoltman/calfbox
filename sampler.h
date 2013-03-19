@@ -92,6 +92,7 @@ struct sampler_voice
     int off_by;
     int delay;
     int age;
+    int play_count;
     float pitch_shift;
     float cutoff_shift;
     float gain_shift, gain_fromvel;

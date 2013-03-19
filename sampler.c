@@ -113,6 +113,7 @@ static void sampler_start_voice(struct sampler_module *m, struct sampler_channel
     v->captured_sostenuto = 0;
     v->channel = c;
     v->layer = l;
+    v->play_count = 0;
     v->program = c->program;
     v->amp_env.shape = &l->amp_env_shape;
     v->filter_env.shape = &l->filter_env_shape;
@@ -298,7 +299,7 @@ void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
     }
     else
     {
-        if (v->loop_mode != slm_one_shot)
+        if (v->loop_mode != slm_one_shot && !v->layer->count)
             v->released = 1;
     }
 }
@@ -375,7 +376,7 @@ void sampler_capture_sostenuto(struct sampler_module *m, struct sampler_channel 
 {
     FOREACH_VOICE(c->voices_running, v)
     {
-        if (!v->released && v->loop_mode != slm_one_shot && v->loop_mode != slm_one_shot_chokeable)
+        if (!v->released && v->loop_mode != slm_one_shot && v->loop_mode != slm_one_shot_chokeable && !v->layer->count)
         {
             // XXXKF unsure what to do with sustain
             v->captured_sostenuto = 1;
@@ -607,8 +608,19 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         }
     }
     gboolean post_sustain = v->released && v->loop_mode == slm_loop_sustain;
-    gboolean loop_finished = v->loop_mode == slm_no_loop || v->loop_mode == slm_one_shot || v->loop_mode == slm_one_shot_chokeable || post_sustain;
-    gboolean play_loop = v->layer->loop_end && !loop_finished;
+    gboolean play_loop;
+    if (!v->layer->loop_end)
+        play_loop = FALSE;
+    else if (v->layer->count > 0)
+    {
+        // End the loop on the last time
+        play_loop = (v->play_count < v->layer->count - 1);
+    }
+    else
+    {
+        play_loop = (v->loop_mode == slm_loop_continuous || (v->loop_mode == slm_loop_sustain && !post_sustain));
+    }
+
     v->gen.loop_start = play_loop ? v->layer->loop_start : (uint32_t)-1;
     v->gen.loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
     v->gen.delta = freq64 >> 32;
@@ -667,7 +679,11 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
     float *tmp_outputs[2] = {left, right};
     uint32_t samples = 0;
+    uint32_t pos = v->gen.pos;
     samples = sampler_gen_sample_playback(&v->gen, tmp_outputs);
+    if (v->layer->count && v->gen.pos < pos)
+        v->play_count++;
+
     for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
         left[i] = right[i] = 0.f;
     if (l->cutoff != -1)

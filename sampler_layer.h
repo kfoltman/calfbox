@@ -230,6 +230,7 @@ typedef int midi_note_t;
     MACRO(int, output, 0) \
     MACRO(int, group, 0) \
     MACRO(int, off_by, 0) \
+    MACRO(int, count, 0) \
     MACRO(float, rt_decay, 0) \
     MACRO##_dahdsr(amp_env, ampeg, 0) \
     MACRO##_dahdsr(filter_env, fileg, 1) \
