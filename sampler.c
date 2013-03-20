@@ -636,6 +636,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * addcc(c, 7) * addcc(c, 11) / (maxv * maxv);
     if (moddests[smdest_gain] != 0.0)
         gain *= dB2gain(moddests[smdest_gain]);
+    // http://drealm.info/sfz/plj-sfz.xhtml#amp "The overall gain must remain in the range -144 to 6 decibels."
+    if (gain > 2)
+        gain = 2;
     float pan = (l->pan + 100) * (1.0 / 200.0) + (addcc(c, 10) * 1.0 / maxv - 0.5) * 2;
     if (pan < 0)
         pan = 0;
