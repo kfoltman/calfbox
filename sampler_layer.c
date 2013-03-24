@@ -313,7 +313,7 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
     if (!l->has_##name##hicc) \
         l->name##hicc = parent ? parent->name##hicc : 127; \
     if (!l->has_##name##locc && !l->has_##name##hicc) \
-        l->name##cc_number = parent->name##cc_number;
+        l->name##cc_number = parent ? parent->name##cc_number : -1;
 
 static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct sampler_layer_data *parent)
 {
