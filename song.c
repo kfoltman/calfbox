@@ -181,21 +181,6 @@ struct cbox_song *cbox_song_new(struct cbox_document *document)
     cbox_command_target_init(&p->cmd_target, cbox_song_process_cmd, p);
     CBOX_OBJECT_REGISTER(p);
     
-#if 0
-    struct cbox_master_track_item *mti = malloc(sizeof(struct cbox_master_track_item));
-    mti->duration_ppqn = PPQN * 2;
-    mti->tempo = 120;
-    p->master_track_items = g_list_append(p->master_track_items, mti);    
-    mti = malloc(sizeof(struct cbox_master_track_item));
-    mti->duration_ppqn = PPQN;
-    mti->tempo = 60;
-    p->master_track_items = g_list_append(p->master_track_items, mti);    
-    mti = malloc(sizeof(struct cbox_master_track_item));
-    mti->duration_ppqn = PPQN;
-    mti->tempo = 120;
-    p->master_track_items = g_list_append(p->master_track_items, mti);    
-#endif
-    
     return p;
 }
 
