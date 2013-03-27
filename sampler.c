@@ -993,10 +993,7 @@ static void swap_program(struct sampler_module *m, int index, struct sampler_pro
     if (pgm)
         old_program = cbox_rt_swap_pointers(m->module.rt, (void **)&m->programs[index], pgm);
     else
-    {
-        void **new_programs = stm_array_clone_remove((void **)m->programs, m->program_count, index);
-        free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, new_programs, &m->program_count, m->program_count - 1));
-    }
+        cbox_rt_array_remove(m->module.rt, (void ***)&m->programs, &m->program_count, index);
 
     struct release_program_voices_data data = {m, old_program, pgm};
 
