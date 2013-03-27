@@ -180,9 +180,9 @@ uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct 
 }
 */
 
-static int play_transport_execute(void *arg)
+static int play_transport_execute(struct cbox_rt *rt, va_list args)
 {
-    struct cbox_master *master = arg;
+    RT_CMD_ARG(args, master, struct cbox_master *);
     // wait for the notes to be released
     if (master->state == CMTS_STOPPING)
         return 0;
@@ -193,13 +193,12 @@ static int play_transport_execute(void *arg)
 
 void cbox_master_play(struct cbox_master *master)
 {
-    static struct cbox_rt_cmd_definition cmd = { NULL, play_transport_execute, NULL };
-    cbox_rt_execute_cmd_sync(master->rt, &cmd, master);
+    cbox_rt_call(master->rt, play_transport_execute, master);
 }
 
-static int stop_transport_execute(void *arg)
+static int stop_transport_execute(struct cbox_rt *rt, va_list args)
 {
-    struct cbox_master *master = arg;
+    RT_CMD_ARG(args, master, struct cbox_master *);
     if (master->state == CMTS_ROLLING)
         master->state = CMTS_STOPPING;
     
@@ -208,8 +207,7 @@ static int stop_transport_execute(void *arg)
 
 void cbox_master_stop(struct cbox_master *master)
 {
-    static struct cbox_rt_cmd_definition cmd = { NULL, stop_transport_execute, NULL };
-    cbox_rt_execute_cmd_sync(master->rt, &cmd, master);
+    cbox_rt_call(master->rt, stop_transport_execute, master);
 }
 
 struct seek_command_arg
