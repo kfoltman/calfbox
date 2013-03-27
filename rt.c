@@ -420,7 +420,16 @@ static int set_song_command_execute(void *user_data)
     if (cmd->new_song)
     {
         if (cmd->new_time_ppqn == -1)
+        {
+            int old_time_ppqn = cmd->old_song ? cmd->old_song->song_pos_ppqn : 0;
             cbox_song_playback_seek_samples(cmd->rt->master->spb, cmd->old_song ? cmd->old_song->song_pos_samples : 0);
+            // If tempo change occurred anywhere before playback point, then
+            // sample-based position corresponds to a completely different location.
+            // So, if new sample-based position corresponds to different PPQN
+            // position, seek again using PPQN position.
+            if (cmd->old_song && abs(cmd->new_song->song_pos_ppqn - old_time_ppqn) > 1)
+                cbox_song_playback_seek_ppqn(cmd->rt->master->spb, old_time_ppqn, FALSE);
+        }
         else
             cbox_song_playback_seek_ppqn(cmd->rt->master->spb, cmd->new_time_ppqn, FALSE);
     }
