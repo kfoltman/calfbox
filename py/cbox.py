@@ -127,6 +127,12 @@ class Transport:
     @staticmethod
     def tell():
         return GetThings("/master/tell", ['pos', 'pos_ppqn', 'playing'], [])
+    @staticmethod
+    def ppqn_to_samples(pos_ppqn):
+        return GetThings("/master/ppqn_to_samples", ['value'], [pos_ppqn]).value
+    @staticmethod
+    def samples_to_ppqn(pos_samples):
+        return GetThings("/master/samples_to_ppqn", ['value'], [pos_samples]).value
 
 # Currently responsible for both JACK and USB I/O - not all functionality is
 # supported by both.

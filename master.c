@@ -96,6 +96,25 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
         return TRUE;
     }
     else
+    if ((!strcmp(cmd->command, "/samples_to_ppqn") || !strcmp(cmd->command, "/ppqn_to_samples")) && 
+        !strcmp(cmd->arg_types, "i"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        if (m->spb)
+        {
+            if (cmd->command[1] == 's')
+                return cbox_execute_on(fb, NULL, "/value", "i", error, cbox_master_samples_to_ppqn(m, CBOX_ARG_I(cmd, 0)));
+            else
+                return cbox_execute_on(fb, NULL, "/value", "i", error, cbox_master_ppqn_to_samples(m, CBOX_ARG_I(cmd, 0)));
+        }
+        else
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Song playback not initialised.");
+            return FALSE;
+        }
+    }
+    else
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
         return FALSE;

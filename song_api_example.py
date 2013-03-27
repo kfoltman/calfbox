@@ -50,6 +50,8 @@ Transport.set_tempo(160.0)
 # Send the updated song data to the realtime thread
 song.update_playback()
 
+print ("Song length (seconds) is %f" % (cbox.Transport.ppqn_to_samples(pattern_len) * 1.0 / Transport.status().sample_rate))
+
 # The /master object API doesn't have any nice Python wrapper yet, so accessing
 # it is a bit ugly, still - it works
 
