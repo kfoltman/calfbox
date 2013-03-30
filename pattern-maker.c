@@ -32,10 +32,24 @@ struct event_entry
 static gint event_entry_compare(gconstpointer a, gconstpointer b, gpointer unused)
 {
     const struct event_entry *ea = a, *eb = b;
+    // Event ordering - it's to ensure bank changes are emitted before program
+    // changes and program changes are emitted before notes.
+    static const char event_class[8] = {
+        8, // Note Off
+        9, // Note On
+        20, // Poly Pressure
+        4, // Control Change
+        6, // Program Change
+        16, // Mono Pressure
+        18, // Pitch Wheel
+        0, // SysEx/Realtime
+    };
     
     if (ea->time < eb->time)
         return -1;
-    if (ea->time == eb->time && ea->data[0] < eb->data[0])
+    if (ea->time == eb->time && event_class[ea->data[0] >> 4] < event_class[eb->data[0] >> 4])
+        return -1;
+    if (ea->time == eb->time && (ea->data[0] & 15) < (eb->data[0] & 15))
         return -1;
     if (ea->time == eb->time && ea->data[0] == eb->data[0] && ea->data[1] < eb->data[1])
         return -1;
