@@ -374,31 +374,6 @@ void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct call_function_command
-{
-    struct cbox_rt *rt;
-    int (*func)(struct cbox_rt *rt, va_list args);
-    va_list args;
-};
-
-static int call_function_command_execute(void *data)
-{
-    struct call_function_command *cmd = data;
-    return (cmd->func)(cmd->rt, cmd->args);
-}
-
-void cbox_rt_call(struct cbox_rt *rt, int (*func)(struct cbox_rt *rt, va_list args), ...)
-{
-    static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = call_function_command_execute, .cleanup = NULL };
-    struct call_function_command cmd = {rt, func};
-
-    va_start(cmd.args, func);
-    cbox_rt_execute_cmd_sync(rt, &def, &cmd);    
-    va_end(cmd.args);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////
-
 struct set_song_command
 {
     struct cbox_rt *rt;
@@ -476,38 +451,64 @@ void cbox_rt_send_events_to(struct cbox_rt *rt, struct cbox_midi_merger *merger,
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-static int swap_pointers_command_execute(struct cbox_rt *rt, va_list args)
+struct swap_pointers_command
 {
-    RT_CMD_ARG(args, ptr, void **);
-    RT_CMD_ARG(args, new_value, void *);
-    RT_CMD_ARG(args, old_value, void **);
-    RT_CMD_ARG(args, pcount, int *);
-    RT_CMD_ARG(args, new_count, int);
+    void **ptr;
+    void *old_value;
+    void *new_value;
+    int *pcount;
+    int new_count;
+};
+
+static int swap_pointers_command_execute(void *user_data)
+{
+    struct swap_pointers_command *cmd = user_data;
     
-    *old_value = *ptr;
-    *ptr = new_value;
-    if (pcount)
-        *pcount = new_count;
+    cmd->old_value = *cmd->ptr;
+    *cmd->ptr = cmd->new_value;
+    if (cmd->pcount)
+        *cmd->pcount = cmd->new_count;
+    
     return 1;
 }
 
 void *cbox_rt_swap_pointers(struct cbox_rt *rt, void **ptr, void *new_value)
 {
-    return cbox_rt_swap_pointers_and_update_count(rt, ptr, new_value, NULL, 0);
+    if (rt)
+    {
+        static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = swap_pointers_command_execute, .cleanup = NULL };
+        
+        struct swap_pointers_command sc = { ptr, NULL, new_value, NULL, 0 };
+        
+        cbox_rt_execute_cmd_sync(rt, &scdef, &sc);
+
+        return sc.old_value;
+    } else {
+        void *old_ptr = *ptr;
+        *ptr = new_value;
+        return old_ptr;
+    }
 }
 
 void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, void *new_value, int *pcount, int new_count)
 {
-    void *old_ptr = NULL;
     if (rt)
-        cbox_rt_call(rt, swap_pointers_command_execute, ptr, new_value, &old_ptr, pcount, new_count);
+    {
+        static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = swap_pointers_command_execute, .cleanup = NULL };
+        
+        struct swap_pointers_command sc = { ptr, NULL, new_value, pcount, new_count };
+        
+        cbox_rt_execute_cmd_sync(rt, &scdef, &sc);
+        
+        return sc.old_value;
+    }
     else
     {
-        old_ptr = *ptr;
+        void *old_ptr = *ptr;
         *ptr = new_value;
         *pcount = new_count;
+        return old_ptr;        
     }
-    return old_ptr;        
 }
 
 void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, int *pcount, int index, void *new_value)
@@ -568,19 +569,26 @@ struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, struct cbox
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-static int get_midi_input_buffer_command_execute(struct cbox_rt *rt, va_list args)
+struct get_midi_input_buffer_command
 {
-    RT_CMD_ARG(args, buffer, struct cbox_midi_buffer **);
+    struct cbox_rt *rt;
+    struct cbox_midi_buffer *buffer;
+};
 
+static int get_midi_input_buffer_command_execute(void *user_data)
+{
+    struct get_midi_input_buffer_command *cmd = user_data;
+    struct cbox_rt *rt = cmd->rt;
+    
     if (rt->midibufs_appsink[rt->current_appsink_buffer].count)
     {
         // return the current buffer, switch to the new, empty one
-        *buffer = &rt->midibufs_appsink[rt->current_appsink_buffer];
+        cmd->buffer = &rt->midibufs_appsink[rt->current_appsink_buffer];
         rt->current_appsink_buffer = 1 - rt->current_appsink_buffer;
         cbox_midi_buffer_clear(&rt->midibufs_appsink[rt->current_appsink_buffer]);
     }
     else
-        *buffer = NULL;
+        cmd->buffer = NULL;
     
     return 1;
 }
@@ -593,9 +601,10 @@ const struct cbox_midi_buffer *cbox_rt_get_input_midi_data(struct cbox_rt *rt)
     if (!rt->midibufs_appsink[rt->current_appsink_buffer].count)
         return NULL;
     
-    struct cbox_midi_buffer *buffer = NULL;
-    cbox_rt_call(rt, get_midi_input_buffer_command_execute, &buffer);
-    return buffer;
+    static struct cbox_rt_cmd_definition gmibdef = { .prepare = NULL, .execute = get_midi_input_buffer_command_execute, .cleanup = NULL };
+    struct get_midi_input_buffer_command cmd = { rt, NULL };
+    cbox_rt_execute_cmd_sync(rt, &gmibdef, &cmd);
+    return cmd.buffer;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
