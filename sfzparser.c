@@ -49,24 +49,11 @@ static gboolean handle_header(struct sfz_parser_state *state, int ch)
         return TRUE;
     if (ch == '>')
     {
-        if (!strncmp(state->buf + state->token_start, "region", state->pos - 1 - state->token_start))
-        {
-            state->client->region(state->client);
-        }
-        else
-        if (!strncmp(state->buf + state->token_start, "group", state->pos - 1 - state->token_start))
-        {
-            state->client->group(state->client);
-        }
-        else
-        {
-            gchar *tmp = g_strndup(state->buf + state->token_start, state->pos - 1 - state->token_start);
-            g_set_error(state->error, CBOX_SFZPARSER_ERROR, CBOX_SFZ_PARSER_ERROR_INVALID_HEADER, "Unexpected header <%s>", tmp);
-            g_free(tmp);
-            return FALSE;
-        }
+        char *token = g_strndup(state->buf + state->token_start, state->pos - 1 - state->token_start);
+        gboolean result = state->client->token(state->client, token, state->error);
+        g_free(token);
         state->handler = handle_char;
-        return TRUE;
+        return result;
     }
     unexpected_char(state, ch);
     return FALSE;

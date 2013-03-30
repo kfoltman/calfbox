@@ -33,8 +33,7 @@ enum CboxSfzParserError
 struct sfz_parser_client
 {
     void *user_data;
-    void (*region)(struct sfz_parser_client *client);
-    void (*group)(struct sfz_parser_client *client);
+    gboolean (*token)(struct sfz_parser_client *client, const char *token, GError **error);
     gboolean (*key_value)(struct sfz_parser_client *client, const char *key, const char *value);
 };
 

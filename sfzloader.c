@@ -48,7 +48,7 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
     ls->region = NULL;
 }
 
-static void load_sfz_group(struct sfz_parser_client *client)
+static gboolean load_sfz_group(struct sfz_parser_client *client)
 {
     struct sfz_load_state *ls = client->user_data;
     if (ls->region)
@@ -56,9 +56,10 @@ static void load_sfz_group(struct sfz_parser_client *client)
     // printf("-- start group\n");
     ls->group = sampler_layer_new(ls->m, ls->program, NULL);
     sampler_program_add_group(ls->program, ls->group);
+    return TRUE;
 }
 
-static void load_sfz_region(struct sfz_parser_client *client)
+static gboolean load_sfz_region(struct sfz_parser_client *client)
 {
     struct sfz_load_state *ls = client->user_data;
     
@@ -75,6 +76,7 @@ static void load_sfz_region(struct sfz_parser_client *client)
     }
     ls->region = sampler_layer_new(ls->m, ls->program, ls->group);
     // g_warning("-- start region");
+    return TRUE;
 }
 
 static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char *key, const char *value)
@@ -93,10 +95,22 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
     return TRUE;
 }
 
+static gboolean handle_token(struct sfz_parser_client *client, const char *token, GError **error)
+{
+    if (!strcmp(token, "region"))
+        return load_sfz_region(client);
+
+    if (!strcmp(token, "group"))
+        return load_sfz_group(client);
+
+    g_set_error(error, CBOX_SFZPARSER_ERROR, CBOX_SFZ_PARSER_ERROR_INVALID_HEADER, "Unexpected header <%s>", token);
+    return FALSE;
+}
+
 gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, int is_from_string, GError **error)
 {
     struct sfz_load_state ls = { .group = prg->default_group, .m = m, .filename = sfz, .region = NULL, .error = error, .program = prg };
-    struct sfz_parser_client c = { .user_data = &ls, .region = load_sfz_region, .group = load_sfz_group, .key_value = load_sfz_key_value };
+    struct sfz_parser_client c = { .user_data = &ls, .token = handle_token, .key_value = load_sfz_key_value };
     g_clear_error(error);
 
     gboolean status = is_from_string ? load_sfz_from_string(sfz, strlen(sfz), &c, error) : load_sfz(sfz, &c, error);
