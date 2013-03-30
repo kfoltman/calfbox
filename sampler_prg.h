@@ -35,6 +35,18 @@ struct sampler_rll
     uint32_t cc_trigger_bitmask[4]; // one bit per CC
 };
 
+struct sampler_ctrlinit
+{
+    uint8_t controller;
+    uint8_t value;
+};
+
+union sampler_ctrlinit_union {
+    gpointer ptr;
+    struct sampler_ctrlinit cinit;
+} u;
+
+
 struct sampler_program
 {
     CBOX_OBJECT_HEADER()
@@ -46,6 +58,7 @@ struct sampler_program
     struct sampler_layer *default_group;
     GSList *groups;
     GSList *all_layers;
+    GSList *ctrl_init_list;
     struct sampler_rll *rll;
     gchar *sample_dir; // can be empty, cannot be NULL
     gchar *source_file; // can be empty, cannot be NULL
@@ -62,5 +75,6 @@ extern struct sampler_program *sampler_program_new_from_cfg(struct sampler_modul
 extern void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer *l);
 extern void sampler_program_delete_layer(struct sampler_program *prg, struct sampler_layer *l);
 extern void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer *l);
+extern void sampler_program_add_controller_init(struct sampler_program *prg, uint8_t controller, uint8_t value);
 
 #endif

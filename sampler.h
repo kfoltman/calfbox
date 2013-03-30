@@ -130,5 +130,7 @@ extern gboolean sampler_select_program(struct sampler_module *m, int channel, co
 extern void sampler_update_layer(struct sampler_module *m, struct sampler_layer *l);
 extern void sampler_update_program_layers(struct sampler_module *m, struct sampler_program *prg);
 extern void sampler_unselect_program(struct sampler_module *m, struct sampler_program *prg);
+// This function may only be called from RT thread!
+extern void sampler_channel_set_program(struct sampler_channel *c, struct sampler_program *prg);
 
 #endif

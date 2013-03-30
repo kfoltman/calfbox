@@ -825,10 +825,7 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
 
 void sampler_program_change_byidx(struct sampler_module *m, struct sampler_channel *c, int program_idx)
 {
-    if (c->program)
-        c->program->in_use--;    
-    c->program = m->programs[program_idx];
-    c->program->in_use++;
+    sampler_channel_set_program(c, m->programs[program_idx]);
 }
 
 void sampler_program_change(struct sampler_module *m, struct sampler_channel *c, int program)
@@ -908,12 +905,29 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->cc[71] = 64;
     c->cc[74] = 64;
     c->previous_note = -1;
-    c->program = m->program_count ? m->programs[0] : NULL;
-    if (c->program)
-        c->program->in_use++;
+    c->program = NULL;
+    sampler_channel_set_program(c, m->program_count ? m->programs[0] : NULL);
     memset(c->switchmask, 0, sizeof(c->switchmask));
     memset(c->sustainmask, 0, sizeof(c->sustainmask));
     memset(c->sostenutomask, 0, sizeof(c->sostenutomask));
+}
+
+void sampler_channel_set_program(struct sampler_channel *c, struct sampler_program *prg)
+{
+    if (c->program)
+        c->program->in_use--;    
+    c->program = prg;
+    if (prg)
+    {
+        for(GSList *p = prg->ctrl_init_list; p; p = p->next)
+        {
+            union sampler_ctrlinit_union u;
+            u.ptr = p->data;
+            // printf("Setting controller %d -> %d\n", u.cinit.controller, u.cinit.value);
+            c->cc[u.cinit.controller] = u.cinit.value;
+        }
+        c->program->in_use++;
+    }
 }
 
 static int get_first_free_program_no(struct sampler_module *m)
@@ -968,7 +982,7 @@ static int release_program_voices_execute(void *data)
         struct sampler_channel *c = &m->channels[i];
         if (c->program == rpv->old_pgm || c->program == NULL)
         {
-            c->program = rpv->new_pgm;
+            sampler_channel_set_program(c, rpv->new_pgm);
             FOREACH_VOICE(c->voices_running, v)
             {
                 if (!m->deleting)

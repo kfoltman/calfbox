@@ -120,6 +120,7 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->all_layers = NULL;
     prg->rll = NULL;
     prg->groups = NULL;
+    prg->ctrl_init_list = NULL;
     prg->default_group = sampler_layer_new(m, prg, NULL);
     prg->deleting = FALSE;
     CBOX_OBJECT_REGISTER(prg);
@@ -233,6 +234,15 @@ void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer
     prg->groups = g_slist_prepend(prg->groups, l);
 }
 
+void sampler_program_add_controller_init(struct sampler_program *prg, uint8_t controller, uint8_t value)
+{
+    union sampler_ctrlinit_union u;
+    u.ptr = NULL;
+    u.cinit.controller = controller;
+    u.cinit.value = value;
+    prg->ctrl_init_list = g_slist_prepend(prg->ctrl_init_list, u.ptr);
+}
+
 void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
 {
     struct sampler_program *prg = CBOX_H2O(hdr_ptr);
@@ -252,6 +262,7 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
     g_free(prg->sample_dir);
     g_free(prg->source_file);
     g_slist_free(prg->all_layers);
+    g_slist_free(prg->ctrl_init_list);
     free(prg);
 }
 
