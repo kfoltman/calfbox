@@ -385,9 +385,17 @@ static int set_song_command_execute(void *user_data)
 {
     struct set_song_command *cmd = user_data;
     
-    if (cmd->rt->scene && cmd->rt->scene->spb &&
-        cbox_song_playback_active_notes_release(cmd->rt->scene->spb, &cmd->rt->midibuf_aux) < 0)
-        return 0;
+    // If there's no new song, silence all ongoing notes. Otherwise, copy the
+    // ongoing notes to the new playback structure so that the notes get released
+    // when playback is stopped (or possibly earlier).
+    if (cmd->rt->scene && cmd->rt->scene->spb)
+    {
+        if (cmd->new_song)
+            cbox_song_playback_apply_old_state(cmd->new_song);
+
+        if (cbox_song_playback_active_notes_release(cmd->rt->scene->spb, &cmd->rt->midibuf_aux) < 0)
+            return 0;
+    }
     cmd->old_song = cmd->rt->master->spb;
     if (cmd->rt->scene)
         cmd->rt->scene->spb = cmd->new_song;
@@ -416,7 +424,7 @@ void cbox_rt_update_song(struct cbox_rt *rt, int new_pos_ppqn)
 {
     static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = set_song_command_execute, .cleanup = NULL };
     
-    struct set_song_command cmd = { rt, cbox_song_playback_new(rt->master->song, rt->master, rt), NULL, new_pos_ppqn };
+    struct set_song_command cmd = { rt, cbox_song_playback_new(rt->master->song, rt->master, rt, rt->scene ? rt->scene->spb : NULL ), NULL, new_pos_ppqn };
     cbox_rt_execute_cmd_sync(rt, &def, &cmd);
     if (cmd.old_song)
         cbox_song_playback_destroy(cmd.old_song);

@@ -44,14 +44,17 @@ static inline void accumulate_event(struct cbox_midi_playback_active_notes *note
     }
 }
 
-struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master, struct cbox_song_playback *spb)
+struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master, struct cbox_song_playback *spb, struct cbox_track_playback *old_state)
 {
     struct cbox_track_playback *pb = malloc(sizeof(struct cbox_track_playback));
+    pb->track = track;
+    pb->old_state = old_state;
     pb->master = master;
     int len = g_list_length(track->items);
     pb->items = calloc(len, sizeof(struct cbox_track_playback_item));
     pb->external_merger = NULL;
     pb->spb = spb;
+    pb->state_copied = FALSE;
     
     GList *it = track->items;
     struct cbox_track_playback_item *p = pb->items;
@@ -302,6 +305,12 @@ void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes
     notes->channels_active = 0;
 }
 
+void cbox_midi_playback_active_notes_copy(struct cbox_midi_playback_active_notes *dest, const struct cbox_midi_playback_active_notes *src)
+{
+    dest->channels_active = src->channels_active;
+    memcpy(dest->notes, src->notes, sizeof(dest->notes));
+}
+
 int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf)
 {
     if (!notes->channels_active)
@@ -338,9 +347,12 @@ int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_not
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_rt *rt)
+struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_rt *rt, struct cbox_song_playback *old_state)
 {
     struct cbox_song_playback *spb = calloc(1, sizeof(struct cbox_song_playback));
+    if (old_state && old_state->song != song)
+        old_state = NULL;
+    spb->song = song;
     spb->rt = rt;
     spb->pattern_map = g_hash_table_new_full(NULL, NULL, NULL, (GDestroyNotify)cbox_midi_pattern_playback_destroy);
     spb->master = master;
@@ -356,7 +368,19 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
     for (GList *p = song->tracks; p != NULL; p = g_list_next(p))
     {
         struct cbox_track *trk = p->data;
-        spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master, spb);
+        struct cbox_track_playback *old_trk = NULL;
+        if (old_state && old_state->track_count)
+        {
+            for (int i = 0; i < old_state->track_count; i++)
+            {
+                if (old_state->tracks[i]->track == trk)
+                {
+                    old_trk = old_state->tracks[i];
+                    break;
+                }
+            }
+        }
+        spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master, spb, old_trk);
         if (!trk->external_output_set)
             cbox_midi_merger_connect(&spb->track_merger, &spb->tracks[pos - 1]->output_buffer, NULL);
     }
@@ -391,6 +415,21 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
     }
     return spb;
 }
+
+void cbox_song_playback_apply_old_state(struct cbox_song_playback *spb)
+{
+    for (int i = 0; i < spb->track_count; i++)
+    {
+        struct cbox_track_playback *tpb = spb->tracks[i];
+        if (tpb->old_state)
+        {
+            cbox_midi_playback_active_notes_copy(&tpb->active_notes, &tpb->old_state->active_notes);
+            tpb->old_state->state_copied = TRUE;
+            tpb->old_state = NULL;
+        }
+    }
+}
+
 
 static void cbox_song_playback_set_tempo(struct cbox_song_playback *spb, double tempo)
 {
@@ -515,6 +554,8 @@ int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, stru
     for(int i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *trk = spb->tracks[i];
+        if (trk->state_copied)
+            continue;
         struct cbox_midi_buffer *output = trk->external_merger ? &trk->output_buffer : buf;
         if (cbox_midi_playback_active_notes_release(&trk->active_notes, output) < 0)
             return 0;

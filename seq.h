@@ -37,6 +37,8 @@ struct cbox_midi_playback_active_notes
 };
 
 extern void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes *notes);
+extern void cbox_midi_playback_active_notes_copy(struct cbox_midi_playback_active_notes *dest, const struct cbox_midi_playback_active_notes *src);
+extern void cbox_midi_playback_active_notes_clear(struct cbox_midi_playback_active_notes *notes);
 extern int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,6 +87,7 @@ struct cbox_track_playback_item
 
 struct cbox_track_playback
 {
+    struct cbox_track *track; // used as identification only
     struct cbox_track_playback_item *items;
     struct cbox_master *master;
     int items_count;
@@ -94,9 +97,11 @@ struct cbox_track_playback
     struct cbox_midi_playback_active_notes active_notes;
     struct cbox_midi_merger *external_merger;
     struct cbox_song_playback *spb;
+    struct cbox_track_playback *old_state;
+    gboolean state_copied;
 };
 
-extern struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master, struct cbox_song_playback *spb);
+extern struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master, struct cbox_song_playback *spb, struct cbox_track_playback *old_state);
 extern void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int nsamples);
 extern void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, int time_ppqn, int min_time_ppqn);
 extern void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, int time_samples);
@@ -119,6 +124,7 @@ struct cbox_tempo_map_item
 struct cbox_song_playback
 {
     struct cbox_master *master;
+    struct cbox_song *song; // for identification only
     struct cbox_track_playback **tracks;
     int track_count;
     struct cbox_tempo_map_item *tempo_map_items;
@@ -131,7 +137,7 @@ struct cbox_song_playback
     struct cbox_rt *rt;
 };
 
-extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_rt *rt);
+extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_rt *rt, struct cbox_song_playback *old_state);
 extern void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, int nsamples);
 extern int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf);
 extern void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int skip_this_pos);
@@ -139,6 +145,7 @@ extern void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int 
 extern int cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, int time_ppqn);
 extern int cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, int time_samples);
 struct cbox_midi_pattern_playback *cbox_song_playback_get_pattern(struct cbox_song_playback *spb, struct cbox_midi_pattern *pattern);
+extern void cbox_song_playback_apply_old_state(struct cbox_song_playback *spb);
 extern void cbox_song_playback_destroy(struct cbox_song_playback *spb);
 
 #endif
