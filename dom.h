@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_DOM_H
 
 #include <glib.h>
+#include <stdint.h>
 #include <uuid/uuid.h>
 
 struct cbox_command_target;
@@ -59,6 +60,7 @@ struct cbox_objhdr
     struct cbox_document *owner;
     void *link_in_document;
     struct cbox_uuid instance_uuid;
+    uint64_t stamp;
 };
 
 inline int cbox_class_is_a(const struct cbox_class *c1, const struct cbox_class *c2)
@@ -83,6 +85,7 @@ extern struct cbox_objhdr *cbox_document_get_service(struct cbox_document *doc, 
 extern void cbox_document_set_service(struct cbox_document *doc, const char *name, struct cbox_objhdr *hdr_ptr);
 extern struct cbox_objhdr *cbox_document_get_object_by_uuid(struct cbox_document *doc, const struct cbox_uuid *uuid);
 extern struct cbox_objhdr *cbox_document_get_object_by_text_uuid(struct cbox_document *doc, const char *uuid, const struct cbox_class *class_ptr, GError **error);
+extern uint64_t cbox_document_get_next_stamp(struct cbox_document *doc);
 extern void cbox_document_destroy(struct cbox_document *);
 
 extern void cbox_dom_init(void);
@@ -100,6 +103,9 @@ extern void cbox_dom_close(void);
 #define CBOX_GET_DOCUMENT(obj) \
     ((obj)->_obj_hdr.owner)
 
+#define CBOX_STAMP(obj) \
+    ((obj)->_obj_hdr.stamp = cbox_document_get_next_stamp(CBOX_GET_DOCUMENT(obj)))
+
 #define CBOX_DELETE(obj) \
     ((obj) && (cbox_object_destroy(&(obj)->_obj_hdr), 1))
 
@@ -111,6 +117,7 @@ extern void cbox_dom_close(void);
         (self)->_obj_hdr.class_ptr = &CBOX_CLASS_##class; \
         (self)->_obj_hdr.owner = (document); \
         (self)->_obj_hdr.link_in_document = NULL; \
+        (self)->_obj_hdr.stamp = cbox_document_get_next_stamp(document); \
         uuid_generate((self)->_obj_hdr.instance_uuid.uuid); \
     } while(0)
     

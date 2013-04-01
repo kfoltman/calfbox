@@ -39,6 +39,7 @@ struct cbox_document
     GHashTable *uuids_per_document;
     struct cbox_command_target cmd_target;
     int item_ctr;
+    uint64_t generation_ctr;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -254,6 +255,7 @@ struct cbox_document *cbox_document_new()
     res->cmd_target.process_cmd = document_process_cmd;
     res->cmd_target.user_data = res;
     res->item_ctr = 0;
+    res->generation_ctr = 1000; // start with non-zero value just to spot invalid values more easily
 
     return res;
 }
@@ -342,6 +344,11 @@ void cbox_document_dump(struct cbox_document *document)
 {
      g_hash_table_foreach(document->classes_per_document, iter_func, document);
      g_hash_table_foreach(document->services_per_document, iter_func2, document);
+}
+
+uint64_t cbox_document_get_next_stamp(struct cbox_document *document)
+{
+    return document->generation_ctr;
 }
 
 void cbox_document_destroy(struct cbox_document *document)
