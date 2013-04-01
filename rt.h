@@ -102,4 +102,81 @@ extern int cbox_rt_get_buffer_size(struct cbox_rt *rt);
 
 extern void cbox_rt_destroy(struct cbox_rt *rt);
 
+///////////////////////////////////////////////////////////////////////////////
+
+#define GET_RT_FROM_cbox_rt(ptr) (ptr)
+#define RT_FUNC_ARG_MEMBER(type, name) type name;
+#define RT_FUNC_ARG_LIST(type, name) , type name
+#define RT_FUNC_ARG_PASS(type, name) _args.name = name;
+#define RT_FUNC_ARG_PASS2(type, name) , _args.name
+#define RT_FUNC_ARG_PASS3(type, name) , _args->name
+#define RT_FUNC_ARG_PASS4(type, name) , name
+#define DEFINE_RT_FUNC(restype, objtype, argname, name) \
+    struct rt_function_args_##name { \
+        struct objtype *_obj; \
+        restype _result; \
+        name##_args(RT_FUNC_ARG_MEMBER) \
+    }; \
+    static restype RT_IMPL_##name(struct objtype *_obj, int *_cost name##_args(RT_FUNC_ARG_LIST)); \
+    int exec_##name(void *user_data) { \
+        int cost = 1; \
+        struct rt_function_args_##name *_args = user_data;\
+        _args->_result = RT_IMPL_##name(_args->_obj, &cost name##_args(RT_FUNC_ARG_PASS3)); \
+        return cost; \
+    } \
+    restype name(struct objtype *_obj name##_args(RT_FUNC_ARG_LIST)) \
+    { \
+        struct cbox_rt *rt = GET_RT_FROM_##objtype(_obj); \
+        if (rt) { \
+            struct rt_function_args_##name _args; \
+            static struct cbox_rt_cmd_definition _cmd = { .prepare = NULL, .execute = exec_##name, .cleanup = NULL }; \
+            _args._obj = _obj; \
+            name##_args(RT_FUNC_ARG_PASS) \
+            cbox_rt_execute_cmd_sync(rt, &_cmd, &_args);  \
+            return _args._result; \
+        } else { \
+            int cost; \
+            restype _result; \
+            do { \
+                cost = 1; \
+                _result = RT_IMPL_##name(_obj, &cost name##_args(RT_FUNC_ARG_PASS4)); \
+            } while(!cost); \
+            return _result; \
+        } \
+    } \
+    restype RT_IMPL_##name(struct objtype *argname, int *_cost name##_args(RT_FUNC_ARG_LIST))
+
+#define DEFINE_RT_VOID_FUNC(objtype, argname, name) \
+    struct rt_function_args_##name { \
+        struct objtype *_obj; \
+        name##_args(RT_FUNC_ARG_MEMBER) \
+    }; \
+    static void RT_IMPL_##name(struct objtype *_obj, int *_cost name##_args(RT_FUNC_ARG_LIST)); \
+    int exec_##name(void *user_data) { \
+        int cost = 1; \
+        struct rt_function_args_##name *_args = user_data;\
+        RT_IMPL_##name(_args->_obj, &cost name##_args(RT_FUNC_ARG_PASS3)); \
+        return cost; \
+    } \
+    void name(struct objtype *_obj name##_args(RT_FUNC_ARG_LIST)) \
+    { \
+        struct cbox_rt *rt = GET_RT_FROM_##objtype(_obj); \
+        if (rt) { \
+            struct rt_function_args_##name _args = { ._obj = _obj }; \
+            static struct cbox_rt_cmd_definition _cmd = { .prepare = NULL, .execute = exec_##name, .cleanup = NULL }; \
+            name##_args(RT_FUNC_ARG_PASS) \
+            cbox_rt_execute_cmd_sync(rt, &_cmd, &_args);  \
+        } else { \
+            int cost; \
+            do { \
+                cost = 1; \
+                RT_IMPL_##name(_obj, &cost name##_args(RT_FUNC_ARG_PASS4)); \
+            } while(!cost); \
+        } \
+    } \
+    void RT_IMPL_##name(struct objtype *argname, int *_cost name##_args(RT_FUNC_ARG_LIST))
+
+#define RT_CALL_AGAIN_LATER() ((*_cost) = 0)
+#define RT_SET_COST(n) ((*_cost) = (n))
+
 #endif

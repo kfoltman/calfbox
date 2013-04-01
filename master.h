@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct cbox_song;
 struct cbox_rt;
 
+#define GET_RT_FROM_cbox_master(ptr) (ptr->rt)
+
 enum cbox_master_transport_state
 {
     CMTS_STOP,

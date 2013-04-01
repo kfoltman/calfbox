@@ -451,64 +451,24 @@ void cbox_rt_send_events_to(struct cbox_rt *rt, struct cbox_midi_merger *merger,
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct swap_pointers_command
-{
-    void **ptr;
-    void *old_value;
-    void *new_value;
-    int *pcount;
-    int new_count;
-};
+#define cbox_rt_swap_pointers_args(ARG) ARG(void **, ptr) ARG(void *, new_value)
 
-static int swap_pointers_command_execute(void *user_data)
+DEFINE_RT_FUNC(void *, cbox_rt, rt, cbox_rt_swap_pointers)
 {
-    struct swap_pointers_command *cmd = user_data;
-    
-    cmd->old_value = *cmd->ptr;
-    *cmd->ptr = cmd->new_value;
-    if (cmd->pcount)
-        *cmd->pcount = cmd->new_count;
-    
-    return 1;
+    void *old_value = *ptr;
+    *ptr = new_value;
+    return old_value;
 }
 
-void *cbox_rt_swap_pointers(struct cbox_rt *rt, void **ptr, void *new_value)
-{
-    if (rt)
-    {
-        static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = swap_pointers_command_execute, .cleanup = NULL };
-        
-        struct swap_pointers_command sc = { ptr, NULL, new_value, NULL, 0 };
-        
-        cbox_rt_execute_cmd_sync(rt, &scdef, &sc);
+#define cbox_rt_swap_pointers_and_update_count_args(ARG) ARG(void **, ptr) ARG(void *, new_value) ARG(int *, pcount) ARG(int, new_count)
 
-        return sc.old_value;
-    } else {
-        void *old_ptr = *ptr;
-        *ptr = new_value;
-        return old_ptr;
-    }
-}
-
-void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, void *new_value, int *pcount, int new_count)
+DEFINE_RT_FUNC(void *, cbox_rt, rt, cbox_rt_swap_pointers_and_update_count)
 {
-    if (rt)
-    {
-        static struct cbox_rt_cmd_definition scdef = { .prepare = NULL, .execute = swap_pointers_command_execute, .cleanup = NULL };
-        
-        struct swap_pointers_command sc = { ptr, NULL, new_value, pcount, new_count };
-        
-        cbox_rt_execute_cmd_sync(rt, &scdef, &sc);
-        
-        return sc.old_value;
-    }
-    else
-    {
-        void *old_ptr = *ptr;
-        *ptr = new_value;
+    void *old_value = *ptr;
+    *ptr = new_value;
+    if (pcount)
         *pcount = new_count;
-        return old_ptr;        
-    }
+    return old_value;
 }
 
 void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, int *pcount, int index, void *new_value)
