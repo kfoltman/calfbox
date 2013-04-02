@@ -374,60 +374,54 @@ void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct set_song_command
-{
-    struct cbox_rt *rt;
-    struct cbox_song_playback *new_song, *old_song;
-    int new_time_ppqn;
-};
+#define cbox_rt_set_song_playback_args(ARG) ARG(struct cbox_song_playback *, new_song) ARG(int, new_time_ppqn)
 
-static int set_song_command_execute(void *user_data)
+DEFINE_RT_VOID_FUNC(cbox_rt, rt, cbox_rt_set_song_playback)
 {
-    struct set_song_command *cmd = user_data;
-    
     // If there's no new song, silence all ongoing notes. Otherwise, copy the
     // ongoing notes to the new playback structure so that the notes get released
     // when playback is stopped (or possibly earlier).
-    if (cmd->rt->scene && cmd->rt->scene->spb)
+    if (rt->scene && rt->scene->spb)
     {
-        if (cmd->new_song)
-            cbox_song_playback_apply_old_state(cmd->new_song);
+        if (new_song)
+            cbox_song_playback_apply_old_state(new_song);
 
-        if (cbox_song_playback_active_notes_release(cmd->rt->scene->spb, &cmd->rt->midibuf_aux) < 0)
-            return 0;
-    }
-    cmd->old_song = cmd->rt->master->spb;
-    if (cmd->rt->scene)
-        cmd->rt->scene->spb = cmd->new_song;
-    cmd->rt->master->spb = cmd->new_song;
-    if (cmd->new_song)
-    {
-        if (cmd->new_time_ppqn == -1)
+        if (cbox_song_playback_active_notes_release(rt->scene->spb, &rt->midibuf_aux) < 0)
         {
-            int old_time_ppqn = cmd->old_song ? cmd->old_song->song_pos_ppqn : 0;
-            cbox_song_playback_seek_samples(cmd->rt->master->spb, cmd->old_song ? cmd->old_song->song_pos_samples : 0);
+            RT_CALL_AGAIN_LATER();
+            return;
+        }
+    }
+    struct cbox_song_playback *old_song = rt->master->spb;
+    if (rt->scene)
+        rt->scene->spb = new_song;
+    rt->master->spb = new_song;
+    if (new_song)
+    {
+        if (new_time_ppqn == -1)
+        {
+            int old_time_ppqn = old_song ? old_song->song_pos_ppqn : 0;
+            cbox_song_playback_seek_samples(rt->master->spb, old_song ? old_song->song_pos_samples : 0);
             // If tempo change occurred anywhere before playback point, then
             // sample-based position corresponds to a completely different location.
             // So, if new sample-based position corresponds to different PPQN
             // position, seek again using PPQN position.
-            if (cmd->old_song && abs(cmd->new_song->song_pos_ppqn - old_time_ppqn) > 1)
-                cbox_song_playback_seek_ppqn(cmd->rt->master->spb, old_time_ppqn, FALSE);
+            if (old_song && abs(new_song->song_pos_ppqn - old_time_ppqn) > 1)
+                cbox_song_playback_seek_ppqn(rt->master->spb, old_time_ppqn, FALSE);
         }
         else
-            cbox_song_playback_seek_ppqn(cmd->rt->master->spb, cmd->new_time_ppqn, FALSE);
+            cbox_song_playback_seek_ppqn(rt->master->spb, new_time_ppqn, FALSE);
     }
-    
-    return 1;
 }
 
 void cbox_rt_update_song(struct cbox_rt *rt, int new_pos_ppqn)
 {
-    static struct cbox_rt_cmd_definition def = { .prepare = NULL, .execute = set_song_command_execute, .cleanup = NULL };
-    
-    struct set_song_command cmd = { rt, cbox_song_playback_new(rt->master->song, rt->master, rt, rt->scene ? rt->scene->spb : NULL ), NULL, new_pos_ppqn };
-    cbox_rt_execute_cmd_sync(rt, &def, &cmd);
-    if (cmd.old_song)
-        cbox_song_playback_destroy(cmd.old_song);
+    struct cbox_song_playback *old_song, *new_song;
+    old_song = rt->scene ? rt->scene->spb : NULL;
+    new_song = cbox_song_playback_new(rt->master->song, rt->master, rt, old_song );
+    cbox_rt_set_song_playback(rt, new_song, new_pos_ppqn);
+    if (old_song)
+        cbox_song_playback_destroy(old_song);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
