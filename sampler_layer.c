@@ -737,6 +737,35 @@ try_now:
         else
             return FALSE;
     }
+    else if (!strncmp(key, "locc", 4) || !strncmp(key, "hicc", 4))
+    {
+        int cc = atoi(key + 4);
+        if (cc > 0 && cc < 120)
+        {
+            if (*value)
+            {
+                l->data.cc_number = cc;
+                if (key[0] == 'l')
+                {
+                    l->data.locc = atoi(value);
+                    l->data.has_locc = TRUE;
+                }
+                else
+                {
+                    l->data.hicc = atoi(value);
+                    l->data.has_hicc = TRUE;
+                }
+            }
+            else
+            {
+                l->data.cc_number = -1;
+                l->data.has_locc = FALSE;
+                l->data.has_hicc = FALSE;
+            }
+        }
+        else
+            return FALSE;
+    }
     else
         goto unknown_key;
     
@@ -784,9 +813,9 @@ unknown_key:
     LFO_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
 #define PROC_FIELDS_TO_FILEPTR_ccrange(name) \
     if (l->has_##name##locc) \
-        g_string_append_printf(outstr, " on_locc%d=%d", l->name##cc_number, l->name##locc); \
+        g_string_append_printf(outstr, " " #name "locc%d=%d", l->name##cc_number, l->name##locc); \
     if (l->has_##name##hicc) \
-        g_string_append_printf(outstr, " on_hicc%d=%d", l->name##cc_number, l->name##hicc);
+        g_string_append_printf(outstr, " " #name "hicc%d=%d", l->name##cc_number, l->name##hicc);
 
 gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited)
 {

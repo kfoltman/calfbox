@@ -241,6 +241,7 @@ typedef int midi_note_t;
     MACRO##_lfo(filter_lfo, fillfo, 1) \
     MACRO##_lfo(pitch_lfo, pitchlfo, 2) \
     MACRO##_ccrange(on_) \
+    MACRO##_ccrange() \
 
 // XXXKF: consider making send1gain the dBamp type... except it's
 // a linear percentage value in SFZ spec - bit weird!
