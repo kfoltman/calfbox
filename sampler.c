@@ -342,7 +342,7 @@ void sampler_stop_sustained(struct sampler_module *m, struct sampler_channel *c)
         }
     }
     // Start release layers for the newly released keys
-    if (c->program->rll && c->program->rll->layers_release)
+    if (c->program && c->program->rll && c->program->rll->layers_release)
     {
         for (int i = 0; i < 128; i++)
         {
@@ -366,7 +366,7 @@ void sampler_stop_sostenuto(struct sampler_module *m, struct sampler_channel *c)
         }
     }
     // Start release layers for the newly released keys
-    if (c->program->rll && c->program->rll->layers_release)
+    if (c->program && c->program->rll && c->program->rll->layers_release)
     {
         for (int i = 0; i < 128; i++)
         {
