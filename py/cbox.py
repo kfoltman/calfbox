@@ -442,7 +442,7 @@ Document.classmap['cbox_song'] = DocSong
 
 class DocLayer(DocObj):
     def __init__(self, uuid):
-        DocObj.__init__(self, uuid, ["name", "instrument_name", "instrument_uuid", "=enable", "=low_note", "=high_note", "=fixed_note", "=in_channel", "=out_channel", "=aftertouch", "=invert_sustain", "=consume", "=ignore_scene_transpose", "=transpose"])
+        DocObj.__init__(self, uuid, ["name", "instrument_name", "instrument_uuid", "=enable", "=low_note", "=high_note", "=fixed_note", "=in_channel", "=out_channel", "=aftertouch", "=invert_sustain", "=consume", "=ignore_scene_transpose", "=ignore_program_changes", "=transpose"])
     def get_instrument(self):
         return Document.map_uuid(self.status().instrument_uuid)
 Document.classmap['cbox_layer'] = DocLayer
@@ -563,7 +563,7 @@ Document.classmap['cbox_scene'] = DocScene
 
 class DocRt(DocObj):
     def __init__(self, uuid):
-        DocObj.__init__(self, uuid, ["name", "instrument_name", "instrument_uuid", "=enable", "=low_note", "=high_note", "=fixed_note", "=in_channel", "=out_channel", "=aftertouch", "=invert_sustain", "=consume", "=ignore_scene_transpose"])
+        DocObj.__init__(self, uuid, [])
 Document.classmap['cbox_rt'] = DocRt
 
 class DocAuxBus(DocObj):

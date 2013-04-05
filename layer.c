@@ -72,6 +72,7 @@ gboolean cbox_layer_load(struct cbox_layer *layer, const char *name, GError **er
     layer->invert_sustain = cbox_config_get_int(section, "invert_sustain", FALSE);
     layer->consume = cbox_config_get_int(section, "consume", FALSE);
     layer->ignore_scene_transpose = cbox_config_get_int(section, "ignore_scene_transpose", FALSE);
+    layer->ignore_program_changes = cbox_config_get_int(section, "ignore_program_changes", FALSE);
     g_free(section);
     
     cbox_layer_set_instrument(layer, instr);    
@@ -126,6 +127,7 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             cbox_execute_on(fb, NULL, "/instrument_uuid", "o", error, layer->instrument) && 
             cbox_execute_on(fb, NULL, "/consume", "i", error, (int)layer->consume) && 
             cbox_execute_on(fb, NULL, "/ignore_scene_transpose", "i", error, (int)layer->ignore_scene_transpose) && 
+            cbox_execute_on(fb, NULL, "/ignore_program_changes", "i", error, (int)layer->ignore_program_changes) && 
             cbox_execute_on(fb, NULL, "/disable_aftertouch", "i", error, (int)layer->disable_aftertouch) && 
             cbox_execute_on(fb, NULL, "/transpose", "i", error, (int)layer->transpose) && 
             cbox_execute_on(fb, NULL, "/fixed_note", "i", error, (int)layer->fixed_note) && 
@@ -150,6 +152,11 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     else if (!strcmp(cmd->command, "/ignore_scene_transpose") && !strcmp(cmd->arg_types, "i"))
     {
         layer->ignore_scene_transpose = 0 != CBOX_ARG_I(cmd, 0);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/ignore_program_changes") && !strcmp(cmd->arg_types, "i"))
+    {
+        layer->ignore_program_changes = 0 != CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/disable_aftertouch") && !strcmp(cmd->arg_types, "i"))
@@ -213,6 +220,7 @@ struct cbox_layer *cbox_layer_new(struct cbox_scene *scene)
     l->invert_sustain = FALSE;
     l->consume = FALSE;
     l->ignore_scene_transpose = FALSE;
+    l->ignore_program_changes = FALSE;
     l->scene = scene;
     CBOX_OBJECT_REGISTER(l);
     return l;

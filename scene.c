@@ -531,7 +531,11 @@ static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbo
                 {
                     data[2] = 127 - data[2];
                 }
+                else if (lp->ignore_program_changes && cmd == 11 && (data[1] == 0 || data[1] == 32))
+                    continue;
                 else if (cmd == 13 && lp->disable_aftertouch)
+                    continue;
+                else if (cmd == 12 && lp->ignore_program_changes)
                     continue;
             }
             if (!cbox_midi_buffer_write_event(&lp->instrument->module->midi_input, event->time, data, event->size))

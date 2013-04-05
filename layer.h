@@ -45,6 +45,7 @@ struct cbox_layer
     gboolean invert_sustain;
     gboolean consume;
     gboolean ignore_scene_transpose;
+    gboolean ignore_program_changes;
 };
 
 extern struct cbox_layer *cbox_layer_new(struct cbox_scene *scene);
