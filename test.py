@@ -120,14 +120,23 @@ class TestCbox(unittest.TestCase):
         # XXXKF: this lack of stable Python representation of engines is annoying
         #instrument.cmd('/engine/load_patch_from_string', None, 1, '.', '<region> key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
         instrument.cmd('/engine/load_patch_from_string', None, 0, '.', '<group> resonance=3 <region> unknown=123 key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
-        patches = instrument.get_things("/engine/patches", ["*patch"]).patch
+        patches = instrument.engine.get_patches()
         patches_dict = {}
-        for patch in patches:
-            patchid, patchname, patchuuid, patchchannelcount = patch
+        self.assertEqual(len(patches), 1)
+        for (patchid, patch) in patches.items():
+            patchname, patchuuid, patchchannelcount = patch
             self.verify_uuid(patchuuid, 'sampler_program')
             program = Document.map_uuid(patchuuid)
             self.verify_uuid(program.uuid, 'sampler_program')
             self.assertEqual(program.uuid, patchuuid)
+            self.assertEqual(program.status().name, 'test_sampler_api')
+            self.assertEqual(program.status().sample_dir, '.')
+            self.assertEqual(program.status().program_no, 0)
+            self.assertEqual(program.status().in_use, 0)
+            instrument.engine.set_patch(1, 0)
+            self.assertEqual(program.status().in_use, 1)
+            instrument.engine.set_patch(2, 0)
+            self.assertEqual(program.status().in_use, 2)
             regions = program.get_things("/regions", ["*region"]).region
             patches_dict[patchid] = (patchname, len(regions))
             for region_uuid in regions:
@@ -142,6 +151,8 @@ class TestCbox(unittest.TestCase):
                     else:
                         self.assertFalse('unknown=123' in region_str)
                         self.assertTrue('cutoff=2000' in region_str)
+            program.add_control_init(11, 64)
+            self.assertTrue([11,64] in program.get_control_inits())
         self.assertEqual(patches_dict, {0 : ('test_sampler_api', 2)})
         region = Document.map_uuid(region_uuid)
         group = Document.map_uuid(region.status().parent_group)

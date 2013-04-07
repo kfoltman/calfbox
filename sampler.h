@@ -42,6 +42,8 @@ enum CboxSamplerError
 struct sampler_noteinitfunc;
 struct sampler_voice;
 
+#define GET_RT_FROM_sampler_channel(channel) ((channel)->module->module.rt)
+
 struct sampler_channel
 {
     struct sampler_module *module;
@@ -131,6 +133,8 @@ extern void sampler_update_layer(struct sampler_module *m, struct sampler_layer 
 extern void sampler_update_program_layers(struct sampler_module *m, struct sampler_program *prg);
 extern void sampler_unselect_program(struct sampler_module *m, struct sampler_program *prg);
 // This function may only be called from RT thread!
+extern void sampler_channel_set_program_RT(struct sampler_channel *c, struct sampler_program *prg);
+// ... and this one is RT-safe
 extern void sampler_channel_set_program(struct sampler_channel *c, struct sampler_program *prg);
 
 #endif

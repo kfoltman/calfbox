@@ -77,7 +77,12 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
 
-        if (!(CBOX_OBJECT_DEFAULT_STATUS(program, fb, error)))
+        if (!((!program->name || cbox_execute_on(fb, NULL, "/name", "s", error, program->name)) &&
+            cbox_execute_on(fb, NULL, "/sample_dir", "s", error, program->sample_dir) &&
+            cbox_execute_on(fb, NULL, "/source_file", "s", error, program->source_file) &&
+            cbox_execute_on(fb, NULL, "/program_no", "i", error, program->prog_no) &&
+            cbox_execute_on(fb, NULL, "/in_use", "i", error, program->in_use) &&
+            CBOX_OBJECT_DEFAULT_STATUS(program, fb, error)))
             return FALSE;
         return TRUE;
     }
@@ -89,11 +94,28 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
     }
     if (!strcmp(cmd->command, "/groups") && !strcmp(cmd->arg_types, ""))
     {
-        if (!cbox_execute_on(fb, NULL, "/default_group", "o", error, program->default_group))
-            return FALSE;
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
+        if (!cbox_execute_on(fb, NULL, "/default_group", "o", error, program->default_group))
+            return FALSE;
         return return_layers(program->groups, "/group", fb, error);
+    }
+    if (!strcmp(cmd->command, "/control_inits") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (GSList *p = program->ctrl_init_list; p; p = p->next)
+        {
+            const struct sampler_ctrlinit *cin = (const struct sampler_ctrlinit *)&p->data;
+            if (!cbox_execute_on(fb, NULL, "/control_init", "ii", error, (int)cin->controller, (int)cin->value))
+                return FALSE;
+        }
+        return TRUE;
+    }
+    if (!strcmp(cmd->command, "/add_control_init") && !strcmp(cmd->arg_types, "ii"))
+    {
+        sampler_program_add_controller_init(program, CBOX_ARG_I(cmd, 0), CBOX_ARG_I(cmd, 1));
+        return TRUE;
     }
     if (!strcmp(cmd->command, "/new_group") && !strcmp(cmd->arg_types, ""))
     {
@@ -124,6 +146,7 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->ctrl_init_list = NULL;
     prg->default_group = sampler_layer_new(m, prg, NULL);
     prg->deleting = FALSE;
+    prg->in_use = 0;
     CBOX_OBJECT_REGISTER(prg);
     return prg;
 }
@@ -241,7 +264,7 @@ void sampler_program_add_controller_init(struct sampler_program *prg, uint8_t co
     u.ptr = NULL;
     u.cinit.controller = controller;
     u.cinit.value = value;
-    prg->ctrl_init_list = g_slist_prepend(prg->ctrl_init_list, u.ptr);
+    prg->ctrl_init_list = g_slist_append(prg->ctrl_init_list, u.ptr);
 }
 
 void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)

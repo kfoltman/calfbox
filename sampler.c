@@ -823,11 +823,6 @@ void sampler_process_cc(struct sampler_module *m, struct sampler_channel *c, int
         c->cc[cc] = val;
 }
 
-void sampler_program_change_byidx(struct sampler_module *m, struct sampler_channel *c, int program_idx)
-{
-    sampler_channel_set_program(c, m->programs[program_idx]);
-}
-
 void sampler_program_change(struct sampler_module *m, struct sampler_channel *c, int program)
 {
     // XXXKF replace with something more efficient
@@ -836,12 +831,12 @@ void sampler_program_change(struct sampler_module *m, struct sampler_channel *c,
         // XXXKF support banks
         if (m->programs[i]->prog_no == program)
         {
-            sampler_program_change_byidx(m, c, i);
+            sampler_channel_set_program_RT(c, m->programs[i]);
             return;
         }
     }
     g_warning("Unknown program %d", program);
-    sampler_program_change_byidx(m, c, 0);
+    sampler_channel_set_program_RT(c, m->programs[0]);
 }
 
 void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
@@ -906,13 +901,13 @@ static void init_channel(struct sampler_module *m, struct sampler_channel *c)
     c->cc[74] = 64;
     c->previous_note = -1;
     c->program = NULL;
-    sampler_channel_set_program(c, m->program_count ? m->programs[0] : NULL);
+    sampler_channel_set_program_RT(c, m->program_count ? m->programs[0] : NULL);
     memset(c->switchmask, 0, sizeof(c->switchmask));
     memset(c->sustainmask, 0, sizeof(c->sustainmask));
     memset(c->sostenutomask, 0, sizeof(c->sostenutomask));
 }
 
-void sampler_channel_set_program(struct sampler_channel *c, struct sampler_program *prg)
+void sampler_channel_set_program_RT(struct sampler_channel *c, struct sampler_program *prg)
 {
     if (c->program)
         c->program->in_use--;    
@@ -928,6 +923,13 @@ void sampler_channel_set_program(struct sampler_channel *c, struct sampler_progr
         }
         c->program->in_use++;
     }
+}
+
+#define sampler_channel_set_program_args(ARG) ARG(struct sampler_program *, prg)
+
+DEFINE_RT_VOID_FUNC(sampler_channel, c, sampler_channel_set_program)
+{
+    sampler_channel_set_program_RT(c, prg);
 }
 
 static int get_first_free_program_no(struct sampler_module *m)
@@ -982,7 +984,7 @@ static int release_program_voices_execute(void *data)
         struct sampler_channel *c = &m->channels[i];
         if (c->program == rpv->old_pgm || c->program == NULL)
         {
-            sampler_channel_set_program(c, rpv->new_pgm);
+            sampler_channel_set_program_RT(c, rpv->new_pgm);
             FOREACH_VOICE(c->voices_running, v)
             {
                 if (!m->deleting)
@@ -1148,7 +1150,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
                 break;
             }
         }
-        cbox_rt_swap_pointers(m->module.rt, (void **)&m->channels[channel - 1].program, pgm);
+        sampler_channel_set_program(&m->channels[channel - 1], pgm);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/load_patch") && !strcmp(cmd->arg_types, "iss"))
@@ -1196,7 +1198,7 @@ gboolean sampler_select_program(struct sampler_module *m, int channel, const gch
     {
         if (!strcmp(m->programs[i]->name, preset))
         {
-            sampler_program_change_byidx(m, &m->channels[channel], i);
+            sampler_channel_set_program(&m->channels[channel], m->programs[i]);
             return TRUE;
         }
     }

@@ -585,14 +585,18 @@ Document.classmap['cbox_module'] = DocModule
     
 class SamplerProgram(DocObj):
     def __init__(self, uuid):
-        DocObj.__init__(self, uuid, [])
+        DocObj.__init__(self, uuid, ['name', 'sample_dir', 'program_no', 'in_use'])
     def get_regions(self):
         return map(Document.map_uuid, self.get_things("/regions", ['*region']).region)
     def get_groups(self):
         g = self.get_things("/groups", ['*group', 'default_group'])
         return [Document.map_uuid(g.default_group)] + list(map(Document.map_uuid, g.group))
+    def get_control_inits(self):
+        return self.get_things("/control_inits", ['*control_init']).control_init
     def new_group(self):
         return self.cmd_makeobj("/new_group")
+    def add_control_init(self, controller, value):
+        return self.cmd("/add_control_init", None, controller, value)
 Document.classmap['sampler_program'] = SamplerProgram
 
 class SamplerLayer(DocObj):
