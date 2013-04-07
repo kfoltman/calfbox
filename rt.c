@@ -92,6 +92,7 @@ struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
     rt->rb_execute = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS);
     rt->rb_cleanup = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS * 2);
     rt->io = NULL;
+    rt->engine = NULL;
     rt->started = FALSE;
     rt->disconnected = FALSE;
     rt->io_env.srate = 0;
