@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "rt.h"
 #include "sampler.h"
 #include "sampler_prg.h"
 #include "sfzloader.h"
@@ -115,6 +116,11 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
     if (!strcmp(cmd->command, "/add_control_init") && !strcmp(cmd->arg_types, "ii"))
     {
         sampler_program_add_controller_init(program, CBOX_ARG_I(cmd, 0), CBOX_ARG_I(cmd, 1));
+        return TRUE;
+    }
+    if (!strcmp(cmd->command, "/delete_control_init") && !strcmp(cmd->arg_types, "ii"))
+    {
+        sampler_program_remove_controller_init(program, CBOX_ARG_I(cmd, 0), CBOX_ARG_I(cmd, 1));
         return TRUE;
     }
     if (!strcmp(cmd->command, "/new_group") && !strcmp(cmd->arg_types, ""))
@@ -265,6 +271,25 @@ void sampler_program_add_controller_init(struct sampler_program *prg, uint8_t co
     u.cinit.controller = controller;
     u.cinit.value = value;
     prg->ctrl_init_list = g_slist_append(prg->ctrl_init_list, u.ptr);
+}
+
+void sampler_program_remove_controller_init(struct sampler_program *prg, uint8_t controller, int which)
+{
+    for (GSList **p = &prg->ctrl_init_list; *p; )
+    {
+        const struct sampler_ctrlinit *cin = (const struct sampler_ctrlinit *)&(*p)->data;
+        if (cin->controller != controller)
+        {
+            p = &((*p)->next);
+            continue;
+        }
+        if (which > 0)
+            which--;
+        GSList *q = (GSList *)cbox_rt_swap_pointers(prg->module->module.rt, (void **)p, (*p)->next);
+        g_slist_free1(q);
+        if (which == 0)
+            break;
+    }
 }
 
 void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)

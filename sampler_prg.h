@@ -76,5 +76,6 @@ extern void sampler_program_add_layer(struct sampler_program *prg, struct sample
 extern void sampler_program_delete_layer(struct sampler_program *prg, struct sampler_layer *l);
 extern void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer *l);
 extern void sampler_program_add_controller_init(struct sampler_program *prg, uint8_t controller, uint8_t value);
+extern void sampler_program_remove_controller_init(struct sampler_program *prg, uint8_t controller, int which);
 
 #endif

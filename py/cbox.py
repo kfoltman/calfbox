@@ -597,6 +597,9 @@ class SamplerProgram(DocObj):
         return self.cmd_makeobj("/new_group")
     def add_control_init(self, controller, value):
         return self.cmd("/add_control_init", None, controller, value)
+    # which = -1 -> remove all controllers with that number from the list
+    def delete_control_init(self, controller, which = 0):
+        return self.cmd("/delete_control_init", None, controller, which)
 Document.classmap['sampler_program'] = SamplerProgram
 
 class SamplerLayer(DocObj):
