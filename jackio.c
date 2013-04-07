@@ -104,7 +104,7 @@ static int process_cb(jack_nframes_t nframes, void *arg)
     struct cbox_io *io = jii->ioi.pio;
     struct cbox_io_callbacks *cb = io->cb;
     
-    io->buffer_size = nframes;
+    io->io_env.buffer_size = nframes;
     for (int i = 0; i < io->input_count; i++)
         io->input_buffers[i] = jack_port_get_buffer(jii->inputs[i], nframes);
     for (int i = 0; i < io->output_count; i++)
@@ -373,7 +373,7 @@ int cbox_jackio_get_midi_data(struct cbox_io_impl *impl, struct cbox_midi_buffer
     struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
 
     jack_port_t *port = jii->midi;
-    void *midi = jack_port_get_buffer(port, jii->ioi.pio->buffer_size);
+    void *midi = jack_port_get_buffer(port, jii->ioi.pio->io_env.buffer_size);
     uint32_t event_count = jack_midi_get_event_count(midi);
 
     cbox_midi_buffer_clear(destination);
@@ -676,7 +676,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     }
     
     // XXXKF would use a callback instead
-    io->buffer_size = jack_get_buffer_size(client);
+    io->io_env.buffer_size = jack_get_buffer_size(client);
     io->cb = NULL;
     io->input_count = cbox_config_get_int("io", "inputs", 0);
     io->input_buffers = malloc(sizeof(float *) * io->input_count);

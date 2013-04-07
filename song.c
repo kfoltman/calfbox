@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "app.h"
+#include "engine.h"
 #include "errors.h"
 #include "song.h"
 #include "track.h"
@@ -323,7 +324,7 @@ void cbox_song_use_looped_pattern(struct cbox_song *song, struct cbox_midi_patte
     song->loop_start_ppqn = 0;
     song->loop_end_ppqn = pattern->loop_end;
     cbox_track_add_item(trk, 0, pattern, 0, pattern->loop_end);
-    cbox_rt_update_song_playback(app.rt);
+    cbox_engine_update_song_playback(app.engine);
 }
 
 void cbox_song_destroyfunc(struct cbox_objhdr *objhdr)

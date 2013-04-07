@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct cbox_song;
 struct cbox_rt;
 
-#define GET_RT_FROM_cbox_master(ptr) (ptr->rt)
+#define GET_RT_FROM_cbox_master(ptr) ((ptr)->engine->rt)
 
 enum cbox_master_transport_state
 {
@@ -43,7 +43,7 @@ struct cbox_master
     int timesig_nom;
     int timesig_denom; // must be 4 for now
     enum cbox_master_transport_state state;
-    struct cbox_rt *rt;
+    struct cbox_engine *engine;
     struct cbox_song *song;
     struct cbox_song_playback *spb;
     struct cbox_command_target cmd_target;
@@ -56,7 +56,7 @@ struct cbox_bbt
     int tick;
 };
 
-extern struct cbox_master *cbox_master_new(struct cbox_rt *rt);
+extern struct cbox_master *cbox_master_new(struct cbox_engine *engine);
 extern void cbox_master_set_sample_rate(struct cbox_master *master, int srate);
 extern void cbox_master_set_tempo(struct cbox_master *master, float tempo);
 extern void cbox_master_set_timesig(struct cbox_master *master, int beats, int unit);

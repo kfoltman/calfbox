@@ -115,7 +115,7 @@ static gboolean stream_recorder_attach(struct cbox_recorder *handler, struct cbo
 
     memset(&self->info, 0, sizeof(self->info));
     self->info.frames = 0;
-    self->info.samplerate = cbox_rt_get_sample_rate(self->rt);
+    self->info.samplerate = self->rt->io_env.srate;
     self->info.channels = src->channels;
     self->info.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT; // XXXKF make format configurable on instantiation
     self->info.sections = 0;

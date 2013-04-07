@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <jack/jack.h>
 #include <jack/ringbuffer.h>
 #include "dom.h"
+#include "ioenv.h"
 #include "master.h"
 #include "mididest.h"
 
@@ -64,7 +65,7 @@ struct cbox_io
     float **input_buffers; // only valid inside jack_rt_process
     int output_count;
     float **output_buffers; // only valid inside jack_rt_process
-    int buffer_size;
+    struct cbox_io_env io_env;
     
     struct cbox_io_callbacks *cb;
     GSList *midi_inputs;
@@ -108,10 +109,6 @@ extern gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *co
 extern int cbox_io_start(struct cbox_io *io, struct cbox_io_callbacks *cb, struct cbox_command_target *fb);
 extern int cbox_io_stop(struct cbox_io *io);
 extern int cbox_io_get_sample_rate(struct cbox_io *io);
-static inline int cbox_io_get_buffer_size(struct cbox_io *io)
-{
-    return io->buffer_size;
-}
 extern int cbox_io_get_midi_data(struct cbox_io *io, struct cbox_midi_buffer *destination);
 extern gboolean cbox_io_get_disconnect_status(struct cbox_io *io, GError **error);
 extern gboolean cbox_io_cycle(struct cbox_io *io, struct cbox_command_target *fb, GError **error);

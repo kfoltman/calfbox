@@ -52,7 +52,7 @@ void jack_input_process_block(struct cbox_module *module, cbox_sample_t **inputs
         for (int j = 0; j < CBOX_BLOCK_SIZE; j++)
             outputs[i][j] = src[j];
     }
-    m->offset = (m->offset + CBOX_BLOCK_SIZE) % app.io.buffer_size;
+    m->offset = (m->offset + CBOX_BLOCK_SIZE) % app.io.io_env.buffer_size;
 }
 
 static gboolean validate_input_index(int input, const char *cfg_section, const char *type, GError **error)

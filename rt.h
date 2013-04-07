@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010-2011 Krzysztof Foltman
+Copyright (C) 2010-2013 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,14 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CBOX_PROCMAIN_H
-#define CBOX_PROCMAIN_H
+#ifndef CBOX_RT_H
+#define CBOX_RT_H
 
 #include <stdint.h>
 #include <jack/ringbuffer.h>
 
 #include "cmd.h"
 #include "dom.h"
+#include "ioenv.h"
 #include "midi.h"
 #include "mididest.h"
 
@@ -50,23 +51,15 @@ struct cbox_rt
 {
     CBOX_OBJECT_HEADER()
     
-    struct cbox_scene *scene;
-    struct cbox_module *effect;
-    
     struct cbox_io *io;
     struct cbox_io_callbacks *cbs;
-    struct cbox_master *master;
-    struct cbox_midi_buffer midibuf_aux, midibuf_jack, midibuf_song, midibuf_total;
-    struct cbox_midi_merger scene_input_merger;
     
     jack_ringbuffer_t *rb_execute, *rb_cleanup;
-    struct cbox_midi_buffer midibufs_appsink[2];
-    int current_appsink_buffer;
     
     struct cbox_command_target cmd_target;
     int started, disconnected;
-    int srate;
-    int buffer_size;
+    struct cbox_io_env io_env;
+    struct cbox_engine *engine;
 };
 
 extern struct cbox_rt *cbox_rt_new(struct cbox_document *doc);
@@ -75,9 +68,9 @@ extern void cbox_rt_set_io(struct cbox_rt *rt, struct cbox_io *io);
 extern void cbox_rt_set_offline(struct cbox_rt *rt, int sample_rate, int buffer_size);
 extern void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb);
 extern void cbox_rt_handle_cmd_queue(struct cbox_rt *rt);
+// This one should be called from RT thread process function to execute the queued RT commands
+extern void cbox_rt_handle_rt_commands(struct cbox_rt *rt);
 extern void cbox_rt_stop(struct cbox_rt *rt);
-
-extern void cbox_rt_update_song_playback(struct cbox_rt *rt);
 
 // Those are for calling from the main thread. I will add a RT-thread version later.
 extern void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition *cmd, void *user_data);
@@ -87,20 +80,7 @@ extern void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **p
 
 extern void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, int *pcount, int index, void *new_value);
 extern void *cbox_rt_array_remove(struct cbox_rt *rt, void ***ptr, int *pcount, int index);
-
-// These use an RT command internally
-extern struct cbox_scene *cbox_rt_set_scene(struct cbox_rt *rt, struct cbox_scene *scene);
-extern struct cbox_song *cbox_rt_set_song(struct cbox_rt *rt, struct cbox_song *song, int new_pos);
-extern struct cbox_song *cbox_rt_set_pattern(struct cbox_rt *rt, struct cbox_midi_pattern *pattern, int new_pos);
-extern void cbox_rt_set_pattern_and_destroy(struct cbox_rt *rt, struct cbox_midi_pattern *pattern);
-extern void cbox_rt_send_events_to(struct cbox_rt *rt, struct cbox_midi_merger *merger, struct cbox_midi_buffer *buffer);
 extern struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, struct cbox_uuid *uuid);
-extern const struct cbox_midi_buffer *cbox_rt_get_input_midi_data(struct cbox_rt *rt);
-
-extern int cbox_rt_get_sample_rate(struct cbox_rt *rt);
-extern int cbox_rt_get_buffer_size(struct cbox_rt *rt);
-
-extern void cbox_rt_destroy(struct cbox_rt *rt);
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "app.h"
 #include "blob.h"
 #include "config-api.h"
+#include "engine.h"
 #include "instr.h"
 #include "io.h"
 #include "layer.h"
@@ -53,7 +54,7 @@ int cmd_quit(struct cbox_menu_item_command *item, void *context)
 int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = app.rt->scene;
+    struct cbox_scene *scene = app.engine->scene;
     cbox_scene_clear(scene);
     if (!cbox_scene_load(scene, item->item.item_context, &error))
         cbox_print_error(error);
@@ -63,7 +64,7 @@ int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = app.rt->scene;
+    struct cbox_scene *scene = app.engine->scene;
     cbox_scene_clear(scene);
     struct cbox_layer *layer = cbox_layer_new_with_instrument(scene, (char *)item->item.item_context, &error);
     
@@ -82,7 +83,7 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = app.rt->scene;
+    struct cbox_scene *scene = app.engine->scene;
     cbox_scene_clear(scene);
     struct cbox_layer *layer = cbox_layer_new_from_config(scene, (char *)item->item.item_context, &error);
     
@@ -111,13 +112,13 @@ gchar *transport_format_value(const struct cbox_menu_item_static *item, void *co
 {
     // XXXKF
     // struct cbox_bbt bbt;
-    // cbox_master_to_bbt(app.rt->master, &bbt);
-    if (app.rt->scene->spb == NULL)
+    // cbox_master_to_bbt(app.engine->master, &bbt);
+    if (app.engine->scene->spb == NULL)
         return g_strdup("N/A");
     if (!strcmp((const char *)item->item.item_context, "pos"))
-        return g_strdup_printf("%d", (int)app.rt->scene->spb->song_pos_samples);
+        return g_strdup_printf("%d", (int)app.engine->scene->spb->song_pos_samples);
     else
-        return g_strdup_printf("%d", (int)app.rt->scene->spb->song_pos_ppqn);
+        return g_strdup_printf("%d", (int)app.engine->scene->spb->song_pos_ppqn);
 }
 
 struct cbox_config_section_cb_data
@@ -168,7 +169,7 @@ struct cbox_menu *create_scene_menu(struct cbox_menu_item_menu *item, void *menu
 
 static struct cbox_command_target *find_module_target(const char *type, GError **error)
 {
-    struct cbox_scene *scene = app.rt->scene;
+    struct cbox_scene *scene = app.engine->scene;
     for (int i = 0; i < scene->instrument_count; i++)
     {
         if (!strcmp(scene->instruments[i]->module->engine_name, type))
@@ -277,56 +278,56 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
 
 static void restart_song()
 {
-    cbox_master_stop(app.rt->master);
-    cbox_master_seek_ppqn(app.rt->master, 0);
-    cbox_master_play(app.rt->master);
+    cbox_master_stop(app.engine->master);
+    cbox_master_seek_ppqn(app.engine->master, 0);
+    cbox_master_play(app.engine->master);
 }
 
 int cmd_pattern_none(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_song_clear(app.rt->master->song);
-    cbox_rt_update_song_playback(app.rt);
+    cbox_song_clear(app.engine->master->song);
+    cbox_engine_update_song_playback(app.engine);
     return 0;
 }
 
 int cmd_pattern_simple(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_new_metronome(app.rt->master->song, 1));
+    cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_new_metronome(app.engine->master->song, 1));
     restart_song();
     return 0;
 }
 
 int cmd_pattern_normal(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_new_metronome(app.rt->master->song, app.rt->master->timesig_nom));
+    cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_new_metronome(app.engine->master->song, app.engine->master->timesig_nom));
     restart_song();
     return 0;
 }
 
 int cmd_load_drumpattern(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load(app.rt->master->song, item->item.item_context, 1));
+    cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_load(app.engine->master->song, item->item.item_context, 1));
     restart_song();
     return 0;
 }
 
 int cmd_load_drumtrack(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load_track(app.rt->master->song, item->item.item_context, 1));
+    cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_load_track(app.engine->master->song, item->item.item_context, 1));
     restart_song();
     return 0;
 }
 
 int cmd_load_pattern(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load(app.rt->master->song, item->item.item_context, 0));
+    cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_load(app.engine->master->song, item->item.item_context, 0));
     restart_song();
     return 0;
 }
 
 int cmd_load_track(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load_track(app.rt->master->song, item->item.item_context, 0));
+    cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_load_track(app.engine->master->song, item->item.item_context, 0));
     restart_song();
     return 0;
 }

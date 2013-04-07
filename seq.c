@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "engine.h"
 #include "pattern.h"
 #include "rt.h"
 #include "seq.h"
@@ -101,10 +102,10 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
 
     if (track->external_output_set)
     {
-        struct cbox_midi_merger *merger = cbox_rt_get_midi_output(spb->rt, &track->external_output);
+        struct cbox_midi_merger *merger = cbox_rt_get_midi_output(spb->engine->rt, &track->external_output);
         if (merger)
         {
-            cbox_midi_merger_connect(merger, &pb->output_buffer, spb->rt);
+            cbox_midi_merger_connect(merger, &pb->output_buffer, spb->engine->rt);
             pb->external_merger = merger;
         }
     }
@@ -205,7 +206,7 @@ void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int 
 void cbox_track_playback_destroy(struct cbox_track_playback *pb)
 {
     if (pb->external_merger)
-        cbox_midi_merger_disconnect(pb->external_merger, &pb->output_buffer, pb->spb->rt);
+        cbox_midi_merger_disconnect(pb->external_merger, &pb->output_buffer, pb->spb->engine->rt);
 
     free(pb->items);
     free(pb);
@@ -347,13 +348,13 @@ int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_not
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_rt *rt, struct cbox_song_playback *old_state)
+struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_engine *engine, struct cbox_song_playback *old_state)
 {
     struct cbox_song_playback *spb = calloc(1, sizeof(struct cbox_song_playback));
     if (old_state && old_state->song != song)
         old_state = NULL;
     spb->song = song;
-    spb->rt = rt;
+    spb->engine = engine;
     spb->pattern_map = g_hash_table_new_full(NULL, NULL, NULL, (GDestroyNotify)cbox_midi_pattern_playback_destroy);
     spb->master = master;
     spb->track_count = g_list_length(song->tracks);

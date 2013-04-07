@@ -24,6 +24,7 @@ csources = [
     "distortion.c",
     "dom.c",
     "eq.c",
+    "engine.c",
     "errors.c",
     "fbr.c",
     "fluid.c",

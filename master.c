@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "engine.h"
 #include "errors.h"
 #include "master.h"
 #include "seq.h"
@@ -121,7 +122,7 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     }
 }
 
-static void cbox_master_init(struct cbox_master *master, struct cbox_rt *rt)
+static void cbox_master_init(struct cbox_master *master, struct cbox_engine *engine)
 {
     master->srate = 0;
     master->tempo = 120.0;
@@ -129,16 +130,16 @@ static void cbox_master_init(struct cbox_master *master, struct cbox_rt *rt)
     master->timesig_nom = 4;
     master->timesig_denom = 4;
     master->state = CMTS_STOP;
-    master->rt = rt;
+    master->engine = engine;
     master->song = NULL;
     master->spb = NULL;
     cbox_command_target_init(&master->cmd_target, master_process_cmd, master);
 }
 
-struct cbox_master *cbox_master_new(struct cbox_rt *rt)
+struct cbox_master *cbox_master_new(struct cbox_engine *engine)
 {
     struct cbox_master *master = malloc(sizeof(struct cbox_master));
-    cbox_master_init(master, rt);
+    cbox_master_init(master, engine);
     return master;
 }
 
@@ -246,7 +247,7 @@ void cbox_master_seek_ppqn(struct cbox_master *master, uint32_t pos_ppqn)
     {
         static struct cbox_rt_cmd_definition cmd = { NULL, seek_transport_execute, NULL };
         struct seek_command_arg arg = { master, TRUE, pos_ppqn, FALSE, FALSE };
-        cbox_rt_execute_cmd_sync(master->rt, &cmd, &arg);
+        cbox_rt_execute_cmd_sync(master->engine->rt, &cmd, &arg);
     }
 }
 
@@ -256,7 +257,7 @@ void cbox_master_seek_samples(struct cbox_master *master, uint32_t pos_samples)
     {
         static struct cbox_rt_cmd_definition cmd = { NULL, seek_transport_execute, NULL };
         struct seek_command_arg arg = { master, FALSE, pos_samples, FALSE, FALSE };
-        cbox_rt_execute_cmd_sync(master->rt, &cmd, &arg);
+        cbox_rt_execute_cmd_sync(master->engine->rt, &cmd, &arg);
     }
 }
 
@@ -272,7 +273,7 @@ void cbox_master_panic(struct cbox_master *master)
         cbox_midi_buffer_write_inline(&buf, ch, 0xB0 + ch, 121, 0);
     }
     // Send to all outputs
-    cbox_rt_send_events_to(master->rt, NULL, &buf);
+    cbox_engine_send_events_to(master->engine, NULL, &buf);
 }
 
 int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn)

@@ -14,6 +14,7 @@ calfbox_SOURCES = \
     delay.c \
     distortion.c \
     dom.c \
+    engine.c \
     eq.c \
     errors.c \
     fbr.c \
@@ -77,11 +78,13 @@ noinst_HEADERS = \
     dom.h \
     dspmath.h \
     envelope.h \
+    engine.h \
     eq.h \
     errors.h \
     hwcfg.h \
     instr.h \
     io.h \
+    ioenv.h \
     layer.h \
     master.h \
     menu.h \

@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010-2011 Krzysztof Foltman
+Copyright (C) 2010-2013 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,34 +16,26 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CBOX_APP_H
-#define CBOX_APP_H
+#ifndef CBOX_IOENV_H
+#define CBOX_IOENV_H
 
-#include "cmd.h"
-#include "dom.h"
-#include "io.h"
-#include "rt.h"
-#include <glib.h>
-
-struct cbox_song;
-
-struct cbox_app
+struct cbox_io_env
 {
-    struct cbox_io io;
-    struct cbox_document *document;
-    struct cbox_rt *rt;
-    struct cbox_engine *engine;
-    struct cbox_command_target cmd_target;
-    struct cbox_command_target config_cmd_target;
-    gchar *current_scene_name;
+    int srate;
+    int buffer_size;    
 };
 
-struct cbox_menu;
+static inline void cbox_io_env_clear(struct cbox_io_env *env)
+{
+    env->srate = 0;
+    env->buffer_size = 0;
+}
 
-extern struct cbox_app app;
-
-struct cbox_menu *create_main_menu(void);
-
-extern gboolean cbox_app_on_idle(struct cbox_command_target *fb, GError **error);
+static inline void cbox_io_env_copy(struct cbox_io_env *dest, const struct cbox_io_env *src)
+{
+    dest->srate = src->srate;
+    dest->buffer_size = src->buffer_size;
+}
 
 #endif
+

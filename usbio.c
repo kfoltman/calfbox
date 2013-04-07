@@ -98,8 +98,8 @@ void usbio_run_idle_loop(struct cbox_usb_io_impl *uii)
     {
         struct cbox_io *io = uii->ioi.pio;
         for (int b = 0; b < uii->output_channels; b++)
-            memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
-        io->cb->process(io->cb->user_data, io, io->buffer_size);
+            memset(io->output_buffers[b], 0, io->io_env.buffer_size * sizeof(float));
+        io->cb->process(io->cb->user_data, io, io->io_env.buffer_size);
         for (GList *p = uii->rt_midi_ports; p; p = p->next)
         {
             struct cbox_usb_midi_interface *umi = p->data;
@@ -116,7 +116,7 @@ void usbio_run_idle_loop(struct cbox_usb_io_impl *uii)
             .tv_usec = 1
         };
         libusb_handle_events_timeout(uii->usbctx, &tv);
-        usleep((int)(io->buffer_size * 1000000.0 / uii->sample_rate));
+        usleep((int)(io->io_env.buffer_size * 1000000.0 / uii->sample_rate));
     }
 }
 
@@ -418,18 +418,19 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     cbox_midi_merger_init(&uii->midi_input_merger, NULL);
     
     // fixed processing buffer size, as we have to deal with packetisation anyway
-    io->buffer_size = 64;
+    io->io_env.srate = uii->sample_rate;
+    io->io_env.buffer_size = 64;
     io->cb = NULL;
     // input and output count is hardcoded for simplicity - in future, it may be
     // necessary to add support for the extra inputs (needs to be figured out)
     io->input_count = 2; //cbox_config_get_int("io", "inputs", 0);
     io->input_buffers = malloc(sizeof(float *) * io->input_count);
     for (int i = 0; i < io->input_count; i++)
-        io->input_buffers[i] = calloc(io->buffer_size, sizeof(float));
+        io->input_buffers[i] = calloc(io->io_env.buffer_size, sizeof(float));
     io->output_count = 2; // cbox_config_get_int("io", "outputs", 2);
     io->output_buffers = malloc(sizeof(float *) * io->output_count);
     for (int i = 0; i < io->output_count; i++)
-        io->output_buffers[i] = calloc(io->buffer_size, sizeof(float));
+        io->output_buffers[i] = calloc(io->io_env.buffer_size, sizeof(float));
     io->impl = &uii->ioi;
     cbox_command_target_init(&io->cmd_target, cbox_usb_io_process_cmd, uii);
 

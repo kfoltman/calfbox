@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "app.h"
 #include "blob.h"
 #include "config-api.h"
+#include "engine.h"
 #include "instr.h"
 #include "io.h"
 #include "layer.h"
@@ -62,13 +63,16 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     if (pos)
     {
         if (!strncmp(obj, "master/", 7))
-            return cbox_execute_sub(&app.rt->master->cmd_target, fb, cmd, pos, error);
+            return cbox_execute_sub(&app.engine->master->cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "config/", 7))
             return cbox_execute_sub(&app.config_cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "scene/", 6))
-            return cbox_execute_sub(&app.rt->scene->cmd_target, fb, cmd, pos, error);
+            return cbox_execute_sub(&app.engine->scene->cmd_target, fb, cmd, pos, error);
+        else
+        if (!strncmp(obj, "engine/", 7))
+            return cbox_execute_sub(&app.engine->cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "rt/", 3))
             return cbox_execute_sub(&app.rt->cmd_target, fb, cmd, pos, error);
@@ -76,8 +80,8 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         if (!strncmp(obj, "io/", 3))
             return cbox_execute_sub(&app.io.cmd_target, fb, cmd, pos, error);
         else
-        if (!strncmp(obj, "song/", 5))
-            return cbox_execute_sub(&app.rt->master->song->cmd_target, fb, cmd, pos, error);
+        if (!strncmp(obj, "song/", 5) && app.engine->master->song)
+            return cbox_execute_sub(&app.engine->master->song->cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "waves/", 6))
             return cbox_execute_sub(&cbox_waves_cmd_target, fb, cmd, pos, error);
@@ -99,7 +103,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     if (!strcmp(obj, "send_event_to") && (!strcmp(cmd->arg_types, "siii") || !strcmp(cmd->arg_types, "sii") || !strcmp(cmd->arg_types, "si")))
     {
         const char *output = CBOX_ARG_S(cmd, 0);
-        struct cbox_midi_merger *merger = &app.rt->scene_input_merger;
+        struct cbox_midi_merger *merger = &app.engine->scene_input_merger;
         if (*output)
         {
             struct cbox_uuid uuid;
@@ -124,7 +128,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         struct cbox_midi_buffer buf;
         cbox_midi_buffer_init(&buf);
         cbox_midi_buffer_write_inline(&buf, 0, mcmd, arg1, arg2);
-        cbox_rt_send_events_to(app.rt, merger, &buf);
+        cbox_engine_send_events_to(app.engine, merger, &buf);
         return TRUE;
     }
     else
@@ -137,13 +141,13 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         cbox_midi_buffer_init(&buf);
         cbox_midi_buffer_write_inline(&buf, 0, 0x90 + ((channel - 1) & 15), note & 127, velocity & 127);
         cbox_midi_buffer_write_inline(&buf, 1, 0x80 + ((channel - 1) & 15), note & 127, velocity & 127);
-        cbox_rt_send_events_to(app.rt, &app.rt->scene_input_merger, &buf);
+        cbox_engine_send_events_to(app.engine, &app.engine->scene_input_merger, &buf);
         return TRUE;
     }
     else
     if (!strcmp(obj, "update_playback") && !strcmp(cmd->arg_types, ""))
     {
-        cbox_rt_update_song_playback(app.rt);
+        cbox_engine_update_song_playback(app.engine);
         return TRUE;
     }
     else
@@ -152,9 +156,9 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        if (app.rt->master->song && app.rt->master->song->tracks)
+        if (app.engine->master->song && app.engine->master->song->tracks)
         {
-            struct cbox_track *track = app.rt->master->song->tracks->data;
+            struct cbox_track *track = app.engine->master->song->tracks->data;
             if (track)
             {
                 struct cbox_track_item *item = track->items->data;
@@ -175,7 +179,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
 
-        struct cbox_meter *meter = cbox_meter_new(app.document, cbox_rt_get_sample_rate(app.rt));
+        struct cbox_meter *meter = cbox_meter_new(app.document, app.rt->io_env.srate);
 
         return cbox_execute_on(fb, NULL, "/uuid", "o", error, meter);
     }
@@ -350,7 +354,7 @@ gboolean cbox_app_on_idle(struct cbox_command_target *fb, GError **error)
         // Process results of asynchronous commands
         cbox_rt_handle_cmd_queue(app.rt);
         
-        const struct cbox_midi_buffer *midi_in = cbox_rt_get_input_midi_data(app.rt);
+        const struct cbox_midi_buffer *midi_in = cbox_engine_get_input_midi_data(app.engine);
         // If no feedback, the input events are lost - probably better than if
         // they filled up the input buffer needlessly.
         if (fb && midi_in)

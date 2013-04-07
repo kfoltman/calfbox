@@ -133,7 +133,7 @@ void cbox_module_init(struct cbox_module *module, struct cbox_document *doc, str
     module->outputs = outputs;
     module->aux_offset = outputs;
     module->bypass = 0;
-    module->srate = cbox_rt_get_sample_rate(rt);
+    module->srate = rt->io_env.srate;
     module->srate_inv = 1.0 / module->srate;
     
     cbox_command_target_init(&module->cmd_target, cmd_handler, module);

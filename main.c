@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config.h"
 #include "config-api.h"
 #include "dom.h"
+#include "engine.h"
 #include "instr.h"
 #include "io.h"
 #include "layer.h"
@@ -226,6 +227,8 @@ int main(int argc, char *argv[])
 
     app.document = cbox_document_new();
     app.rt = cbox_rt_new(app.document);
+    app.engine = cbox_engine_new(app.rt);
+    app.rt->engine = app.engine;
     
     cbox_config_init(config_name);
     if (tempo < 1)
@@ -289,12 +292,12 @@ int main(int argc, char *argv[])
     
     if (effect_preset_name && *effect_preset_name)
     {
-        app.rt->effect = cbox_module_new_from_fx_preset(effect_preset_name, app.document, app.rt, &error);
-        if (!app.rt->effect)
+        app.engine->effect = cbox_module_new_from_fx_preset(effect_preset_name, app.document, app.rt, &error);
+        if (!app.engine->effect)
             goto fail;
     }
-    cbox_master_set_tempo(app.rt->master, tempo);
-    cbox_master_set_timesig(app.rt->master, bpb, 4);
+    cbox_master_set_tempo(app.engine->master, tempo);
+    cbox_master_set_timesig(app.engine->master, bpb, 4);
 
     if (output_name && scene)
     {
@@ -304,16 +307,16 @@ int main(int argc, char *argv[])
     }
     cbox_rt_start(app.rt, NULL);
     if (drum_pattern_name)
-        cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load(app.rt->master->song, drum_pattern_name, 1));
+        cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_load(app.engine->master->song, drum_pattern_name, 1));
     else if (drum_track_name)
-        cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_load_track(app.rt->master->song, drum_track_name, 1));
+        cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_load_track(app.engine->master->song, drum_track_name, 1));
     else if (metronome)
-        cbox_song_use_looped_pattern(app.rt->master->song, cbox_midi_pattern_new_metronome(app.rt->master->song, app.rt->master->timesig_nom));
+        cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_new_metronome(app.engine->master->song, app.engine->master->timesig_nom));
     
     gboolean has_song = drum_pattern_name || drum_track_name || metronome;
     if (play_immediately == 1 || (play_immediately != -1 && has_song))
-        cbox_master_play(app.rt->master);
-    cbox_rt_set_scene(app.rt, scene);
+        cbox_master_play(app.engine->master);
+    cbox_engine_set_scene(app.engine, scene);
 #if USE_PYTHON
     if (script_name)
         cbox_script_run(script_name);
@@ -334,7 +337,7 @@ int main(int argc, char *argv[])
         } while(1);
         fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) &~ O_NONBLOCK);
     }
-    scene = cbox_rt_set_scene(app.rt, NULL);
+    scene = cbox_engine_set_scene(app.engine, NULL);
     cbox_rt_stop(app.rt);
     if (!no_io)
         cbox_io_close(&app.io);
@@ -345,14 +348,15 @@ fail:
 ok:
     if (error)
         g_error_free(error);
-    if (app.rt->effect)
+    if (app.engine->effect)
     {
-        CBOX_DELETE(app.rt->effect);
-        app.rt->effect = NULL;
+        CBOX_DELETE(app.engine->effect);
+        app.engine->effect = NULL;
     }
     if (scene)
         CBOX_DELETE(scene);
     
+    CBOX_DELETE(app.engine);
     CBOX_DELETE(app.rt);
     
     if (cbox_wavebank_get_maxbytes() > 0)

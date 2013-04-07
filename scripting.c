@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "app.h"
 #include "blob.h"
+#include "engine.h"
 #include "errors.h"
 #include "scripting.h"
 #include <assert.h>
@@ -318,7 +319,9 @@ static PyObject *cbox_python_init_engine(PyObject *self, PyObject *args)
  
     cbox_dom_init();
     app.document = cbox_document_new();
-    app.rt = cbox_rt_new(app.document);    
+    app.rt = cbox_rt_new(app.document);
+    app.engine = cbox_engine_new(app.rt);
+    app.rt->engine = app.engine;
     cbox_config_init(config_file);
     cbox_wavebank_init();
     engine_initialised = 1;
@@ -334,6 +337,7 @@ static PyObject *cbox_python_shutdown_engine(PyObject *self, PyObject *args)
     if (!engine_initialised)
         return PyErr_Format(PyExc_Exception, "Engine not initialised");
     
+    CBOX_DELETE(app.engine);
     CBOX_DELETE(app.rt);
     cbox_document_destroy(app.document);
     cbox_wavebank_close();
@@ -366,7 +370,7 @@ static PyObject *cbox_python_start_audio(PyObject *self, PyObject *args)
         return PyErr_Format(PyExc_IOError, "Cannot initialise sound I/O: %s", (error && error->message) ? error->message : "Unknown error");
 
     cbox_rt_set_io(app.rt, &app.io);
-    cbox_rt_set_scene(app.rt, cbox_scene_new(app.document, app.rt, FALSE));
+    cbox_engine_set_scene(app.engine, cbox_scene_new(app.document, app.rt, FALSE));
     cbox_rt_start(app.rt, (callback && callback != Py_None) ? &target : NULL);
     audio_running = TRUE;
 
@@ -390,7 +394,7 @@ static PyObject *cbox_python_start_noaudio(PyObject *self, PyObject *args)
         cbox_command_target_init(&target, bridge_to_python_callback, callback);
 
     cbox_rt_set_offline(app.rt, sample_rate, 1024);
-    cbox_rt_set_scene(app.rt, cbox_scene_new(app.document, app.rt, FALSE));
+    cbox_engine_set_scene(app.engine, cbox_scene_new(app.document, app.rt, FALSE));
     cbox_rt_start(app.rt, (callback && callback != Py_None) ? &target : NULL);
     audio_running = TRUE;
 
@@ -407,7 +411,7 @@ static PyObject *cbox_python_stop_audio(PyObject *self, PyObject *args)
     if (!audio_running)
         return PyErr_Format(PyExc_Exception, "Audio not running");
 
-    cbox_rt_set_scene(app.rt, NULL);
+    cbox_engine_set_scene(app.engine, NULL);
     cbox_rt_stop(app.rt);
     cbox_io_close(&app.io);
     audio_running = FALSE;

@@ -272,8 +272,8 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
         return cbox_execute_on(fb, NULL, "/client_type", "s", error, "USB") &&
             cbox_execute_on(fb, NULL, "/audio_inputs", "i", error, io->input_count) &&
             cbox_execute_on(fb, NULL, "/audio_outputs", "i", error, io->output_count) &&
-            cbox_execute_on(fb, NULL, "/sample_rate", "i", error, cbox_io_get_sample_rate(io)) &&
-            cbox_execute_on(fb, NULL, "/buffer_size", "i", error, io->buffer_size);
+            cbox_execute_on(fb, NULL, "/sample_rate", "i", error, io->io_env.srate) &&
+            cbox_execute_on(fb, NULL, "/buffer_size", "i", error, io->io_env.buffer_size);
     }
     else if (io->impl->createmidiinfunc && !strcmp(cmd->command, "/create_midi_input") && !strcmp(cmd->arg_types, "s"))
     {

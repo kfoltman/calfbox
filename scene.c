@@ -735,7 +735,7 @@ static struct cbox_instrument *create_instrument(struct cbox_scene *scene, struc
     instr->aux_output_count = auxes;
 
     for (int i = 0; i < module->outputs / 2; i ++)
-        cbox_instrument_output_init(&instr->outputs[i], scene, cbox_rt_get_buffer_size(module->rt));
+        cbox_instrument_output_init(&instr->outputs[i], scene, module->rt->io_env.buffer_size);
     
     return instr;
 }
@@ -884,7 +884,7 @@ static struct cbox_recording_source *create_rec_sources(struct cbox_scene *scene
 {
     struct cbox_recording_source *s = malloc(sizeof(struct cbox_recording_source) * count);
     for (int i = 0; i < count; i++)
-        cbox_recording_source_init(&s[i], scene, io->buffer_size, channels);
+        cbox_recording_source_init(&s[i], scene, io->io_env.buffer_size, channels);
     return s;
 }
 

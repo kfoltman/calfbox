@@ -121,9 +121,10 @@ static void calc_output_buffer(struct cbox_usb_io_impl *uii)
         clock_gettime(CLOCK_THREAD_CPUTIME_ID, &tvs2);
     }
     struct cbox_io *io = uii->ioi.pio;
+    uint32_t buffer_size = io->io_env.buffer_size;
     for (int b = 0; b < uii->output_channels; b++)
-        memset(io->output_buffers[b], 0, io->buffer_size * sizeof(float));
-    io->cb->process(io->cb->user_data, io, io->buffer_size);
+        memset(io->output_buffers[b], 0, buffer_size * sizeof(float));
+    io->cb->process(io->cb->user_data, io, buffer_size);
     for (GList *p = uii->rt_midi_ports; p; p = p->next)
     {
         struct cbox_usb_midi_interface *umi = p->data;
@@ -151,6 +152,7 @@ static void calc_output_buffer(struct cbox_usb_io_impl *uii)
 static void fill_playback_buffer(struct cbox_usb_io_impl *uii, struct libusb_transfer *transfer)
 {
     struct cbox_io *io = uii->ioi.pio;
+    uint32_t buffer_size = io->io_env.buffer_size;
     uint8_t *data8 = (uint8_t*)transfer->buffer;
     int16_t *data = (int16_t*)transfer->buffer;
     int resolution = uii->output_resolution;
@@ -161,13 +163,13 @@ static void fill_playback_buffer(struct cbox_usb_io_impl *uii, struct libusb_tra
 
     for (i = 0; i < nframes; )
     {
-        if (rptr == io->buffer_size)
+        if (rptr == buffer_size)
         {
             calc_output_buffer(uii);
             rptr = 0;
         }
         int left1 = nframes - i;
-        int left2 = io->buffer_size - rptr;
+        int left2 = buffer_size - rptr;
         if (left1 > left2)
             left1 = left2;
 
@@ -547,7 +549,7 @@ void usbio_start_audio_playback(struct cbox_usb_io_impl *uii)
 {
     uii->desync = 0;
     uii->samples_played = 0;
-    uii->read_ptr = uii->ioi.pio->buffer_size;
+    uii->read_ptr = uii->ioi.pio->io_env.buffer_size;
     
     uii->playback_transfers = malloc(sizeof(struct libusb_transfer *) * uii->playback_buffers);
     uii->sync_transfers = malloc(sizeof(struct libusb_transfer *) * uii->sync_buffers);
