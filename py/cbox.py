@@ -668,7 +668,7 @@ class DocLayer(DocObj):
         fixed_note = SettableProperty(int)
         in_channel = SettableProperty(int)
         out_channel = SettableProperty(int)
-        aftertouch = SettableProperty(bool)
+        disable_aftertouch = SettableProperty(bool)
         invert_sustain = SettableProperty(bool)
         consume = SettableProperty(bool)
         ignore_scene_transpose = SettableProperty(bool)
