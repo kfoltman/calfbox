@@ -110,6 +110,8 @@ def new_get_things(obj, cmd, settermap, args):
         try:
             if cmd2 in settermap:
                 settermap[cmd2](obj, args2)
+            elif cmd2 != '/uuid': # Ignore UUID as it's usually safe to do so
+                print ("Unexpected command: %s" % cmd2)
         except Exception as error:
             traceback.print_exc()
             raise
@@ -170,7 +172,7 @@ class DictAdderWithConversion:
     def __call__(self, obj, args):
         getattr(obj, self.property)[self.keytype(args[0])] = self.valueextractor(args[1:])
 
-def _create_unmarshaller(name, fields_to_unmarshall, base_type):
+def _create_unmarshaller(name, base_type, object_wrapper = False):
     status_fields = []
     all_decorators = {}
     prop_types = {}
@@ -178,10 +180,10 @@ def _create_unmarshaller(name, fields_to_unmarshall, base_type):
     if type_wrapper_debug:
         print ("Wrapping type: %s" % name)
         print ("-----")
-    for prop in dir(fields_to_unmarshall):
+    for prop in dir(base_type):
         if prop.startswith("__"):
             continue
-        value = getattr(fields_to_unmarshall, prop)
+        value = getattr(base_type, prop)
         decorators = []
         propcmd = '/' + prop
         if type(value) is list or type(value) is dict:
@@ -221,15 +223,17 @@ def _create_unmarshaller(name, fields_to_unmarshall, base_type):
             raise ValueError("Don't know what to do with %s property '%s' of type %s" % (name, prop, repr(value)))
         all_decorators[prop] = decorators
         prop_types[prop] = value
-    fields_to_unmarshall.__str__ = lambda self: (str(name) + ":" + " ".join(["%s=%s" % (v.property, repr(getattr(self, v.property))) for v in settermap.values()]))
+    base_type.__str__ = lambda self: (str(name) + ":" + " ".join(["%s=%s" % (v.property, repr(getattr(self, v.property))) for v in settermap.values()]))
     if type_wrapper_debug:
         print ("")
-    cmdwrapper = lambda cmd: (lambda self: new_get_things(base_type(), self.path + cmd, settermap, []))
     def exec_cmds(o):
         for propname, decorators in all_decorators.items():
             for decorator in decorators:
                 decorator.execute(propname, prop_types[propname], o)
-    return exec_cmds, cmdwrapper
+    if object_wrapper:
+        return exec_cmds, lambda cmd: (lambda self, *args: new_get_things(base_type(), self.path + cmd, settermap, list(args)))
+    else:
+        return lambda cmd, *args: new_get_things(base_type(), cmd, settermap, list(args))
 
 class CboxObjMetaclass(type):
     """Metaclass that creates Python wrapper classes for various C-side objects.
@@ -237,7 +241,7 @@ class CboxObjMetaclass(type):
     fields of Status inner class on status() calls."""
     def __new__(cls, name, bases, namespace, **kwds):
         status_class = namespace['Status']
-        classfinaliser, cmdwrapper = _create_unmarshaller(name, status_class, status_class)
+        classfinaliser, cmdwrapper = _create_unmarshaller(name, status_class, True)
         result = type.__new__(cls, name, bases, namespace, **kwds)
         classfinaliser(result)
         result.status = cmdwrapper('/status')        
@@ -289,6 +293,10 @@ class VarPath:
 ###############################################################################
 
 class Config:
+    class KeysUnmarshaller:
+        keys = [str]
+    keys_unmarshaller = _create_unmarshaller('Config.keys()', KeysUnmarshaller)
+
     """INI file manipulation class."""
     @staticmethod
     def sections(prefix = ""):
@@ -298,7 +306,7 @@ class Config:
     @staticmethod
     def keys(section, prefix = ""):
         """Return a list of configuration keys in a section, with optional prefix filtering."""
-        return GetThings('/config/keys', ['*key'], [str(section), str(prefix)]).key
+        return Config.keys_unmarshaller('/config/keys', str(section), str(prefix)).keys
 
     @staticmethod
     def get(section, key):
