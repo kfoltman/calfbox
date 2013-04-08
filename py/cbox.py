@@ -689,7 +689,7 @@ class SamplerEngine(NonDocObj):
         """GM pan (14-bit) per MIDI channel."""
         pan = {int:int}
         """Current number of voices playing per MIDI channel."""
-        channel_voices = {int:int}
+        channel_voices = AltPropName('/channel_voices', {int:int})
         """MIDI channel -> (program number, program name)"""
         patches = {int:(int, str)}
 
