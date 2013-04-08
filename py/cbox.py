@@ -118,8 +118,6 @@ def new_get_things(obj, cmd, settermap, args):
         setattr(obj, setterobj.property, setterobj.init_value())
     # Call command and apply callback commands via setters to the object
     do_cmd(cmd, update_callback, args)
-    strmethod = lambda self: (str(self.__class__) + ":" + " ".join(["%s=%s" % (v.property, repr(getattr(self, v.property))) for v in settermap.values()]))
-    obj.__str__ = strmethod.__get__(obj, obj.__class__)
     return obj
 
 def _convert_single(t, value):
@@ -246,6 +244,7 @@ class CboxObjMetaclass(type):
             for decorator in decorators:
                 decorator.execute(propname, prop_types[propname], result)
         result.status = lambda self: new_get_things(self.Status(), self.path + '/status', self.settermap, [])
+        result.Status.__str__ = lambda self: (str(name) + ":" + " ".join(["%s=%s" % (v.property, repr(getattr(self, v.property))) for v in settermap.values()]))
 
         if type_wrapper_debug:
             print ("")
