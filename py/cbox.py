@@ -170,73 +170,77 @@ class DictAdderWithConversion:
     def __call__(self, obj, args):
         getattr(obj, self.property)[self.keytype(args[0])] = self.valueextractor(args[1:])
 
+def _create_unmarshaller(name, fields_to_unmarshall, base_type):
+    status_fields = []
+    all_decorators = {}
+    prop_types = {}
+    settermap = {}
+    if type_wrapper_debug:
+        print ("Wrapping type: %s" % name)
+        print ("-----")
+    for prop in dir(fields_to_unmarshall):
+        if prop.startswith("__"):
+            continue
+        value = getattr(fields_to_unmarshall, prop)
+        decorators = []
+        propcmd = '/' + prop
+        if type(value) is list or type(value) is dict:
+            if propcmd.endswith('s'):
+                if propcmd.endswith('es'):
+                    propcmd = propcmd[:-2]
+                else:
+                    propcmd = propcmd[:-1]
+        while isinstance(value, PropertyDecorator):
+            decorators.append(value)
+            propcmd = value.map_cmd(propcmd)
+            value = value.get_base()
+        
+        def _make_decoder(t):
+            if type(t) is tuple:
+                return _make_args_to_tuple_of_types_lambda(t)
+            else:
+                return _make_args_to_type_lambda(t)
+        
+        if type(value) in [type, CboxObjMetaclass, tuple]:
+            if type_wrapper_debug:
+                print ("%s is type %s" % (prop, repr(value)))
+            status_fields.append(prop)
+            settermap[propcmd] = SetterWithConversion(prop, _make_decoder(value))
+        elif type(value) is dict:
+            assert(len(value) == 1)
+            value = list(value.items())[0]
+            if type_wrapper_debug:
+                print ("%s is type: %s -> %s" % (prop, repr(value[0]), repr(value[1])))
+            settermap[propcmd] = DictAdderWithConversion(prop, value[0], _make_decoder(value[1]))
+        elif type(value) is list:
+            assert(len(value) == 1)
+            if type_wrapper_debug:
+                print ("%s is array of %s" % (prop, repr(value)))
+            settermap[propcmd] = ListAdderWithConversion(prop, _make_decoder(value[0]))
+        else:
+            raise ValueError("Don't know what to do with %s property '%s' of type %s" % (name, prop, repr(value)))
+        all_decorators[prop] = decorators
+        prop_types[prop] = value
+    fields_to_unmarshall.__str__ = lambda self: (str(name) + ":" + " ".join(["%s=%s" % (v.property, repr(getattr(self, v.property))) for v in settermap.values()]))
+    if type_wrapper_debug:
+        print ("")
+    cmdwrapper = lambda cmd: (lambda self: new_get_things(base_type(), self.path + cmd, settermap, []))
+    def exec_cmds(o):
+        for propname, decorators in all_decorators.items():
+            for decorator in decorators:
+                decorator.execute(propname, prop_types[propname], o)
+    return exec_cmds, cmdwrapper
+
 class CboxObjMetaclass(type):
     """Metaclass that creates Python wrapper classes for various C-side objects.
     This class is responsible for automatically marshalling and type-checking/converting
     fields of Status inner class on status() calls."""
     def __new__(cls, name, bases, namespace, **kwds):
         status_class = namespace['Status']
-        status_fields = []
-        all_decorators = {}
-        prop_types = {}
-        settermap = {}
-        if type_wrapper_debug:
-            print ("Wrapping type: %s" % name)
-            print ("-----")
-        for prop in dir(status_class):
-            if prop.startswith("__"):
-                continue
-            value = getattr(status_class, prop)
-            decorators = []
-            propcmd = '/' + prop
-            if type(value) is list or type(value) is dict:
-                if propcmd.endswith('s'):
-                    if propcmd.endswith('es'):
-                        propcmd = propcmd[:-2]
-                    else:
-                        propcmd = propcmd[:-1]
-            while isinstance(value, PropertyDecorator):
-                decorators.append(value)
-                propcmd = value.map_cmd(propcmd)
-                value = value.get_base()
-            
-            def _make_decoder(t):
-                if type(t) is tuple:
-                    return _make_args_to_tuple_of_types_lambda(t)
-                else:
-                    return _make_args_to_type_lambda(t)
-            
-            if type(value) in [type, CboxObjMetaclass, tuple]:
-                if type_wrapper_debug:
-                    print ("%s is type %s" % (prop, repr(value)))
-                status_fields.append(prop)
-                settermap[propcmd] = SetterWithConversion(prop, _make_decoder(value))
-            elif type(value) is dict:
-                assert(len(value) == 1)
-                value = list(value.items())[0]
-                if type_wrapper_debug:
-                    print ("%s is type: %s -> %s" % (prop, repr(value[0]), repr(value[1])))
-                settermap[propcmd] = DictAdderWithConversion(prop, value[0], _make_decoder(value[1]))
-            elif type(value) is list:
-                assert(len(value) == 1)
-                if type_wrapper_debug:
-                    print ("%s is array of %s" % (prop, repr(value)))
-                settermap[propcmd] = ListAdderWithConversion(prop, _make_decoder(value[0]))
-            else:
-                raise ValueError("Don't know what to do with %s property '%s' of type %s" % (name, prop, repr(value)))
-            all_decorators[prop] = decorators
-            prop_types[prop] = value
+        classfinaliser, cmdwrapper = _create_unmarshaller(name, status_class, status_class)
         result = type.__new__(cls, name, bases, namespace, **kwds)
-        result.status_field_list = status_fields
-        result.settermap = settermap
-        for propname, decorators in all_decorators.items():
-            for decorator in decorators:
-                decorator.execute(propname, prop_types[propname], result)
-        result.status = lambda self: new_get_things(self.Status(), self.path + '/status', self.settermap, [])
-        result.Status.__str__ = lambda self: (str(name) + ":" + " ".join(["%s=%s" % (v.property, repr(getattr(self, v.property))) for v in settermap.values()]))
-
-        if type_wrapper_debug:
-            print ("")
+        classfinaliser(result)
+        result.status = cmdwrapper('/status')        
         return result
 
 class NonDocObj(object, metaclass = CboxObjMetaclass):
@@ -245,13 +249,8 @@ class NonDocObj(object, metaclass = CboxObjMetaclass):
     This covers various singletons and inner objects (e.g. engine in instrument)."""
     class Status:
         pass
-    def __init__(self, path, status_field_list = None):
-        if status_field_list is None:
-            status_field_list = self.status_field_list
+    def __init__(self, path):
         self.path = path
-        self.status_fields = []
-        for sf in status_field_list:
-            self.status_fields.append(sf)
 
     def cmd(self, cmd, fb = None, *args):
         do_cmd(self.path + cmd, fb, list(args))
@@ -269,8 +268,8 @@ class DocObj(NonDocObj):
     """Root class for all wrapper classes that wrap first-class document objects."""
     class Status:
         pass
-    def __init__(self, uuid, status_field_list = None):
-        NonDocObj.__init__(self, Document.uuid_cmd(uuid, ''), status_field_list)
+    def __init__(self, uuid):
+        NonDocObj.__init__(self, Document.uuid_cmd(uuid, ''))
         self.uuid = uuid
 
     def delete(self):
