@@ -277,12 +277,6 @@ class NonDocObj(object, metaclass = CboxObjMetaclass):
     def make_path(self, path):
         return self.path + path
 
-    #def status(self):
-    #    return self.transform_status(self.get_things("/status", self.status_fields))
-        
-    def transform_status(self, status):
-        return status
-
 class DocObj(NonDocObj):
     """Root class for all wrapper classes that wrap first-class document objects."""
     class Status:
@@ -588,15 +582,8 @@ class DocTrackClip(DocObj):
         pattern = DocPattern
     def __init__(self, uuid):
         DocObj.__init__(self, uuid)
-    def transform_status(self, status):
-        return ClipItem(status.pos, status.offset, status.length, status.pattern, status.uuid)
 Document.classmap['cbox_track_item'] = DocTrackClip
         
-class DocTrackStatus:
-    name = None
-    clips = None
-    external_output = None
-    
 class DocTrack(DocObj):
     class Status:
         clips = [ClipItem]
@@ -604,12 +591,6 @@ class DocTrack(DocObj):
         external_output = SettableProperty(int)
     def add_clip(self, pos, offset, length, pattern):
         return self.cmd_makeobj("/add_clip", int(pos), int(offset), int(length), pattern.uuid)
-    def transform_status(self, status):
-        res = DocTrackStatus()
-        res.name = status.name
-        res.clips = [ClipItem(*c) for c in status.clip]
-        res.external_output = status.external_output
-        return res
 Document.classmap['cbox_track'] = DocTrack
 
 class TrackItem:
@@ -666,13 +647,6 @@ class DocSong(DocObj):
         track.add_clip(0, 0, length, pat)
         self.set_loop(0, length)
         self.update_playback()
-        
-    def transform_status(self, status):
-        res = DocSongStatus()
-        res.tracks = [TrackItem(*t) for t in status.track]
-        res.patterns = [PatternItem(*t) for t in status.pattern]
-        res.mtis = [tuple(t) for t in status.mti]
-        return res
     def update_playback(self):
         # XXXKF Maybe make it a song-level API instead of global
         do_cmd("/update_playback", None, [])
@@ -750,9 +724,6 @@ class SamplerEngine(NonDocObj):
     def get_patches(self):
         """Return a map of program identifiers to program objects."""
         return self.get_things("/patches", ['%patch']).patch
-    def transform_status(self, status):
-        status.patches = status.patch
-        return status
 
 class FluidsynthEngine(NonDocObj):
     class Status:
@@ -767,9 +738,6 @@ class FluidsynthEngine(NonDocObj):
         self.cmd("/polyphony", None, int(polyphony))
     def get_patches(self):
         return self.get_things("/patches", ['%patch']).patch
-    def transform_status(self, status):
-        status.patches = status.patch
-        return status
 
 class StreamPlayerEngine(NonDocObj):
     class Status:
@@ -810,9 +778,6 @@ engine_classes = {
 class DocAuxBus(DocObj):
     class Status:
         name = str
-    #def transform_status(self, status):
-    #    status.slot = Document.map_uuid(status.slot_uuid)
-    #    return status
     def get_slot_engine(self):
         return self.cmd_makeobj("/slot/engine/get_uuid")
     def get_slot_status(self):
@@ -862,15 +827,11 @@ class DocRt(DocObj):
     class Status:
         audio_channels = (int, int)
         state = (int, str)
-    def __init__(self, uuid):
-        DocObj.__init__(self, uuid, [])
 Document.classmap['cbox_rt'] = DocRt
 
 class DocModule(DocObj):
     class Status:
         pass
-    def __init__(self, uuid):
-        DocObj.__init__(self, uuid, [])
 Document.classmap['cbox_module'] = DocModule
     
 class SamplerProgram(DocObj):
