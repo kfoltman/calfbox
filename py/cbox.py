@@ -120,51 +120,40 @@ def new_get_things(obj, cmd, settermap, args):
     do_cmd(cmd, update_callback, args)
     return obj
 
-def _convert_single(t, value):
-    """Convert a single value to a specified type (basic type or wrapper class)"""
+def _handle_object_wrapping(t):
     if type(t) is CboxObjMetaclass:
-        if type(value) is list:
-            assert len(value) == 1, "Value is a list: %s, not single item of type %s" % (value, t)
-            value = Document.map_uuid(value[0])
-        else:
-            value = Document.map_uuid(value)
-        assert isinstance(value, t), "Value is %s, not %s" % (type(value), t)
-        return value
-    if type(value) is list:
-        return t(*value)
-    return t(value)
-
-def _convert_tuple(conversions, value):
-    """Convert a tuple of values to a specified type."""
-    assert len(conversions) == len(value), "Conversion list is %s, value list is %s" % (repr(conversions), repr(value))
-    return tuple([_convert_single(conversions[i], value[i]) for i in range(len(conversions))])
+        return lambda uuid: Document.map_uuid_and_check(uuid, t)
+    return t
+def _make_args_to_type_lambda(t):
+    t = _handle_object_wrapping(t)
+    return lambda args: t(*args)
+def _make_args_to_tuple_of_types_lambda(ts):
+    ts = list(map(_handle_object_wrapping, ts))
+    return lambda args: tuple([ts[i](args[i]) for i in range(max(len(ts), len(args)))])
 
 class SetterWithConversion:
     """A setter object class that sets a specific property to a typed value or a tuple of typed value."""
-    def __init__(self, property, conversions):
+    def __init__(self, property, extractor):
         self.property = property
-        self.conversions = conversions
+        self.extractor = extractor
     def init_value(self):
         return None
     def __call__(self, obj, args):
         # print ("Setting attr %s on object %s" % (self.property, obj))
-        setattr(obj, self.property, _convert_tuple(self.conversions, args)[0])
+        setattr(obj, self.property, self.extractor(args))
 
 class ListAdderWithConversion:
     """A setter object class that adds a tuple filled with type-converted arguments of the
     callback to a list. E.g. ListAdderWithConversion('foo', (int, int))(obj, [1,2])
     adds a tuple: (int(1), int(2)) to the list obj.foo"""
 
-    def __init__(self, property, types):
+    def __init__(self, property, extractor):
         self.property = property
-        self.types = types
+        self.extractor = extractor
     def init_value(self):
         return []
     def __call__(self, obj, args):
-        if type(self.types) is tuple:
-            getattr(obj, self.property).append(_convert_tuple(self.types, args))
-        else:
-            getattr(obj, self.property).append(_convert_single(self.types, args))
+        getattr(obj, self.property).append(self.extractor(args))
 
 class DictAdderWithConversion:
     """A setter object class that adds a tuple filled with type-converted
@@ -172,17 +161,14 @@ class DictAdderWithConversion:
     i.e. DictAdderWithConversion('foo', str, (int, int))(obj, ['bar',1,2]) adds
     a tuple: (int(1), int(2)) under key 'bar' to obj.foo"""
 
-    def __init__(self, property, keytype, types):
+    def __init__(self, property, keytype, valueextractor):
         self.property = property
         self.keytype = keytype
-        self.types = types
+        self.valueextractor = valueextractor
     def init_value(self):
         return {}
     def __call__(self, obj, args):
-        if type(self.types) is tuple:
-            getattr(obj, self.property)[_convert_single(self.keytype, args[0])] = _convert_tuple(self.types, args[1:])
-        else:
-            getattr(obj, self.property)[_convert_single(self.keytype, args[0])] = _convert_single(self.types, args[1])
+        getattr(obj, self.property)[self.keytype(args[0])] = self.valueextractor(args[1:])
 
 class CboxObjMetaclass(type):
     """Metaclass that creates Python wrapper classes for various C-side objects.
@@ -213,26 +199,29 @@ class CboxObjMetaclass(type):
                 decorators.append(value)
                 propcmd = value.map_cmd(propcmd)
                 value = value.get_base()
-            if type(value) in [type, CboxObjMetaclass]:
+            
+            def _make_decoder(t):
+                if type(t) is tuple:
+                    return _make_args_to_tuple_of_types_lambda(t)
+                else:
+                    return _make_args_to_type_lambda(t)
+            
+            if type(value) in [type, CboxObjMetaclass, tuple]:
                 if type_wrapper_debug:
                     print ("%s is type %s" % (prop, repr(value)))
                 status_fields.append(prop)
-                settermap[propcmd] = SetterWithConversion(prop, (value, ))
+                settermap[propcmd] = SetterWithConversion(prop, _make_decoder(value))
             elif type(value) is dict:
                 assert(len(value) == 1)
                 value = list(value.items())[0]
                 if type_wrapper_debug:
                     print ("%s is type: %s -> %s" % (prop, repr(value[0]), repr(value[1])))
-                settermap[propcmd] = DictAdderWithConversion(prop, value[0], value[1])
+                settermap[propcmd] = DictAdderWithConversion(prop, value[0], _make_decoder(value[1]))
             elif type(value) is list:
                 assert(len(value) == 1)
                 if type_wrapper_debug:
                     print ("%s is array of %s" % (prop, repr(value)))
-                settermap[propcmd] = ListAdderWithConversion(prop, value[0])
-            elif type(value) is tuple:
-                if type_wrapper_debug:
-                    print ("%s is a tuple: %s" % (prop, repr(value)))
-                settermap[propcmd] = SetterWithConversion(prop, value)
+                settermap[propcmd] = ListAdderWithConversion(prop, _make_decoder(value[0]))
             else:
                 raise ValueError("Don't know what to do with %s property '%s' of type %s" % (name, prop, repr(value)))
             all_decorators[prop] = decorators
@@ -548,6 +537,12 @@ class Document:
         Document.objmap[uuid] = o
         if hasattr(o, 'init_object'):
             o.init_object()
+        return o
+    @staticmethod
+    def map_uuid_and_check(uuid, t):
+        o = Document.map_uuid(uuid)
+        if not isinstance(o, t):
+            raise TypeError("UUID %s is of type %s, expected %s" % (uuid, o.__class__, t))
         return o
 
 class DocPattern(DocObj):
