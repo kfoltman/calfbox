@@ -67,7 +67,7 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(layers[0].status().enable, 1)
         
         layer_status = layers[0].status()
-        instr_uuid = layer_status.instrument_uuid
+        instr_uuid = layer_status.instrument.uuid
         iname = layer_status.instrument_name
         self.assertEqual(iname, 'test_instr')
         self.verify_uuid(instr_uuid, "cbox_instrument", "/scene/instr/%s" % iname)
@@ -98,7 +98,7 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(layers[0].status().enable, 1)
         
         layer_status = layers[0].status()
-        instr_uuid = layer_status.instrument_uuid
+        instr_uuid = layer_status.instrument.uuid
         iname = layer_status.instrument_name
         self.verify_uuid(instr_uuid, "cbox_instrument", scene.make_path("/instr/%s" % iname))
         
@@ -169,7 +169,7 @@ class TestCbox(unittest.TestCase):
             self.assertTrue([11,64] not in program.get_control_inits())
         self.assertEqual(patches_dict, {0 : ('test_sampler_api', 2)})
         region = Document.map_uuid(region_uuid)
-        group = Document.map_uuid(region.status().parent_group)
+        group = region.status().parent_group
         self.assertTrue("resonance=3" in group.as_string())
         region.set_param("cutoff", 9000)
         self.assertTrue('cutoff=9000' in region.as_string())
@@ -190,7 +190,7 @@ class TestCbox(unittest.TestCase):
         scene.clear()
         scene.add_new_instrument_layer("temporary", "sampler")
         layer = scene.status().layers[0]
-        instr = Document.map_uuid(layer.status().instrument_uuid)
+        instr = layer.status().instrument
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [])
         
         meter_uuid = cbox.GetThings("/new_meter", ['uuid'], []).uuid
@@ -268,6 +268,7 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(clips, [cbox.ClipItem(192, 96, 48, pattern.uuid, clip2.uuid)])
 
     def test_mti(self):
+        MtiItem = cbox.MtiItem
         song = Document.get_song()
         song.clear()
         tp = song.status()
@@ -275,26 +276,26 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(tp.patterns, [])
         self.assertEqual(tp.mtis, [])
         song.set_mti(0, 120.0)
-        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0)])
+        self.assertEqual(song.status().mtis, [MtiItem(0, 120.0, 0, 0)])
         song.set_mti(60, 150.0)
-        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (60, 150.0, 0, 0)])
+        self.assertEqual(song.status().mtis, [MtiItem(0, 120.0, 0, 0), MtiItem(60, 150.0, 0, 0)])
         song.set_mti(90, 180.0)
-        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (60, 150.0, 0, 0), (90, 180.0, 0, 0)])
+        self.assertEqual(song.status().mtis, [MtiItem(0, 120.0, 0, 0), MtiItem(60, 150.0, 0, 0), MtiItem(90, 180.0, 0, 0)])
         song.set_mti(60, 180.0)
-        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (60, 180.0, 0, 0), (90, 180.0, 0, 0)])
+        self.assertEqual(song.status().mtis, [MtiItem(0, 120.0, 0, 0), MtiItem(60, 180.0, 0, 0), MtiItem(90, 180.0, 0, 0)])
         song.set_mti(65, 210.0)
-        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (60, 180.0, 0, 0), (65, 210.0, 0, 0), (90, 180.0, 0, 0)])
+        self.assertEqual(song.status().mtis, [MtiItem(0, 120.0, 0, 0), MtiItem(60, 180.0, 0, 0), MtiItem(65, 210.0, 0, 0), MtiItem(90, 180.0, 0, 0)])
 
         song.set_mti(60, 0.0, 0, 0)
-        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (65, 210.0, 0, 0), (90, 180.0, 0, 0)])
+        self.assertEqual(song.status().mtis, [MtiItem(0, 120.0, 0, 0), MtiItem(65, 210.0, 0, 0), MtiItem(90, 180.0, 0, 0)])
         song.set_mti(65, 0.0, 0, 0)
-        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (90, 180.0, 0, 0)])
+        self.assertEqual(song.status().mtis, [MtiItem(0, 120.0, 0, 0), MtiItem(90, 180.0, 0, 0)])
         song.set_mti(68, 0.0, 0, 0)
-        self.assertEqual(song.status().mtis, [(0, 120.0, 0, 0), (90, 180.0, 0, 0)])
+        self.assertEqual(song.status().mtis, [MtiItem(0, 120.0, 0, 0), MtiItem(90, 180.0, 0, 0)])
         song.set_mti(0, 0.0, 0, 0)
-        self.assertEqual(song.status().mtis, [(0, 0, 0, 0), (90, 180.0, 0, 0)])
+        self.assertEqual(song.status().mtis, [MtiItem(0, 0, 0, 0), MtiItem(90, 180.0, 0, 0)])
         song.set_mti(90, 0.0, 0, 0)
-        self.assertEqual(song.status().mtis, [(0, 0, 0, 0)])
+        self.assertEqual(song.status().mtis, [MtiItem(0, 0, 0, 0)])
         
     def test_error(self):
         thrown = False

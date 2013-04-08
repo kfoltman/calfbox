@@ -42,6 +42,8 @@ r2.set_param("sample", "*sqr")
 r2.set_param("transpose", "12")
 r2.set_param("gain_cc17", "-12")
 
+print(instrument.engine.status().__str__())
+
 print("Ready!")
 
 while True:
