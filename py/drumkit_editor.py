@@ -64,7 +64,7 @@ class KeyModelPath(object):
         model = self.controller.get_current_layer_model()
         oldval = model.attribs[self.var]
         model.attribs[self.var] = value
-        if value != oldval:
+        if value != oldval and not self.controller.no_sfz_update:
             print ("%s: set %s to %s" % (self.controller, self.var, value))
             self.controller.update_kit_later()
 
@@ -384,6 +384,7 @@ class EditorDialog(Gtk.Dialog):
         self.tree = FileView(self.dirs_model)
         self.layer_list = LayerListView(self)
         self.layer_editor = LayerEditor(self, self.bank_model)
+        self.no_sfz_update = False
         
         combo = Gtk.ComboBox(model = self.dirs_model)
         cell = Gtk.CellRendererText()
@@ -453,12 +454,16 @@ class EditorDialog(Gtk.Dialog):
         #    self.pad_editor.refresh()
         
     def refresh_layers(self):
-        if self.current_pad is not None:
-            self.layer_list.set_model(self.bank_model[self.current_pad.key])
-            self.layer_list.set_cursor(0)
-        else:
-            self.layer_list.set_model(None)
-        self.layer_editor.refresh()
+        try:
+            self.no_sfz_update = True
+            if self.current_pad is not None:
+                self.layer_list.set_model(self.bank_model[self.current_pad.key])
+                self.layer_list.set_cursor(0)
+            else:
+                self.layer_list.set_model(None)
+            self.layer_editor.refresh()
+        finally:
+            self.no_sfz_update = False
         
     def on_pad_selected(self, widget):
         self.current_pad = widget
