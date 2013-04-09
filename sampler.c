@@ -971,6 +971,7 @@ struct release_program_voices_data
     struct sampler_module *module;
     
     struct sampler_program *old_pgm, *new_pgm;
+    uint16_t channels_to_wait_for;
 };
 
 static int release_program_voices_execute(void *data)
@@ -981,10 +982,15 @@ static int release_program_voices_execute(void *data)
     
     for (int i = 0; i < 16; i++)
     {
+        uint16_t mask = 1 << i;
         struct sampler_channel *c = &m->channels[i];
         if (c->program == rpv->old_pgm || c->program == NULL)
         {
             sampler_channel_set_program_RT(c, rpv->new_pgm);
+            rpv->channels_to_wait_for |= mask;
+        }
+        if (rpv->channels_to_wait_for & mask)
+        {
             FOREACH_VOICE(c->voices_running, v)
             {
                 if (!m->deleting)
@@ -1011,7 +1017,7 @@ static void swap_program(struct sampler_module *m, int index, struct sampler_pro
     else
         cbox_rt_array_remove(m->module.rt, (void ***)&m->programs, &m->program_count, index);
 
-    struct release_program_voices_data data = {m, old_program, pgm};
+    struct release_program_voices_data data = {m, old_program, pgm, 0};
 
     cbox_rt_execute_cmd_sync(m->module.rt, &release_program_voices, &data);
     
