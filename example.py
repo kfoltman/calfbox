@@ -120,8 +120,7 @@ class SceneAuxBusesModel(Gtk.ListStore):
     def refresh(self, scene_status):
         self.clear()
         for aux_name, aux_obj in scene_status.auxes.items():
-            # XXXKF make slots more 1st class
-            slot = aux_obj.get_slot_status()
+            slot = aux_obj.slot.status()
             self.append((slot.insert_preset, slot.insert_engine))
 
 class SceneAuxBusesView(Gtk.TreeView):
@@ -320,7 +319,7 @@ class MainWindow(Gtk.Window):
         if rowid is None:
             return
         wclass = fx_gui.effect_window_map[row[1]]
-        popup = wclass("Aux: %s" % row[0], self, "/scene/aux/%d/engine" % rowid)
+        popup = wclass("Aux: %s" % row[0], self, "/scene/aux/%s/slot/engine" % row[0])
         popup.show_all()
         popup.present()
         

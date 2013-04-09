@@ -122,6 +122,8 @@ def new_get_things(obj, cmd, settermap, args):
     do_cmd(cmd, update_callback, args)
     return obj
 
+def _error_arg_mismatch(required, passed):
+    raise ValueError("Types required: %s, values passed: %s" % (repr(required), repr(passed)))
 def _handle_object_wrapping(t):
     if type(t) is CboxObjMetaclass:
         return lambda uuid: Document.map_uuid_and_check(uuid, t)
@@ -131,7 +133,7 @@ def _make_args_to_type_lambda(t):
     return lambda args: t(*args)
 def _make_args_to_tuple_of_types_lambda(ts):
     ts = list(map(_handle_object_wrapping, ts))
-    return lambda args: tuple([ts[i](args[i]) for i in range(max(len(ts), len(args)))])
+    return lambda args: tuple([ts[i](args[i]) for i in range(max(len(ts), len(args)))]) if len(ts) == len(args) else _error_arg_mismatch(ts, args)
 def _make_args_decoder(t):
     if type(t) is tuple:
         return _make_args_to_tuple_of_types_lambda(t)
@@ -809,13 +811,18 @@ engine_classes = {
     'tonewheel_organ' : TonewheelOrganEngine,
 }
 
+class EngineSlot(NonDocObj):
+    class Status:
+        insert_preset = str
+        insert_engine = str
+        bypass = bool
+    
 class DocAuxBus(DocObj):
     class Status:
         name = str
-    def get_slot_engine(self):
-        return self.cmd_makeobj("/slot/engine/get_uuid")
-    def get_slot_status(self):
-        return self.get_things("/slot/status", ["insert_preset", "insert_engine"])
+    def init_object(self):
+        self.slot = EngineSlot("/doc/uuid/" + self.uuid + "/slot")
+
 Document.classmap['cbox_aux_bus'] = DocAuxBus
 
 class DocScene(DocObj):
@@ -825,7 +832,7 @@ class DocScene(DocObj):
         transpose = int
         layers = [DocLayer]
         instruments = {str: (str, DocInstrument)}
-        auxes = {str: (str, str, DocAuxBus)}
+        auxes = {str: DocAuxBus}
     def clear(self):
         self.cmd("/clear", None)
     def load(self, name):
@@ -895,7 +902,7 @@ class SamplerLayer(DocObj):
         parent_program = SamplerProgram
         parent_group = DocObj
     def get_children(self):
-        return map(Document.map_uuid, self.get_things("/get_children", ['*region']).region)
+        return self.get_thing("/get_children", '/region', [SamplerLayer])
     def as_string(self):
         return self.get_thing("/as_string", '/value', str)
     def as_string_full(self):

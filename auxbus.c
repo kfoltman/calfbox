@@ -39,7 +39,7 @@ static gboolean cbox_aux_bus_process_cmd(struct cbox_command_target *ct, struct 
             CBOX_OBJECT_DEFAULT_STATUS(aux_bus, fb, error);
     }
     else 
-    if (!strncmp(cmd->command, "/slot/", 6) && !strcmp(cmd->arg_types, ""))
+    if (!strncmp(cmd->command, "/slot/", 6))
     {
         return cbox_module_slot_process_cmd(&aux_bus->module, fb, cmd, cmd->command + 5, CBOX_GET_DOCUMENT(aux_bus), rt, error);
     }
