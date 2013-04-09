@@ -880,7 +880,7 @@ class SamplerProgram(DocObj):
         g = self.get_things("/groups", ['*group', 'default_group'])
         return [Document.map_uuid(g.default_group)] + list(map(Document.map_uuid, g.group))
     def get_control_inits(self):
-        return self.get_things("/control_inits", ['*control_init']).control_init
+        return self.get_thing("/control_inits", '/control_init', [(int, int)])
     def new_group(self):
         return self.cmd_makeobj("/new_group")
     def add_control_init(self, controller, value):
