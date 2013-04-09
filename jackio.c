@@ -705,6 +705,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     jii->client = client;
     jii->rb_autoconnect = jack_ringbuffer_create(sizeof(jack_port_t *) * 128);
     jii->error_str = NULL;
+    io->io_env.srate = jack_get_sample_rate(client);
     
     jii->inputs = malloc(sizeof(jack_port_t *) * io->input_count);
     jii->outputs = malloc(sizeof(jack_port_t *) * io->output_count);
