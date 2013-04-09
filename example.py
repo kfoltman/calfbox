@@ -185,14 +185,14 @@ class MainWindow(Gtk.Window):
         ]))
         
         self.vbox.pack_start(self.menu_bar, False, False, 0)
-        rt = cbox.GetThings("/rt/status", ['audio_channels'], [])
+        rt_status = cbox.Document.get_rt().status()
         scene = cbox.Document.get_scene()
         self.nb = Gtk.Notebook()
         self.vbox.add(self.nb)
         self.nb.append_page(self.create_master(scene), Gtk.Label("Master"))
         self.status_bar = StatusBar()
         self.vbox.pack_start(self.status_bar, False, False, 0)
-        self.create_instrument_pages(scene.status(), rt)
+        self.create_instrument_pages(scene.status(), rt_status)
 
     def create_master(self, scene):
         scene_status = scene.status()
@@ -342,8 +342,7 @@ class MainWindow(Gtk.Window):
         cbox.Document.dump()
 
     def tools_wave_bank_dump(self, w):
-        waves = cbox.GetThings("/waves/list", ["*waveform"], [])
-        for w in waves.waveform:
+        for w in cbox.get_thing('/waves/list', '/waveform', [str]):
             info = cbox.GetThings("/waves/info", ["filename", "name", "bytes", "loop"], [w])
             print("%s: %d bytes, loop = %s" % (info.filename, info.bytes, info.loop))
 
@@ -400,22 +399,22 @@ class MainWindow(Gtk.Window):
 
     def refresh_instrument_pages(self, scene_status = None):
         self.delete_instrument_pages()
-        rt = cbox.GetThings("/rt/status", ['audio_channels'], [])
+        rt_status = cbox.Document.get_rt().status()
         if scene_status is None:
             scene_status = cbox.Document.get_scene().status()
         self.layers_model.refresh(scene_status)
         self.auxes_model.refresh(scene_status)
-        self.create_instrument_pages(scene_status, rt)
+        self.create_instrument_pages(scene_status, rt_status)
         self.nb.show_all()
         self.title_label.set_text(scene_status.title)
 
-    def create_instrument_pages(self, scene_status, rt):
+    def create_instrument_pages(self, scene_status, rt_status):
         self.path_widgets = {}
         self.path_popups = {}
         self.fx_choosers = {}
         
         outputs_ls = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_INT)
-        for out in range(0, rt.audio_channels[1]//2):
+        for out in range(0, rt_status.audio_channels[1]//2):
             outputs_ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
             
         auxbus_ls = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_STRING)
@@ -488,12 +487,12 @@ class MainWindow(Gtk.Window):
             
     def update(self):
         cbox.call_on_idle()
-        master = cbox.GetThings("/master/status", ['pos', 'pos_ppqn', 'tempo', 'timesig', 'sample_rate'], [])
+        master = cbox.Transport.status()
         if master.tempo is not None:
             self.master_info.set_markup('%s (%s)' % (master.pos, master.pos_ppqn))
             self.timesig_info.set_markup("%s/%s" % tuple(master.timesig))
             self.tempo_adj.set_value(master.tempo)
-        state = cbox.GetThings("/rt/status", ['state'], []).state
+        state = cbox.Document.get_rt().status().state
         self.status_bar.update(state[1], master.sample_rate)
         return True
 

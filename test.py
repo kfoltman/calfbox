@@ -121,12 +121,10 @@ class TestCbox(unittest.TestCase):
         patches = instrument.engine.get_patches()
         patches_dict = {}
         self.assertEqual(len(patches), 1)
-        for (patchid, patch) in patches.items():
-            patchname, patchuuid, patchchannelcount = patch
-            self.verify_uuid(patchuuid, 'sampler_program')
-            program = Document.map_uuid(patchuuid)
+        for (patchid, patchdata) in patches.items():
+            patchname, program, patchchannelcount = patchdata
             self.verify_uuid(program.uuid, 'sampler_program')
-            self.assertEqual(program.uuid, patchuuid)
+            self.assertEqual(program.status().program_no, patchid)
             self.assertEqual(program.status().name, 'test_sampler_api')
             self.assertEqual(program.status().sample_dir, '.')
             self.assertEqual(program.status().program_no, 0)

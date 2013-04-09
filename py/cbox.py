@@ -132,6 +132,40 @@ def _make_args_to_type_lambda(t):
 def _make_args_to_tuple_of_types_lambda(ts):
     ts = list(map(_handle_object_wrapping, ts))
     return lambda args: tuple([ts[i](args[i]) for i in range(max(len(ts), len(args)))])
+def _make_args_decoder(t):
+    if type(t) is tuple:
+        return _make_args_to_tuple_of_types_lambda(t)
+    else:
+        return _make_args_to_type_lambda(t)
+
+def get_thing(cmd, fieldcmd, datatype, *args):
+    if type(datatype) is list:
+        assert (len(datatype) == 1)
+        decoder = _make_args_decoder(datatype[0])
+        value = []
+        def adder(data):
+            value.append(decoder(data))
+    elif type(datatype) is dict:
+        assert (len(datatype) == 1)
+        key_type, value_type = list(datatype.items())[0]
+        key_decoder = _make_args_decoder(key_type)
+        value_decoder = _make_args_decoder(value_type)
+        value = {}
+        def adder(data):
+            value[key_decoder([data[0]])] = value_decoder(data[1:])
+    else:
+        decoder = _make_args_decoder(datatype)
+        def adder(data):
+            nonlocal value
+            value = decoder(data)
+        value = None
+    def callback(cmd2, fb, args2):
+        if cmd2 == fieldcmd:
+            adder(args2)
+        else:
+            print ("Unexpected command %s" % cmd2)
+    do_cmd(cmd, callback, list(args))
+    return value    
 
 class SetterWithConversion:
     """A setter object class that sets a specific property to a typed value or a tuple of typed value."""
@@ -172,57 +206,52 @@ class DictAdderWithConversion:
     def __call__(self, obj, args):
         getattr(obj, self.property)[self.keytype(args[0])] = self.valueextractor(args[1:])
 
-def _create_unmarshaller(name, base_type, object_wrapper = False):
-    status_fields = []
+def _type_properties(base_type):
+    return {prop: getattr(base_type, prop) for prop in dir(base_type) if not prop.startswith("__")}
+
+def _create_setter(prop, t):
+    if type(t) in [type, CboxObjMetaclass, tuple]:
+        if type_wrapper_debug:
+            print ("%s is type %s" % (prop, repr(t)))
+        return SetterWithConversion(prop, _make_args_decoder(t))
+    elif type(t) is dict:
+        assert(len(t) == 1)
+        tkey, tvalue = list(t.items())[0]
+        if type_wrapper_debug:
+            print ("%s is type: %s -> %s" % (prop, repr(tkey), repr(tvalue)))
+        return DictAdderWithConversion(prop, tkey, _make_args_decoder(tvalue))
+    elif type(t) is list:
+        assert(len(t) == 1)
+        if type_wrapper_debug:
+            print ("%s is array of %s" % (prop, repr(t[0])))
+        return ListAdderWithConversion(prop, _make_args_decoder(t[0]))
+    else:
+        raise ValueError("Don't know what to do with %s property '%s' of type %s" % (name, prop, repr(t)))
+
+def _create_unmarshaller(name, base_type, object_wrapper = False, property_grabber = _type_properties):
     all_decorators = {}
     prop_types = {}
     settermap = {}
     if type_wrapper_debug:
         print ("Wrapping type: %s" % name)
         print ("-----")
-    for prop in dir(base_type):
-        if prop.startswith("__"):
-            continue
-        value = getattr(base_type, prop)
+    for prop, proptype in property_grabber(base_type).items():
         decorators = []
         propcmd = '/' + prop
-        if type(value) is list or type(value) is dict:
+        if type(proptype) in [list, dict]:
             if propcmd.endswith('s'):
                 if propcmd.endswith('es'):
                     propcmd = propcmd[:-2]
                 else:
                     propcmd = propcmd[:-1]
-        while isinstance(value, PropertyDecorator):
-            decorators.append(value)
-            propcmd = value.map_cmd(propcmd)
-            value = value.get_base()
-        
-        def _make_decoder(t):
-            if type(t) is tuple:
-                return _make_args_to_tuple_of_types_lambda(t)
-            else:
-                return _make_args_to_type_lambda(t)
-        
-        if type(value) in [type, CboxObjMetaclass, tuple]:
-            if type_wrapper_debug:
-                print ("%s is type %s" % (prop, repr(value)))
-            status_fields.append(prop)
-            settermap[propcmd] = SetterWithConversion(prop, _make_decoder(value))
-        elif type(value) is dict:
-            assert(len(value) == 1)
-            value = list(value.items())[0]
-            if type_wrapper_debug:
-                print ("%s is type: %s -> %s" % (prop, repr(value[0]), repr(value[1])))
-            settermap[propcmd] = DictAdderWithConversion(prop, value[0], _make_decoder(value[1]))
-        elif type(value) is list:
-            assert(len(value) == 1)
-            if type_wrapper_debug:
-                print ("%s is array of %s" % (prop, repr(value)))
-            settermap[propcmd] = ListAdderWithConversion(prop, _make_decoder(value[0]))
-        else:
-            raise ValueError("Don't know what to do with %s property '%s' of type %s" % (name, prop, repr(value)))
+        while isinstance(proptype, PropertyDecorator):
+            decorators.append(proptype)
+            propcmd = proptype.map_cmd(propcmd)
+            proptype = proptype.get_base()
+
+        settermap[propcmd] = _create_setter(prop, proptype)
         all_decorators[prop] = decorators
-        prop_types[prop] = value
+        prop_types[prop] = proptype
     base_type.__str__ = lambda self: (str(name) + ":" + " ".join(["%s=%s" % (v.property, repr(getattr(self, v.property))) for v in settermap.values()]))
     if type_wrapper_debug:
         print ("")
@@ -247,6 +276,7 @@ class CboxObjMetaclass(type):
         result.status = cmdwrapper('/status')        
         return result
 
+
 class NonDocObj(object, metaclass = CboxObjMetaclass):
     """Root class for all wrapper classes that wrap objects that don't have 
     their own identity/UUID.
@@ -264,6 +294,9 @@ class NonDocObj(object, metaclass = CboxObjMetaclass):
 
     def get_things(self, cmd, fields, *args):
         return GetThings(self.path + cmd, fields, list(args))
+
+    def get_thing(self, cmd, fieldcmd, type, *args):
+        return get_thing(self.path + cmd, fieldcmd, type, *args)
 
     def make_path(self, path):
         return self.path + path
@@ -301,7 +334,7 @@ class Config:
     @staticmethod
     def sections(prefix = ""):
         """Return a list of configuration sections."""
-        return [CfgSection(name) for name in GetThings('/config/sections', ['*section'], [str(prefix)]).section]
+        return [CfgSection(name) for name in get_thing('/config/sections', '/section', [str], prefix)]
 
     @staticmethod
     def keys(section, prefix = ""):
@@ -311,7 +344,7 @@ class Config:
     @staticmethod
     def get(section, key):
         """Return a string value of a given key."""
-        return GetThings('/config/get', ['value'], [str(section), str(key)]).value
+        return get_thing('/config/get', '/value', str, str(section), str(key))
 
     @staticmethod
     def set(section, key, value):
@@ -375,10 +408,10 @@ class Transport:
         return GetThings("/master/tell", ['pos', 'pos_ppqn', 'playing'], [])
     @staticmethod
     def ppqn_to_samples(pos_ppqn):
-        return GetThings("/master/ppqn_to_samples", ['value'], [pos_ppqn]).value
+        return get_thing("/master/ppqn_to_samples", '/value', int, pos_ppqn)
     @staticmethod
     def samples_to_ppqn(pos_samples):
-        return GetThings("/master/samples_to_ppqn", ['value'], [pos_samples]).value
+        return get_thing("/master/samples_to_ppqn", '/value', int, pos_samples)
 
 # Currently responsible for both JACK and USB I/O - not all functionality is
 # supported by both.
@@ -438,13 +471,13 @@ class JackIO:
         do_cmd("/io/port_disconnect", None, [pfrom, pto])
     @staticmethod
     def get_ports(name_mask = ".*", type_mask = ".*", flag_mask = 0):
-        return GetThings("/io/get_ports", ['*port'], [name_mask, type_mask, int(flag_mask)]).port
+        return get_thing("/io/get_ports", '/port', [str], name_mask, type_mask, int(flag_mask))
 
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])
         
 def get_new_events():
-    return GetThings("/on_idle", ['seq'], []).seq
+    return get_thing("/on_idle", '/seq', str)
     
 def send_midi_event(*data, output = None):
     do_cmd('/send_event_to', None, [output if output is not None else ''] + list(data))
@@ -469,7 +502,7 @@ class CfgSection:
 class Pattern:
     @staticmethod
     def get_pattern():
-        pat_data = GetThings("/get_pattern", ['pattern'], []).pattern
+        pat_data = get_thing("/get_pattern", '/pattern', str)
         if pat_data is not None:
             pat_blob, length = pat_data
             pat_data = []
@@ -507,7 +540,7 @@ class Document:
     @staticmethod
     def get_obj_class(uuid):
         """Internal: retrieve an internal class type of an object that has specified path."""
-        return GetThings(Document.uuid_cmd(uuid, "/get_class_name"), ["class_name"], []).class_name
+        return get_thing(Document.uuid_cmd(uuid, "/get_class_name"), '/class_name', str)
     @staticmethod
     def get_song():
         """Retrieve the current song object of a given document. Each document can
@@ -718,13 +751,13 @@ class SamplerEngine(NonDocObj):
         self.cmd("/set_patch", None, int(channel), int(patch_no))
     def get_unused_program(self):
         """Returns first program number that has no program associated with it."""
-        return self.get_things("/get_unused_program", ['program_no']).program_no
+        return self.get_thing("/get_unused_program", '/program_no', int)
     def set_polyphony(self, polyphony):
         """Set a maximum number of voices that can be played at a given time."""
         self.cmd("/polyphony", None, int(polyphony))
     def get_patches(self):
         """Return a map of program identifiers to program objects."""
-        return self.get_things("/patches", ['%patch']).patch
+        return self.get_thing("/patches", '/patch', {int : (str, SamplerProgram, int)})
 
 class FluidsynthEngine(NonDocObj):
     class Status:
@@ -738,7 +771,7 @@ class FluidsynthEngine(NonDocObj):
     def set_polyphony(self, polyphony):
         self.cmd("/polyphony", None, int(polyphony))
     def get_patches(self):
-        return self.get_things("/patches", ['%patch']).patch
+        return self.get_thing("/patches", '/patch', [str])
 
 class StreamPlayerEngine(NonDocObj):
     class Status:
@@ -842,7 +875,7 @@ class SamplerProgram(DocObj):
         program_no = int
         in_use = int
     def get_regions(self):
-        return map(Document.map_uuid, self.get_things("/regions", ['*region']).region)
+        return map(Document.map_uuid, self.get_thing("/regions", '/region', [str]))
     def get_groups(self):
         g = self.get_things("/groups", ['*group', 'default_group'])
         return [Document.map_uuid(g.default_group)] + list(map(Document.map_uuid, g.group))
@@ -864,9 +897,9 @@ class SamplerLayer(DocObj):
     def get_children(self):
         return map(Document.map_uuid, self.get_things("/get_children", ['*region']).region)
     def as_string(self):
-        return self.get_things("/as_string", ['value']).value
+        return self.get_thing("/as_string", '/value', str)
     def as_string_full(self):
-        return self.get_things("/as_string_full", ['value']).value
+        return self.get_thing("/as_string_full", '/value', str)
     def set_param(self, key, value):
         self.cmd("/set_param", None, key, str(value))
     def new_region(self):
