@@ -254,7 +254,7 @@ def _create_unmarshaller(name, base_type, object_wrapper = False, property_grabb
         settermap[propcmd] = _create_setter(prop, proptype)
         all_decorators[prop] = decorators
         prop_types[prop] = proptype
-    base_type.__str__ = lambda self: (str(name) + ":" + " ".join(["%s=%s" % (v.property, repr(getattr(self, v.property))) for v in settermap.values()]))
+    base_type.__str__ = lambda self: (str(name) + ":" + " ".join(["%s=%s" % (v.property, str(getattr(self, v.property))) for v in settermap.values()]))
     if type_wrapper_debug:
         print ("")
     def exec_cmds(o):
@@ -282,7 +282,7 @@ class CboxObjMetaclass(type):
 class NonDocObj(object, metaclass = CboxObjMetaclass):
     """Root class for all wrapper classes that wrap objects that don't have 
     their own identity/UUID.
-    This covers various singletons and inner objects (e.g. engine in instrument)."""
+    This covers various singletons and inner objects (e.g. engine in instruments)."""
     class Status:
         pass
     def __init__(self, path):
@@ -302,6 +302,9 @@ class NonDocObj(object, metaclass = CboxObjMetaclass):
 
     def make_path(self, path):
         return self.path + path
+        
+    def __str__(self):
+        return "%s<%s>" % (self.__class__.__name__, self.path)
 
 class DocObj(NonDocObj):
     """Root class for all wrapper classes that wrap first-class document objects."""
@@ -313,6 +316,9 @@ class DocObj(NonDocObj):
 
     def delete(self):
         self.cmd("/delete")
+
+    def __str__(self):
+        return "%s<%s>" % (self.__class__.__name__, self.uuid)
 
 class VarPath:
     def __init__(self, path, args = []):
