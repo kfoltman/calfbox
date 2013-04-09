@@ -811,17 +811,25 @@ engine_classes = {
     'tonewheel_organ' : TonewheelOrganEngine,
 }
 
-class EngineSlot(NonDocObj):
+class UnknownModule(NonDocObj):
+    class Status:
+        pass
+    
+class EffectSlot(NonDocObj):
     class Status:
         insert_preset = str
         insert_engine = str
         bypass = bool
+    def init_object(self):
+        # XXXKF add wrapper classes for effect engines
+        self.engine = UnknownModule(self.path+ "/engine")
     
 class DocAuxBus(DocObj):
     class Status:
         name = str
     def init_object(self):
-        self.slot = EngineSlot("/doc/uuid/" + self.uuid + "/slot")
+        self.slot = EffectSlot("/doc/uuid/" + self.uuid + "/slot")
+        self.slot.init_object()
 
 Document.classmap['cbox_aux_bus'] = DocAuxBus
 
@@ -879,10 +887,11 @@ class SamplerProgram(DocObj):
     class Status:
         name = str
         sample_dir = str
+        source_file = str
         program_no = int
         in_use = int
     def get_regions(self):
-        return map(Document.map_uuid, self.get_thing("/regions", '/region', [str]))
+        return self.get_thing("/regions", '/region', [SamplerLayer])
     def get_groups(self):
         g = self.get_things("/groups", ['*group', 'default_group'])
         return [Document.map_uuid(g.default_group)] + list(map(Document.map_uuid, g.group))

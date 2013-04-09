@@ -73,7 +73,7 @@ class TestCbox(unittest.TestCase):
         self.verify_uuid(instr_uuid, "cbox_instrument", "/scene/instr/%s" % iname)
         
         aux = scene.load_aux("piano_reverb")
-        module = aux.get_slot_engine()
+        module = aux.slot.engine
         self.verify_uuid(aux.uuid, "cbox_aux_bus", "/scene/aux/piano_reverb")
         scene.delete_aux("piano_reverb")
 
@@ -103,7 +103,7 @@ class TestCbox(unittest.TestCase):
         self.verify_uuid(instr_uuid, "cbox_instrument", scene.make_path("/instr/%s" % iname))
         
         aux = scene.load_aux("piano_reverb")
-        module = aux.get_slot_engine()
+        module = aux.slot.engine
         self.verify_uuid(aux.uuid, "cbox_aux_bus", scene.make_path("/aux/piano_reverb"))
         scene.delete_aux("piano_reverb")
 
@@ -133,11 +133,11 @@ class TestCbox(unittest.TestCase):
             self.assertEqual(program.status().in_use, 1)
             instrument.engine.set_patch(2, 0)
             self.assertEqual(program.status().in_use, 2)
-            regions = program.get_things("/regions", ["*region"]).region
+            regions = program.get_regions()
             patches_dict[patchid] = (patchname, len(regions))
-            for region_uuid in regions:
-                region_str = Document.map_uuid(region_uuid).as_string()
-                print (patchname, region_uuid, region_str)
+            for region in regions:
+                region_str = Document.map_uuid(region.uuid).as_string()
+                print (patchname, region.uuid, region_str)
                 if patchname == 'test_sampler_api':
                     self.assertTrue('impulse.wav' in region_str)
                     self.assertTrue('key=c' in region_str)
@@ -166,7 +166,6 @@ class TestCbox(unittest.TestCase):
             self.assertTrue((11,0) not in program.get_control_inits())
             self.assertTrue((11,64) not in program.get_control_inits())
         self.assertEqual(patches_dict, {0 : ('test_sampler_api', 2)})
-        region = Document.map_uuid(region_uuid)
         group = region.status().parent_group
         self.assertTrue("resonance=3" in group.as_string())
         region.set_param("cutoff", 9000)
