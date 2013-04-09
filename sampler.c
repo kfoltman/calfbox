@@ -993,6 +993,8 @@ static int release_program_voices_execute(void *data)
         {
             FOREACH_VOICE(c->voices_running, v)
             {
+                if (v->program == rpv->new_pgm)
+                    continue;
                 if (!m->deleting)
                     finished = 0;
                 if (v->amp_env.cur_stage != 15)
