@@ -485,7 +485,9 @@ def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])
         
 def get_new_events():
-    return get_thing("/on_idle", '/seq', str)
+    seq = []
+    do_cmd("/on_idle", (lambda cmd, fb, args: seq.append((cmd, fb, args))), [])
+    return seq
     
 def send_midi_event(*data, output = None):
     do_cmd('/send_event_to', None, [output if output is not None else ''] + list(data))
