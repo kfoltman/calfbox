@@ -632,7 +632,7 @@ class DocTrack(DocObj):
     class Status:
         clips = [ClipItem]
         name = SettableProperty(str)
-        external_output = SettableProperty(int)
+        external_output = SettableProperty(str)
     def add_clip(self, pos, offset, length, pattern):
         return self.cmd_makeobj("/add_clip", int(pos), int(offset), int(length), pattern.uuid)
 Document.classmap['cbox_track'] = DocTrack
