@@ -1076,6 +1076,8 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
     if (index != -1)
     {
         swap_program(m, index, pgm, TRUE);
+        if (ppgm)
+            *ppgm = pgm;
         return TRUE;
     }
     
@@ -1185,7 +1187,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         struct sampler_program *pgm = NULL; 
         if (!load_from_string(m, CBOX_ARG_S(cmd, 1), CBOX_ARG_S(cmd, 2), CBOX_ARG_S(cmd, 3), CBOX_ARG_I(cmd, 0), &pgm, error))
             return FALSE;
-        if (fb)
+        if (fb && pgm)
             return cbox_execute_on(fb, NULL, "/uuid", "o", error, pgm);
         return TRUE;
     }
