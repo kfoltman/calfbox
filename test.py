@@ -117,7 +117,22 @@ class TestCbox(unittest.TestCase):
         instrument = layer.get_instrument()
         self.assertEqual(instrument.status().engine, "sampler")
         
-        instrument.engine.load_patch_from_string(0, '.', '<group> resonance=3 <region> unknown=123 key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
+        program0 = instrument.engine.load_patch_from_file(0, 'synthbass.sfz', 'test_sampler_sfz_loader')
+        self.assertNotEqual(program0, None)
+        self.assertEqual(program0.status().in_use, 16)
+        program1 = instrument.engine.load_patch_from_string(0, '.', '<group> resonance=3 <region> unknown=123 key=36 sample=impulse.wav cutoff=1000 <region> key=37 cutoff=2000 sample=impulse.wav ', 'test_sfz_parser_trailing_spaces')
+        self.assertNotEqual(program1, None)
+        self.assertEqual(program1.status().in_use, 16)
+        self.assertEqual(program1.status().name, 'test_sfz_parser_trailing_spaces')
+        self.assertRegex(program1.get_regions()[0].as_string(), 'sample=.*impulse\.wav')
+        program2 = instrument.engine.load_patch_from_string(0, '.', '<group> resonance=3 <region> unknown=123 key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
+        self.assertNotEqual(program2, None)
+        self.assertEqual(program2.status().in_use, 16)
+        try:
+            program1.status()
+            self.assertTrue(False)
+        except Exception as e:
+            self.assertTrue('UUID not found' in str(e))
         patches = instrument.engine.get_patches()
         patches_dict = {}
         self.assertEqual(len(patches), 1)
@@ -128,11 +143,11 @@ class TestCbox(unittest.TestCase):
             self.assertEqual(program.status().name, 'test_sampler_api')
             self.assertEqual(program.status().sample_dir, '.')
             self.assertEqual(program.status().program_no, 0)
-            self.assertEqual(program.status().in_use, 0)
+            self.assertEqual(program.status().in_use, 16)
             instrument.engine.set_patch(1, 0)
-            self.assertEqual(program.status().in_use, 1)
+            self.assertEqual(program.status().in_use, 16)
             instrument.engine.set_patch(2, 0)
-            self.assertEqual(program.status().in_use, 2)
+            self.assertEqual(program.status().in_use, 16)
             regions = program.get_regions()
             patches_dict[patchid] = (patchname, len(regions))
             for region in regions:
