@@ -1027,6 +1027,13 @@ static void swap_program(struct sampler_module *m, int index, struct sampler_pro
         CBOX_DELETE(old_program);
 }
 
+static void select_initial_program(struct sampler_module *m)
+{
+    static struct cbox_rt_cmd_definition release_program_voices = { NULL, release_program_voices_execute, NULL };
+    struct release_program_voices_data data = {m, NULL, m->programs[0], 0};
+    cbox_rt_execute_cmd_sync(m->module.rt, &release_program_voices, &data);
+}
+
 static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, struct sampler_program **ppgm, GError **error)
 {
     struct sampler_program *pgm = NULL;
@@ -1047,6 +1054,8 @@ static gboolean load_program_at(struct sampler_module *m, const char *cfg_sectio
     if (ppgm)
         *ppgm = pgm;
     free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));
+    if (m->program_count == 1)
+        select_initial_program(m);
     return TRUE;
 }
 
@@ -1087,6 +1096,8 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
     if (ppgm)
         *ppgm = pgm;
     free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
+    if (m->program_count == 1)
+        select_initial_program(m);
     return TRUE;
 }
 
