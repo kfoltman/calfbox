@@ -575,6 +575,8 @@ class Document:
     @staticmethod
     def map_uuid(uuid):
         """Create or retrieve a Python-side accessor proxy for a C-side object."""
+        if uuid is None:
+            return None
         if uuid in Document.objmap:
             return Document.objmap[uuid]
         try:
