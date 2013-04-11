@@ -67,7 +67,7 @@ static void scan_for_value(struct sfz_parser_state *state)
         if (state->pos < state->len + 2 && state->buf[state->pos] == '/' && state->buf[state->pos + 1] == '/')
         {
             state->value_end = state->pos;
-            while(state->value_end > state->value_start && state->buf[state->value_end - 1] == ' ')
+            while(state->value_end > state->value_start && isspace(state->buf[state->value_end - 1]))
                 state->value_end--;
             state->pos += 2;
             while (state->pos < state->len && state->buf[state->pos] != '\r' && state->buf[state->pos] != '\n')
@@ -98,6 +98,8 @@ static void scan_for_value(struct sfz_parser_state *state)
         state->pos++;
     }
     state->value_end = state->pos;
+    while(state->value_end > state->value_start && isspace(state->buf[state->value_end - 1]))
+        state->value_end--;
 }
 
 static gboolean handle_key(struct sfz_parser_state *state, int ch)
