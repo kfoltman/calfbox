@@ -47,7 +47,7 @@ static gint event_entry_compare(gconstpointer a, gconstpointer b, gpointer unuse
     
     if (ea->time < eb->time)
         return -1;
-    if (ea->time == eb->time && event_class[ea->data[0] >> 4] < event_class[eb->data[0] >> 4])
+    if (ea->time == eb->time && event_class[(ea->data[0] >> 4) & 7] < event_class[(eb->data[0] >> 4) & 7])
         return -1;
     if (ea->time == eb->time && (ea->data[0] & 15) < (eb->data[0] & 15))
         return -1;
