@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "auxbus.h"
-#include "blob.h"
 #include "config-api.h"
 #include "errors.h"
 #include "instr.h"
@@ -261,41 +260,6 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         cbox_midi_buffer_init(&buf);
         cbox_midi_buffer_write_inline(&buf, 0, mcmd, arg1, arg2);
         cbox_midi_merger_push(&s->scene_input_merger, &buf, s->rt);
-        return TRUE;
-    }
-    else if (!strcmp(cmd->command, "/render_stereo") && !strcmp(cmd->arg_types, "i"))
-    {
-        if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
-        if (s->rt && s->rt->io)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot use render function in real-time mode.");
-            return FALSE;
-        }
-        struct cbox_midi_buffer midibuf_song;
-        cbox_midi_buffer_init(&midibuf_song);
-        int nframes = CBOX_ARG_I(cmd, 0);
-        float *data = malloc(2 * nframes * sizeof(float));
-        float *data_i = malloc(2 * nframes * sizeof(float));
-        float *buffers[2] = { data, data + nframes };
-        for (int i = 0; i < nframes; i++)
-        {
-            buffers[0][i] = 0.f;
-            buffers[1][i] = 0.f;
-        }
-        if (s->spb)
-            cbox_song_playback_render(s->spb, &midibuf_song, nframes);
-        cbox_midi_merger_push(&s->scene_input_merger, &midibuf_song, s->rt);
-        cbox_scene_render(s, nframes, buffers);
-        for (int i = 0; i < nframes; i++)
-        {
-            data_i[i * 2] = buffers[0][i];
-            data_i[i * 2 + 1] = buffers[1][i];
-        }
-        free(data);
-
-        if (!cbox_execute_on(fb, NULL, "/data", "b", error, cbox_blob_new_acquire_data(data_i, nframes * 2 * sizeof(float))))
-            return FALSE;
         return TRUE;
     }
     else
@@ -936,7 +900,6 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_rt
     cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
     s->transpose = 0;
     s->owns_rt = owns_rt;
-    s->spb = NULL;
 
     cbox_midi_buffer_init(&s->midibuf_total);
     cbox_midi_merger_init(&s->scene_input_merger, &s->midibuf_total);

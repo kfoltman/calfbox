@@ -35,6 +35,7 @@ struct cbox_engine
     struct cbox_command_target cmd_target;
     struct cbox_rt *rt;
     struct cbox_scene *scene;
+    struct cbox_song_playback *spb;
     struct cbox_module *effect;
     struct cbox_master *master;
     struct cbox_midi_buffer midibuf_aux, midibuf_jack, midibuf_song;

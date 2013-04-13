@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "blob.h"
 #include "dom.h"
 #include "engine.h"
 #include "instr.h"
@@ -48,6 +49,8 @@ struct cbox_engine *cbox_engine_new(struct cbox_rt *rt)
     engine->effect = NULL;
     engine->master = cbox_master_new(engine);
     engine->master->song = cbox_song_new(CBOX_GET_DOCUMENT(rt));
+    engine->spb = NULL;
+
     cbox_midi_buffer_init(&engine->midibuf_aux);
     cbox_midi_buffer_init(&engine->midibuf_jack);
     cbox_midi_buffer_init(&engine->midibuf_song);
@@ -84,8 +87,47 @@ void cbox_engine_destroyfunc(struct cbox_objhdr *obj_ptr)
 
 static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
-    // struct cbox_engine *engine = ct->user_data;
-    return cbox_object_default_process_cmd(ct, fb, cmd, error);
+    struct cbox_engine *engine = ct->user_data;
+    if (!strcmp(cmd->command, "/render_stereo") && !strcmp(cmd->arg_types, "i"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        if (engine->rt && engine->rt->io)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot use render function in real-time mode.");
+            return FALSE;
+        }
+        struct cbox_midi_buffer midibuf_song;
+        cbox_midi_buffer_init(&midibuf_song);
+        int nframes = CBOX_ARG_I(cmd, 0);
+        float *data = malloc(2 * nframes * sizeof(float));
+        float *data_i = malloc(2 * nframes * sizeof(float));
+        float *buffers[2] = { data, data + nframes };
+        for (int i = 0; i < nframes; i++)
+        {
+            buffers[0][i] = 0.f;
+            buffers[1][i] = 0.f;
+        }
+        if (engine->spb)
+            cbox_song_playback_render(engine->spb, &midibuf_song, nframes);
+        if (engine->scene)
+        {
+            cbox_midi_merger_push(&engine->scene->scene_input_merger, &midibuf_song, engine->rt);
+            cbox_scene_render(engine->scene, nframes, buffers);
+        }   
+        for (int i = 0; i < nframes; i++)
+        {
+            data_i[i * 2] = buffers[0][i];
+            data_i[i * 2 + 1] = buffers[1][i];
+        }
+        free(data);
+
+        if (!cbox_execute_on(fb, NULL, "/data", "b", error, cbox_blob_new_acquire_data(data_i, nframes * 2 * sizeof(float))))
+            return FALSE;
+        return TRUE;
+    }
+    else
+        return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
 void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_t nframes)
@@ -113,8 +155,8 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
     cbox_rt_handle_rt_commands(engine->rt);
     
     // Combine various sources of events (song, non-RT thread, JACK input)
-    if (engine->scene && engine->scene->spb)
-        cbox_song_playback_render(engine->scene->spb, &engine->midibuf_song, nframes);
+    if (engine->spb)
+        cbox_song_playback_render(engine->spb, &engine->midibuf_song, nframes);
 
     if (engine->scene)
         cbox_scene_render(engine->scene, nframes, io->output_buffers);
@@ -147,7 +189,7 @@ struct cbox_scene *cbox_engine_set_scene(struct cbox_engine *engine, struct cbox
 
     if (scene)
     {
-        scene->spb = engine->master->spb;
+        engine->spb = engine->master->spb;
         cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_aux, engine->rt);
         cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_jack, engine->rt);
         cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_song, engine->rt);
@@ -171,20 +213,19 @@ DEFINE_RT_VOID_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
     // If there's no new song, silence all ongoing notes. Otherwise, copy the
     // ongoing notes to the new playback structure so that the notes get released
     // when playback is stopped (or possibly earlier).
-    if (engine->scene && engine->scene->spb)
+    if (engine->scene && engine->spb)
     {
         if (new_song)
             cbox_song_playback_apply_old_state(new_song);
 
-        if (cbox_song_playback_active_notes_release(engine->scene->spb, &engine->midibuf_aux) < 0)
+        if (cbox_song_playback_active_notes_release(engine->spb, &engine->midibuf_aux) < 0)
         {
             RT_CALL_AGAIN_LATER();
             return;
         }
     }
-    struct cbox_song_playback *old_song = engine->master->spb;
-    if (engine->scene)
-        engine->scene->spb = new_song;
+    struct cbox_song_playback *old_song = engine->spb;
+    engine->spb = new_song;
     engine->master->spb = new_song;
     if (new_song)
     {
@@ -207,7 +248,7 @@ DEFINE_RT_VOID_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
 void cbox_engine_update_song(struct cbox_engine *engine, int new_pos_ppqn)
 {
     struct cbox_song_playback *old_song, *new_song;
-    old_song = engine->scene ? engine->scene->spb : NULL;
+    old_song = engine->scene ? engine->spb : NULL;
     new_song = cbox_song_playback_new(engine->master->song, engine->master, engine, old_song );
     cbox_engine_set_song_playback(engine, new_song, new_pos_ppqn);
     if (old_song)

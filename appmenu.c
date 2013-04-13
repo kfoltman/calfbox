@@ -113,12 +113,12 @@ gchar *transport_format_value(const struct cbox_menu_item_static *item, void *co
     // XXXKF
     // struct cbox_bbt bbt;
     // cbox_master_to_bbt(app.engine->master, &bbt);
-    if (app.engine->scene->spb == NULL)
+    if (app.engine->master->spb == NULL)
         return g_strdup("N/A");
     if (!strcmp((const char *)item->item.item_context, "pos"))
-        return g_strdup_printf("%d", (int)app.engine->scene->spb->song_pos_samples);
+        return g_strdup_printf("%d", (int)app.engine->master->spb->song_pos_samples);
     else
-        return g_strdup_printf("%d", (int)app.engine->scene->spb->song_pos_ppqn);
+        return g_strdup_printf("%d", (int)app.engine->master->spb->song_pos_ppqn);
 }
 
 struct cbox_config_section_cb_data
