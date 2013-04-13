@@ -299,7 +299,7 @@ void cbox_rt_process(void *user_data, struct cbox_io *io, uint32_t nframes)
 {
     struct cbox_rt *rt = user_data;
     if (rt->engine)
-        cbox_engine_process(rt->engine, io, nframes);
+        cbox_engine_process(rt->engine, io, nframes, io->output_buffers);
     else
         cbox_rt_handle_rt_commands(rt);
 }

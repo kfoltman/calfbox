@@ -108,13 +108,7 @@ static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct c
             buffers[0][i] = 0.f;
             buffers[1][i] = 0.f;
         }
-        if (engine->spb)
-            cbox_song_playback_render(engine->spb, &midibuf_song, nframes);
-        if (engine->scene)
-        {
-            cbox_midi_merger_push(&engine->scene->scene_input_merger, &midibuf_song, engine->rt);
-            cbox_scene_render(engine->scene, nframes, buffers);
-        }   
+        cbox_engine_process(engine, NULL, nframes, buffers);
         for (int i = 0; i < nframes; i++)
         {
             data_i[i * 2] = buffers[0][i];
@@ -130,14 +124,17 @@ static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct c
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
-void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_t nframes)
+void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_t nframes, float **output_buffers)
 {
     struct cbox_module *effect = engine->effect;
     uint32_t i, j;
     
     cbox_midi_buffer_clear(&engine->midibuf_aux);
     cbox_midi_buffer_clear(&engine->midibuf_song);
-    cbox_io_get_midi_data(io, &engine->midibuf_jack);
+    if (io)
+        cbox_io_get_midi_data(io, &engine->midibuf_jack);
+    else
+        cbox_midi_buffer_clear(&engine->midibuf_jack);
     
     // Copy MIDI input to the app-sink with no timing information
     struct cbox_midi_buffer *appsink = &engine->midibufs_appsink[engine->current_appsink_buffer];
@@ -159,7 +156,7 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
         cbox_song_playback_render(engine->spb, &engine->midibuf_song, nframes);
 
     if (engine->scene)
-        cbox_scene_render(engine->scene, nframes, io->output_buffers);
+        cbox_scene_render(engine->scene, nframes, output_buffers);
     
     // Process "master" effect
     if (effect)
@@ -167,13 +164,13 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
         for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
         {
             cbox_sample_t left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
-            cbox_sample_t *in_bufs[2] = {io->output_buffers[0] + i, io->output_buffers[1] + i};
+            cbox_sample_t *in_bufs[2] = {output_buffers[0] + i, output_buffers[1] + i};
             cbox_sample_t *out_bufs[2] = {left, right};
             (*effect->process_block)(effect, in_bufs, out_bufs);
             for (j = 0; j < CBOX_BLOCK_SIZE; j++)
             {
-                io->output_buffers[0][i + j] = left[j];
-                io->output_buffers[1][i + j] = right[j];
+                output_buffers[0][i + j] = left[j];
+                output_buffers[1][i + j] = right[j];
             }
         }
     }
