@@ -81,6 +81,8 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
             return FALSE;
         }
     }
+    else if (!strncmp(cmd->command, "/engine/", 8))
+        return cbox_execute_sub(&rt->engine->cmd_target, fb, cmd, cmd->command + 7, error);
     else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
@@ -375,6 +377,19 @@ void *cbox_rt_array_remove(struct cbox_rt *rt, void ***ptr, int *pcount, int ind
     void **new_array = stm_array_clone_remove(*ptr, *pcount, index);
     free(cbox_rt_swap_pointers_and_update_count(rt, (void **)ptr, new_array, pcount, *pcount - 1));            
     return p;
+}
+
+gboolean cbox_rt_array_remove_by_value(struct cbox_rt *rt, void ***ptr, int *pcount, void *value_to_remove)
+{
+    for (int i = 0; i < *pcount; i++)
+    {
+        if ((*ptr)[i] == value_to_remove)
+        {
+            cbox_rt_array_remove(rt, ptr, pcount, i);
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

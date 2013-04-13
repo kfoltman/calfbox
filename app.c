@@ -69,7 +69,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             return cbox_execute_sub(&app.config_cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "scene/", 6))
-            return cbox_execute_sub(&app.engine->scene->cmd_target, fb, cmd, pos, error);
+            return cbox_execute_sub(&app.engine->scenes[0]->cmd_target, fb, cmd, pos, error);
         else
         if (!strncmp(obj, "engine/", 7))
             return cbox_execute_sub(&app.engine->cmd_target, fb, cmd, pos, error);
@@ -119,12 +119,12 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         }
         else
         {
-            if (!app.engine->scene)
+            if (!app.engine->scene_count)
             {
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Scene not set");
                 return FALSE;
             }
-            merger = &app.engine->scene->scene_input_merger;
+            merger = &app.engine->scenes[0]->scene_input_merger;
         }
         int mcmd = CBOX_ARG_I(cmd, 1);
         int arg1 = 0, arg2 = 0;
@@ -138,24 +138,6 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         cbox_midi_buffer_init(&buf);
         cbox_midi_buffer_write_inline(&buf, 0, mcmd, arg1, arg2);
         cbox_engine_send_events_to(app.engine, merger, &buf);
-        return TRUE;
-    }
-    else
-    if (!strcmp(obj, "play_note") && !strcmp(cmd->arg_types, "iii"))
-    {
-        if (!app.engine->scene)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Scene not set");
-            return FALSE;
-        }
-        int channel = CBOX_ARG_I(cmd, 0);
-        int note = CBOX_ARG_I(cmd, 1);
-        int velocity = CBOX_ARG_I(cmd, 2);
-        struct cbox_midi_buffer buf;
-        cbox_midi_buffer_init(&buf);
-        cbox_midi_buffer_write_inline(&buf, 0, 0x90 + ((channel - 1) & 15), note & 127, velocity & 127);
-        cbox_midi_buffer_write_inline(&buf, 1, 0x80 + ((channel - 1) & 15), note & 127, velocity & 127);
-        cbox_engine_send_events_to(app.engine, &app.engine->scene->scene_input_merger, &buf);
         return TRUE;
     }
     else

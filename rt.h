@@ -80,6 +80,7 @@ extern void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **p
 
 extern void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, int *pcount, int index, void *new_value);
 extern void *cbox_rt_array_remove(struct cbox_rt *rt, void ***ptr, int *pcount, int index);
+extern gboolean cbox_rt_array_remove_by_value(struct cbox_rt *rt, void ***ptr, int *pcount, void *value_to_remove);
 extern struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, struct cbox_uuid *uuid);
 
 ///////////////////////////////////////////////////////////////////////////////

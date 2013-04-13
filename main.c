@@ -316,7 +316,6 @@ int main(int argc, char *argv[])
     gboolean has_song = drum_pattern_name || drum_track_name || metronome;
     if (play_immediately == 1 || (play_immediately != -1 && has_song))
         cbox_master_play(app.engine->master);
-    cbox_engine_set_scene(app.engine, scene);
 #if USE_PYTHON
     if (script_name)
         cbox_script_run(script_name);
@@ -337,7 +336,6 @@ int main(int argc, char *argv[])
         } while(1);
         fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) &~ O_NONBLOCK);
     }
-    scene = cbox_engine_set_scene(app.engine, NULL);
     cbox_rt_stop(app.rt);
     if (!no_io)
         cbox_io_close(&app.io);
@@ -352,10 +350,7 @@ ok:
     {
         CBOX_DELETE(app.engine->effect);
         app.engine->effect = NULL;
-    }
-    if (scene)
-        CBOX_DELETE(scene);
-    
+    }    
     CBOX_DELETE(app.engine);
     CBOX_DELETE(app.rt);
     

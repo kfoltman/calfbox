@@ -264,6 +264,19 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         return TRUE;
     }
     else
+    if (!strcmp(cmd->command, "/play_note") && !strcmp(cmd->arg_types, "iii"))
+    {
+        int channel = CBOX_ARG_I(cmd, 0);
+        int note = CBOX_ARG_I(cmd, 1);
+        int velocity = CBOX_ARG_I(cmd, 2);
+        struct cbox_midi_buffer buf;
+        cbox_midi_buffer_init(&buf);
+        cbox_midi_buffer_write_inline(&buf, 0, 0x90 + ((channel - 1) & 15), note & 127, velocity & 127);
+        cbox_midi_buffer_write_inline(&buf, 1, 0x80 + ((channel - 1) & 15), note & 127, velocity & 127);
+        cbox_midi_merger_push(&s->scene_input_merger, &buf, s->rt);
+        return TRUE;
+    }
+    else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
@@ -910,12 +923,15 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_en
     s->rec_stereo_outputs = create_rec_sources(s, buffer_size, engine->io_env.output_count / 2, 2);
     
     CBOX_OBJECT_REGISTER(s);
+    
+    cbox_engine_add_scene(s->engine, s);
     return s;
 }
 
 static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_scene *scene = CBOX_H2O(objhdr);
+    cbox_engine_remove_scene(scene->engine, scene);
     cbox_scene_clear(scene);
     g_free(scene->name);
     g_free(scene->title);

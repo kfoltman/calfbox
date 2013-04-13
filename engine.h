@@ -35,7 +35,8 @@ struct cbox_engine
     struct cbox_command_target cmd_target;
     struct cbox_io_env io_env;
     struct cbox_rt *rt;
-    struct cbox_scene *scene;
+    struct cbox_scene **scenes;
+    int scene_count;
     struct cbox_song_playback *spb;
     struct cbox_module *effect;
     struct cbox_master *master;
@@ -48,7 +49,8 @@ struct cbox_engine
 // These use an RT command internally
 extern struct cbox_engine *cbox_engine_new(struct cbox_document *doc, struct cbox_rt *rt);
 extern void cbox_engine_update_song_playback(struct cbox_engine *engine);
-extern struct cbox_scene *cbox_engine_set_scene(struct cbox_engine *engine, struct cbox_scene *scene);
+extern void cbox_engine_add_scene(struct cbox_engine *engine, struct cbox_scene *scene);
+void cbox_engine_remove_scene(struct cbox_engine *engine, struct cbox_scene *scene);
 extern struct cbox_song *cbox_engine_set_song(struct cbox_engine *engine, struct cbox_song *song, int new_pos);
 extern struct cbox_song *cbox_engine_set_pattern(struct cbox_engine *engine, struct cbox_midi_pattern *pattern, int new_pos);
 extern void cbox_engine_set_pattern_and_destroy(struct cbox_engine *engine, struct cbox_midi_pattern *pattern);

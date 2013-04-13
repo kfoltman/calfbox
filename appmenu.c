@@ -54,7 +54,7 @@ int cmd_quit(struct cbox_menu_item_command *item, void *context)
 int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = app.engine->scene;
+    struct cbox_scene *scene = app.engine->scenes[0];
     cbox_scene_clear(scene);
     if (!cbox_scene_load(scene, item->item.item_context, &error))
         cbox_print_error(error);
@@ -64,7 +64,7 @@ int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = app.engine->scene;
+    struct cbox_scene *scene = app.engine->scenes[0];
     cbox_scene_clear(scene);
     struct cbox_layer *layer = cbox_layer_new_with_instrument(scene, (char *)item->item.item_context, &error);
     
@@ -83,7 +83,7 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
 int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_scene *scene = app.engine->scene;
+    struct cbox_scene *scene = app.engine->scenes[0];
     cbox_scene_clear(scene);
     struct cbox_layer *layer = cbox_layer_new_from_config(scene, (char *)item->item.item_context, &error);
     
@@ -169,7 +169,7 @@ struct cbox_menu *create_scene_menu(struct cbox_menu_item_menu *item, void *menu
 
 static struct cbox_command_target *find_module_target(const char *type, GError **error)
 {
-    struct cbox_scene *scene = app.engine->scene;
+    struct cbox_scene *scene = app.engine->scenes[0];
     for (int i = 0; i < scene->instrument_count; i++)
     {
         if (!strcmp(scene->instruments[i]->module->engine_name, type))

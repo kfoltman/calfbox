@@ -45,7 +45,8 @@ struct cbox_engine *cbox_engine_new(struct cbox_document *doc, struct cbox_rt *r
     CBOX_OBJECT_HEADER_INIT(engine, cbox_engine, doc);
     
     engine->rt = rt;
-    engine->scene = NULL;
+    engine->scenes = NULL;
+    engine->scene_count = 0;
     engine->effect = NULL;
     engine->master = cbox_master_new(engine);
     engine->master->song = cbox_song_new(doc);
@@ -97,7 +98,16 @@ void cbox_engine_destroyfunc(struct cbox_objhdr *obj_ptr)
 static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct cbox_engine *engine = ct->user_data;
-    if (!strcmp(cmd->command, "/render_stereo") && !strcmp(cmd->arg_types, "i"))
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        for (int i = 0; i < engine->scene_count; i++)
+        {
+            if (!cbox_execute_on(fb, NULL, "/scene", "o", error, engine->scenes[i]))
+                return FALSE;
+        }
+        return CBOX_OBJECT_DEFAULT_STATUS(engine, fb, error);
+    }
+    else if (!strcmp(cmd->command, "/render_stereo") && !strcmp(cmd->arg_types, "i"))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
@@ -150,20 +160,6 @@ static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct c
         return rec ? cbox_execute_on(fb, NULL, "/uuid", "o", error, rec) : FALSE;
     }
     else
-    if (!strcmp(cmd->command, "/set_scene") && !strcmp(cmd->arg_types, "s"))
-    {
-        if (CBOX_ARG_S_ISNULL(cmd, 0))
-            cbox_engine_set_scene(engine, NULL);
-        else
-        {
-            struct cbox_scene *scene = (struct cbox_scene *)CBOX_ARG_O(cmd, 0, engine, cbox_scene, error);
-            if (!scene)
-                return FALSE;
-            cbox_engine_set_scene(engine, scene);
-        }
-        return TRUE;
-    }
-    else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
@@ -199,8 +195,8 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
     if (engine->spb)
         cbox_song_playback_render(engine->spb, &engine->midibuf_song, nframes);
 
-    if (engine->scene)
-        cbox_scene_render(engine->scene, nframes, output_buffers);
+    for (int i = 0; i < engine->scene_count; i++)
+        cbox_scene_render(engine->scenes[i], nframes, output_buffers);
     
     // Process "master" effect
     if (effect)
@@ -223,26 +219,23 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_scene *cbox_engine_set_scene(struct cbox_engine *engine, struct cbox_scene *scene)
+void cbox_engine_add_scene(struct cbox_engine *engine, struct cbox_scene *scene)
 {
-    if (scene == engine->scene)
-        return scene;
-
-    if (scene)
-    {
-        engine->spb = engine->master->spb;
-        cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_aux, engine->rt);
-        cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_jack, engine->rt);
-        cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_song, engine->rt);
-    }
-    if (engine->scene)
-    {
-        cbox_midi_merger_disconnect(&engine->scene->scene_input_merger, &engine->midibuf_aux, engine->rt);
-        cbox_midi_merger_disconnect(&engine->scene->scene_input_merger, &engine->midibuf_jack, engine->rt);
-        cbox_midi_merger_disconnect(&engine->scene->scene_input_merger, &engine->midibuf_song, engine->rt);
-    }
+    assert(scene->engine == engine);
+    cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_aux, engine->rt);
+    cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_jack, engine->rt);
+    cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_song, engine->rt);
     
-    return cbox_rt_swap_pointers(engine->rt, (void **)&engine->scene, scene);
+    cbox_rt_array_insert(engine->rt, (void ***)&engine->scenes, &engine->scene_count, -1, scene);
+}
+
+void cbox_engine_remove_scene(struct cbox_engine *engine, struct cbox_scene *scene)
+{
+    assert(scene->engine == engine);
+    cbox_rt_array_remove_by_value(engine->rt, (void ***)&engine->scenes, &engine->scene_count, scene);
+    cbox_midi_merger_disconnect(&scene->scene_input_merger, &engine->midibuf_aux, engine->rt);
+    cbox_midi_merger_disconnect(&scene->scene_input_merger, &engine->midibuf_jack, engine->rt);
+    cbox_midi_merger_disconnect(&scene->scene_input_merger, &engine->midibuf_song, engine->rt);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -254,7 +247,7 @@ DEFINE_RT_VOID_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
     // If there's no new song, silence all ongoing notes. Otherwise, copy the
     // ongoing notes to the new playback structure so that the notes get released
     // when playback is stopped (or possibly earlier).
-    if (engine->scene && engine->spb)
+    if (engine->spb)
     {
         if (new_song)
             cbox_song_playback_apply_old_state(new_song);
@@ -289,7 +282,7 @@ DEFINE_RT_VOID_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
 void cbox_engine_update_song(struct cbox_engine *engine, int new_pos_ppqn)
 {
     struct cbox_song_playback *old_song, *new_song;
-    old_song = engine->scene ? engine->spb : NULL;
+    old_song = engine->spb;
     new_song = cbox_song_playback_new(engine->master->song, engine->master, engine, old_song );
     cbox_engine_set_song_playback(engine, new_song, new_pos_ppqn);
     if (old_song)
@@ -313,8 +306,8 @@ void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_mer
         cbox_midi_merger_push(merger, buffer, engine->rt);
     else
     {
-        if (engine->scene)
-            cbox_midi_merger_push(&engine->scene->scene_input_merger, buffer, engine->rt);
+        for (int i = 0; i < engine->scene_count; i++)
+            cbox_midi_merger_push(&engine->scenes[i]->scene_input_merger, buffer, engine->rt);
         if (!engine->rt || !engine->rt->io)
             return;
         for (GSList *p = engine->rt->io->midi_outputs; p; p = p->next)
