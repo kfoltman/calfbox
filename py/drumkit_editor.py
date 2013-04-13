@@ -278,8 +278,7 @@ class PadButton(Gtk.RadioButton):
             self.get_child().set_markup(data.to_markup())
             self.get_child().set_line_wrap(True)
     def on_clicked(self, w):
-        cbox.Document.get_scene().send_midi_event(0x90, self.key, 127)
-        cbox.Document.get_scene().send_midi_event(0x80, self.key, 127)
+        self.controller.play_note(self.key)
         w.controller.on_pad_selected(w)
 
 ####################################################################################################################################################
@@ -305,7 +304,8 @@ class PadTable(Gtk.Table):
 ####################################################################################################################################################
 
 class FileView(Gtk.TreeView):
-    def __init__(self, dirs_model):
+    def __init__(self, dirs_model, controller):
+        self.controller = controller
         self.is_playing = True
         self.dirs_model = dirs_model
         self.files_model = SampleFilesModel(dirs_model)
@@ -320,13 +320,12 @@ class FileView(Gtk.TreeView):
 
     def stop_playing(self):
         if self.is_playing:
-            cbox.do_cmd("/scene/instr/_preview_sample/engine/unload", None, [])
+            self.controller.stop_preview()
             self.is_playing = False
 
     def start_playing(self, fn):
         self.is_playing = True
-        cbox.do_cmd("/scene/instr/_preview_sample/engine/load", None, [fn, -1])
-        cbox.do_cmd("/scene/instr/_preview_sample/engine/play", None, [])
+        self.controller.start_preview(fn)
 
     def cursor_changed(self, w):
         if self.files_model.is_refreshing:
@@ -382,7 +381,7 @@ class EditorDialog(Gtk.Dialog):
         self.current_pad = None
         self.dirs_model = SampleDirsModel()
         self.bank_model = BankModel()
-        self.tree = FileView(self.dirs_model)
+        self.tree = FileView(self.dirs_model, self)
         self.layer_list = LayerListView(self)
         self.layer_editor = LayerEditor(self, self.bank_model)
         self.no_sfz_update = False
@@ -428,18 +427,26 @@ class EditorDialog(Gtk.Dialog):
         self.update_kit()
         
     def prepare_scene(self):
-        scene = cbox.Document.get_scene()
-        scene_status = scene.status()
-        layers = [layer.status().instrument_name for layer in scene_status.layers]
-        if '_preview_sample' not in layers:
-            scene.add_new_instrument_layer("_preview_sample", "stream_player", pos = 0)
-            ps = scene.status().instruments['_preview_sample'][1]
+        found_scene = None
+        for scene in cbox.Document.get_engine().status().scenes:
+            scene_status = scene.status()
+            layers = [layer.status().instrument_name for layer in scene_status.layers]
+            if '_preview_sample' in layers and '_preview_kit' in layers:
+                found_scene = scene
+                break
+        if found_scene is None:
+            self.scene = cbox.Document.get_engine().new_scene()
+            self.scene.add_new_instrument_layer("_preview_sample", "stream_player", pos = 0)
+            ps = self.scene.status().instruments['_preview_sample'][1]
             ps.cmd('/output/1/gain', None, -12.0)
-        if '_preview_kit' not in layers:
-            scene.add_new_instrument_layer("_preview_kit", "sampler", pos = 1)
+            self.scene.add_new_instrument_layer("_preview_kit", "sampler", pos = 1)
+        else:
+            self.scene = found_scene
+        _, self._preview_kit = self.scene.status().instruments['_preview_kit']
+        _, self._preview_sample = self.scene.status().instruments['_preview_sample']
 
     def update_kit(self):
-        cbox.do_cmd("/scene/instr/_preview_kit/engine/load_patch_from_string", None, [0, "", self.bank_model.to_sfz(), "Preview"])
+        self._preview_kit.engine.load_patch_from_string(0, "", self.bank_model.to_sfz(), "Preview")
         self.update_source = None
         return False
         
@@ -522,3 +529,12 @@ class EditorDialog(Gtk.Dialog):
                 open(dlg.get_filename(), "w").write(self.bank_model.to_sfz())
         finally:
             dlg.destroy()
+            
+    def start_preview(self, filename):
+        self._preview_sample.engine.load(filename)
+        self._preview_sample.engine.play()
+    def stop_preview(self):
+        self._preview_sample.engine.unload()
+    def play_note(self, note, vel = 127):
+        self.scene.send_midi_event(0x90, note, vel)
+        self.scene.send_midi_event(0x80, note, vel)
