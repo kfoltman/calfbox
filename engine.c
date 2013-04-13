@@ -322,6 +322,19 @@ void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_mer
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+struct cbox_midi_merger *cbox_engine_get_midi_output(struct cbox_engine *engine, struct cbox_uuid *uuid)
+{
+    struct cbox_objhdr *objhdr = cbox_document_get_object_by_uuid(CBOX_GET_DOCUMENT(engine), uuid);
+    if (!objhdr)
+        return NULL;
+    struct cbox_scene *scene = (struct cbox_scene *)objhdr;
+    if (!CBOX_IS_A(scene, cbox_scene))
+        return NULL;
+    return &scene->scene_input_merger;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 #define cbox_engine_get_input_midi_data__args(ARG) 
 
 DEFINE_RT_FUNC(const struct cbox_midi_buffer *, cbox_engine, engine, cbox_engine_get_input_midi_data_)

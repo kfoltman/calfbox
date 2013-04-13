@@ -361,6 +361,12 @@ class MainWindow(Gtk.Window):
                     song = cbox.Document().get_song()
                     song.clear()
                     song.update_playback()
+                tracks = song.status().tracks
+                if len(tracks):
+                    for track_item in tracks:
+                        track_item.track.set_external_output(cbox.Document.get_scene().uuid)
+                song.update_playback()
+
         finally:
             d.destroy()
 

@@ -396,6 +396,12 @@ gboolean cbox_rt_array_remove_by_value(struct cbox_rt *rt, void ***ptr, int *pco
 
 struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, struct cbox_uuid *uuid)
 {
+    if (rt->engine)
+    {
+        struct cbox_midi_merger *merger = cbox_engine_get_midi_output(rt->engine, uuid);
+        if (merger)
+            return merger;
+    }
     if (!rt->io)
         return NULL;
     
