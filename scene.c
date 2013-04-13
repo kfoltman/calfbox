@@ -246,6 +246,23 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         }
         return TRUE;
     }
+    else
+    if (!strcmp(cmd->command, "/send_event") && (!strcmp(cmd->arg_types, "iii") || !strcmp(cmd->arg_types, "ii") || !strcmp(cmd->arg_types, "i")))
+    {
+        int mcmd = CBOX_ARG_I(cmd, 0);
+        int arg1 = 0, arg2 = 0;
+        if (cmd->arg_types[1] == 'i')
+        {
+            arg1 = CBOX_ARG_I(cmd, 1);
+            if (cmd->arg_types[2] == 'i')
+                arg2 = CBOX_ARG_I(cmd, 2);
+        }
+        struct cbox_midi_buffer buf;
+        cbox_midi_buffer_init(&buf);
+        cbox_midi_buffer_write_inline(&buf, 0, mcmd, arg1, arg2);
+        cbox_midi_merger_push(&s->scene_input_merger, &buf, s->rt);
+        return TRUE;
+    }
     else if (!strcmp(cmd->command, "/render_stereo") && !strcmp(cmd->arg_types, "i"))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
@@ -257,7 +274,6 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         }
         struct cbox_midi_buffer midibuf_song;
         cbox_midi_buffer_init(&midibuf_song);
-        cbox_midi_merger_connect(&s->scene_input_merger, &midibuf_song, s->rt);
         int nframes = CBOX_ARG_I(cmd, 0);
         float *data = malloc(2 * nframes * sizeof(float));
         float *data_i = malloc(2 * nframes * sizeof(float));
@@ -269,6 +285,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         }
         if (s->spb)
             cbox_song_playback_render(s->spb, &midibuf_song, nframes);
+        cbox_midi_merger_push(&s->scene_input_merger, &midibuf_song, s->rt);
         cbox_scene_render(s, nframes, buffers);
         for (int i = 0; i < nframes; i++)
         {
@@ -276,7 +293,6 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             data_i[i * 2 + 1] = buffers[1][i];
         }
         free(data);
-        cbox_midi_merger_disconnect(&s->scene_input_merger, &midibuf_song, s->rt);
 
         if (!cbox_execute_on(fb, NULL, "/data", "b", error, cbox_blob_new_acquire_data(data_i, nframes * 2 * sizeof(float))))
             return FALSE;

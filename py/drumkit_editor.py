@@ -278,7 +278,8 @@ class PadButton(Gtk.RadioButton):
             self.get_child().set_markup(data.to_markup())
             self.get_child().set_line_wrap(True)
     def on_clicked(self, w):
-        cbox.do_cmd('/play_note', None, [1, self.key, 127])
+        cbox.Document.get_scene().send_midi_event(0x90, self.key, 127)
+        cbox.Document.get_scene().send_midi_event(0x80, self.key, 127)
         w.controller.on_pad_selected(w)
 
 ####################################################################################################################################################

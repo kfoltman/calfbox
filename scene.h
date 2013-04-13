@@ -48,6 +48,7 @@ struct cbox_scene
     int aux_bus_count;
     int transpose;
     int owns_rt;
+    struct cbox_engine *engine;
     struct cbox_song_playback *spb;
     struct cbox_midi_merger scene_input_merger;
     struct cbox_midi_buffer midibuf_total;

@@ -880,6 +880,8 @@ class DocScene(DocObj):
             return self.cmd_makeobj("/add_new_instrument_layer", 0, name, engine)
         else:
             return self.cmd_makeobj("/add_new_instrument_layer", int(1 + pos), name, engine)
+    def send_midi_event(self, *data):
+        self.cmd('/send_event', None, *data)
 Document.classmap['cbox_scene'] = DocScene
 
 class DocRt(DocObj):

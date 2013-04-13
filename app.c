@@ -128,10 +128,10 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         }
         int mcmd = CBOX_ARG_I(cmd, 1);
         int arg1 = 0, arg2 = 0;
-        if (cmd->arg_types[1] == 'i')
+        if (cmd->arg_types[2] == 'i')
         {
             arg1 = CBOX_ARG_I(cmd, 2);
-            if (cmd->arg_types[2] == 'i')
+            if (cmd->arg_types[3] == 'i')
                 arg2 = CBOX_ARG_I(cmd, 3);
         }
         struct cbox_midi_buffer buf;
