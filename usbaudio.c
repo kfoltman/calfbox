@@ -247,7 +247,7 @@ static void play_callback_adaptive(struct libusb_transfer *transfer)
         tlen += transfer->iso_packet_desc[i].actual_length;
         olen += transfer->iso_packet_desc[i].length;
         if (transfer->iso_packet_desc[i].status)
-            printf("ISO error: index = %d i = %d status = %d\n", (int)transfer->user_data, i, transfer->iso_packet_desc[i].status);
+            printf("ISO error: index = %d i = %d status = %d\n", (int)xf->index, i, transfer->iso_packet_desc[i].status);
     }
     uii->samples_played += olen / (oc * resolution);
     int nsamps = uii->sample_rate / 1000;
