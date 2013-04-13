@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "cmd.h"
 #include "dom.h"
+#include "mididest.h"
 
 CBOX_EXTERN_CLASS(cbox_scene)
 
@@ -48,6 +49,8 @@ struct cbox_scene
     int transpose;
     int owns_rt;
     struct cbox_song_playback *spb;
+    struct cbox_midi_merger scene_input_merger;
+    struct cbox_midi_buffer midibuf_total;
 
     struct cbox_recording_source *rec_mono_inputs, *rec_mono_outputs;
     struct cbox_recording_source *rec_stereo_inputs, *rec_stereo_outputs;
@@ -61,7 +64,7 @@ extern void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newp
 extern gboolean cbox_scene_load(struct cbox_scene *scene, const char *section, GError **error);
 extern gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument);
 extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, int allow_load, GError **error);
-extern void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_midi_buffer *midibuf_total, float *output_buffers[]);
+extern void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output_buffers[]);
 extern void cbox_scene_clear(struct cbox_scene *scene);
 extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *scene, const char *name, gboolean load, GError **error);
 extern struct cbox_instrument *cbox_scene_create_instrument(struct cbox_scene *scene, const char *instrument_name, const char *engine_name, GError **error);

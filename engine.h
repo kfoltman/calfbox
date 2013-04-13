@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dom.h"
 #include "io.h"
 #include "midi.h"
-#include "mididest.h"
 #include "rt.h"
 
 CBOX_EXTERN_CLASS(cbox_engine)
@@ -38,8 +37,7 @@ struct cbox_engine
     struct cbox_scene *scene;
     struct cbox_module *effect;
     struct cbox_master *master;
-    struct cbox_midi_buffer midibuf_aux, midibuf_jack, midibuf_song, midibuf_total;
-    struct cbox_midi_merger scene_input_merger;
+    struct cbox_midi_buffer midibuf_aux, midibuf_jack, midibuf_song;
     
     struct cbox_midi_buffer midibufs_appsink[2];
     int current_appsink_buffer;

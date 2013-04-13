@@ -103,7 +103,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     if (!strcmp(obj, "send_event_to") && (!strcmp(cmd->arg_types, "siii") || !strcmp(cmd->arg_types, "sii") || !strcmp(cmd->arg_types, "si")))
     {
         const char *output = CBOX_ARG_S(cmd, 0);
-        struct cbox_midi_merger *merger = &app.engine->scene_input_merger;
+        struct cbox_midi_merger *merger = NULL;
         if (*output)
         {
             struct cbox_uuid uuid;
@@ -116,6 +116,15 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown MIDI output UUID: '%s'", output);
                 return FALSE;
             }
+        }
+        else
+        {
+            if (!app.engine->scene)
+            {
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Scene not set");
+                return FALSE;
+            }
+            merger = &app.engine->scene->scene_input_merger;
         }
         int mcmd = CBOX_ARG_I(cmd, 1);
         int arg1 = 0, arg2 = 0;
@@ -134,6 +143,11 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     else
     if (!strcmp(obj, "play_note") && !strcmp(cmd->arg_types, "iii"))
     {
+        if (!app.engine->scene)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Scene not set");
+            return FALSE;
+        }
         int channel = CBOX_ARG_I(cmd, 0);
         int note = CBOX_ARG_I(cmd, 1);
         int velocity = CBOX_ARG_I(cmd, 2);
@@ -141,7 +155,7 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         cbox_midi_buffer_init(&buf);
         cbox_midi_buffer_write_inline(&buf, 0, 0x90 + ((channel - 1) & 15), note & 127, velocity & 127);
         cbox_midi_buffer_write_inline(&buf, 1, 0x80 + ((channel - 1) & 15), note & 127, velocity & 127);
-        cbox_engine_send_events_to(app.engine, &app.engine->scene_input_merger, &buf);
+        cbox_engine_send_events_to(app.engine, &app.engine->scene->scene_input_merger, &buf);
         return TRUE;
     }
     else

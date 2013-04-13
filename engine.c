@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "io.h"
 #include "layer.h"
 #include "midi.h"
+#include "mididest.h"
 #include "module.h"
 #include "rt.h"
 #include "scene.h"
@@ -50,13 +51,7 @@ struct cbox_engine *cbox_engine_new(struct cbox_rt *rt)
     cbox_midi_buffer_init(&engine->midibuf_aux);
     cbox_midi_buffer_init(&engine->midibuf_jack);
     cbox_midi_buffer_init(&engine->midibuf_song);
-    cbox_midi_buffer_init(&engine->midibuf_total);
-    cbox_midi_merger_init(&engine->scene_input_merger, &engine->midibuf_total);
 
-    cbox_midi_merger_connect(&engine->scene_input_merger, &engine->midibuf_aux, NULL);
-    cbox_midi_merger_connect(&engine->scene_input_merger, &engine->midibuf_jack, NULL);
-    cbox_midi_merger_connect(&engine->scene_input_merger, &engine->midibuf_song, NULL);
-    
     cbox_midi_buffer_init(&engine->midibufs_appsink[0]);
     cbox_midi_buffer_init(&engine->midibufs_appsink[1]);
     engine->current_appsink_buffer = 0;
@@ -84,8 +79,6 @@ void cbox_engine_destroyfunc(struct cbox_objhdr *obj_ptr)
     cbox_master_destroy(engine->master);
     engine->master = NULL;
 
-    cbox_midi_merger_close(&engine->scene_input_merger);
-    
     free(engine);
 }
 
@@ -102,7 +95,6 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
     
     cbox_midi_buffer_clear(&engine->midibuf_aux);
     cbox_midi_buffer_clear(&engine->midibuf_song);
-    cbox_midi_buffer_clear(&engine->midibuf_total);
     cbox_io_get_midi_data(io, &engine->midibuf_jack);
     
     // Copy MIDI input to the app-sink with no timing information
@@ -124,10 +116,8 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
     if (engine->scene && engine->scene->spb)
         cbox_song_playback_render(engine->scene->spb, &engine->midibuf_song, nframes);
 
-    cbox_midi_merger_render(&engine->scene_input_merger);
-
     if (engine->scene)
-        cbox_scene_render(engine->scene, nframes, &engine->midibuf_total, io->output_buffers);
+        cbox_scene_render(engine->scene, nframes, io->output_buffers);
     
     // Process "master" effect
     if (effect)
@@ -152,8 +142,23 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
 
 struct cbox_scene *cbox_engine_set_scene(struct cbox_engine *engine, struct cbox_scene *scene)
 {
+    if (scene == engine->scene)
+        return scene;
+
     if (scene)
+    {
         scene->spb = engine->master->spb;
+        cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_aux, engine->rt);
+        cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_jack, engine->rt);
+        cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_song, engine->rt);
+    }
+    if (engine->scene)
+    {
+        cbox_midi_merger_disconnect(&engine->scene->scene_input_merger, &engine->midibuf_aux, engine->rt);
+        cbox_midi_merger_disconnect(&engine->scene->scene_input_merger, &engine->midibuf_jack, engine->rt);
+        cbox_midi_merger_disconnect(&engine->scene->scene_input_merger, &engine->midibuf_song, engine->rt);
+    }
+    
     return cbox_rt_swap_pointers(engine->rt, (void **)&engine->scene, scene);
 }
 
@@ -226,7 +231,8 @@ void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_mer
         cbox_midi_merger_push(merger, buffer, engine->rt);
     else
     {
-        cbox_midi_merger_push(&engine->scene_input_merger, buffer, engine->rt);
+        if (engine->scene)
+            cbox_midi_merger_push(&engine->scene->scene_input_merger, buffer, engine->rt);
         for (GSList *p = engine->rt->io->midi_outputs; p; p = p->next)
         {
             struct cbox_midi_output *midiout = p->data;

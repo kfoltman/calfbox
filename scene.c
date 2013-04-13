@@ -257,6 +257,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         }
         struct cbox_midi_buffer midibuf_song;
         cbox_midi_buffer_init(&midibuf_song);
+        cbox_midi_merger_connect(&s->scene_input_merger, &midibuf_song, s->rt);
         int nframes = CBOX_ARG_I(cmd, 0);
         float *data = malloc(2 * nframes * sizeof(float));
         float *data_i = malloc(2 * nframes * sizeof(float));
@@ -268,13 +269,14 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         }
         if (s->spb)
             cbox_song_playback_render(s->spb, &midibuf_song, nframes);
-        cbox_scene_render(s, nframes, &midibuf_song, buffers);
+        cbox_scene_render(s, nframes, buffers);
         for (int i = 0; i < nframes; i++)
         {
             data_i[i * 2] = buffers[0][i];
             data_i[i * 2 + 1] = buffers[1][i];
         }
         free(data);
+        cbox_midi_merger_disconnect(&s->scene_input_merger, &midibuf_song, s->rt);
 
         if (!cbox_execute_on(fb, NULL, "/data", "b", error, cbox_blob_new_acquire_data(data_i, nframes * 2 * sizeof(float))))
             return FALSE;
@@ -548,7 +550,7 @@ static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbo
     return event_count;
 }
 
-void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_midi_buffer *midibuf_total, float *output_buffers[])
+void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output_buffers[])
 {
     int n, i, j;
 
@@ -570,7 +572,10 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, struct cbox_m
         }
     }
     
-    write_events_to_instrument_ports(scene, midibuf_total);
+    cbox_midi_buffer_clear(&scene->midibuf_total);
+    cbox_midi_merger_render(&scene->scene_input_merger);
+
+    write_events_to_instrument_ports(scene, &scene->midibuf_total);
 
     for (n = 0; n < scene->aux_bus_count; n++)
     {
@@ -917,6 +922,9 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_rt
     s->owns_rt = owns_rt;
     s->spb = NULL;
 
+    cbox_midi_buffer_init(&s->midibuf_total);
+    cbox_midi_merger_init(&s->scene_input_merger, &s->midibuf_total);
+
     if (s->rt && s->rt->io)
     {
         struct cbox_io *io = s->rt->io;
@@ -956,6 +964,7 @@ static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
         destroy_rec_sources(scene->rec_mono_outputs, io->output_count);
         destroy_rec_sources(scene->rec_stereo_outputs, io->output_count / 2);
     }
+    cbox_midi_merger_close(&scene->scene_input_merger);    
     if (scene->owns_rt && scene->rt)
         CBOX_DELETE(scene->rt);
     free(scene);
