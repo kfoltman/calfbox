@@ -23,18 +23,23 @@ struct cbox_io_env
 {
     int srate;
     int buffer_size;    
+    int input_count, output_count;
 };
 
 static inline void cbox_io_env_clear(struct cbox_io_env *env)
 {
     env->srate = 0;
     env->buffer_size = 0;
+    env->input_count = 0;
+    env->output_count = 0;
 }
 
 static inline void cbox_io_env_copy(struct cbox_io_env *dest, const struct cbox_io_env *src)
 {
     dest->srate = src->srate;
     dest->buffer_size = src->buffer_size;
+    dest->input_count = src->input_count;
+    dest->output_count = src->output_count;
 }
 
 #endif

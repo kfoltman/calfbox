@@ -35,7 +35,7 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
             cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
             cbox_execute_on(fb, NULL, "/output", "i", error, output->output_bus + 1)))
             return FALSE;
-        return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, CBOX_GET_DOCUMENT(instr->scene), instr->scene->rt, error);
+        return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, CBOX_GET_DOCUMENT(instr->scene), instr->scene->rt, instr->scene->engine, error);
     }
     if (!strcmp(subcmd, "/gain") && !strcmp(cmd->arg_types, "f"))
     {
@@ -53,7 +53,7 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
         return cbox_execute_sub(&output->rec_dry.cmd_target, fb, cmd, subcmd + 8, error);
     if (!strncmp(subcmd, "/rec_wet/", 9))
         return cbox_execute_sub(&output->rec_wet.cmd_target, fb, cmd, subcmd + 8, error);
-    return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, CBOX_GET_DOCUMENT(instr->scene), instr->scene->rt, error);
+    return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, CBOX_GET_DOCUMENT(instr->scene), instr->scene->rt, instr->scene->engine, error);
 }
 
 static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, struct cbox_instrument_output *output, int id, struct cbox_command_target *fb, struct cbox_osc_command *cmd, const char *subcmd, GError **error)
@@ -66,7 +66,7 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
             cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
             cbox_execute_on(fb, NULL, "/bus", "s", error, instr->aux_output_names[id] ? instr->aux_output_names[id] : "")))
             return FALSE;
-        return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, CBOX_GET_DOCUMENT(instr->scene), instr->scene->rt, error);
+        return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, CBOX_GET_DOCUMENT(instr->scene), instr->scene->rt, instr->scene->engine, error);
     }
     else if (!strcmp(subcmd, "/bus") && !strcmp(cmd->arg_types, "s"))
     {

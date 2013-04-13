@@ -198,26 +198,16 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return cbox_execute_on(fb, NULL, "/uuid", "o", error, meter);
     }
     else
-    if (!strcmp(obj, "new_recorder") && !strcmp(cmd->arg_types, "s"))
+    if (!strcmp(obj, "new_engine") && !strcmp(cmd->arg_types, "ii"))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
 
-        struct cbox_recorder *rec = cbox_recorder_new_stream(app.rt, CBOX_ARG_S(cmd, 0));
+        struct cbox_engine *e = cbox_engine_new(app.document, NULL);
+        e->io_env.srate = CBOX_ARG_I(cmd, 0);
+        e->io_env.buffer_size = CBOX_ARG_I(cmd, 1);
 
-        return cbox_execute_on(fb, NULL, "/uuid", "o", error, rec);
-    }
-    else
-    if (!strcmp(obj, "new_scene") && !strcmp(cmd->arg_types, "ii"))
-    {
-        if (!cbox_check_fb_channel(fb, cmd->command, error))
-            return FALSE;
-
-        struct cbox_rt *rt = cbox_rt_new(app.document);
-        cbox_rt_set_offline(rt, CBOX_ARG_I(cmd, 0), CBOX_ARG_I(cmd, 1));
-        struct cbox_scene *rec = cbox_scene_new(app.document, rt, TRUE);
-
-        return cbox_execute_on(fb, NULL, "/uuid", "o", error, rec);
+        return e ? cbox_execute_on(fb, NULL, "/uuid", "o", error, e) : FALSE;
     }
     else
     if (!strcmp(obj, "print_s") && !strcmp(cmd->arg_types, "s"))

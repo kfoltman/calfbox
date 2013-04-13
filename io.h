@@ -61,9 +61,7 @@ struct cbox_io
     struct cbox_io_impl *impl;
     struct cbox_command_target cmd_target;
 
-    int input_count;
     float **input_buffers; // only valid inside jack_rt_process
-    int output_count;
     float **output_buffers; // only valid inside jack_rt_process
     struct cbox_io_env io_env;
     

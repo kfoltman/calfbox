@@ -320,7 +320,7 @@ static PyObject *cbox_python_init_engine(PyObject *self, PyObject *args)
     cbox_dom_init();
     app.document = cbox_document_new();
     app.rt = cbox_rt_new(app.document);
-    app.engine = cbox_engine_new(app.rt);
+    app.engine = cbox_engine_new(app.document, app.rt);
     app.rt->engine = app.engine;
     cbox_config_init(config_file);
     cbox_wavebank_init();
@@ -370,7 +370,7 @@ static PyObject *cbox_python_start_audio(PyObject *self, PyObject *args)
         return PyErr_Format(PyExc_IOError, "Cannot initialise sound I/O: %s", (error && error->message) ? error->message : "Unknown error");
 
     cbox_rt_set_io(app.rt, &app.io);
-    cbox_engine_set_scene(app.engine, cbox_scene_new(app.document, app.rt, FALSE));
+    cbox_engine_set_scene(app.engine, cbox_scene_new(app.document, app.engine));
     cbox_rt_start(app.rt, (callback && callback != Py_None) ? &target : NULL);
     audio_running = TRUE;
 
@@ -394,7 +394,7 @@ static PyObject *cbox_python_start_noaudio(PyObject *self, PyObject *args)
         cbox_command_target_init(&target, bridge_to_python_callback, callback);
 
     cbox_rt_set_offline(app.rt, sample_rate, 1024);
-    cbox_engine_set_scene(app.engine, cbox_scene_new(app.document, app.rt, FALSE));
+    cbox_engine_set_scene(app.engine, cbox_scene_new(app.document, app.engine));
     cbox_rt_start(app.rt, (callback && callback != Py_None) ? &target : NULL);
     audio_running = TRUE;
 

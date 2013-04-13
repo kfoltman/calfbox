@@ -78,7 +78,9 @@ class TestCbox(unittest.TestCase):
         scene.delete_aux("piano_reverb")
 
     def test_aux_scene(self):
-        scene = Document.new_scene(44100, 1024)
+        engine = Document.new_engine(44100, 1024)
+        scene = engine.new_scene()
+        engine.set_scene(scene)
         scene.add_instrument_layer("vintage")
         scene_status = scene.status()
         layer = scene_status.layers[0]
@@ -108,7 +110,9 @@ class TestCbox(unittest.TestCase):
         scene.delete_aux("piano_reverb")
 
     def test_sampler_api(self):
-        scene = Document.new_scene(44100, 1024)
+        engine = Document.new_engine(44100, 1024)
+        scene = engine.new_scene()
+        engine.set_scene(scene)
         scene.add_new_instrument_layer("temporary", "sampler")
         scene_status = scene.status()
         layer = scene_status.layers[0]
@@ -198,9 +202,10 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(cbox.GetThings(Document.uuid_cmd(rt.uuid, "/status"), ['uuid'], []).uuid, rt.uuid)
 
     def test_recorder_api(self):
-        scene = Document.get_scene()
-        scene.clear()
+        engine = Document.new_engine(44100, 512)
+        scene = engine.new_scene()
         scene.add_new_instrument_layer("temporary", "sampler")
+        engine.set_scene(scene)
         layer = scene.status().layers[0]
         instr = layer.status().instrument
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [])
@@ -210,21 +215,29 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [meter_uuid])
         instr.cmd('/output/1/rec_dry/detach', None, meter_uuid)
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [])
+        if os.path.exists("test.wav"):
+            os.unlink('test.wav')
 
-        rec_uuid = cbox.GetThings("/new_recorder", ['uuid'], ['test.wav']).uuid
+        rec = engine.new_recorder('test.wav')
+        self.assertEqual(rec.status().filename, 'test.wav')
+        rec_uuid = rec.uuid
         instr.cmd('/output/1/rec_dry/attach', None, rec_uuid)
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [rec_uuid])
         instr.cmd('/output/1/rec_dry/detach', None, rec_uuid)
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [])
         self.assertTrue(os.path.exists('test.wav'))
         self.assertTrue(os.path.getsize('test.wav') < 512)
+        os.unlink('test.wav')
 
-        rec_uuid = cbox.GetThings("/new_recorder", ['uuid'], ['test.wav']).uuid
+        rec = engine.new_recorder('test.wav')
+        self.assertEqual(rec.status().filename, 'test.wav')
+        rec_uuid = rec.uuid
         instr.cmd('/output/1/rec_dry/attach', None, rec_uuid)
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [rec_uuid])
-        data = struct.unpack_from("512f", cbox.GetThings("/scene/render_stereo", ['data'], [512]).data)
+        data = struct.unpack_from("512f", engine.render_stereo(512))
         instr.cmd('/output/1/rec_dry/detach', None, rec_uuid)
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [])
+        rec.delete()
         self.assertTrue(os.path.exists('test.wav'))
         self.assertTrue(os.path.getsize('test.wav') > 512 * 4 * 2)
         

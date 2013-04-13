@@ -41,7 +41,7 @@ static gboolean cbox_aux_bus_process_cmd(struct cbox_command_target *ct, struct 
     else 
     if (!strncmp(cmd->command, "/slot/", 6))
     {
-        return cbox_module_slot_process_cmd(&aux_bus->module, fb, cmd, cmd->command + 5, CBOX_GET_DOCUMENT(aux_bus), rt, error);
+        return cbox_module_slot_process_cmd(&aux_bus->module, fb, cmd, cmd->command + 5, CBOX_GET_DOCUMENT(aux_bus), rt, aux_bus->owner->engine, error);
     }
     else 
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
@@ -49,7 +49,7 @@ static gboolean cbox_aux_bus_process_cmd(struct cbox_command_target *ct, struct 
 
 struct cbox_aux_bus *cbox_aux_bus_load(struct cbox_scene *scene, const char *name, struct cbox_rt *rt, GError **error)
 {
-    struct cbox_module *module = cbox_module_new_from_fx_preset(name, CBOX_GET_DOCUMENT(scene), rt, error);
+    struct cbox_module *module = cbox_module_new_from_fx_preset(name, CBOX_GET_DOCUMENT(scene), rt, scene->engine, error);
     if (!module)
         return NULL;
     

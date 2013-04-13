@@ -47,7 +47,6 @@ struct cbox_scene
     struct cbox_aux_bus **aux_buses;
     int aux_bus_count;
     int transpose;
-    int owns_rt;
     struct cbox_engine *engine;
     struct cbox_midi_merger scene_input_merger;
     struct cbox_midi_buffer midibuf_total;
@@ -56,7 +55,7 @@ struct cbox_scene
     struct cbox_recording_source *rec_stereo_inputs, *rec_stereo_outputs;
 };
 
-extern struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_rt *rt, int owns_rt);
+extern struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_engine *engine);
 extern gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error);
 extern gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *layer, int pos, GError **error);
 extern struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos);

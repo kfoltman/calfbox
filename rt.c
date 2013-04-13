@@ -50,13 +50,13 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
             GError *cerror = NULL;
             if (cbox_io_get_disconnect_status(rt->io, &cerror))
             {
-                return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count) &&
+                return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->io_env.input_count, rt->io->io_env.output_count) &&
                     cbox_execute_on(fb, NULL, "/state", "is", error, 1, "OK") &&
                     CBOX_OBJECT_DEFAULT_STATUS(rt, fb, error);
             }
             else
             {
-                return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->input_count, rt->io->output_count) &&
+                return cbox_execute_on(fb, NULL, "/audio_channels", "ii", error, rt->io->io_env.input_count, rt->io->io_env.output_count) &&
                     cbox_execute_on(fb, NULL, "/state", "is", error, -1, cerror ? cerror->message : "Unknown error") &&
                     CBOX_OBJECT_DEFAULT_STATUS(rt, fb, error);
             }
@@ -141,7 +141,10 @@ static void cbox_rt_on_midi_outputs_changed(void *user_data)
 void cbox_rt_on_update_io_env(struct cbox_rt *rt)
 {
     if (rt->engine)
+    {
+        cbox_io_env_copy(&rt->engine->io_env, &rt->io_env);
         cbox_master_set_sample_rate(rt->engine->master, rt->io_env.srate);
+    }
 }
 
 void cbox_rt_set_io(struct cbox_rt *rt, struct cbox_io *io)
@@ -165,6 +168,8 @@ void cbox_rt_set_offline(struct cbox_rt *rt, int sample_rate, int buffer_size)
     rt->io = NULL;
     rt->io_env.srate = sample_rate;
     rt->io_env.buffer_size = buffer_size;
+    rt->io_env.input_count = 0;
+    rt->io_env.output_count = 2;
     cbox_rt_on_update_io_env(rt);
 }
 

@@ -33,6 +33,7 @@ struct cbox_engine
 {
     CBOX_OBJECT_HEADER()
     struct cbox_command_target cmd_target;
+    struct cbox_io_env io_env;
     struct cbox_rt *rt;
     struct cbox_scene *scene;
     struct cbox_song_playback *spb;
@@ -45,7 +46,7 @@ struct cbox_engine
 };
 
 // These use an RT command internally
-extern struct cbox_engine *cbox_engine_new(struct cbox_rt *rt);
+extern struct cbox_engine *cbox_engine_new(struct cbox_document *doc, struct cbox_rt *rt);
 extern void cbox_engine_update_song_playback(struct cbox_engine *engine);
 extern struct cbox_scene *cbox_engine_set_scene(struct cbox_engine *engine, struct cbox_scene *scene);
 extern struct cbox_song *cbox_engine_set_song(struct cbox_engine *engine, struct cbox_song *song, int new_pos);

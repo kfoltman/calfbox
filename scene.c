@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "auxbus.h"
 #include "config-api.h"
+#include "engine.h"
 #include "errors.h"
 #include "instr.h"
 #include "io.h"
@@ -537,12 +538,12 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
     if (scene->rt && scene->rt->io)
     {
         struct cbox_io *io = scene->rt->io;
-        for (i = 0; i < io->input_count; i++)
+        for (i = 0; i < io->io_env.input_count; i++)
         {
             if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_mono_inputs[i]))
                 cbox_recording_source_push(&scene->rec_mono_inputs[i], (const float **)&io->input_buffers[i], nframes);
         }
-        for (i = 0; i < io->input_count / 2; i++)
+        for (i = 0; i < io->io_env.input_count / 2; i++)
         {
             if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_stereo_inputs[i]))
             {
@@ -669,22 +670,20 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
             }
         }
     }
-    if (scene->rt && scene->rt->io)
+
+    int output_count = scene->engine->io_env.output_count;
+    // XXXKF this assumes that the buffers are zeroed on start - which isn't true if there are multiple scenes
+    for (i = 0; i < output_count; i++)
     {
-        struct cbox_io *io = scene->rt->io;
-        // XXXKF this assumes that the buffers are zeroed on start - which isn't true if there are multiple scenes
-        for (i = 0; i < io->output_count; i++)
+        if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_mono_outputs[i]))
+            cbox_recording_source_push(&scene->rec_mono_outputs[i], (const float **)&output_buffers[i], nframes);
+    }
+    for (i = 0; i < output_count / 2; i++)
+    {
+        if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_stereo_outputs[i]))
         {
-            if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_mono_outputs[i]))
-                cbox_recording_source_push(&scene->rec_mono_outputs[i], (const float **)&io->output_buffers[i], nframes);
-        }
-        for (i = 0; i < io->output_count / 2; i++)
-        {
-            if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_stereo_outputs[i]))
-            {
-                const float *buf[2] = { io->output_buffers[i * 2], io->output_buffers[i * 2 + 1] };
-                cbox_recording_source_push(&scene->rec_stereo_outputs[i], buf, nframes);
-            }
+            const float *buf[2] = { output_buffers[i * 2], output_buffers[i * 2 + 1] };
+            cbox_recording_source_push(&scene->rec_stereo_outputs[i], buf, nframes);
         }
     }
 }
@@ -720,7 +719,7 @@ static struct cbox_instrument *create_instrument(struct cbox_scene *scene, struc
     instr->aux_output_count = auxes;
 
     for (int i = 0; i < module->outputs / 2; i ++)
-        cbox_instrument_output_init(&instr->outputs[i], scene, module->rt->io_env.buffer_size);
+        cbox_instrument_output_init(&instr->outputs[i], scene, module->engine->io_env.buffer_size);
     
     return instr;
 }
@@ -746,7 +745,7 @@ struct cbox_instrument *cbox_scene_create_instrument(struct cbox_scene *scene, c
         return NULL;
     }
 
-    module = cbox_module_manifest_create_module(mptr, NULL, doc, scene->rt, instrument_name, error);
+    module = cbox_module_manifest_create_module(mptr, NULL, doc, scene->rt, scene->engine, instrument_name, error);
     if (!module)
     {
         cbox_force_error(error);
@@ -803,7 +802,7 @@ struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *sce
     
     // cbox_module_manifest_dump(mptr);
     
-    module = cbox_module_manifest_create_module(mptr, instr_section, doc, scene->rt, name, error);
+    module = cbox_module_manifest_create_module(mptr, instr_section, doc, scene->rt, scene->engine, name, error);
     if (!module)
     {
         cbox_force_error(error);
@@ -830,7 +829,7 @@ struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *sce
         
         if (cv)
         {
-            oobj->insert = cbox_module_new_from_fx_preset(cv, CBOX_GET_DOCUMENT(scene), module->rt, error);
+            oobj->insert = cbox_module_new_from_fx_preset(cv, CBOX_GET_DOCUMENT(scene), module->rt, scene->engine, error);
             if (!oobj->insert)
             {
                 cbox_force_error(error);
@@ -865,11 +864,11 @@ error:
     return NULL;
 }
 
-static struct cbox_recording_source *create_rec_sources(struct cbox_scene *scene, struct cbox_io *io, int count, int channels)
+static struct cbox_recording_source *create_rec_sources(struct cbox_scene *scene, int buffer_size, int count, int channels)
 {
     struct cbox_recording_source *s = malloc(sizeof(struct cbox_recording_source) * count);
     for (int i = 0; i < count; i++)
-        cbox_recording_source_init(&s[i], scene, io->io_env.buffer_size, channels);
+        cbox_recording_source_init(&s[i], scene, buffer_size, channels);
     return s;
 }
 
@@ -880,14 +879,15 @@ static void destroy_rec_sources(struct cbox_recording_source *s, int count)
     free(s);
 }
 
-struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_rt *rt, int owns_rt)
+struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_engine *engine)
 {
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
     if (!s)
         return NULL;
 
     CBOX_OBJECT_HEADER_INIT(s, cbox_scene, document);
-    s->rt = rt;
+    s->engine = engine;
+    s->rt = engine ? engine->rt : NULL;
     s->instrument_hash = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     s->name = g_strdup("");
     s->title = g_strdup("");
@@ -899,26 +899,15 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_rt
     s->aux_bus_count = 0;
     cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
     s->transpose = 0;
-    s->owns_rt = owns_rt;
 
     cbox_midi_buffer_init(&s->midibuf_total);
     cbox_midi_merger_init(&s->scene_input_merger, &s->midibuf_total);
 
-    if (s->rt && s->rt->io)
-    {
-        struct cbox_io *io = s->rt->io;
-        s->rec_mono_inputs = create_rec_sources(s, io, io->input_count, 1);
-        s->rec_stereo_inputs = create_rec_sources(s, io, io->input_count / 2, 2);
-        s->rec_mono_outputs = create_rec_sources(s, io, io->output_count, 1);
-        s->rec_stereo_outputs = create_rec_sources(s, io, io->output_count / 2, 2);
-    }
-    else
-    {
-        s->rec_mono_inputs = NULL;
-        s->rec_stereo_inputs = NULL;
-        s->rec_mono_outputs = NULL;
-        s->rec_stereo_outputs = NULL;
-    }
+    int buffer_size = engine->io_env.buffer_size;
+    s->rec_mono_inputs = create_rec_sources(s, buffer_size, engine->io_env.input_count, 1);
+    s->rec_stereo_inputs = create_rec_sources(s, buffer_size, engine->io_env.input_count / 2, 2);
+    s->rec_mono_outputs = create_rec_sources(s, buffer_size, engine->io_env.output_count, 1);
+    s->rec_stereo_outputs = create_rec_sources(s, buffer_size, engine->io_env.output_count / 2, 2);
     
     CBOX_OBJECT_REGISTER(s);
     return s;
@@ -935,16 +924,12 @@ static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
     free(scene->aux_buses);
     free(scene->instruments);
     g_hash_table_destroy(scene->instrument_hash);
-    if (scene->rt && scene->rt->io)
-    {
-        struct cbox_io *io = scene->rt->io;
-        destroy_rec_sources(scene->rec_mono_inputs, io->input_count);
-        destroy_rec_sources(scene->rec_stereo_inputs, io->input_count / 2);
-        destroy_rec_sources(scene->rec_mono_outputs, io->output_count);
-        destroy_rec_sources(scene->rec_stereo_outputs, io->output_count / 2);
-    }
+
+    destroy_rec_sources(scene->rec_mono_inputs, scene->engine->io_env.input_count);
+    destroy_rec_sources(scene->rec_stereo_inputs, scene->engine->io_env.input_count / 2);
+    destroy_rec_sources(scene->rec_mono_outputs, scene->engine->io_env.output_count);
+    destroy_rec_sources(scene->rec_stereo_outputs, scene->engine->io_env.output_count / 2);
+
     cbox_midi_merger_close(&scene->scene_input_merger);    
-    if (scene->owns_rt && scene->rt)
-        CBOX_DELETE(scene->rt);
     free(scene);
 }

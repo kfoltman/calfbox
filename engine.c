@@ -39,17 +39,27 @@ CBOX_CLASS_DEFINITION_ROOT(cbox_engine)
 
 static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
 
-struct cbox_engine *cbox_engine_new(struct cbox_rt *rt)
+struct cbox_engine *cbox_engine_new(struct cbox_document *doc, struct cbox_rt *rt)
 {
     struct cbox_engine *engine = malloc(sizeof(struct cbox_engine));
-    CBOX_OBJECT_HEADER_INIT(engine, cbox_engine, CBOX_GET_DOCUMENT(rt));
+    CBOX_OBJECT_HEADER_INIT(engine, cbox_engine, doc);
     
     engine->rt = rt;
     engine->scene = NULL;
     engine->effect = NULL;
     engine->master = cbox_master_new(engine);
-    engine->master->song = cbox_song_new(CBOX_GET_DOCUMENT(rt));
+    engine->master->song = cbox_song_new(doc);
     engine->spb = NULL;
+    
+    if (rt)
+        cbox_io_env_copy(&engine->io_env, &rt->io_env);
+    else
+    {
+        engine->io_env.srate = 0; // must be overridden
+        engine->io_env.buffer_size = 256;
+        engine->io_env.input_count = 0;
+        engine->io_env.output_count = 2;
+    }
 
     cbox_midi_buffer_init(&engine->midibuf_aux);
     cbox_midi_buffer_init(&engine->midibuf_jack);
@@ -61,7 +71,6 @@ struct cbox_engine *cbox_engine_new(struct cbox_rt *rt)
 
     cbox_command_target_init(&engine->cmd_target, cbox_engine_process_cmd, engine);
     CBOX_OBJECT_REGISTER(engine);
-    cbox_document_set_service(CBOX_GET_DOCUMENT(rt), "engine", &engine->_obj_hdr);
     
     return engine;
 }
@@ -121,6 +130,40 @@ static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct c
         return TRUE;
     }
     else
+    if (!strcmp(cmd->command, "/new_scene") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        struct cbox_scene *s = cbox_scene_new(CBOX_GET_DOCUMENT(engine), engine);
+
+        return s ? cbox_execute_on(fb, NULL, "/uuid", "o", error, s) : FALSE;
+    }
+    else
+    if (!strcmp(cmd->command, "/new_recorder") && !strcmp(cmd->arg_types, "s"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        struct cbox_recorder *rec = cbox_recorder_new_stream(engine, engine->rt, CBOX_ARG_S(cmd, 0));
+
+        return rec ? cbox_execute_on(fb, NULL, "/uuid", "o", error, rec) : FALSE;
+    }
+    else
+    if (!strcmp(cmd->command, "/set_scene") && !strcmp(cmd->arg_types, "s"))
+    {
+        if (CBOX_ARG_S_ISNULL(cmd, 0))
+            cbox_engine_set_scene(engine, NULL);
+        else
+        {
+            struct cbox_scene *scene = (struct cbox_scene *)CBOX_ARG_O(cmd, 0, engine, cbox_scene, error);
+            if (!scene)
+                return FALSE;
+            cbox_engine_set_scene(engine, scene);
+        }
+        return TRUE;
+    }
+    else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
@@ -149,7 +192,8 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
         }
     }
     
-    cbox_rt_handle_rt_commands(engine->rt);
+    if (engine->rt)
+        cbox_rt_handle_rt_commands(engine->rt);
     
     // Combine various sources of events (song, non-RT thread, JACK input)
     if (engine->spb)
@@ -271,6 +315,8 @@ void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_mer
     {
         if (engine->scene)
             cbox_midi_merger_push(&engine->scene->scene_input_merger, buffer, engine->rt);
+        if (!engine->rt || !engine->rt->io)
+            return;
         for (GSList *p = engine->rt->io->midi_outputs; p; p = p->next)
         {
             struct cbox_midi_output *midiout = p->data;

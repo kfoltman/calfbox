@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_ARG_B(cmd, idx) ((const struct cbox_blob *)(cmd)->arg_values[(idx)])
 #define CBOX_ARG_F(cmd, idx) (*(double *)(cmd)->arg_values[(idx)])
 #define CBOX_ARG_O(cmd, idx, src, class, error) cbox_document_get_object_by_text_uuid(CBOX_GET_DOCUMENT(src), (const char *)(cmd)->arg_values[(idx)], &CBOX_CLASS(class), (error))
+#define CBOX_ARG_S_ISNULL(cmd, idx) (0 == (const char *)(cmd)->arg_values[(idx)])
 
 struct cbox_command_target;
 

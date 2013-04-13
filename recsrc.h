@@ -24,6 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct cbox_recording_source;
 struct cbox_rt;
+struct cbox_engine;
+
 CBOX_EXTERN_CLASS(cbox_recorder)
 
 struct cbox_recorder
@@ -57,6 +59,6 @@ extern int cbox_recording_source_detach(struct cbox_recording_source *src, struc
 extern void cbox_recording_source_push(struct cbox_recording_source *src, const float **buffers, uint32_t numsamples);
 extern void cbox_recording_source_uninit(struct cbox_recording_source *src);
 
-extern struct cbox_recorder *cbox_recorder_new_stream(struct cbox_rt *rt, const char *filename);
+extern struct cbox_recorder *cbox_recorder_new_stream(struct cbox_engine *engine, struct cbox_rt *rt, const char *filename);
 
 #endif

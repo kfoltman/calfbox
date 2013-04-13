@@ -57,9 +57,9 @@ void jack_input_process_block(struct cbox_module *module, cbox_sample_t **inputs
 
 static gboolean validate_input_index(int input, const char *cfg_section, const char *type, GError **error)
 {
-    if (input < 1 || input > app.io.input_count)
+    if (input < 1 || input > app.io.io_env.input_count)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_OUT_OF_RANGE, "%s: invalid value for %s (%d), allowed values are 1..%d", cfg_section, type, input, app.io.input_count);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_OUT_OF_RANGE, "%s: invalid value for %s (%d), allowed values are 1..%d", cfg_section, type, input, app.io.io_env.input_count);
         return FALSE;
     }
     return TRUE;

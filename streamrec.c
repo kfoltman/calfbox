@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "engine.h"
 #include "errors.h"
 #include "recsrc.h"
 #include "rt.h"
@@ -55,6 +56,7 @@ struct stream_recorder
     struct recording_buffer buffers[STREAM_BUFFER_COUNT];
 
     struct cbox_rt *rt;
+    struct cbox_engine *engine;
     gchar *filename;
     SNDFILE *volatile sndfile;
     SF_INFO info;
@@ -115,7 +117,7 @@ static gboolean stream_recorder_attach(struct cbox_recorder *handler, struct cbo
 
     memset(&self->info, 0, sizeof(self->info));
     self->info.frames = 0;
-    self->info.samplerate = self->rt->io_env.srate;
+    self->info.samplerate = self->engine->io_env.srate;
     self->info.channels = src->channels;
     self->info.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT; // XXXKF make format configurable on instantiation
     self->info.sections = 0;
@@ -210,11 +212,12 @@ static gboolean stream_recorder_process_cmd(struct cbox_command_target *ct, stru
     return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
-struct cbox_recorder *cbox_recorder_new_stream(struct cbox_rt *rt, const char *filename)
+struct cbox_recorder *cbox_recorder_new_stream(struct cbox_engine *engine, struct cbox_rt *rt, const char *filename)
 {
     struct stream_recorder *self = malloc(sizeof(struct stream_recorder));
     self->rt = rt;
-    CBOX_OBJECT_HEADER_INIT(&self->iface, cbox_recorder, CBOX_GET_DOCUMENT(rt));
+    self->engine = engine;
+    CBOX_OBJECT_HEADER_INIT(&self->iface, cbox_recorder, CBOX_GET_DOCUMENT(engine));
     cbox_command_target_init(&self->iface.cmd_target, stream_recorder_process_cmd, self);
     
     self->iface.user_data = self;

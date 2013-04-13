@@ -548,6 +548,14 @@ class Document:
         """Internal: retrieve an UUID of an object that has specified path."""
         return GetUUID('%s/get_uuid' % path).uuid
     @staticmethod
+    def map_path(path, *args):
+        """Internal: return an object corresponding to a path"""
+        return Document.map_uuid(Document.get_uuid(path))
+    @staticmethod
+    def cmd_makeobj(cmd, *args):
+        """Internal: create an object from the UUID result of a command"""
+        return Document.map_uuid(GetUUID(cmd, *args).uuid)
+    @staticmethod
     def get_obj_class(uuid):
         """Internal: retrieve an internal class type of an object that has specified path."""
         return get_thing(Document.uuid_cmd(uuid, "/get_class_name"), '/class_name', str)
@@ -555,23 +563,23 @@ class Document:
     def get_song():
         """Retrieve the current song object of a given document. Each document can
         only have one current song."""
-        return Document.map_uuid(Document.get_uuid("/song"))
+        return Document.map_path("/song")
     @staticmethod
     def get_scene():
         """Retrieve the current scene object of a given document. Each document can
         only have one current scene."""
-        return Document.map_uuid(Document.get_uuid("/scene"))
+        return Document.map_path("/scene")
     @staticmethod
     def get_rt():
         """Retrieve the RT singleton. RT is an object used to communicate between
         realtime and user thread, and is currently also used to access the audio
         engine."""
-        return Document.map_uuid(Document.get_uuid("/rt"))
+        return Document.map_path("/rt")
     @staticmethod
-    def new_scene(srate, bufsize):
-        """Create a new scene object. This new scene object cannot be used for
-        audio playback - that's only allowed for main document scene."""
-        return Document.map_uuid(GetUUID('/new_scene', int(srate), int(bufsize)).uuid)
+    def new_engine(srate, bufsize):
+        """Create a new off-line engine object. This new engine object cannot be used for
+        audio playback - that's only allowed for default engine."""
+        return Document.cmd_makeobj('/new_engine', int(srate), int(bufsize))
     @staticmethod
     def map_uuid(uuid):
         """Create or retrieve a Python-side accessor proxy for a C-side object."""
@@ -894,6 +902,24 @@ class DocModule(DocObj):
     class Status:
         pass
 Document.classmap['cbox_module'] = DocModule
+    
+class DocEngine(DocObj):
+    class Status:
+        pass
+    def new_scene(self):
+        return self.cmd_makeobj('/new_scene')
+    def new_recorder(self, filename):
+        return self.cmd_makeobj("/new_recorder", filename)
+    def render_stereo(self, samples):
+        return self.get_thing("/render_stereo", '/data', bytes, samples)
+    def set_scene(self, scene):
+        self.cmd('/set_scene', None, scene.uuid)
+Document.classmap['cbox_engine'] = DocEngine
+    
+class DocRecorder(DocObj):
+    class Status:
+        filename = str
+Document.classmap['cbox_recorder'] = DocRecorder
     
 class SamplerProgram(DocObj):
     class Status:

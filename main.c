@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
 
     app.document = cbox_document_new();
     app.rt = cbox_rt_new(app.document);
-    app.engine = cbox_engine_new(app.rt);
+    app.engine = cbox_engine_new(app.document, app.rt);
     app.rt->engine = app.engine;
     
     cbox_config_init(config_name);
@@ -266,7 +266,7 @@ int main(int argc, char *argv[])
         }
     }
     
-    scene = cbox_scene_new(app.document, app.rt, FALSE);
+    scene = cbox_scene_new(app.document, app.engine);
     if (!scene)
         goto fail;
     if (scene_name)
@@ -292,7 +292,7 @@ int main(int argc, char *argv[])
     
     if (effect_preset_name && *effect_preset_name)
     {
-        app.engine->effect = cbox_module_new_from_fx_preset(effect_preset_name, app.document, app.rt, &error);
+        app.engine->effect = cbox_module_new_from_fx_preset(effect_preset_name, app.document, app.rt, app.engine, &error);
         if (!app.engine->effect)
             goto fail;
     }
@@ -302,7 +302,7 @@ int main(int argc, char *argv[])
     if (output_name && scene)
     {
         GError *error = NULL;
-        if (!cbox_recording_source_attach(&scene->rec_stereo_outputs[0], cbox_recorder_new_stream(app.rt, output_name), &error))
+        if (!cbox_recording_source_attach(&scene->rec_stereo_outputs[0], cbox_recorder_new_stream(app.engine, app.rt, output_name), &error))
             cbox_print_error(error);
     }
     cbox_rt_start(app.rt, NULL);
