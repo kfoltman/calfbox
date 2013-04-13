@@ -648,6 +648,10 @@ try_now:
         l->data.lovel = atoi(value), l->data.has_lovel = 1;
     else if (!strcmp(key, "hilev"))
         l->data.hivel = atoi(value), l->data.has_hivel = 1;
+    else if (!strcmp(key, "benddown"))
+        l->data.bend_down = atoi(value), l->data.has_bend_down = 1;
+    else if (!strcmp(key, "bendup"))
+        l->data.bend_up = atoi(value), l->data.has_bend_up = 1;
     else if (!strcmp(key, "loopstart"))
         l->data.loop_start = atoi(value), l->data.has_loop_start = 1;
     else if (!strcmp(key, "loopend"))
