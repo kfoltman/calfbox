@@ -84,6 +84,8 @@ struct cbox_objhdr *cbox_engine_newfunc(struct cbox_class *class_ptr, struct cbo
 void cbox_engine_destroyfunc(struct cbox_objhdr *obj_ptr)
 {
     struct cbox_engine *engine = (struct cbox_engine *)obj_ptr;
+    while(engine->scene_count)
+        CBOX_DELETE(engine->scenes[0]);
     if (engine->master->song)
     {
         CBOX_DELETE(engine->master->song);
