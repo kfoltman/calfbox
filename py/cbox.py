@@ -812,7 +812,7 @@ class StreamPlayerEngine(NonDocObj):
         self.cmd('/seek', None, int(place))
     def load(self, filename, loop_start = -1):
         self.cmd('/load', None, filename, int(loop_start))
-    def unload(self, filename, loop_start = -1):
+    def unload(self):
         self.cmd('/unload')
 
 class TonewheelOrganEngine(NonDocObj):
