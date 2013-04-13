@@ -566,9 +566,14 @@ class Document:
         return Document.map_path("/song")
     @staticmethod
     def get_scene():
+        """Retrieve the first scene object of a default engine. This function
+        is considered obsolete-ish, because of multiple scene support."""
+        return Document.map_path("/scene")
+    @staticmethod
+    def get_engine():
         """Retrieve the current scene object of a given document. Each document can
         only have one current scene."""
-        return Document.map_path("/scene")
+        return Document.map_path("/rt/engine")
     @staticmethod
     def get_rt():
         """Retrieve the RT singleton. RT is an object used to communicate between
@@ -905,15 +910,13 @@ Document.classmap['cbox_module'] = DocModule
     
 class DocEngine(DocObj):
     class Status:
-        pass
+        scenes = AltPropName('/scene', [DocScene])
     def new_scene(self):
         return self.cmd_makeobj('/new_scene')
     def new_recorder(self, filename):
         return self.cmd_makeobj("/new_recorder", filename)
     def render_stereo(self, samples):
         return self.get_thing("/render_stereo", '/data', bytes, samples)
-    def set_scene(self, scene):
-        self.cmd('/set_scene', None, scene.uuid)
 Document.classmap['cbox_engine'] = DocEngine
     
 class DocRecorder(DocObj):

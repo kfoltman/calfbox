@@ -45,6 +45,7 @@ class TestCbox(unittest.TestCase):
         
     def test_scene(self):
         scene = Document.get_scene()
+        self.assertEqual(Document.get_engine().status().scenes[0], scene)
         
         scene.clear()
         scene.add_new_instrument_layer("test_instr", "sampler")
@@ -80,7 +81,7 @@ class TestCbox(unittest.TestCase):
     def test_aux_scene(self):
         engine = Document.new_engine(44100, 1024)
         scene = engine.new_scene()
-        engine.set_scene(scene)
+        self.assertEqual(engine.status().scenes[0], scene)
         scene.add_instrument_layer("vintage")
         scene_status = scene.status()
         layer = scene_status.layers[0]
@@ -112,7 +113,6 @@ class TestCbox(unittest.TestCase):
     def test_sampler_api(self):
         engine = Document.new_engine(44100, 1024)
         scene = engine.new_scene()
-        engine.set_scene(scene)
         scene.add_new_instrument_layer("temporary", "sampler")
         scene_status = scene.status()
         layer = scene_status.layers[0]
@@ -205,7 +205,6 @@ class TestCbox(unittest.TestCase):
         engine = Document.new_engine(44100, 512)
         scene = engine.new_scene()
         scene.add_new_instrument_layer("temporary", "sampler")
-        engine.set_scene(scene)
         layer = scene.status().layers[0]
         instr = layer.status().instrument
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [])
