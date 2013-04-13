@@ -280,9 +280,10 @@ void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition
             return;
     }
     // No realtime thread - do it all in the main thread
-    if (!rt->started)
+    if (!rt || !rt->started || rt->disconnected)
     {
-        def->execute(user_data);
+        while (!def->execute(user_data))
+            ;
         if (def->cleanup)
             def->cleanup(user_data);
         return;
