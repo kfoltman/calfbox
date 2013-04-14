@@ -98,6 +98,30 @@ void cbox_jack_midi_output_destroy(struct cbox_jack_midi_output *jmo)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static int copy_midi_data_to_buffer(jack_port_t *port, int buffer_size, struct cbox_midi_buffer *destination)
+{
+    void *midi = jack_port_get_buffer(port, buffer_size);
+    uint32_t event_count = jack_midi_get_event_count(midi);
+
+    cbox_midi_buffer_clear(destination);
+    for (uint32_t i = 0; i < event_count; i++)
+    {
+        jack_midi_event_t event;
+        
+        if (!jack_midi_event_get(&event, midi, i))
+        {
+            if (!cbox_midi_buffer_write_event(destination, event.time, event.buffer, event.size))
+                return -i;
+        }
+        else
+            return -i;
+    }
+    
+    return event_count;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 static int process_cb(jack_nframes_t nframes, void *arg)
 {
     struct cbox_jack_io_impl *jii = arg;
@@ -112,6 +136,14 @@ static int process_cb(jack_nframes_t nframes, void *arg)
         io->output_buffers[i] = jack_port_get_buffer(jii->outputs[i], nframes);
         for (int j = 0; j < nframes; j ++)
             io->output_buffers[i][j] = 0.f;
+    }
+    for (GSList *p = io->midi_inputs; p; p = p->next)
+    {
+        struct cbox_jack_midi_input *input = p->data;
+        if (input->hdr.output_set)
+            copy_midi_data_to_buffer(input->port, io->io_env.buffer_size, &input->hdr.buffer);
+        else
+            cbox_midi_buffer_clear(&input->hdr.buffer);
     }
     cb->process(cb->user_data, io, nframes);
     for (int i = 0; i < io->io_env.input_count; i++)
@@ -372,25 +404,7 @@ int cbox_jackio_get_midi_data(struct cbox_io_impl *impl, struct cbox_midi_buffer
 {
     struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
 
-    jack_port_t *port = jii->midi;
-    void *midi = jack_port_get_buffer(port, jii->ioi.pio->io_env.buffer_size);
-    uint32_t event_count = jack_midi_get_event_count(midi);
-
-    cbox_midi_buffer_clear(destination);
-    for (uint32_t i = 0; i < event_count; i++)
-    {
-        jack_midi_event_t event;
-        
-        if (!jack_midi_event_get(&event, midi, i))
-        {
-            if (!cbox_midi_buffer_write_event(destination, event.time, event.buffer, event.size))
-                return -i;
-        }
-        else
-            return -i;
-    }
-    
-    return event_count;
+    return copy_midi_data_to_buffer(jii->midi, jii->ioi.pio->io_env.buffer_size, destination);
 }
 
 void cbox_jackio_destroy(struct cbox_io_impl *impl)

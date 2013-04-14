@@ -50,6 +50,9 @@ struct cbox_scene
     struct cbox_engine *engine;
     struct cbox_midi_merger scene_input_merger;
     struct cbox_midi_buffer midibuf_total;
+    
+    struct cbox_midi_input **connected_inputs;
+    int connected_input_count;
 
     struct cbox_recording_source *rec_mono_inputs, *rec_mono_outputs;
     struct cbox_recording_source *rec_stereo_inputs, *rec_stereo_outputs;
@@ -65,6 +68,7 @@ extern gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cb
 extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, int allow_load, GError **error);
 extern void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output_buffers[]);
 extern void cbox_scene_clear(struct cbox_scene *scene);
+extern void cbox_scene_update_connected_inputs(struct cbox_scene *scene);
 extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *scene, const char *name, gboolean load, GError **error);
 extern struct cbox_instrument *cbox_scene_create_instrument(struct cbox_scene *scene, const char *instrument_name, const char *engine_name, GError **error);
 

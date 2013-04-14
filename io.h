@@ -87,6 +87,8 @@ struct cbox_midi_input
     struct cbox_uuid uuid;
     struct cbox_midi_buffer buffer;
     gboolean removing;
+    gboolean output_set;
+    struct cbox_uuid output;
 };
 
 struct cbox_midi_output

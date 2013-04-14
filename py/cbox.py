@@ -472,6 +472,9 @@ class JackIO:
     def delete_midi_output(uuid):
         do_cmd("/io/delete_midi_output", None, [uuid])
     @staticmethod
+    def route_midi_input(input_uuid, scene_uuid):
+        do_cmd("/io/route_midi_input", None, [input_uuid, scene_uuid])
+    @staticmethod
     def port_connect(pfrom, pto):
         do_cmd("/io/port_connect", None, [pfrom, pto])
     @staticmethod

@@ -300,6 +300,14 @@ void cbox_engine_update_song_playback(struct cbox_engine *engine)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+void cbox_engine_update_input_connections(struct cbox_engine *engine)
+{
+    for (int i = 0; i < engine->scene_count; i++)
+        cbox_scene_update_connected_inputs(engine->scenes[i]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_merger *merger, struct cbox_midi_buffer *buffer)
 {
     if (!engine || !buffer)

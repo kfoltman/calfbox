@@ -912,6 +912,8 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_en
     s->aux_bus_count = 0;
     cbox_command_target_init(&s->cmd_target, cbox_scene_process_cmd, s);
     s->transpose = 0;
+    s->connected_inputs = NULL;
+    s->connected_input_count = 0;
 
     cbox_midi_buffer_init(&s->midibuf_total);
     cbox_midi_merger_init(&s->scene_input_merger, &s->midibuf_total);
@@ -928,6 +930,47 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_en
     return s;
 }
 
+void cbox_scene_update_connected_inputs(struct cbox_scene *scene)
+{
+    if (!scene->rt || !scene->rt->io)
+        return;
+    
+    // This is called when a MIDI Input port has been created, connected/disconnected
+    // or is about to be removed (and then the removing flag will be set)
+    for (int i = 0; i < scene->connected_input_count; )
+    {
+        struct cbox_midi_input *input = scene->connected_inputs[i];
+        if (input->removing || !cbox_uuid_equal(&input->output, &scene->_obj_hdr.instance_uuid))
+        {
+            cbox_midi_merger_disconnect(&scene->scene_input_merger, &input->buffer, scene->rt);
+            cbox_rt_array_remove(scene->rt, (void ***)&scene->connected_inputs, &scene->connected_input_count, i);
+        }
+        else
+            i++;
+    }
+    for (GSList *p = scene->rt->io->midi_inputs; p; p = p->next)
+    {
+        struct cbox_midi_input *input = p->data;
+        if (cbox_uuid_equal(&input->output, &scene->_obj_hdr.instance_uuid))
+        {
+            gboolean found = FALSE;
+            for (int i = 0; i < scene->connected_input_count; i++)
+            {
+                if (scene->connected_inputs[i] == input)
+                {
+                    found = TRUE;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                cbox_midi_merger_connect(&scene->scene_input_merger, &input->buffer, scene->rt);
+                cbox_rt_array_insert(scene->rt, (void ***)&scene->connected_inputs, &scene->connected_input_count, -1, input);
+            }
+        }
+    }
+}
+
 static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_scene *scene = CBOX_H2O(objhdr);
@@ -940,12 +983,13 @@ static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
     free(scene->aux_buses);
     free(scene->instruments);
     g_hash_table_destroy(scene->instrument_hash);
+    free(scene->connected_inputs);
 
     destroy_rec_sources(scene->rec_mono_inputs, scene->engine->io_env.input_count);
     destroy_rec_sources(scene->rec_stereo_inputs, scene->engine->io_env.input_count / 2);
     destroy_rec_sources(scene->rec_mono_outputs, scene->engine->io_env.output_count);
     destroy_rec_sources(scene->rec_stereo_outputs, scene->engine->io_env.output_count / 2);
-
+    
     cbox_midi_merger_close(&scene->scene_input_merger);    
     free(scene);
 }

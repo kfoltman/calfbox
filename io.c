@@ -284,6 +284,29 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
             return FALSE;
         return cbox_uuid_report(&midiin->uuid, fb, error);
     }
+    else if (io->impl->createmidiinfunc && !strcmp(cmd->command, "/route_midi_input") && !strcmp(cmd->arg_types, "ss"))
+    {
+        const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        struct cbox_uuid uuid;
+        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+            return FALSE;
+        struct cbox_midi_input *midiin = cbox_io_get_midi_input(io, NULL, &uuid);
+        if (!midiin)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+            return FALSE;
+        }
+        if (*CBOX_ARG_S(cmd, 1))
+        {
+            if (cbox_uuid_fromstring(&midiin->output, CBOX_ARG_S(cmd, 1), error))
+                midiin->output_set = TRUE;
+        }
+        else
+            midiin->output_set = FALSE;
+        if (io->cb->on_midi_inputs_changed)
+            io->cb->on_midi_inputs_changed(io->cb->user_data);
+        return TRUE;
+    }
     else if (io->impl->createmidioutfunc && !strcmp(cmd->command, "/create_midi_output") && !strcmp(cmd->arg_types, "s"))
     {
         *cmd_handled = TRUE;

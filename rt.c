@@ -140,6 +140,13 @@ static void cbox_rt_on_midi_outputs_changed(void *user_data)
         cbox_engine_update_song_playback(rt->engine);
 }
 
+static void cbox_rt_on_midi_inputs_changed(void *user_data)
+{
+    struct cbox_rt *rt = user_data;
+    if (rt->engine)
+        cbox_engine_update_input_connections(rt->engine);
+}
+
 void cbox_rt_on_update_io_env(struct cbox_rt *rt)
 {
     if (rt->engine)
@@ -185,6 +192,7 @@ void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
         rt->cbs->process = cbox_rt_process;
         rt->cbs->on_disconnected = cbox_rt_on_disconnected;
         rt->cbs->on_reconnected = cbox_rt_on_reconnected;
+        rt->cbs->on_midi_inputs_changed = cbox_rt_on_midi_inputs_changed;
         rt->cbs->on_midi_outputs_changed = cbox_rt_on_midi_outputs_changed;
 
         cbox_io_start(rt->io, rt->cbs, fb);
