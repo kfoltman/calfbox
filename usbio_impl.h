@@ -164,14 +164,21 @@ struct cbox_usb_midi_interface
     int busdevadr;
     struct usbio_endpoint_descriptor epdesc_in, epdesc_out;
     struct usbio_transfer *transfer_in, *transfer_out;
-    struct cbox_midi_buffer midi_buffer;
     uint8_t midi_recv_data[MAX_MIDI_PACKET_SIZE];
     uint8_t sysex_data[MAX_SYSEX_SIZE];
     uint32_t current_sysex_length;
     enum usb_midi_protocol_type protocol;
+    struct cbox_usb_midi_input *input_port;
+    struct cbox_usb_midi_output *output_port;
 };
 
 #define USB_MIDI_OUTPUT_QUEUE 256
+
+struct cbox_usb_midi_input
+{
+    struct cbox_midi_input hdr;
+    struct cbox_usb_midi_interface *ifptr;
+};
 
 struct cbox_usb_midi_output
 {

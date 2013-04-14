@@ -75,6 +75,7 @@ struct cbox_io_callbacks
     void *user_data;
     
     void (*process)(void *user_data, struct cbox_io *io, uint32_t nframes);
+    void (*on_started)(void *user_data);
     void (*on_disconnected)(void *user_data);
     void (*on_reconnected)(void *user_data);
     void (*on_midi_inputs_changed)(void *user_data);

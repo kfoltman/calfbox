@@ -182,14 +182,20 @@ void cbox_rt_set_offline(struct cbox_rt *rt, int sample_rate, int buffer_size)
     cbox_rt_on_update_io_env(rt);
 }
 
+void cbox_rt_on_started(void *user_data)
+{
+    struct cbox_rt *rt = user_data;
+    rt->started = 1;
+}
+
 void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
 {
     if (rt->io)
     {
-        rt->started = 1;
         rt->cbs = malloc(sizeof(struct cbox_io_callbacks));
         rt->cbs->user_data = rt;
         rt->cbs->process = cbox_rt_process;
+        rt->cbs->on_started = cbox_rt_on_started;
         rt->cbs->on_disconnected = cbox_rt_on_disconnected;
         rt->cbs->on_reconnected = cbox_rt_on_reconnected;
         rt->cbs->on_midi_inputs_changed = cbox_rt_on_midi_inputs_changed;

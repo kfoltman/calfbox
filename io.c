@@ -284,7 +284,7 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
             return FALSE;
         return cbox_uuid_report(&midiin->uuid, fb, error);
     }
-    else if (io->impl->createmidiinfunc && !strcmp(cmd->command, "/route_midi_input") && !strcmp(cmd->arg_types, "ss"))
+    else if (!strcmp(cmd->command, "/route_midi_input") && !strcmp(cmd->arg_types, "ss"))
     {
         const char *uuidstr = CBOX_ARG_S(cmd, 0);
         struct cbox_uuid uuid;

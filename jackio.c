@@ -367,6 +367,11 @@ gboolean cbox_jackio_start(struct cbox_io_impl *impl, struct cbox_command_target
     jack_set_process_callback(jii->client, process_cb, jii);
     jack_set_port_registration_callback(jii->client, port_connect_cb, jii);
     jack_on_info_shutdown(jii->client, client_shutdown_cb, jii);
+
+    struct cbox_io *io = jii->ioi.pio;
+    if (io->cb->on_started)
+        io->cb->on_started(io->cb->user_data);
+
     jack_activate(jii->client);
 
     if (cbox_config_has_section(cbox_io_section))

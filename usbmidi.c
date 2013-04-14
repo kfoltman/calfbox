@@ -36,7 +36,7 @@ static void decode_events_mpd16(struct cbox_usb_midi_interface *umi, struct libu
         uint8_t len = data[0] & 15;
         if (!len || i + len >= transfer->actual_length)
             break;
-        cbox_midi_buffer_write_inline(&umi->midi_buffer, 0, data[1], len > 1 ? data[2] : 0, len > 2 ? data[3] : 0);
+        cbox_midi_buffer_write_inline(&umi->input_port->hdr.buffer, 0, data[1], len > 1 ? data[2] : 0, len > 2 ? data[3] : 0);
         i += len + 1;
     }
 }
@@ -58,7 +58,7 @@ static void decode_events_nocturn(struct cbox_usb_midi_interface *umi, struct li
             g_warning("Unrecognized combination of control, data and length: %02x %02x %02x", control, data[0], transfer->actual_length - i);
             break;
         }
-        cbox_midi_buffer_write_inline(&umi->midi_buffer, 0, control, data[0], data[1]);
+        cbox_midi_buffer_write_inline(&umi->input_port->hdr.buffer, 0, control, data[0], data[1]);
         i += 2;
     }
 }
@@ -73,14 +73,14 @@ static void decode_events_class(struct cbox_usb_midi_interface *umi, struct libu
         {
             // normalise: note on with vel 0 -> note off
             if ((data[1] & 0xF0) == 0x90 && data[3] == 0)
-                cbox_midi_buffer_write_inline(&umi->midi_buffer, 0, data[1] - 0x10, data[2], data[3]);
+                cbox_midi_buffer_write_inline(&umi->input_port->hdr.buffer, 0, data[1] - 0x10, data[2], data[3]);
             else
-                cbox_midi_buffer_write_event(&umi->midi_buffer, 0, data + 1, midi_cmd_size(data[1]));
+                cbox_midi_buffer_write_event(&umi->input_port->hdr.buffer, 0, data + 1, midi_cmd_size(data[1]));
         }
         else
         if (etype == 2 || etype == 3)
         {
-            cbox_midi_buffer_write_event(&umi->midi_buffer, 0, data + 1, etype);
+            cbox_midi_buffer_write_event(&umi->input_port->hdr.buffer, 0, data + 1, etype);
         }
         else
         if (etype == 4)
@@ -97,7 +97,7 @@ static void decode_events_class(struct cbox_usb_midi_interface *umi, struct libu
                 memcpy(&umi->sysex_data[umi->current_sysex_length], data + 1, len);
             umi->current_sysex_length += len;
             if (umi->current_sysex_length <= MAX_SYSEX_SIZE)
-                cbox_midi_buffer_write_event(&umi->midi_buffer, 0, umi->sysex_data, umi->current_sysex_length);
+                cbox_midi_buffer_write_event(&umi->input_port->hdr.buffer, 0, umi->sysex_data, umi->current_sysex_length);
             else
                 g_warning("Dropping oversized SysEx: length %d", umi->current_sysex_length);
             umi->current_sysex_length = 0;
@@ -231,10 +231,10 @@ void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
     for(GList *p = uii->rt_midi_ports; p; p = p->next)
     {
         struct cbox_usb_midi_interface *umi = p->data;
-        cbox_midi_buffer_clear(&umi->midi_buffer);
+        cbox_midi_buffer_clear(&umi->input_port->hdr.buffer);
         if (umi->epdesc_in.found)
         {
-            cbox_midi_merger_connect(&uii->midi_input_merger, &umi->midi_buffer, NULL);
+            cbox_midi_merger_connect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, NULL);
             umi->current_sysex_length = 0;
             umi->transfer_in = usbio_transfer_new(uii->usbctx, "MIDI In", 0, 0, umi);
             int pktsize = umi->epdesc_in.wMaxPacketSize;
@@ -275,7 +275,7 @@ void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii)
             usbio_transfer_shutdown(umi->transfer_in);
             usbio_transfer_destroy(umi->transfer_in);
             umi->transfer_in = NULL;
-            cbox_midi_buffer_clear(&umi->midi_buffer);
+            cbox_midi_buffer_clear(&umi->input_port->hdr.buffer);
         }
         if (umi->transfer_out)
         {
@@ -288,7 +288,7 @@ void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii)
     {
         struct cbox_usb_midi_interface *umi = p->data;
         if (umi->epdesc_in.found)
-            cbox_midi_merger_disconnect(&uii->midi_input_merger, &umi->midi_buffer, NULL);
+            cbox_midi_merger_disconnect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, NULL);
     }
     g_list_free(uii->rt_midi_ports);
 }
@@ -317,12 +317,11 @@ struct cbox_usb_midi_interface *usbio_open_midi_interface(struct cbox_usb_io_imp
         return NULL;
     }
     
-    struct cbox_usb_midi_interface *umi = malloc(sizeof(struct cbox_usb_midi_interface));
+    struct cbox_usb_midi_interface *umi = calloc(sizeof(struct cbox_usb_midi_interface), 1);
     umi->uii = uii;
     umi->devinfo = devinfo;
     umi->handle = handle;
     umi->busdevadr = devinfo->busdevadr;
-    cbox_midi_buffer_init(&umi->midi_buffer);
     uii->midi_ports = g_list_prepend(uii->midi_ports, umi);
     umi->protocol = uminf->protocol;
     memcpy(&umi->epdesc_in, &uminf->epdesc_in, sizeof(umi->epdesc_in));
