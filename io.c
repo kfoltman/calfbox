@@ -303,6 +303,8 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
         }
         else
             midiin->output_set = FALSE;
+        if (io->impl->updatemidiinroutingfunc)
+            io->impl->updatemidiinroutingfunc(io->impl);
         if (io->cb->on_midi_inputs_changed)
             io->cb->on_midi_inputs_changed(io->cb->user_data);
         return TRUE;

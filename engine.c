@@ -224,9 +224,6 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
 void cbox_engine_add_scene(struct cbox_engine *engine, struct cbox_scene *scene)
 {
     assert(scene->engine == engine);
-    cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_aux, engine->rt);
-    cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_jack, engine->rt);
-    cbox_midi_merger_connect(&scene->scene_input_merger, &engine->midibuf_song, engine->rt);
     
     cbox_rt_array_insert(engine->rt, (void ***)&engine->scenes, &engine->scene_count, -1, scene);
 }
@@ -235,9 +232,6 @@ void cbox_engine_remove_scene(struct cbox_engine *engine, struct cbox_scene *sce
 {
     assert(scene->engine == engine);
     cbox_rt_array_remove_by_value(engine->rt, (void ***)&engine->scenes, &engine->scene_count, scene);
-    cbox_midi_merger_disconnect(&scene->scene_input_merger, &engine->midibuf_aux, engine->rt);
-    cbox_midi_merger_disconnect(&scene->scene_input_merger, &engine->midibuf_jack, engine->rt);
-    cbox_midi_merger_disconnect(&scene->scene_input_merger, &engine->midibuf_song, engine->rt);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

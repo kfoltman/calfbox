@@ -226,6 +226,8 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         if (!cbox_execute_on(fb, NULL, "/name", "s", error, s->name) || 
             !cbox_execute_on(fb, NULL, "/title", "s", error, s->title) ||
             !cbox_execute_on(fb, NULL, "/transpose", "i", error, s->transpose) ||
+            !cbox_execute_on(fb, NULL, "/enable_default_song_input", "i", error, s->enable_default_song_input) ||
+            !cbox_execute_on(fb, NULL, "/enable_default_external_input", "i", error, s->enable_default_external_input) ||
             !CBOX_OBJECT_DEFAULT_STATUS(s, fb, error))
             return FALSE;
         
@@ -274,6 +276,18 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
         cbox_midi_buffer_write_inline(&buf, 0, 0x90 + ((channel - 1) & 15), note & 127, velocity & 127);
         cbox_midi_buffer_write_inline(&buf, 1, 0x80 + ((channel - 1) & 15), note & 127, velocity & 127);
         cbox_midi_merger_push(&s->scene_input_merger, &buf, s->rt);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/enable_default_song_input") && !strcmp(cmd->arg_types, "i"))
+    {
+        s->enable_default_song_input = CBOX_ARG_I(cmd, 0);
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/enable_default_external_input") && !strcmp(cmd->arg_types, "i"))
+    {
+        s->enable_default_external_input = CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else
@@ -914,6 +928,8 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_en
     s->transpose = 0;
     s->connected_inputs = NULL;
     s->connected_input_count = 0;
+    s->enable_default_song_input = TRUE;
+    s->enable_default_external_input = TRUE;
 
     cbox_midi_buffer_init(&s->midibuf_total);
     cbox_midi_merger_init(&s->scene_input_merger, &s->midibuf_total);
@@ -927,6 +943,7 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_en
     CBOX_OBJECT_REGISTER(s);
     
     cbox_engine_add_scene(s->engine, s);
+    cbox_scene_update_connected_inputs(s);
     return s;
 }
 
@@ -969,11 +986,30 @@ void cbox_scene_update_connected_inputs(struct cbox_scene *scene)
             }
         }
     }
+    if (scene->enable_default_song_input)
+    {
+        cbox_midi_merger_connect(&scene->scene_input_merger, &scene->engine->midibuf_aux, scene->rt);
+        cbox_midi_merger_connect(&scene->scene_input_merger, &scene->engine->midibuf_song, scene->rt);
+    }
+    else
+    {
+        cbox_midi_merger_disconnect(&scene->scene_input_merger, &scene->engine->midibuf_aux, scene->rt);
+        cbox_midi_merger_disconnect(&scene->scene_input_merger, &scene->engine->midibuf_song, scene->rt);
+    }
+    
+    if (scene->enable_default_external_input)
+        cbox_midi_merger_connect(&scene->scene_input_merger, &scene->engine->midibuf_jack, scene->rt);
+    else
+        cbox_midi_merger_disconnect(&scene->scene_input_merger, &scene->engine->midibuf_jack, scene->rt);
+    
 }
 
 static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_scene *scene = CBOX_H2O(objhdr);
+    cbox_midi_merger_disconnect(&scene->scene_input_merger, &scene->engine->midibuf_aux,  scene->rt);
+    cbox_midi_merger_disconnect(&scene->scene_input_merger, &scene->engine->midibuf_jack, scene->rt);
+    cbox_midi_merger_disconnect(&scene->scene_input_merger, &scene->engine->midibuf_song, scene->rt);
     cbox_engine_remove_scene(scene->engine, scene);
     cbox_scene_clear(scene);
     g_free(scene->name);

@@ -53,6 +53,7 @@ struct cbox_io_impl
     void (*destroymidioutfunc)(struct cbox_io_impl *ioi, struct cbox_midi_output *midiout);
     struct cbox_midi_input *(*createmidiinfunc)(struct cbox_io_impl *ioi, const char *name, GError **error);
     void (*destroymidiinfunc)(struct cbox_io_impl *ioi, struct cbox_midi_input *midiout);
+    void (*updatemidiinroutingfunc)(struct cbox_io_impl *ioi);
     void (*destroyfunc)(struct cbox_io_impl *ioi);
 };
 

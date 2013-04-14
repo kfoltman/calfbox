@@ -88,11 +88,6 @@ struct cbox_usb_io_impl
     GList *midi_ports;
     GList *rt_midi_ports;
     struct cbox_midi_merger midi_input_merger;
-    /*
-    struct cbox_midi_buffer **midi_input_port_buffers;
-    int *midi_input_port_pos;
-    int midi_input_port_count;
-    */
     void (*play_function)(struct cbox_usb_io_impl *uii);
     int8_t audio_output_endpoint;
     int8_t audio_sync_endpoint;
@@ -207,6 +202,8 @@ extern void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii);
 extern gboolean usbio_open_audio_interface(struct cbox_usb_io_impl *uii, 
     struct cbox_usb_audio_info *uainf, struct libusb_device_handle *handle, GError **error);
 extern gboolean usbio_open_audio_interface_multimix(struct cbox_usb_io_impl *uii, int bus, int devadr, struct libusb_device_handle *handle, GError **error);
+extern void usbio_update_port_routing(struct cbox_io_impl *ioi);
+
 
 extern void usbio_play_buffer_asynchronous(struct cbox_usb_io_impl *uii);
 extern gboolean usbio_scan_devices(struct cbox_usb_io_impl *uii, gboolean probe_only);

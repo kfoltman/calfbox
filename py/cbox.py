@@ -867,6 +867,8 @@ class DocScene(DocObj):
         layers = [DocLayer]
         instruments = {str: (str, DocInstrument)}
         auxes = {str: DocAuxBus}
+        enable_default_song_input = SettableProperty(bool)
+        enable_default_external_input = SettableProperty(bool)
     def clear(self):
         self.cmd("/clear", None)
     def load(self, name):

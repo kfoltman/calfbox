@@ -224,6 +224,22 @@ void usbio_send_midi_to_output(struct cbox_usb_midi_output *umo)
         g_warning("Failed to send MIDI events, transferred = %d out of %d, result = %d", (int)transferred, (int)umo->endpoint_buffer_pos, res);
 }
 
+void usbio_update_port_routing(struct cbox_io_impl *ioi)
+{
+    struct cbox_usb_io_impl *uii = (struct cbox_usb_io_impl *)ioi;
+    for(GList *p = uii->rt_midi_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_interface *umi = p->data;
+        if (umi->input_port)
+        {
+            if (!umi->input_port->hdr.output_set)
+                cbox_midi_merger_connect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, NULL);
+            else
+                cbox_midi_merger_disconnect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, NULL);
+        }
+    }
+}
+
 void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
 {
     uii->rt_midi_ports = g_list_copy(uii->midi_ports);
@@ -262,6 +278,7 @@ void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
             umi->transfer_in = NULL;
         }
     }
+    usbio_update_port_routing(&uii->ioi);
 }
 
 void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii)

@@ -53,6 +53,8 @@ struct cbox_scene
     
     struct cbox_midi_input **connected_inputs;
     int connected_input_count;
+    
+    gboolean enable_default_song_input, enable_default_external_input;
 
     struct cbox_recording_source *rec_mono_inputs, *rec_mono_outputs;
     struct cbox_recording_source *rec_stereo_inputs, *rec_stereo_outputs;
