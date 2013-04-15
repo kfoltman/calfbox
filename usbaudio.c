@@ -124,6 +124,12 @@ static void calc_output_buffer(struct cbox_usb_io_impl *uii)
     uint32_t buffer_size = io->io_env.buffer_size;
     for (int b = 0; b < uii->output_channels; b++)
         memset(io->output_buffers[b], 0, buffer_size * sizeof(float));
+    for (GList *p = uii->rt_midi_ports; p; p = p->next)
+    {
+        struct cbox_usb_midi_interface *umi = p->data;
+        if (umi->input_port->hdr.enable_appsink && umi->input_port && umi->input_port->hdr.buffer.count)
+            cbox_midi_appsink_supply(&umi->input_port->hdr.appsink, &umi->input_port->hdr.buffer);
+    }
     io->cb->process(io->cb->user_data, io, buffer_size);
     for (GList *p = uii->rt_midi_ports; p; p = p->next)
     {

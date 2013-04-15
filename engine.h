@@ -54,7 +54,6 @@ extern struct cbox_song *cbox_engine_set_song(struct cbox_engine *engine, struct
 extern struct cbox_song *cbox_engine_set_pattern(struct cbox_engine *engine, struct cbox_midi_pattern *pattern, int new_pos);
 extern void cbox_engine_set_pattern_and_destroy(struct cbox_engine *engine, struct cbox_midi_pattern *pattern);
 extern void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_merger *merger, struct cbox_midi_buffer *buffer);
-extern const struct cbox_midi_buffer *cbox_engine_get_input_midi_data(struct cbox_engine *engine);
 extern void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_t nframes, float **output_buffers);
 extern struct cbox_midi_merger *cbox_engine_get_midi_output(struct cbox_engine *engine, struct cbox_uuid *uuid);
 

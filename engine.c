@@ -321,8 +321,3 @@ struct cbox_midi_merger *cbox_engine_get_midi_output(struct cbox_engine *engine,
         return NULL;
     return &scene->scene_input_merger;
 }
-
-const struct cbox_midi_buffer *cbox_engine_get_input_midi_data(struct cbox_engine *engine)
-{
-    return cbox_midi_appsink_get_input_midi_data(&engine->appsink);
-}

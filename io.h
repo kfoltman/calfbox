@@ -91,6 +91,8 @@ struct cbox_midi_input
     gboolean removing;
     gboolean output_set;
     struct cbox_uuid output;
+    gboolean enable_appsink;
+    struct cbox_midi_appsink appsink;
 };
 
 struct cbox_midi_output

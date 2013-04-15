@@ -178,6 +178,8 @@ struct cbox_midi_input *cbox_usbio_create_midi_in(struct cbox_io_impl *impl, con
     cbox_uuid_generate(&input->hdr.uuid);
     cbox_midi_buffer_init(&input->hdr.buffer);
     input->ifptr = cur_midi_interface;
+    cbox_midi_appsink_init(&input->hdr.appsink, NULL);
+    input->hdr.enable_appsink = FALSE;
 
     return (struct cbox_midi_input *)input;
 }

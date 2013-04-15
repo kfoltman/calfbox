@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "midi.h"
 #include <glib.h>
 
+struct cbox_command_target;
 struct cbox_rt;
 
 struct cbox_midi_source
@@ -63,5 +64,6 @@ struct cbox_midi_appsink
 extern void cbox_midi_appsink_init(struct cbox_midi_appsink *appsink, struct cbox_rt *rt);
 extern void cbox_midi_appsink_supply(struct cbox_midi_appsink *appsink, struct cbox_midi_buffer *buffer);
 extern const struct cbox_midi_buffer *cbox_midi_appsink_get_input_midi_data(struct cbox_midi_appsink *appsink);
+extern gboolean cbox_midi_appsink_send_to(struct cbox_midi_appsink *appsink, struct cbox_command_target *fb, GError **error);
 
 #endif

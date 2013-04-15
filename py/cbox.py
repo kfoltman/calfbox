@@ -475,6 +475,14 @@ class JackIO:
     def route_midi_input(input_uuid, scene_uuid):
         do_cmd("/io/route_midi_input", None, [input_uuid, scene_uuid])
     @staticmethod
+    def set_appsink_for_midi_input(input_uuid, enabled):
+        do_cmd("/io/set_appsink_for_midi_input", None, [input_uuid, 1 if enabled else 0])
+    @staticmethod
+    def get_new_events(input_uuid):
+        seq = []
+        do_cmd("/io/get_new_events", (lambda cmd, fb, args: seq.append((cmd, fb, args))), [input_uuid])
+        return seq
+    @staticmethod
     def port_connect(pfrom, pto):
         do_cmd("/io/port_connect", None, [pfrom, pto])
     @staticmethod

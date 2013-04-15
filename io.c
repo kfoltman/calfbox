@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "errors.h"
@@ -308,6 +309,43 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
         if (io->cb->on_midi_inputs_changed)
             io->cb->on_midi_inputs_changed(io->cb->user_data);
         return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/set_appsink_for_midi_input") && !strcmp(cmd->arg_types, "si"))
+    {
+        const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        struct cbox_uuid uuid;
+        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+            return FALSE;
+        struct cbox_midi_input *midiin = cbox_io_get_midi_input(io, NULL, &uuid);
+        if (!midiin)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+            return FALSE;
+        }
+        midiin->enable_appsink = CBOX_ARG_I(cmd, 1);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/get_new_events") && !strcmp(cmd->arg_types, "s"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        struct cbox_uuid uuid;
+        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+            return FALSE;
+        struct cbox_midi_input *midiin = cbox_io_get_midi_input(io, NULL, &uuid);
+        if (!midiin)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+            return FALSE;
+        }
+        if (!midiin->enable_appsink)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "App sink not enabled for port '%s'", uuidstr);
+            return FALSE;
+        }
+        midiin->appsink.rt = app.rt; // XXXKF this is a bad hack
+        return cbox_midi_appsink_send_to(&midiin->appsink, fb, error);
     }
     else if (io->impl->createmidioutfunc && !strcmp(cmd->command, "/create_midi_output") && !strcmp(cmd->arg_types, "s"))
     {
