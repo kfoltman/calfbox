@@ -51,4 +51,17 @@ void cbox_midi_merger_disconnect(struct cbox_midi_merger *dest, struct cbox_midi
 void cbox_midi_merger_push(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt);
 void cbox_midi_merger_close(struct cbox_midi_merger *dest);
 
+#define GET_RT_FROM_cbox_midi_appsink(appsink) ((appsink)->rt)
+
+struct cbox_midi_appsink
+{
+    struct cbox_rt *rt;
+    struct cbox_midi_buffer midibufs[2];
+    int current_buffer;
+};
+
+extern void cbox_midi_appsink_init(struct cbox_midi_appsink *appsink, struct cbox_rt *rt);
+extern void cbox_midi_appsink_supply(struct cbox_midi_appsink *appsink, struct cbox_midi_buffer *buffer);
+extern const struct cbox_midi_buffer *cbox_midi_appsink_get_input_midi_data(struct cbox_midi_appsink *appsink);
+
 #endif

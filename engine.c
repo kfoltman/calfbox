@@ -65,10 +65,7 @@ struct cbox_engine *cbox_engine_new(struct cbox_document *doc, struct cbox_rt *r
     cbox_midi_buffer_init(&engine->midibuf_aux);
     cbox_midi_buffer_init(&engine->midibuf_jack);
     cbox_midi_buffer_init(&engine->midibuf_song);
-
-    cbox_midi_buffer_init(&engine->midibufs_appsink[0]);
-    cbox_midi_buffer_init(&engine->midibufs_appsink[1]);
-    engine->current_appsink_buffer = 0;
+    cbox_midi_appsink_init(&engine->appsink, rt);
 
     cbox_command_target_init(&engine->cmd_target, cbox_engine_process_cmd, engine);
     CBOX_OBJECT_REGISTER(engine);
@@ -178,17 +175,7 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
         cbox_midi_buffer_clear(&engine->midibuf_jack);
     
     // Copy MIDI input to the app-sink with no timing information
-    struct cbox_midi_buffer *appsink = &engine->midibufs_appsink[engine->current_appsink_buffer];
-    for (int i = 0; i < engine->midibuf_jack.count; i++)
-    {
-        const struct cbox_midi_event *event = cbox_midi_buffer_get_event(&engine->midibuf_jack, i);
-        if (event)
-        {
-            if (!cbox_midi_buffer_can_store_msg(appsink, event->size))
-                break;
-            cbox_midi_buffer_copy_event(appsink, event, 0);
-        }
-    }
+    cbox_midi_appsink_supply(&engine->appsink, &engine->midibuf_jack);
     
     if (engine->rt)
         cbox_rt_handle_rt_commands(engine->rt);
@@ -335,30 +322,7 @@ struct cbox_midi_merger *cbox_engine_get_midi_output(struct cbox_engine *engine,
     return &scene->scene_input_merger;
 }
 
-////////////////////////////////////////////////////////////////////////////////////////
-
-#define cbox_engine_get_input_midi_data__args(ARG) 
-
-DEFINE_RT_FUNC(const struct cbox_midi_buffer *, cbox_engine, engine, cbox_engine_get_input_midi_data_)
-{
-    const struct cbox_midi_buffer *ret = NULL;
-    if (engine->midibufs_appsink[engine->current_appsink_buffer].count)
-    {
-        // return the current buffer, switch to the new, empty one
-        ret = &engine->midibufs_appsink[engine->current_appsink_buffer];
-        engine->current_appsink_buffer = 1 - engine->current_appsink_buffer;
-        cbox_midi_buffer_clear(&engine->midibufs_appsink[engine->current_appsink_buffer]);
-    }
-
-    return ret;
-}
-
 const struct cbox_midi_buffer *cbox_engine_get_input_midi_data(struct cbox_engine *engine)
 {
-    // This checks the counter from the 'wrong' thread, but that's OK, it's
-    // just to avoid doing any RT work when input buffer is completely empty.
-    // Any further access/manipulation is done via RT cmd.
-    if (!engine->midibufs_appsink[engine->current_appsink_buffer].count)
-        return NULL;
-    return cbox_engine_get_input_midi_data_(engine);
+    return cbox_midi_appsink_get_input_midi_data(&engine->appsink);
 }

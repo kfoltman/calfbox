@@ -134,3 +134,54 @@ void cbox_midi_merger_close(struct cbox_midi_merger *dest)
         free(dest->inputs[i]);
     free(dest->inputs);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+void cbox_midi_appsink_init(struct cbox_midi_appsink *appsink, struct cbox_rt *rt)
+{
+    appsink->rt = rt;
+    cbox_midi_buffer_init(&appsink->midibufs[0]);
+    cbox_midi_buffer_init(&appsink->midibufs[1]);
+    appsink->current_buffer = 0;
+}
+
+void cbox_midi_appsink_supply(struct cbox_midi_appsink *appsink, struct cbox_midi_buffer *buffer)
+{
+    struct cbox_midi_buffer *sinkbuf = &appsink->midibufs[appsink->current_buffer];
+    for (int i = 0; i < buffer->count; i++)
+    {
+        const struct cbox_midi_event *event = cbox_midi_buffer_get_event(buffer, i);
+        if (event)
+        {
+            if (!cbox_midi_buffer_can_store_msg(sinkbuf, event->size))
+                break;
+            cbox_midi_buffer_copy_event(sinkbuf, event, 0);
+        }
+    }
+}
+
+#define cbox_midi_appsink_get_input_midi_data__args(ARG) 
+
+DEFINE_RT_FUNC(const struct cbox_midi_buffer *, cbox_midi_appsink, appsink, cbox_midi_appsink_get_input_midi_data_)
+{
+    const struct cbox_midi_buffer *ret = NULL;
+    if (appsink->midibufs[appsink->current_buffer].count)
+    {
+        // return the current buffer, switch to the new, empty one
+        ret = &appsink->midibufs[appsink->current_buffer];
+        appsink->current_buffer = 1 - appsink->current_buffer;
+        cbox_midi_buffer_clear(&appsink->midibufs[appsink->current_buffer]);
+    }
+
+    return ret;
+}
+
+const struct cbox_midi_buffer *cbox_midi_appsink_get_input_midi_data(struct cbox_midi_appsink *appsink)
+{
+    // This checks the counter from the 'wrong' thread, but that's OK, it's
+    // just to avoid doing any RT work when input buffer is completely empty.
+    // Any further access/manipulation is done via RT cmd.
+    if (!appsink->midibufs[appsink->current_buffer].count)
+        return NULL;
+    return cbox_midi_appsink_get_input_midi_data_(appsink);
+}
