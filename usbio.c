@@ -386,9 +386,9 @@ static gboolean cbox_usb_io_process_cmd(struct cbox_command_target *ct, struct c
         {
             struct cbox_usb_midi_interface *midi = p->data;
             struct cbox_usb_device_info *di = midi->devinfo;
-            if (midi->epdesc_in.found && !cbox_execute_on(fb, NULL, "/usb_midi_input", "iiii", error, di->bus, di->devadr, di->vid, di->pid))
+            if (midi->epdesc_in.found && !cbox_execute_on(fb, NULL, "/usb_midi_input", "iiiiu", error, di->bus, di->devadr, di->vid, di->pid, &midi->input_port->hdr.uuid))
                 return FALSE;
-            if (midi->epdesc_out.found && !cbox_execute_on(fb, NULL, "/usb_midi_output", "iiii", error, di->bus, di->devadr, di->vid, di->pid))
+            if (midi->epdesc_out.found && !cbox_execute_on(fb, NULL, "/usb_midi_output", "iiiiu", error, di->bus, di->devadr, di->vid, di->pid, &midi->output_port->hdr.uuid))
                 return FALSE;
         }
         
