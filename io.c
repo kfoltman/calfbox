@@ -287,6 +287,7 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
     }
     else if (!strcmp(cmd->command, "/route_midi_input") && !strcmp(cmd->arg_types, "ss"))
     {
+        *cmd_handled = TRUE;
         const char *uuidstr = CBOX_ARG_S(cmd, 0);
         struct cbox_uuid uuid;
         if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
@@ -312,6 +313,7 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
     }
     else if (!strcmp(cmd->command, "/set_appsink_for_midi_input") && !strcmp(cmd->arg_types, "si"))
     {
+        *cmd_handled = TRUE;
         const char *uuidstr = CBOX_ARG_S(cmd, 0);
         struct cbox_uuid uuid;
         if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
@@ -327,6 +329,7 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
     }
     else if (!strcmp(cmd->command, "/get_new_events") && !strcmp(cmd->arg_types, "s"))
     {
+        *cmd_handled = TRUE;
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         const char *uuidstr = CBOX_ARG_S(cmd, 0);
