@@ -269,11 +269,12 @@ void cbox_usbio_poll_ports(struct cbox_io_impl *impl, struct cbox_command_target
     // Dry run, just to detect if anything changed
     if (usbio_scan_devices(uii, TRUE))
     {
+        struct cbox_io_callbacks *cb = uii->ioi.pio->cb;
         g_debug("Restarting I/O due to device being connected or disconnected");
-        cbox_usbio_stop(&uii->ioi, NULL);
+        cbox_io_stop(uii->ioi.pio);
         // Re-scan, this time actually create the MIDI inputs
         usbio_scan_devices(uii, FALSE);
-        cbox_usbio_start(&uii->ioi, fb, NULL);
+        cbox_io_start(uii->ioi.pio, cb, fb);
     }
 }
 

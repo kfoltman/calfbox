@@ -151,6 +151,22 @@ static void midi_transfer_cb(struct libusb_transfer *transfer)
     usbio_transfer_submit(xf);
 }
 
+static gboolean push_data_to_umo(struct cbox_usb_midi_output *umo, const uint8_t *pdata, uint32_t size, uint8_t first_byte)
+{
+    if (umo->endpoint_buffer_pos + 4 <= USB_MIDI_OUTPUT_QUEUE)
+    {
+        umo->endpoint_buffer[umo->endpoint_buffer_pos] = first_byte;
+        memcpy(&umo->endpoint_buffer[umo->endpoint_buffer_pos + 1], pdata, size);
+        umo->endpoint_buffer_pos += 4;
+    }
+    else
+    {
+        g_warning("Class MIDI buffer overflow.");    
+        return FALSE;
+    }
+    return TRUE;
+}
+
 static void encode_events_class(struct cbox_usb_midi_output *umo)
 {
     for (int i = 0; i < umo->hdr.buffer.count; i++)
@@ -159,17 +175,19 @@ static void encode_events_class(struct cbox_usb_midi_output *umo)
         const uint8_t *pdata = cbox_midi_event_get_data(event);
         if (event->size <= 3)
         {
-            if (umo->endpoint_buffer_pos + 4 <= USB_MIDI_OUTPUT_QUEUE)
-            {
-                umo->endpoint_buffer[umo->endpoint_buffer_pos] = pdata[0] >> 4;
-                memcpy(&umo->endpoint_buffer[umo->endpoint_buffer_pos + 1], pdata, event->size);
-                umo->endpoint_buffer_pos += 4;
-            }
-            else
-                g_warning("Class MIDI buffer overflow.");
+            if (!push_data_to_umo(umo, pdata, event->size, pdata[0] >> 4))
+                return;
         }
         else
-            g_warning("Sending SysEx events is not implemented yet.");
+        {
+            int i = 0;
+            while(i + 3 < event->size)
+            {
+                push_data_to_umo(umo, pdata + i, 3, 4);
+                i += 3;
+            }
+            push_data_to_umo(umo, pdata + i, 3, 4 + event->size - i);
+        }
     }
 }
 

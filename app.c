@@ -46,6 +46,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <unistd.h>
 
+static gboolean lookup_midi_merger(const char *output, struct cbox_midi_merger **pmerger, GError **error)
+{
+    if (*output)
+    {
+        struct cbox_uuid uuid;
+        if (!cbox_uuid_fromstring(&uuid, output, error))
+            return FALSE;
+        
+        *pmerger = cbox_rt_get_midi_output(app.rt, &uuid);
+        if (!*pmerger)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown MIDI output UUID: '%s'", output);
+            return FALSE;
+        }
+    }
+    else
+    {
+        if (!app.engine->scene_count)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Scene not set");
+            return FALSE;
+        }
+        *pmerger = &app.engine->scenes[0]->scene_input_merger;
+    }
+    return TRUE;
+}
+
 static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     if (!cmd->command)
@@ -104,28 +131,8 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
     {
         const char *output = CBOX_ARG_S(cmd, 0);
         struct cbox_midi_merger *merger = NULL;
-        if (*output)
-        {
-            struct cbox_uuid uuid;
-            if (!cbox_uuid_fromstring(&uuid, output, error))
-                return FALSE;
-            
-            merger = cbox_rt_get_midi_output(app.rt, &uuid);
-            if (!merger)
-            {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown MIDI output UUID: '%s'", output);
-                return FALSE;
-            }
-        }
-        else
-        {
-            if (!app.engine->scene_count)
-            {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Scene not set");
-                return FALSE;
-            }
-            merger = &app.engine->scenes[0]->scene_input_merger;
-        }
+        if (!lookup_midi_merger(output, &merger, error))
+            return FALSE;
         int mcmd = CBOX_ARG_I(cmd, 1);
         int arg1 = 0, arg2 = 0;
         if (cmd->arg_types[2] == 'i')
@@ -137,6 +144,20 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         struct cbox_midi_buffer buf;
         cbox_midi_buffer_init(&buf);
         cbox_midi_buffer_write_inline(&buf, 0, mcmd, arg1, arg2);
+        cbox_engine_send_events_to(app.engine, merger, &buf);
+        return TRUE;
+    }
+    else
+    if (!strcmp(obj, "send_sysex_to") && !strcmp(cmd->arg_types, "sb"))
+    {
+        const char *output = CBOX_ARG_S(cmd, 0);
+        struct cbox_midi_merger *merger = NULL;
+        if (!lookup_midi_merger(output, &merger, error))
+            return FALSE;
+        const struct cbox_blob *blob = CBOX_ARG_B(cmd, 1);
+        struct cbox_midi_buffer buf;
+        cbox_midi_buffer_init(&buf);
+        cbox_midi_buffer_write_event(&buf, 0, blob->data, blob->size);
         cbox_engine_send_events_to(app.engine, merger, &buf);
         return TRUE;
     }

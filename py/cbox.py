@@ -503,6 +503,9 @@ def get_new_events():
 def send_midi_event(*data, output = None):
     do_cmd('/send_event_to', None, [output if output is not None else ''] + list(data))
         
+def send_sysex(data, output = None):
+    do_cmd('/send_sysex_to', None, [output if output is not None else '', bytearray(data)])
+        
 class CfgSection:
     def __init__(self, name):
         self.name = name
