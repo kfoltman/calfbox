@@ -172,13 +172,15 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
 
 struct cbox_song *cbox_song_new(struct cbox_document *document)
 {
-    struct cbox_song *p = malloc(sizeof(struct cbox_song));
+    struct cbox_song *p = calloc(1, sizeof(struct cbox_song));
     CBOX_OBJECT_HEADER_INIT(p, cbox_song, document);
     p->master_track_items = NULL;
     p->tracks = NULL;
     p->patterns = NULL;
     p->lyrics_sheet = NULL;
     p->chord_sheet = NULL;
+    p->loop_start_ppqn = 0;
+    p->loop_end_ppqn = 0;
     cbox_command_target_init(&p->cmd_target, cbox_song_process_cmd, p);
     CBOX_OBJECT_REGISTER(p);
     
