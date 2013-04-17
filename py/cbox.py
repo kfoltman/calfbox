@@ -434,7 +434,7 @@ class JackIO:
     @staticmethod
     def status():
         # Some of these only make sense for 
-        return GetThings("/io/status", ['client_type', 'client_name', 'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output', '*midi_input', 'sample_rate', 'output_resolution'], [])
+        return GetThings("/io/status", ['client_type', 'client_name', 'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output', '*midi_input', 'sample_rate', 'output_resolution', '*usb_midi_input', '*usb_midi_output'], [])
     @staticmethod
     def create_midi_input(name, autoconnect_spec = None):
         uuid = GetUUID("/io/create_midi_input", name).uuid

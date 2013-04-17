@@ -245,6 +245,7 @@ gboolean cbox_usbio_start(struct cbox_io_impl *impl, struct cbox_command_target 
     }
     while(!uii->setup_error && uii->playback_counter < uii->playback_buffers)
         usleep(10000);
+    usbio_update_port_routing(&uii->ioi);
 
     return TRUE;
 }

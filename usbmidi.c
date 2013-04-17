@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "errors.h"
@@ -233,9 +234,9 @@ void usbio_update_port_routing(struct cbox_io_impl *ioi)
         if (umi->input_port)
         {
             if (!umi->input_port->hdr.output_set)
-                cbox_midi_merger_connect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, NULL);
+                cbox_midi_merger_connect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, app.rt);
             else
-                cbox_midi_merger_disconnect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, NULL);
+                cbox_midi_merger_disconnect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, app.rt);
         }
     }
 }
@@ -250,7 +251,6 @@ void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
         cbox_midi_buffer_clear(&umi->input_port->hdr.buffer);
         if (umi->epdesc_in.found)
         {
-            cbox_midi_merger_connect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, NULL);
             umi->current_sysex_length = 0;
             umi->transfer_in = usbio_transfer_new(uii->usbctx, "MIDI In", 0, 0, umi);
             int pktsize = umi->epdesc_in.wMaxPacketSize;
@@ -278,7 +278,6 @@ void usbio_start_midi_capture(struct cbox_usb_io_impl *uii)
             umi->transfer_in = NULL;
         }
     }
-    usbio_update_port_routing(&uii->ioi);
 }
 
 void usbio_stop_midi_capture(struct cbox_usb_io_impl *uii)
