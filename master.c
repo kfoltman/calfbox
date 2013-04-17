@@ -301,7 +301,7 @@ int cbox_master_samples_to_ppqn(struct cbox_master *master, int time_samples)
     if (master->spb)
     {
         int idx = cbox_song_playback_tmi_from_samples(master->spb, time_samples);
-        if (idx != -1)
+        if (idx != -1 && idx < master->spb->tempo_map_item_count)
         {
             const struct cbox_tempo_map_item *tmi = &master->spb->tempo_map_items[idx];
             tempo = tmi->tempo;
