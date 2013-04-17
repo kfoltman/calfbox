@@ -140,8 +140,12 @@ static int process_cb(jack_nframes_t nframes, void *arg)
     for (GSList *p = io->midi_inputs; p; p = p->next)
     {
         struct cbox_jack_midi_input *input = p->data;
-        if (input->hdr.output_set)
+        if (input->hdr.output_set || input->hdr.enable_appsink)
+        {
             copy_midi_data_to_buffer(input->port, io->io_env.buffer_size, &input->hdr.buffer);
+            if (input->hdr.enable_appsink)
+                cbox_midi_appsink_supply(&input->hdr.appsink, &input->hdr.buffer);
+        }
         else
             cbox_midi_buffer_clear(&input->hdr.buffer);
     }
