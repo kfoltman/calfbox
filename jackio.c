@@ -722,6 +722,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     jii->ioi.destroymidiinfunc = cbox_jackio_destroy_midi_in;
     jii->ioi.createmidioutfunc = cbox_jackio_create_midi_out;
     jii->ioi.destroymidioutfunc = cbox_jackio_destroy_midi_out;
+    jii->ioi.updatemidiinroutingfunc = NULL;
     jii->ioi.destroyfunc = cbox_jackio_destroy;
     
     jii->client_name = g_strdup(jack_get_client_name(client));
