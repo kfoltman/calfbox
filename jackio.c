@@ -44,6 +44,7 @@ struct cbox_jack_io_impl
     jack_port_t *midi;
     char *error_str; // set to non-NULL if client has been booted out by JACK
     char *client_name;
+    gboolean enable_common_midi_input;
 
     jack_ringbuffer_t *rb_autoconnect;    
 };
@@ -412,6 +413,11 @@ void cbox_jackio_poll_ports(struct cbox_io_impl *impl, struct cbox_command_targe
 int cbox_jackio_get_midi_data(struct cbox_io_impl *impl, struct cbox_midi_buffer *destination)
 {
     struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
+    if (!jii->enable_common_midi_input)
+    {
+        cbox_midi_buffer_clear(destination);
+        return 1;
+    }
 
     return copy_midi_data_to_buffer(jii->midi, jii->ioi.pio->io_env.buffer_size, destination);
 }
@@ -708,6 +714,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
 
     struct cbox_jack_io_impl *jii = malloc(sizeof(struct cbox_jack_io_impl));
     io->impl = &jii->ioi;
+    jii->enable_common_midi_input = cbox_config_get_int("io", "enable_common_midi_input", 1);
 
     cbox_command_target_init(&io->cmd_target, cbox_jack_io_process_cmd, jii);
     jii->ioi.pio = io;
@@ -761,13 +768,18 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
         }
         g_free(name);
     }
-    jii->midi = jack_port_register(jii->client, "midi", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
-    
-    if (!jii->midi)
+    if (jii->enable_common_midi_input)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create MIDI port");
-        return FALSE;
+        jii->midi = jack_port_register(jii->client, "midi", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
+        if (!jii->midi)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create MIDI port");
+            return FALSE;
+        }
     }
+    else
+        jii->midi = NULL;
+    
     if (fb)
         cbox_execute_on(fb, NULL, "/io/jack_client_name", "s", NULL, jii->client_name);
     
