@@ -495,7 +495,7 @@ static double atof_C(const char *value)
     static locale_t l;
     if (!inited)
     {
-        l = newlocale(LC_ALL_MASK, NULL, NULL);
+        l = newlocale(LC_ALL_MASK, "C", NULL);
         inited = TRUE;
     }
     return strtod_l(value, NULL, l);
