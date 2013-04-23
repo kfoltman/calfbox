@@ -32,6 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sndfile.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <locale.h>
+#include <xlocale.h>
 
 static void sampler_layer_data_set_modulation(struct sampler_layer_data *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags, gboolean propagating_defaults)
 {
@@ -487,13 +489,25 @@ static int sfz_note_from_string(const char *note)
     return -1;
 }
 
+static double atof_C(const char *value)
+{
+    static gboolean inited = FALSE;
+    static locale_t l;
+    if (!inited)
+    {
+        l = newlocale(LC_ALL_MASK, NULL, NULL);
+        inited = TRUE;
+    }
+    return strtod_l(value, NULL, l);
+}
+
 static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_dahdsr *env, struct sampler_dahdsr_has_fields *has_fields, int env_type, const char *key, const char *value)
 {
     static const enum sampler_modsrc srcs[] = { smsrc_ampenv, smsrc_filenv, smsrc_pitchenv };
     static const enum sampler_moddest dests[] = { smdest_gain, smdest_cutoff, smdest_pitch };
     enum sampler_modsrc src = srcs[env_type];
     enum sampler_moddest dest = dests[env_type];
-    float fvalue = atof(value);
+    float fvalue = atof_C(value);
     
 #define PROC_SET_ENV_FIELD(name, index, def_value) \
         if (!strcmp(key, #name)) {\
@@ -503,7 +517,7 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_da
         }
     DAHDSR_FIELDS(PROC_SET_ENV_FIELD)
     if (!strcmp(key, "depth"))
-        sampler_layer_set_modulation1(layer, src, dest, atof(value), 0);
+        sampler_layer_set_modulation1(layer, src, dest, atof_C(value), 0);
     else if (!strcmp(key, "vel2delay"))
         sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 0, fvalue);
     else if (!strcmp(key, "vel2attack"))
@@ -517,7 +531,7 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_da
     else if (!strcmp(key, "vel2release"))
         sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 5, fvalue);
     else if (!strcmp(key, "vel2depth"))
-        sampler_layer_set_modulation(layer, src, smsrc_vel, dest, atof(value), 0);
+        sampler_layer_set_modulation(layer, src, smsrc_vel, dest, atof_C(value), 0);
     else if (!strncmp(key, "depthcc", 7))
     {
         int cc = atoi(key + 7);
@@ -544,7 +558,7 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
             has_fields->name = 1; \
             return TRUE; \
         }
-    float fvalue = atof(value);
+    float fvalue = atof_C(value);
     LFO_FIELDS(PROC_SET_LFO_FIELD)
     if (!strcmp(key, "depth"))
         sampler_layer_set_modulation1(layer, src, dest, fvalue, 0);
@@ -572,7 +586,7 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
 #define PARSE_PARAM_uint32_t(field, strname, valuestr) \
     return ((l->data.field = (uint32_t)strtoul(value, NULL, 10)), (l->data.has_##field = 1));
 #define PARSE_PARAM_float(field, strname, valuestr) \
-    return ((l->data.field = atof(value)), (l->data.has_##field = 1));
+    return ((l->data.field = atof_C(value)), (l->data.has_##field = 1));
 
 #define PROC_APPLY_PARAM(type, name, def_value) \
     if (!strcmp(key, #name)) { \
@@ -580,7 +594,7 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     }
 #define PROC_APPLY_PARAM_dBamp(type, name, def_value) \
     if (!strcmp(key, #name)) { \
-        return ((l->data.name = atof(value)), (l->data.has_##name = 1)); \
+        return ((l->data.name = atof_C(value)), (l->data.has_##name = 1)); \
     }
 #define PROC_APPLY_PARAM_enum(enumtype, name, def_value) \
     if (!strcmp(key, #name)) { \
@@ -662,20 +676,20 @@ try_now:
         goto try_now; // yes, goto, why not?
     }
     else if (!strcmp(key, "cutoff_chanaft"))
-        sampler_layer_set_modulation1(l, smsrc_chanaft, smdest_cutoff, atof(value), 0);
+        sampler_layer_set_modulation1(l, smsrc_chanaft, smdest_cutoff, atof_C(value), 0);
     else if (!strcmp(key, "amp_random"))
-        sampler_layer_add_nif(l, sampler_nif_addrandom, 0, atof(value));
+        sampler_layer_add_nif(l, sampler_nif_addrandom, 0, atof_C(value));
     else if (!strcmp(key, "fil_random"))
-        sampler_layer_add_nif(l, sampler_nif_addrandom, 1, atof(value));
+        sampler_layer_add_nif(l, sampler_nif_addrandom, 1, atof_C(value));
     else if (!strcmp(key, "pitch_random"))
-        sampler_layer_add_nif(l, sampler_nif_addrandom, 2, atof(value));
+        sampler_layer_add_nif(l, sampler_nif_addrandom, 2, atof_C(value));
     else if (!strcmp(key, "pitch_veltrack"))
-        sampler_layer_add_nif(l, sampler_nif_vel2pitch, 0, atof(value));
+        sampler_layer_add_nif(l, sampler_nif_vel2pitch, 0, atof_C(value));
     else if (!strncmp(key, "delay_cc", 8))
     {
         int ccno = atoi(key + 8);
         if (ccno > 0 && ccno < 120)
-            sampler_layer_add_nif(l, sampler_nif_cc2delay, ccno, atof(value));
+            sampler_layer_add_nif(l, sampler_nif_cc2delay, ccno, atof_C(value));
         else
             goto unknown_key;
     }
@@ -683,7 +697,7 @@ try_now:
     {
         int ccno = atoi(key + 9);
         if (ccno > 0 && ccno < 120)
-            sampler_layer_set_modulation1(l, ccno, smdest_cutoff, atof(value), 0);
+            sampler_layer_set_modulation1(l, ccno, smdest_cutoff, atof_C(value), 0);
         else
             goto unknown_key;
     }
@@ -691,7 +705,7 @@ try_now:
     {
         int ccno = atoi(key + 7);
         if (ccno > 0 && ccno < 120)
-            sampler_layer_set_modulation1(l, ccno, smdest_gain, atof(value), 0);
+            sampler_layer_set_modulation1(l, ccno, smdest_gain, atof_C(value), 0);
         else
             goto unknown_key;
     }
@@ -703,7 +717,7 @@ try_now:
         int point = atoi(key + 13);
         if (point >= 0 && point <= 127)
         {
-            l->data.velcurve[point] = atof(value);
+            l->data.velcurve[point] = atof_C(value);
             if (l->data.velcurve[point] < 0)
                 l->data.velcurve[point] = 0;
             if (l->data.velcurve[point] > 1)
