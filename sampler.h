@@ -131,15 +131,16 @@ struct sampler_module
 extern GQuark cbox_sampler_error_quark(void);
 
 extern gboolean sampler_select_program(struct sampler_module *m, int channel, const gchar *preset, GError **error);
-extern void sampler_update_layer(struct sampler_module *m, struct sampler_layer *l);
-extern void sampler_update_program_layers(struct sampler_module *m, struct sampler_program *prg);
 extern void sampler_unselect_program(struct sampler_module *m, struct sampler_program *prg);
+
+extern void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m);
 // This function may only be called from RT thread!
 extern void sampler_channel_set_program_RT(struct sampler_channel *c, struct sampler_program *prg);
 // ... and this one is RT-safe
 extern void sampler_channel_set_program(struct sampler_channel *c, struct sampler_program *prg);
 extern void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gboolean is_release_trigger);
 extern void sampler_channel_stop_note(struct sampler_channel *c, int note, int vel, gboolean is_polyaft);
+extern void sampler_channel_program_change(struct sampler_channel *c, int program);
 extern void sampler_channel_stop_sustained(struct sampler_channel *c);
 extern void sampler_channel_stop_sostenuto(struct sampler_channel *c);
 extern void sampler_channel_capture_sostenuto(struct sampler_channel *c);

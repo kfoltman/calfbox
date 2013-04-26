@@ -39,7 +39,7 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
     struct sampler_layer *l = ls->region;
     sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, ls->m);
     sampler_layer_reset_switches(l, ls->m);
-    sampler_update_layer(ls->m, l);
+    sampler_layer_update(l);
     sampler_program_add_layer(ls->program, ls->region);
 
     ls->region = NULL;
@@ -154,7 +154,7 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
     end_token(&c);
     
     prg->all_layers = g_slist_reverse(prg->all_layers);
-    sampler_update_program_layers(m, prg);
+    sampler_program_update_layers(prg);
     return TRUE;
 }
 

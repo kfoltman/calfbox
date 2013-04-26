@@ -35,6 +35,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 
+void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
+{
+    c->module = m;
+    c->voices_running = NULL;
+    c->active_voices = 0;
+    c->pitchwheel = 0;
+    memset(c->cc, 0, sizeof(c->cc));
+    c->cc[7] = 100;
+    c->cc[10] = 64;
+    c->cc[11] = 127;
+    c->cc[71] = 64;
+    c->cc[74] = 64;
+    c->previous_note = -1;
+    c->program = NULL;
+    sampler_channel_set_program_RT(c, m->program_count ? m->programs[0] : NULL);
+    memset(c->switchmask, 0, sizeof(c->switchmask));
+    memset(c->sustainmask, 0, sizeof(c->sustainmask));
+    memset(c->sostenutomask, 0, sizeof(c->sostenutomask));
+}
+
 void sampler_channel_release_groups(struct sampler_channel *c, int note, int exgroups[MAX_RELEASED_GROUPS], int exgroupcount)
 {
     if (exgroupcount)
@@ -203,5 +223,47 @@ void sampler_channel_stop_all(struct sampler_channel *c)
         v->released_with_sostenuto = 0;
         v->captured_sostenuto = 0;
     }
+}
+
+void sampler_channel_set_program_RT(struct sampler_channel *c, struct sampler_program *prg)
+{
+    if (c->program)
+        c->program->in_use--;    
+    c->program = prg;
+    if (prg)
+    {
+        for(GSList *p = prg->ctrl_init_list; p; p = p->next)
+        {
+            union sampler_ctrlinit_union u;
+            u.ptr = p->data;
+            // printf("Setting controller %d -> %d\n", u.cinit.controller, u.cinit.value);
+            c->cc[u.cinit.controller] = u.cinit.value;
+        }
+        c->program->in_use++;
+    }
+}
+
+#define sampler_channel_set_program_args(ARG) ARG(struct sampler_program *, prg)
+
+DEFINE_RT_VOID_FUNC(sampler_channel, c, sampler_channel_set_program)
+{
+    sampler_channel_set_program_RT(c, prg);
+}
+
+void sampler_channel_program_change(struct sampler_channel *c, int program)
+{
+    struct sampler_module *m = c->module;
+    // XXXKF replace with something more efficient
+    for (int i = 0; i < m->program_count; i++)
+    {
+        // XXXKF support banks
+        if (m->programs[i]->prog_no == program)
+        {
+            sampler_channel_set_program_RT(c, m->programs[i]);
+            return;
+        }
+    }
+    g_warning("Unknown program %d", program);
+    sampler_channel_set_program_RT(c, m->programs[0]);
 }
 

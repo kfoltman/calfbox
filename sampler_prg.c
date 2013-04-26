@@ -232,17 +232,20 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         
         prg->source_file = g_strdup_printf("config:%s", cfg_section);
         struct sampler_layer *l = sampler_layer_new_from_section(m, prg, where);
-        sampler_update_layer(m, l);
         if (!l)
             g_warning("Sample layer '%s' cannot be created - skipping", layer_section);
-        else if (!l->data.waveform)
-            g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
-        else
-            sampler_program_add_layer(prg, l);
+        else 
+        {
+            sampler_layer_update(l);
+            if (!l->data.waveform)
+                g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
+            else
+                sampler_program_add_layer(prg, l);
+        }
         g_free(where);
     }
     prg->all_layers = g_slist_reverse(prg->all_layers);
-    sampler_update_program_layers(m, prg);    
+    sampler_program_update_layers(prg);    
     return prg;
 }
 
@@ -313,6 +316,15 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
     g_slist_free(prg->all_layers);
     g_slist_free(prg->ctrl_init_list);
     free(prg);
+}
+
+void sampler_program_update_layers(struct sampler_program *prg)
+{
+    struct sampler_module *m = prg->module;
+    struct sampler_rll *new_rll = sampler_rll_new_from_program(prg);
+    struct sampler_rll *old_rll = cbox_rt_swap_pointers(m->module.rt, (void **)&prg->rll, new_rll);
+    if (old_rll)
+        sampler_rll_destroy(old_rll);
 }
 
 /////////////////////////////////////////////////////////////////////////////////

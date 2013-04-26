@@ -185,23 +185,6 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
         c->cc[cc] = val;
 }
 
-void sampler_channel_program_change(struct sampler_channel *c, int program)
-{
-    struct sampler_module *m = c->module;
-    // XXXKF replace with something more efficient
-    for (int i = 0; i < m->program_count; i++)
-    {
-        // XXXKF support banks
-        if (m->programs[i]->prog_no == program)
-        {
-            sampler_channel_set_program_RT(c, m->programs[i]);
-            return;
-        }
-    }
-    g_warning("Unknown program %d", program);
-    sampler_channel_set_program_RT(c, m->programs[0]);
-}
-
 void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
     struct sampler_module *m = (struct sampler_module *)module;
@@ -248,51 +231,6 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
 
             }
     }
-}
-
-static void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
-{
-    c->module = m;
-    c->voices_running = NULL;
-    c->active_voices = 0;
-    c->pitchwheel = 0;
-    memset(c->cc, 0, sizeof(c->cc));
-    c->cc[7] = 100;
-    c->cc[10] = 64;
-    c->cc[11] = 127;
-    c->cc[71] = 64;
-    c->cc[74] = 64;
-    c->previous_note = -1;
-    c->program = NULL;
-    sampler_channel_set_program_RT(c, m->program_count ? m->programs[0] : NULL);
-    memset(c->switchmask, 0, sizeof(c->switchmask));
-    memset(c->sustainmask, 0, sizeof(c->sustainmask));
-    memset(c->sostenutomask, 0, sizeof(c->sostenutomask));
-}
-
-void sampler_channel_set_program_RT(struct sampler_channel *c, struct sampler_program *prg)
-{
-    if (c->program)
-        c->program->in_use--;    
-    c->program = prg;
-    if (prg)
-    {
-        for(GSList *p = prg->ctrl_init_list; p; p = p->next)
-        {
-            union sampler_ctrlinit_union u;
-            u.ptr = p->data;
-            // printf("Setting controller %d -> %d\n", u.cinit.controller, u.cinit.value);
-            c->cc[u.cinit.controller] = u.cinit.value;
-        }
-        c->program->in_use++;
-    }
-}
-
-#define sampler_channel_set_program_args(ARG) ARG(struct sampler_program *, prg)
-
-DEFINE_RT_VOID_FUNC(sampler_channel, c, sampler_channel_set_program)
-{
-    sampler_channel_set_program_RT(c, prg);
 }
 
 static int get_first_free_program_no(struct sampler_module *m)
@@ -750,98 +688,6 @@ void sampler_destroyfunc(struct cbox_module *module)
     }
 
 ENUM_LIST(MAKE_FROM_TO_STRING)
-
-//////////////////////////////////////////////////////////////////////////
-
-struct sampler_update_layer_cmd
-{
-    struct sampler_module *module;
-    struct sampler_layer *layer;
-    struct sampler_layer_data *new_data;
-    struct sampler_layer_data *old_data;
-};
-
-static int sampler_update_layer_cmd_prepare(void *data)
-{
-    struct sampler_update_layer_cmd *cmd = data;
-    cmd->old_data = cmd->layer->runtime;
-    cmd->new_data = calloc(1, sizeof(struct sampler_layer_data));
-    
-    sampler_layer_data_clone(cmd->new_data, &cmd->layer->data, TRUE);
-    sampler_layer_data_finalize(cmd->new_data, cmd->layer->parent_group ? &cmd->layer->parent_group->data : NULL, cmd->module);
-    if (cmd->layer->runtime == NULL)
-    {
-        // initial update of the layer, so none of the voices need updating yet
-        // because the layer hasn't been allocated to any voice
-        cmd->layer->runtime = cmd->new_data;
-        return 1;
-    }
-    return 0;
-}
-
-static int sampler_update_layer_cmd_execute(void *data)
-{
-    struct sampler_update_layer_cmd *cmd = data;
-    
-    for (int i = 0; i < 16; i++)
-    {
-        FOREACH_VOICE(cmd->module->channels[i].voices_running, v)
-        {
-            if (v->layer == cmd->old_data)
-                v->layer = cmd->new_data;
-        }
-    }
-    cmd->layer->runtime = cmd->new_data;
-    return 10;
-}
-
-static void sampler_update_layer_cmd_cleanup(void *data)
-{
-    struct sampler_update_layer_cmd *cmd = data;
-    
-    sampler_layer_data_destroy(cmd->old_data);
-}
-
-void sampler_update_layer(struct sampler_module *m, struct sampler_layer *l)
-{
-    // if changing a group, update all child regions instead
-    if (g_hash_table_size(l->child_layers))
-    {
-        GHashTableIter iter;
-        g_hash_table_iter_init(&iter, l->child_layers);
-        gpointer key, value;
-        while(g_hash_table_iter_next(&iter, &key, &value))
-        {
-            sampler_layer_data_finalize(&((struct sampler_layer *)key)->data, &l->data, m);
-            sampler_update_layer(m, (struct sampler_layer *)key);
-        }
-        return;
-    }
-    static struct cbox_rt_cmd_definition rtcmd = {
-        .prepare = sampler_update_layer_cmd_prepare,
-        .execute = sampler_update_layer_cmd_execute,
-        .cleanup = sampler_update_layer_cmd_cleanup,
-    };
-    
-    struct sampler_update_layer_cmd lcmd;
-    lcmd.module = m;
-    lcmd.layer = l;
-    lcmd.new_data = NULL;
-    lcmd.old_data = NULL;
-    
-    // In order to be able to use the async call, it would be necessary to
-    // identify old data by layer pointer, not layer data pointer. For now,
-    // it might be good enough to just use sync calls for this.
-    cbox_rt_execute_cmd_sync(m->module.rt, &rtcmd, &lcmd);
-}
-
-void sampler_update_program_layers(struct sampler_module *m, struct sampler_program *prg)
-{
-    struct sampler_rll *new_rll = sampler_rll_new_from_program(prg);
-    struct sampler_rll *old_rll = cbox_rt_swap_pointers(m->module.rt, (void **)&prg->rll, new_rll);
-    if (old_rll)
-        sampler_rll_destroy(old_rll);
-}
 
 //////////////////////////////////////////////////////////////////////////
 // Note initialisation functions

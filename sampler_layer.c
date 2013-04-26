@@ -132,8 +132,8 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         const char *value = CBOX_ARG_S(cmd, 1);
         if (sampler_layer_apply_param(layer, key, value, error))
         {
-            sampler_update_layer(layer->module, layer);
-            sampler_update_program_layers(layer->module, layer->parent_program);
+            sampler_layer_update(layer);
+            sampler_program_update_layers(layer->parent_program);
             return TRUE;
         }
         return FALSE;
@@ -148,10 +148,10 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         struct sampler_layer *l = sampler_layer_new(layer->module, layer->parent_program, layer);
         sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, layer->module);
         sampler_layer_reset_switches(l, l->module);
-        sampler_update_layer(l->module, l);
+        sampler_layer_update(l);
 
         sampler_program_add_layer(layer->parent_program, l);
-        sampler_update_program_layers(layer->module, layer->parent_program);
+        sampler_program_update_layers(layer->parent_program);
         
         return cbox_execute_on(fb, NULL, "/uuid", "o", error, l);
     }
@@ -967,7 +967,6 @@ void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct sampler_layer *l = CBOX_H2O(objhdr);
     struct sampler_program *prg = l->parent_program;
-    struct sampler_module *m = l->module;
     assert(g_hash_table_size(l->child_layers) == 0);
 
     if (l->parent_group)
@@ -976,7 +975,7 @@ void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
         if (prg && prg->rll)
         {
             sampler_program_delete_layer(prg, l);
-            sampler_update_program_layers(m, prg);
+            sampler_program_update_layers(l->parent_program);
         }
         l->parent_group = NULL;
     }
@@ -990,3 +989,88 @@ void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
 
     free(l);
 }
+
+//////////////////////////////////////////////////////////////////////////
+
+struct sampler_layer_update_cmd
+{
+    struct sampler_module *module;
+    struct sampler_layer *layer;
+    struct sampler_layer_data *new_data;
+    struct sampler_layer_data *old_data;
+};
+
+static int sampler_layer_update_cmd_prepare(void *data)
+{
+    struct sampler_layer_update_cmd *cmd = data;
+    cmd->old_data = cmd->layer->runtime;
+    cmd->new_data = calloc(1, sizeof(struct sampler_layer_data));
+    
+    sampler_layer_data_clone(cmd->new_data, &cmd->layer->data, TRUE);
+    sampler_layer_data_finalize(cmd->new_data, cmd->layer->parent_group ? &cmd->layer->parent_group->data : NULL, cmd->module);
+    if (cmd->layer->runtime == NULL)
+    {
+        // initial update of the layer, so none of the voices need updating yet
+        // because the layer hasn't been allocated to any voice
+        cmd->layer->runtime = cmd->new_data;
+        return 1;
+    }
+    return 0;
+}
+
+static int sampler_layer_update_cmd_execute(void *data)
+{
+    struct sampler_layer_update_cmd *cmd = data;
+    
+    for (int i = 0; i < 16; i++)
+    {
+        FOREACH_VOICE(cmd->module->channels[i].voices_running, v)
+        {
+            if (v->layer == cmd->old_data)
+                v->layer = cmd->new_data;
+        }
+    }
+    cmd->layer->runtime = cmd->new_data;
+    return 10;
+}
+
+static void sampler_layer_update_cmd_cleanup(void *data)
+{
+    struct sampler_layer_update_cmd *cmd = data;
+    
+    sampler_layer_data_destroy(cmd->old_data);
+}
+
+void sampler_layer_update(struct sampler_layer *l)
+{
+    // if changing a group, update all child regions instead
+    if (g_hash_table_size(l->child_layers))
+    {
+        GHashTableIter iter;
+        g_hash_table_iter_init(&iter, l->child_layers);
+        gpointer key, value;
+        while(g_hash_table_iter_next(&iter, &key, &value))
+        {
+            sampler_layer_data_finalize(&((struct sampler_layer *)key)->data, &l->data, l->module);
+            sampler_layer_update((struct sampler_layer *)key);
+        }
+        return;
+    }
+    static struct cbox_rt_cmd_definition rtcmd = {
+        .prepare = sampler_layer_update_cmd_prepare,
+        .execute = sampler_layer_update_cmd_execute,
+        .cleanup = sampler_layer_update_cmd_cleanup,
+    };
+    
+    struct sampler_layer_update_cmd lcmd;
+    lcmd.module = l->module;
+    lcmd.layer = l;
+    lcmd.new_data = NULL;
+    lcmd.old_data = NULL;
+    
+    // In order to be able to use the async call, it would be necessary to
+    // identify old data by layer pointer, not layer data pointer. For now,
+    // it might be good enough to just use sync calls for this.
+    cbox_rt_execute_cmd_sync(l->module->module.rt, &rtcmd, &lcmd);
+}
+
