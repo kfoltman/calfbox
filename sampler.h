@@ -126,6 +126,8 @@ struct sampler_module
     gboolean deleting;
 };
 
+#define MAX_RELEASED_GROUPS 4
+
 extern GQuark cbox_sampler_error_quark(void);
 
 extern gboolean sampler_select_program(struct sampler_module *m, int channel, const gchar *preset, GError **error);
@@ -136,5 +138,28 @@ extern void sampler_unselect_program(struct sampler_module *m, struct sampler_pr
 extern void sampler_channel_set_program_RT(struct sampler_channel *c, struct sampler_program *prg);
 // ... and this one is RT-safe
 extern void sampler_channel_set_program(struct sampler_channel *c, struct sampler_program *prg);
+extern void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gboolean is_release_trigger);
+extern void sampler_channel_stop_note(struct sampler_channel *c, int note, int vel, gboolean is_polyaft);
+extern void sampler_channel_stop_sustained(struct sampler_channel *c);
+extern void sampler_channel_stop_sostenuto(struct sampler_channel *c);
+extern void sampler_channel_capture_sostenuto(struct sampler_channel *c);
+extern void sampler_channel_release_groups(struct sampler_channel *c, int note, int exgroups[MAX_RELEASED_GROUPS], int exgroupcount);
+extern void sampler_channel_stop_all(struct sampler_channel *c);
+
+extern void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel, int *exgroups, int *pexgroupcount);
+extern void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft);
+extern void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs);
+extern void sampler_voice_link(struct sampler_voice **pv, struct sampler_voice *v);
+extern void sampler_voice_unlink(struct sampler_voice **pv, struct sampler_voice *v);
+
+extern float sampler_sine_wave[2049];
+
+static inline int sampler_channel_addcc(struct sampler_channel *c, int cc_no)
+{
+    return (((int)c->cc[cc_no]) << 7) + c->cc[cc_no + 32];
+}
+
+#define FOREACH_VOICE(var, p) \
+    for (struct sampler_voice *p = (var), *p##_next = NULL; p && (p##_next = p->next, TRUE); p = p##_next)
 
 #endif

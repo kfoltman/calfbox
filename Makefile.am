@@ -43,9 +43,11 @@ calfbox_SOURCES = \
     reverb.c \
     rt.c \
     sampler.c \
+    sampler_channel.c \
     sampler_gen.c \
     sampler_layer.c \
     sampler_prg.c \
+    sampler_voice.c \
     scene.c \
     scripting.c \
     seq.c \
