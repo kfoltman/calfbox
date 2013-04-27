@@ -4,6 +4,9 @@ import struct
 import time
 import unittest
 
+# This is for locale testing
+from gi.repository import GObject, Gdk, Gtk
+
 from calfbox import cbox
 cbox.init_engine("")
 cbox.start_noaudio(44100)
@@ -129,7 +132,7 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(program1.status().in_use, 16)
         self.assertEqual(program1.status().name, 'test_sfz_parser_trailing_spaces')
         self.assertRegex(program1.get_regions()[0].as_string(), 'sample=.*impulse\.wav')
-        program2 = instrument.engine.load_patch_from_string(0, '.', '<group> resonance=3 <region> unknown=123 key=36 sample=impulse.wav cutoff=1000 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
+        program2 = instrument.engine.load_patch_from_string(0, '.', '<group> resonance=3 <region> unknown=123 key=36 sample=impulse.wav cutoff=1000.5 <region> key=37 sample=impulse.wav cutoff=2000', 'test_sampler_api')
         self.assertNotEqual(program2, None)
         self.assertEqual(program2.status().in_use, 16)
         try:
@@ -162,7 +165,7 @@ class TestCbox(unittest.TestCase):
                     self.assertTrue('key=c' in region_str)
                     if 'key=c2' in region_str:
                         self.assertTrue('unknown=123' in region_str)
-                        self.assertTrue('cutoff=1000' in region_str)
+                        self.assertTrue('cutoff=1000.5' in region_str)
                     else:
                         self.assertFalse('unknown=123' in region_str)
                         self.assertTrue('cutoff=2000' in region_str)

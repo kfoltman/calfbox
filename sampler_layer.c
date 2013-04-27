@@ -491,14 +491,7 @@ static int sfz_note_from_string(const char *note)
 
 static double atof_C(const char *value)
 {
-    static gboolean inited = FALSE;
-    static locale_t l;
-    if (!inited)
-    {
-        l = newlocale(LC_ALL_MASK, "C", NULL);
-        inited = TRUE;
-    }
-    return strtod_l(value, NULL, l);
+    return g_ascii_strtod(value, NULL);
 }
 
 static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_dahdsr *env, struct sampler_dahdsr_has_fields *has_fields, int env_type, const char *key, const char *value)
@@ -810,20 +803,20 @@ unknown_key:
     } else {}
 #define TYPE_PRINTF_float(name, def_value) \
     if (show_inherited || l->has_##name) \
-        g_string_append_printf(outstr, " %s=%g", #name, (float)(l->name));
+        g_string_append_printf(outstr, " %s=%s", #name, g_ascii_dtostr(floatbuf, floatbufsize, l->name));
 
 #define PROC_FIELDS_TO_FILEPTR(type, name, def_value) \
     TYPE_PRINTF_##type(name, def_value)
 #define PROC_FIELDS_TO_FILEPTR_dBamp(type, name, def_value) \
     if (show_inherited || l->has_##name) \
-        g_string_append_printf(outstr, " %s=%g", #name, (float)(l->name));
+        g_string_append_printf(outstr, " %s=%s", #name, g_ascii_dtostr(floatbuf, floatbufsize, l->name));
 #define PROC_FIELDS_TO_FILEPTR_enum(enumtype, name, def_value) \
     if ((show_inherited || l->has_##name) && (tmpstr = enumtype##_to_string(l->name)) != NULL) \
         g_string_append_printf(outstr, " %s=%s", #name, tmpstr);
 
 #define ENV_PARAM_OUTPUT(param, index, def_value, env, envfield, envname) \
     if (show_inherited || l->has_##envfield.param) \
-        g_string_append_printf(outstr, " " #envname "_" #param "=%g", env.param);
+        g_string_append_printf(outstr, " " #envname "_" #param "=%s", g_ascii_dtostr(floatbuf, floatbufsize, env.param));
 
 #define PROC_FIELDS_TO_FILEPTR_dahdsr(name, parname, index) \
     DAHDSR_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
@@ -840,6 +833,8 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     struct sampler_layer_data *l = &lr->data;
     GString *outstr = g_string_sized_new(200);
     const char *tmpstr;
+    char floatbuf[G_ASCII_DTOSTR_BUF_SIZE];
+    int floatbufsize = G_ASCII_DTOSTR_BUF_SIZE;
     if ((show_inherited || l->has_waveform) && l->waveform && l->waveform->display_name)
         g_string_append_printf(outstr, " sample=%s", l->waveform->display_name);
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
@@ -855,36 +850,38 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         #define PROC_ENVSTAGE_NAME(name, index, def_value) #name, 
         static const char *env_stages[] = { DAHDSR_FIELDS(PROC_ENVSTAGE_NAME) };
         int v = nd->variant;
+        g_ascii_dtostr(floatbuf, floatbufsize, nd->param);
         
         if (nd->notefunc == sampler_nif_addrandom && v >= 0 && v <= 2)
-            g_string_append_printf(outstr, " %s_random=%g", addrandom_variants[nd->variant], nd->param);
+            g_string_append_printf(outstr, " %s_random=%s", addrandom_variants[nd->variant], floatbuf);
         else if (nd->notefunc == sampler_nif_vel2pitch)
-            g_string_append_printf(outstr, " pitch_veltrack=%g", nd->param);
+            g_string_append_printf(outstr, " pitch_veltrack=%s", floatbuf);
         else if (nd->notefunc == sampler_nif_cc2delay && v >= 0 && v < 120)
-            g_string_append_printf(outstr, " delay_cc%d=%g", nd->variant, nd->param);
+            g_string_append_printf(outstr, " delay_cc%d=%s", nd->variant, floatbuf);
         else if (nd->notefunc == sampler_nif_vel2env && v >= 0 && (v & 15) < 6 && (v >> 4) < 3)
-            g_string_append_printf(outstr, " %seg_vel2%s=%g", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], nd->param);
+            g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], floatbuf);
     }
     for(GSList *mod = l->modulations; mod; mod = mod->next)
     {
         struct sampler_modulation *md = mod->data;
         if (!md->has_value && !show_inherited)
             continue;
+        g_ascii_dtostr(floatbuf, floatbufsize, md->amount);
 
         if (md->src2 == smsrc_none)
         {
             if (md->src < 120)
             {
-                g_string_append_printf(outstr, " %s_cc%d=%g", moddest_names[md->dest], md->src, md->amount);
+                g_string_append_printf(outstr, " %s_cc%d=%s", moddest_names[md->dest], md->src, floatbuf);
                 continue;
             }
             if (md->src < 120 + sizeof(modsrc_names) / sizeof(modsrc_names[0]))
             {
                 if ((md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
                     (md->src == smsrc_pitchenv && md->dest == smdest_pitch))
-                    g_string_append_printf(outstr, " %s_depth=%g", modsrc_names[md->src - 120], md->amount);
+                    g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - 120], floatbuf);
                 else
-                    g_string_append_printf(outstr, " %s_%s=%g", moddest_names[md->dest], modsrc_names[md->src - 120], md->amount);
+                    g_string_append_printf(outstr, " %s_%s=%s", moddest_names[md->dest], modsrc_names[md->src - 120], floatbuf);
                 continue;
             }
         }
@@ -896,12 +893,12 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             {
             case smsrc_chanaft:
             case smsrc_polyaft:
-                g_string_append_printf(outstr, " %slfo_depth%s=%g", moddest_names[md->dest], modsrc_names[md->src2 - 120], md->amount);
+                g_string_append_printf(outstr, " %slfo_depth%s=%s", moddest_names[md->dest], modsrc_names[md->src2 - 120], floatbuf);
                 continue;
             default:
                 if (md->src2 < 120)
                 {
-                    g_string_append_printf(outstr, " %slfo_depthcc%d=%g", moddest_names[md->dest], md->src2, md->amount);
+                    g_string_append_printf(outstr, " %slfo_depthcc%d=%s", moddest_names[md->dest], md->src2, floatbuf);
                     continue;
                 }
                 break;
@@ -914,16 +911,16 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         {
             if (md->src2 == smsrc_vel)
             {
-                g_string_append_printf(outstr, " %seg_vel2depth=%g", moddest_names[md->dest], md->amount);
+                g_string_append_printf(outstr, " %seg_vel2depth=%s", moddest_names[md->dest], floatbuf);
                 continue;
             }
             if (md->src2 < 120)
             {
-                g_string_append_printf(outstr, " %s_depthcc%d=%g", modsrc_names[md->src - 120], md->src2, md->amount);
+                g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - 120], md->src2, floatbuf);
                 continue;
             }
         }
-        g_string_append_printf(outstr, " genericmod_from_%d_and_%d_to_%d=%g", md->src, md->src2, md->dest, md->amount);
+        g_string_append_printf(outstr, " genericmod_from_%d_and_%d_to_%d=%s", md->src, md->src2, md->dest, floatbuf);
     }
 
     if (lr->unknown_keys)
