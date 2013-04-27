@@ -188,6 +188,12 @@ void cbox_rt_on_started(void *user_data)
     rt->started = 1;
 }
 
+void cbox_rt_on_stopped(void *user_data)
+{
+    struct cbox_rt *rt = user_data;
+    rt->started = 0;
+}
+
 void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
 {
     if (rt->io)
@@ -196,12 +202,15 @@ void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
         rt->cbs->user_data = rt;
         rt->cbs->process = cbox_rt_process;
         rt->cbs->on_started = cbox_rt_on_started;
+        rt->cbs->on_stopped = cbox_rt_on_stopped;
         rt->cbs->on_disconnected = cbox_rt_on_disconnected;
         rt->cbs->on_reconnected = cbox_rt_on_reconnected;
         rt->cbs->on_midi_inputs_changed = cbox_rt_on_midi_inputs_changed;
         rt->cbs->on_midi_outputs_changed = cbox_rt_on_midi_outputs_changed;
 
+        assert(!rt->started);
         cbox_io_start(rt->io, rt->cbs, fb);
+        assert(rt->started);
     }
 }
 
@@ -213,7 +222,7 @@ void cbox_rt_stop(struct cbox_rt *rt)
         cbox_io_stop(rt->io);
         free(rt->cbs);
         rt->cbs = NULL;
-        rt->started = 0;
+        assert(!rt->started);
     }
 }
 

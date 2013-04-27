@@ -235,6 +235,10 @@ gboolean cbox_usbio_start(struct cbox_io_impl *impl, struct cbox_command_target 
     create_midi_ports(uii);
 
     struct cbox_io *io = uii->ioi.pio;
+    // XXXKF There is a short period of time when the playback is in 'started' state
+    // but is not really processing the event loop. This is likely harmless, but
+    // should be kept in mind when adding any code between pthread_create
+    // and usbio_update_port_routing.
     if (io->cb->on_started)
         io->cb->on_started(io->cb->user_data);
     

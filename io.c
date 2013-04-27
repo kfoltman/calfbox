@@ -74,6 +74,8 @@ gboolean cbox_io_cycle(struct cbox_io *io, struct cbox_command_target *fb, GErro
 int cbox_io_stop(struct cbox_io *io)
 {
     int result = io->impl->stopfunc(io->impl, NULL);
+    if (io->cb && io->cb->on_stopped)
+        io->cb->on_stopped(io->cb->user_data);
     io->cb = NULL;
     return result;
 }
