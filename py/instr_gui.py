@@ -19,7 +19,10 @@ class StreamWindow(Gtk.VBox):
         self.filebutton.add_filter(standard_filter(["*.flac", "*.FLAC"], "FLAC files"))
         self.filebutton.add_filter(standard_filter(["*"], "All files"))
         self.filebutton.connect('file-set', self.file_set)
-        panel.pack_start(self.filebutton, False, False, 5)
+        hpanel = Gtk.HBox(spacing = 5)
+        hpanel.pack_start(Gtk.Label.new_with_mnemonic("_Play file:"), False, False, 5)
+        hpanel.pack_start(self.filebutton, True, True, 5)
+        panel.pack_start(hpanel, False, False, 5)
 
         self.adjustment = Gtk.Adjustment()
         self.adjustment_handler = self.adjustment.connect('value-changed', self.pos_slider_moved)
@@ -165,7 +168,7 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         self.engine = iobj.engine
         self.path = self.engine.path
         
-        attribs = cbox.GetThings("%s/status" % self.path, ['%patch', 'polyphony', 'active_voices', '%channel_voices'], [])
+        attribs = self.engine.status()
 
         panel = Gtk.VBox(spacing=5)
         table = Gtk.Table(2, 2)
@@ -177,9 +180,23 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         WithPatchTable.__init__(self, attribs)
         panel.pack_start(standard_vscroll_window(-1, 160, self.table), True, True, 5)
         self.add(panel)
-        load_button = Gtk.Button.new_with_mnemonic("_Load")
-        load_button.connect('clicked', self.load)
-        panel.pack_start(load_button, False, True, 5)
+        hpanel = Gtk.HBox(spacing = 5)
+
+        hpanel.pack_start(Gtk.Label.new_with_mnemonic("Add from _SFZ:"), False, False, 5)
+        self.filebutton = Gtk.FileChooserButton("Soundfont")
+        self.filebutton.set_action(Gtk.FileChooserAction.OPEN)
+        self.filebutton.set_local_only(True)
+        #self.filebutton.set_filename(cbox.GetThings("%s/status" % self.path, ['soundfont'], []).soundfont)
+        self.filebutton.add_filter(standard_filter(["*.sfz", "*.SFZ"], "SFZ Programs"))
+        self.filebutton.add_filter(standard_filter(["*"], "All files"))
+        self.filebutton.connect('file-set', self.load_sfz)
+        hpanel.pack_start(self.filebutton, False, True, 5)
+        
+        load_button = Gtk.Button.new_with_mnemonic("Add from _config")
+        load_button.connect('clicked', self.load_config)
+        hpanel.pack_start(load_button, False, True, 5)
+        panel.pack_start(hpanel, False, False, 5)
+        
         set_timer(self, 200, self.voices_update)
         self.polyphony_labels = {}
         for i in range(16):
@@ -204,17 +221,22 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
             for r in grp.get_children():
                 print ("<region> %s" % (r.as_string()))
         
-    def load(self, event):
+    def load_config(self, event):
         d = LoadProgramDialog(self.get_toplevel())
         response = d.run()
         try:
             if response == Gtk.ResponseType.OK:
                 scene = d.get_selected_object()
-                pgm_id = cbox.GetThings("%s/get_unused_program" % self.path, ['program_no'], []).program_no
+                pgm_id = self.engine.get_unused_program()
                 self.engine.load_patch_from_cfg(pgm_id, scene[2], scene[2][5:])
                 self.update_model()
         finally:
             d.destroy()        
+        
+    def load_sfz(self, button):
+        pgm_id = self.engine.get_unused_program()
+        self.engine.load_patch_from_file(pgm_id, self.filebutton.get_filename(), self.filebutton.get_filename())
+        self.update_model()
         
     def voices_update(self):
         status = self.engine.status()
