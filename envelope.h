@@ -50,11 +50,11 @@ static inline void cbox_envelope_init_stage(struct cbox_envelope *env)
     env->inv_time = es->time ? 1.0 / es->time : 1;
     if (es->is_exp)
     {
-        if (env->stage_start_value < 1.0/16384.0)
-            env->stage_start_value = 1.0/16384.0;
+        if (env->stage_start_value < 100.0/16384.0)
+            env->stage_start_value = 100.0/16384.0;
         double ev = es->end_value;
-        if (ev < 1.0/16384.0)
-            ev = 1.0/16384.0;
+        if (ev < 100.0/16384.0)
+            ev = 100.0/16384.0;
         env->exp_factor = log(ev/env->stage_start_value);
     }
 }
@@ -91,7 +91,7 @@ static inline float cbox_envelope_get_next(struct cbox_envelope *env, int releas
         // instead of exp, may use 2**x which can be factored
         // into a shift and a table lookup
         env->cur_value = env->stage_start_value * exp(pos * env->exp_factor);
-        if (env->cur_value <= 1.1/16384.0)
+        if (env->cur_value <= 100.1/16384.0)
             env->cur_value = 0;
     }
     else
