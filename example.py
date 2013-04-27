@@ -27,8 +27,16 @@ class SceneDialog(SelectObjectDialog):
             title = s["title"]
             model.append((s.name[6:], "Layer", s.name, title))
 
-class AddLayerDialog(SelectObjectDialog):
-    title = "Add a layer"
+class NewLayerDialog(SelectObjectDialog):
+    title = "Create a layer"
+    def __init__(self, parent):
+        SelectObjectDialog.__init__(self, parent)
+    def update_model(self, model):
+        for engine_name, wclass in instr_gui.instrument_window_map.items():
+            model.append((engine_name, "Engine", engine_name, ""))
+
+class LoadLayerDialog(SelectObjectDialog):
+    title = "Load a layer"
     def __init__(self, parent):
         SelectObjectDialog.__init__(self, parent)
     def update_model(self, model):
@@ -166,7 +174,8 @@ class MainWindow(Gtk.Window):
             ("_Quit", self.quit),
         ]))
         self.menu_bar.append(create_menu("_Layer", [
-            ("_Add", self.layer_add),
+            ("_New", self.layer_new),
+            ("_Load", self.layer_load),
             ("_Remove", self.layer_remove),
         ]))
         self.menu_bar.append(create_menu("_AuxBus", [
@@ -278,8 +287,8 @@ class MainWindow(Gtk.Window):
         finally:
             d.destroy()
 
-    def layer_add(self, w):
-        d = AddLayerDialog(self)
+    def layer_load(self, w):
+        d = LoadLayerDialog(self)
         response = d.run()
         try:
             if response == Gtk.ResponseType.OK:
@@ -289,6 +298,23 @@ class MainWindow(Gtk.Window):
                     scene.add_layer(item_name)
                 elif item_type == 'Instrument':
                     scene.add_instrument_layer(item_name)
+                self.refresh_instrument_pages()
+        finally:
+            d.destroy()
+
+    def layer_new(self, w):
+        d = NewLayerDialog(self)
+        response = d.run()
+        try:
+            if response == Gtk.ResponseType.OK:
+                scene = cbox.Document.get_scene()
+                keys = scene.status().instruments.keys()
+                engine_name = d.get_selected_object()[0]
+                for i in range(1, 1001):
+                    name = "%s%s" % (engine_name, i)
+                    if name not in keys:
+                        break
+                scene.add_new_instrument_layer(name, engine_name)
                 self.refresh_instrument_pages()
         finally:
             d.destroy()
