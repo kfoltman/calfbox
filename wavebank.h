@@ -54,7 +54,7 @@ struct cbox_waveform
 extern struct cbox_command_target cbox_waves_cmd_target;
 
 extern void cbox_wavebank_init(void);
-extern struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *filename, GError **error);
+extern struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *sample_dir, const char *filename, GError **error);
 extern struct cbox_waveform *cbox_wavebank_peek_waveform_by_id(int id);
 extern void cbox_wavebank_foreach(void (*cb)(void *user_data, struct cbox_waveform *waveform), void *user_data);
 extern void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, void *user_data), void *user_data, int levels);

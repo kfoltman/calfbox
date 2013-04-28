@@ -37,7 +37,7 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
     struct sfz_load_state *ls = client->user_data;
     // printf("-- copy current region to the list of layers\n");
     struct sampler_layer *l = ls->region;
-    sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, ls->m);
+    sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, ls->program);
     sampler_layer_reset_switches(l, ls->m);
     sampler_layer_update(l);
     sampler_program_add_layer(ls->program, ls->region);

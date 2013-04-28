@@ -185,6 +185,7 @@ typedef int midi_note_t;
  */
 
 #define SAMPLER_FIXED_FIELDS(MACRO) \
+    MACRO##_string(sample) \
     MACRO(uint32_t, offset, 0) \
     MACRO(uint32_t, offset_random, 0) \
     MACRO(uint32_t, loop_start, 0) \
@@ -287,6 +288,9 @@ struct sampler_lfo_has_fields
 
 #define PROC_FIELDS_TO_STRUCT(type, name, def_value) \
     type name;
+#define PROC_FIELDS_TO_STRUCT_string(name) \
+    gchar *name; \
+    gboolean name##_changed;
 #define PROC_FIELDS_TO_STRUCT_dBamp(type, name, def_value) \
     type name; \
     type name##_linearized;
@@ -303,6 +307,8 @@ struct sampler_lfo_has_fields
     int8_t name##cc_number;
 
 #define PROC_HAS_FIELD(type, name, def_value) \
+    unsigned int has_##name:1;
+#define PROC_HAS_FIELD_string(name) \
     unsigned int has_##name:1;
 #define PROC_HAS_FIELD_dBamp(type, name, def_value) \
     PROC_HAS_FIELD(type, name, def_value)
@@ -323,9 +329,6 @@ CBOX_EXTERN_CLASS(sampler_layer)
 
 struct sampler_layer_data
 {
-    struct cbox_waveform *waveform;
-    gboolean has_waveform;
-
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
     SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)    
 
@@ -338,6 +341,7 @@ struct sampler_layer_data
     // computed values:
     float eff_freq;
     int eff_use_keyswitch;
+    struct cbox_waveform *eff_waveform;
 };
 
 struct sampler_layer
@@ -359,12 +363,11 @@ struct sampler_layer
 
 extern struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group);
 extern struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, const char *cfg_section);
-extern void sampler_layer_set_waveform(struct sampler_layer *l, struct cbox_waveform *waveform);
 extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param);
 extern void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_section);
-extern void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_layer_data *parent, struct sampler_module *m);
+extern void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_layer_data *parent, struct sampler_program *p);
 extern void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m);
 extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error);
 extern gchar *sampler_layer_to_string(struct sampler_layer *l, gboolean show_inherited);

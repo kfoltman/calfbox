@@ -31,8 +31,8 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
     for(;next_layer;next_layer = g_slist_next(next_layer))
     {
         struct sampler_layer *lr = next_layer->data;
-        struct sampler_layer_data *l = &lr->data;
-        if (!l->waveform)
+        struct sampler_layer_data *l = lr->runtime;
+        if (!l->eff_waveform)
             continue;
         if ((l->trigger == stm_first && !is_first) ||
             (l->trigger == stm_legato && is_first))
@@ -240,7 +240,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         else 
         {
             sampler_layer_update(l);
-            if (!l->data.waveform)
+            if (!l->data.eff_waveform)
                 g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
             else
                 sampler_program_add_layer(prg, l);

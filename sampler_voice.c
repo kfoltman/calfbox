@@ -132,13 +132,13 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
         if (age * l->rt_decay > 84)
             return;
     }
-    uint32_t end = l->waveform->info.frames;
+    uint32_t end = l->eff_waveform->info.frames;
     if (l->end != 0)
         end = (l->end == -1) ? 0 : l->end;
-    v->last_waveform = l->waveform;
+    v->last_waveform = l->eff_waveform;
     v->gen.cur_sample_end = end;
-    if (end > l->waveform->info.frames)
-        end = l->waveform->info.frames;
+    if (end > l->eff_waveform->info.frames)
+        end = l->eff_waveform->info.frames;
     
     v->output_pair_no = l->output % m->output_pairs;
     v->serial_no = m->serial_no;
@@ -228,7 +228,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     cbox_envelope_reset(&v->filter_env);
     cbox_envelope_reset(&v->pitch_env);
 
-    sampler_voice_activate(v, l->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16);
+    sampler_voice_activate(v, l->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16);
 }
 
 void sampler_voice_link(struct sampler_voice **pv, struct sampler_voice *v)
@@ -292,13 +292,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     if (v->age < v->delay)
         return;
 
-    if (v->last_waveform != v->layer->waveform)
+    if (v->last_waveform != v->layer->eff_waveform)
     {
-        v->last_waveform = v->layer->waveform;
-        if (v->layer->waveform)
+        v->last_waveform = v->layer->eff_waveform;
+        if (v->layer->eff_waveform)
         {
-            v->gen.mode = v->layer->waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-            v->gen.cur_sample_end = v->layer->waveform->info.frames;
+            v->gen.mode = v->layer->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+            v->gen.cur_sample_end = v->layer->eff_waveform->info.frames;
         }
         else
         {

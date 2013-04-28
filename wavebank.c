@@ -240,7 +240,7 @@ void cbox_wavebank_init()
     cbox_wavebank_add_std_waveform("*tri", func_tri, NULL, 11);
 }
 
-struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *filename, GError **error)
+struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *sample_dir, const char *filename, GError **error)
 {
     int i;
     int nshorts;
@@ -263,15 +263,26 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
         }
     }
     
-    char *canonical = realpath(filename, NULL);
+    gchar *value_copy = g_strdup(filename);
+    for (int i = 0; value_copy[i]; i++)
+    {
+        if (value_copy[i] == '\\')
+            value_copy[i] = '/';
+    }
+    gchar *pathname = g_build_filename(sample_dir, value_copy, NULL);
+    g_free(value_copy);
+
+    char *canonical = realpath(pathname, NULL);
     if (!canonical)
     {
-        g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, "%s: cannot find a real path for '%s'", context_name, filename);
+        g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, "%s: cannot find a real path for '%s'", context_name, pathname);
+        g_free(pathname);
         return NULL;
     }
     gpointer value = g_hash_table_lookup(bank.waveforms_by_name, canonical);
     if (value)
     {
+        g_free(pathname);
         free(canonical);
         
         struct cbox_waveform *waveform = value;
@@ -280,22 +291,25 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     }
     
     struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
-    SNDFILE *sndfile = sf_open(filename, SFM_READ, &waveform->info);
+    SNDFILE *sndfile = sf_open(pathname, SFM_READ, &waveform->info);
     SF_INSTRUMENT instrument;
     if (!sndfile)
     {
-        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "%s: cannot open '%s'", context_name, filename);
+        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "%s: cannot open '%s'", context_name, pathname);
+        g_free(pathname);
         free(canonical);
         return NULL;
     }
     if (waveform->info.channels != 1 && waveform->info.channels != 2)
     {
         g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, 
-            "%s: cannot open file '%s': unsupported channel count %d", context_name, filename, (int)waveform->info.channels);
+            "%s: cannot open file '%s': unsupported channel count %d", context_name, pathname, (int)waveform->info.channels);
         sf_close(sndfile);
         free(canonical);
+        g_free(pathname);
         return NULL;
     }
+    g_free(pathname);
     waveform->id = ++bank.serial_no;
     waveform->bytes = waveform->info.channels * 2 * (waveform->info.frames + 1);
     waveform->data = malloc(waveform->bytes);
