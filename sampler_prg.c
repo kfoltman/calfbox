@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_program)
 
-GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random)
+GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random, gboolean is_first)
 {
     int ch = (c - c->module->channels) + 1;
     for(;next_layer;next_layer = g_slist_next(next_layer))
@@ -33,6 +33,9 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
         struct sampler_layer *lr = next_layer->data;
         struct sampler_layer_data *l = &lr->data;
         if (!l->waveform)
+            continue;
+        if ((l->trigger == stm_first && !is_first) ||
+            (l->trigger == stm_legato && is_first))
             continue;
         if (l->sw_last != -1)
         {

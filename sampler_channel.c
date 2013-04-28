@@ -85,16 +85,26 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
 {
     struct sampler_module *m = c->module;
     float random = rand() * 1.0 / (RAND_MAX + 1.0);
+    gboolean is_first = FALSE;
     if (!is_release_trigger)
     {
         c->switchmask[note >> 5] |= 1 << (note & 31);
         c->prev_note_velocity[note] = vel;
         c->prev_note_start_time[note] = m->current_time;
+        is_first = TRUE;
+        FOREACH_VOICE(c->voices_running, v)
+        {
+            if (!v->released && v->layer->trigger != stm_release)
+            {
+                is_first = FALSE;
+                break;
+            }
+        }
     }
     struct sampler_program *prg = c->program;
     if (!prg || !prg->rll || prg->deleting)
         return;
-    GSList *next_layer = sampler_program_get_next_layer(prg, c, !is_release_trigger ? prg->rll->layers : prg->rll->layers_release, note, vel, random);
+    GSList *next_layer = sampler_program_get_next_layer(prg, c, !is_release_trigger ? prg->rll->layers : prg->rll->layers_release, note, vel, random, is_first);
     if (!next_layer)
     {
         if (!is_release_trigger)
@@ -112,7 +122,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
         // Maybe someone forgot to call sampler_update_layer?
         assert(l->runtime);
         sampler_voice_start(v, c, l->runtime, note, vel, exgroups, &exgroupcount);
-        next_layer = sampler_program_get_next_layer(prg, c, g_slist_next(next_layer), note, vel, random);
+        next_layer = sampler_program_get_next_layer(prg, c, g_slist_next(next_layer), note, vel, random, is_first);
         if (!next_layer)
             break;
     }

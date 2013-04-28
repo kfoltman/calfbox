@@ -69,11 +69,15 @@ enum sampler_trigger
 {
     stm_attack,
     stm_release,
+    stm_first,
+    stm_legato,
 };
 
 #define ENUM_VALUES_sampler_trigger(MACRO) \
     MACRO("attack", stm_attack) \
-    MACRO("release", stm_release)  
+    MACRO("release", stm_release) \
+    MACRO("first", stm_first) \
+    MACRO("legato", stm_legato)
 
 enum sampler_filter_type
 {
