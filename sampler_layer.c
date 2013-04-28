@@ -663,11 +663,6 @@ try_now:
         l->data.loop_start = atoi(value), l->data.has_loop_start = 1;
     else if (!strcmp(key, "loopend"))
         l->data.loop_end = atoi(value), l->data.has_loop_end = 1;
-    else if (!strcmp(key, "loopmode"))
-    {
-        key = "loop_mode";
-        goto try_now; // yes, goto, why not?
-    }
     else if (!strcmp(key, "cutoff_chanaft"))
         sampler_layer_set_modulation1(l, smsrc_chanaft, smdest_cutoff, atof_C(value), 0);
     else if (!strcmp(key, "amp_random"))
@@ -776,6 +771,16 @@ try_now:
         }
         else
             return FALSE;
+    }
+    else if (!strcmp(key, "loopmode"))
+    {
+        key = "loop_mode";
+        goto try_now; // yes, goto, why not?
+    }
+    else if (!strcmp(key, "offby"))
+    {
+        key = "off_by";
+        goto try_now;
     }
     else
         goto unknown_key;
