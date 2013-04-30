@@ -122,6 +122,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
 {
     struct sampler_module *m = c->module;
     sampler_gen_reset(&v->gen);
+    
     v->age = 0;
     if (l->trigger == stm_release)
     {
@@ -139,6 +140,14 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     v->gen.cur_sample_end = end;
     if (end > l->eff_waveform->info.frames)
         end = l->eff_waveform->info.frames;
+    
+    if (end > l->eff_waveform->preloaded_frames)
+    {
+        // XXXKF allow looping
+        v->current_pipe = cbox_prefetch_stack_pop(m->pipe_stack, l->eff_waveform, -1, end);
+        if (!v->current_pipe)
+            g_warning("Prefetch pipe pool exhausted, no streaming playback will be possible");
+    }
     
     v->output_pair_no = l->output % m->output_pairs;
     v->serial_no = m->serial_no;
@@ -257,6 +266,11 @@ void sampler_voice_inactivate(struct sampler_voice *v, gboolean expect_active)
     assert((v->gen.mode != spt_inactive) == expect_active);
     sampler_voice_unlink(&v->channel->voices_running, v);
     v->gen.mode = spt_inactive;
+    if (v->current_pipe)
+    {
+        cbox_prefetch_stack_push(v->program->module->pipe_stack, v->current_pipe);
+        v->current_pipe = NULL;
+    }
     v->channel = NULL;
     sampler_voice_link(&v->program->module->voices_free, v);
 }
@@ -281,7 +295,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
 {
     struct sampler_layer_data *l = v->layer;
     assert(v->gen.mode != spt_inactive);
-
+    
     // if it's a DAHD envelope without sustain, consider the note finished
     if (v->amp_env.cur_stage == 4 && v->amp_env.shape->stages[3].end_value == 0)
         cbox_envelope_go_to(&v->amp_env, 15);                
@@ -373,35 +387,58 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     double maxv = 127 << 7;
     double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;
     uint64_t freq64 = (uint64_t)(freq * 65536.0 * 65536.0 * m->module.srate_inv);
-    v->gen.sample_data = v->last_waveform->data;
-    if (v->last_waveform->levels)
+    if (!v->current_pipe)
     {
-        // XXXKF: optimise later by caching last lookup value
-        // XXXKF: optimise later by using binary search
-        for (int i = 0; i < v->last_waveform->level_count; i++)
+        v->gen.sample_data = v->last_waveform->data;
+        if (v->last_waveform->levels)
         {
-            if (freq64 <= v->last_waveform->levels[i].max_rate)
+            // XXXKF: optimise later by caching last lookup value
+            // XXXKF: optimise later by using binary search
+            for (int i = 0; i < v->last_waveform->level_count; i++)
             {
-                v->gen.sample_data = v->last_waveform->levels[i].data;
-                break;
+                if (freq64 <= v->last_waveform->levels[i].max_rate)
+                {
+                    v->gen.sample_data = v->last_waveform->levels[i].data;
+                    break;
+                }
             }
         }
     }
     gboolean post_sustain = v->released && v->loop_mode == slm_loop_sustain;
+    uint32_t loop_start, loop_end;
     if (v->layer->count > 0)
     {
         // End the loop on the last time
         gboolean play_loop = (v->play_count < v->layer->count - 1);
-        v->gen.loop_start = play_loop ? 0 : (uint32_t)-1;
-        v->gen.loop_end = v->gen.cur_sample_end;
+        loop_start = play_loop ? 0 : (uint32_t)-1;
+        loop_end = v->gen.cur_sample_end;
     }
     else
     {
         gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || (v->loop_mode == slm_loop_sustain && !post_sustain)) && v->layer->on_cc_number == -1;
-        v->gen.loop_start = play_loop ? v->layer->loop_start : (uint32_t)-1;
-        v->gen.loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
+        loop_start = play_loop ? v->layer->loop_start : (uint32_t)-1;
+        loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
+    }
+    
+    if (v->current_pipe)
+    {
+        v->current_pipe->file_loop_end = loop_end;
+        v->current_pipe->file_loop_start = loop_start;
+        v->gen.sample_data = v->gen.loop_count ? v->current_pipe->data : v->last_waveform->data;
+        v->gen.sample_data_loop = v->current_pipe->data;
+        
+        v->gen.loop_start = 0;
+        v->gen.loop_overlap = 0;
+        v->gen.loop_end = v->gen.loop_count ? v->current_pipe->buffer_loop_end : v->last_waveform->preloaded_frames;
+        v->gen.loop_end2 = v->current_pipe->buffer_loop_end;
+    }
+    else
+    {
+        v->gen.loop_start = loop_start;
+        v->gen.loop_end = loop_end;
     }
         
+    
     v->gen.delta = freq64 >> 32;
     v->gen.frac_delta = freq64 & 0xFFFFFFFF;
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * sampler_channel_addcc(c, 7) * sampler_channel_addcc(c, 11) / (maxv * maxv);
@@ -461,10 +498,16 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
     float *tmp_outputs[2] = {left, right};
     uint32_t samples = 0;
-    uint32_t pos = v->gen.pos;
+        
     samples = sampler_gen_sample_playback(&v->gen, tmp_outputs);
-    if (v->layer->count && v->gen.pos < pos)
-        v->play_count++;
+
+    if (v->current_pipe)
+    {
+        cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.consumed);
+        v->gen.consumed = 0;
+    }
+    else
+        v->play_count = v->gen.loop_count;
 
     for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
         left[i] = right[i] = 0.f;

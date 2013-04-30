@@ -45,6 +45,7 @@ csources = [
     "pattern.c",
     "pattern-maker.c",
     "phaser.c",
+    "prefetch_pipe.c",
     "recsrc.c",
     "reverb.c",
     "rt.c",

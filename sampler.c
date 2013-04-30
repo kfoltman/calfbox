@@ -569,7 +569,9 @@ MODULE_CREATE_FUNCTION(sampler)
     m->max_voices = max_voices;
     m->serial_no = 0;
     m->deleting = FALSE;
-            
+    // XXXKF read defaults from some better place, like config
+    m->pipe_stack = cbox_prefetch_stack_new(max_voices, cbox_config_get_int("streaming", "streambuf_size", 65536));
+
     for (i = 0; ; i++)
     {
         gchar *s = g_strdup_printf("program%d", i);
@@ -654,9 +656,11 @@ MODULE_CREATE_FUNCTION(sampler)
 void sampler_destroyfunc(struct cbox_module *module)
 {
     struct sampler_module *m = (struct sampler_module *)module;
+    int i;
     m->deleting = TRUE;
     
-    for (int i = 0; i < m->program_count;)
+    cbox_prefetch_stack_destroy(m->pipe_stack);
+    for (i = 0; i < m->program_count;)
     {
         if (m->programs[i])
             CBOX_DELETE(m->programs[i]);

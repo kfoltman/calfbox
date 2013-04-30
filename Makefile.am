@@ -39,6 +39,7 @@ calfbox_SOURCES = \
     pattern.c \
     pattern-maker.c \
     phaser.c \
+    prefetch_pipe.c \
     recsrc.c \
     reverb.c \
     rt.c \
@@ -99,6 +100,7 @@ noinst_HEADERS = \
     onepole-float.h \
     pattern.h \
     pattern-maker.h \
+    prefetch_pipe.h \
     recsrc.h \
     rt.h \
     sampler.h \

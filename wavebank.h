@@ -42,6 +42,7 @@ struct cbox_waveform
     int id;
     int refcount;
     size_t bytes;
+    size_t preloaded_frames;
     gchar *canonical_name;
     gchar *display_name;
     gboolean has_loop;

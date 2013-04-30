@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "biquad-float.h"
 #include "envelope.h"
 #include "module.h"
+#include "prefetch_pipe.h"
 #include "sampler_layer.h"
 #include "sampler_prg.h"
 #include "wavebank.h"
@@ -70,13 +71,16 @@ struct sampler_gen
 {
     enum sampler_player_type mode;
     int16_t *sample_data;
+    int16_t *sample_data_loop;
     
-    uint32_t pos, delta, loop_start, loop_end, cur_sample_end;
+    uint32_t pos, delta, loop_start, loop_end, cur_sample_end, loop_end2;
     uint32_t frac_pos, frac_delta;
     uint32_t loop_overlap;
+    uint32_t consumed;
     float loop_overlap_step;
     float lgain, rgain;
     float last_lgain, last_rgain;
+    uint32_t loop_count;
 };
 
 struct sampler_voice
@@ -87,6 +91,7 @@ struct sampler_voice
     struct sampler_program *program;
     struct cbox_waveform *last_waveform;
     struct sampler_gen gen;
+    struct cbox_prefetch_pipe *current_pipe;
     int note;
     int vel;
     int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;
@@ -124,6 +129,7 @@ struct sampler_module
     int output_pairs, aux_pairs;
     uint32_t current_time;
     gboolean deleting;
+    struct cbox_prefetch_stack *pipe_stack;
 };
 
 #define MAX_RELEASED_GROUPS 4
@@ -162,5 +168,6 @@ static inline int sampler_channel_addcc(struct sampler_channel *c, int cc_no)
 
 #define FOREACH_VOICE(var, p) \
     for (struct sampler_voice *p = (var), *p##_next = NULL; p && (p##_next = p->next, TRUE); p = p##_next)
+
 
 #endif

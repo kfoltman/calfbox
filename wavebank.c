@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "cmd.h"
+#include "config.h"
 #include "dspmath.h"
 #include "errors.h"
 #include "wavebank.h"
@@ -121,6 +122,7 @@ struct wave_bank
     int64_t bytes, maxbytes, serial_no;
     GHashTable *waveforms_by_name, *waveforms_by_id;
     GSList *std_waveforms;
+    uint32_t streaming_prefetch_size;
 };
 
 static struct wave_bank bank;
@@ -200,7 +202,7 @@ void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, 
     struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
     waveform->data = wave;
     waveform->info.channels = 1;
-    waveform->info.frames = nsize;
+    waveform->preloaded_frames = waveform->info.frames = nsize;
     waveform->info.samplerate = (int)(nsize * 261.6255);
     waveform->id = ++bank.serial_no;
     waveform->bytes = waveform->info.channels * 2 * (waveform->info.frames + 1);
@@ -233,6 +235,7 @@ void cbox_wavebank_init()
     bank.waveforms_by_name = g_hash_table_new(g_str_hash, g_str_equal);
     bank.waveforms_by_id = g_hash_table_new(g_int_hash, g_int_equal);
     bank.std_waveforms = NULL;
+    bank.streaming_prefetch_size = cbox_config_get_int("streaming", "prefetch_size", 65536);
     
     cbox_wavebank_add_std_waveform("*sine", func_sine, NULL, 0);
     cbox_wavebank_add_std_waveform("*saw", func_saw, NULL, 11);
@@ -310,8 +313,11 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
         return NULL;
     }
     g_free(pathname);
+    uint32_t preloaded_frames = waveform->info.frames + 1;
+    if (preloaded_frames > 2 * bank.streaming_prefetch_size)
+        preloaded_frames = bank.streaming_prefetch_size;
     waveform->id = ++bank.serial_no;
-    waveform->bytes = waveform->info.channels * 2 * (waveform->info.frames + 1);
+    waveform->bytes = waveform->info.channels * 2 * preloaded_frames;
     waveform->data = malloc(waveform->bytes);
     waveform->refcount = 1;
     waveform->canonical_name = canonical;
@@ -319,6 +325,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     waveform->has_loop = FALSE;
     waveform->levels = NULL;
     waveform->level_count = 0;
+    waveform->preloaded_frames = preloaded_frames;
     
     if (sf_command(sndfile, SFC_GET_INSTRUMENT, &instrument, sizeof(SF_INSTRUMENT)))
     {
@@ -334,10 +341,10 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
         }
     }
 
-    nshorts = waveform->info.channels * (waveform->info.frames + 1);
+    nshorts = waveform->info.channels * preloaded_frames;
     for (i = 0; i < nshorts; i++)
         waveform->data[i] = 0;
-    sf_readf_short(sndfile, waveform->data, waveform->info.frames);
+    sf_readf_short(sndfile, waveform->data, preloaded_frames);
     sf_close(sndfile);
     bank.bytes += waveform->bytes;
     if (bank.bytes > bank.maxbytes)
