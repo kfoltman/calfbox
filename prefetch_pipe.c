@@ -233,6 +233,7 @@ struct cbox_prefetch_pipe *cbox_prefetch_stack_pop(struct cbox_prefetch_stack *s
     pipe->file_loop_start = pipe->file_loop_start;
     pipe->file_loop_end = pipe->file_loop_end;
     pipe->buffer_loop_end = 0;
+    pipe->finished = FALSE;
     
     __sync_synchronize();
     pipe->state = pps_opening;
