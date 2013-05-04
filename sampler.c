@@ -58,7 +58,7 @@ void sampler_steal_voice(struct sampler_module *m)
                 continue;
             int age = m->serial_no - v->serial_no;
             if (v->gen.loop_start == -1)
-                age += (int)(v->gen.pos * 100.0 / v->gen.cur_sample_end);
+                age += (int)((v->gen.bigpos >> 32) * 100.0 / v->gen.cur_sample_end);
             else
             if (v->released)
                 age += 10;

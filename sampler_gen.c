@@ -30,323 +30,142 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <memory.h>
 #include <stdio.h>
 
-#define LOW_QUALITY_INTERPOLATION 0
-
-#define PREPARE_LOOP \
-    uint32_t __attribute__((unused)) loop_end = v->loop_end; \
-    int16_t *sample_data = v->sample_data; \
-    int16_t __attribute__((unused)) *sample_data_loop = v->sample_data_loop;
-
-#define IS_LOOP_FINISHED \
-    (v->loop_start == (uint32_t)-1)
-
-
-#if LOW_QUALITY_INTERPOLATION
-
-static uint32_t process_voice_mono_lerp(struct sampler_gen *v, float **output)
+struct resampler_state
 {
-    float lgain = v->last_lgain;
-    float rgain = v->last_rgain;
-    float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
-    float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
-    PREPARE_LOOP
-    
-    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
-    {
-        if (v->pos >= loop_end)
-        {
-            if (IS_LOOP_FINISHED)
-            {
-                v->mode = spt_inactive;
-                return i;
-            }
-            v->pos = v->pos - loop_end + v->loop_start;
-            sample_data = sample_data_loop;
-        }
-        
-        float fr = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
-        uint32_t nextsample = v->pos + 1;
-        if (nextsample >= loop_end && v->loop_start != (uint32_t)-1)
-            nextsample -= v->loop_start;
-        
-        float sample = fr * sample_data[nextsample] + (1 - fr) * sample_data[v->pos];
-        
-        if (v->frac_pos > ~v->frac_delta)
-            v->pos++;
-        v->frac_pos += v->frac_delta;
-        v->pos += v->delta;
-        
-        output[0][i] = sample * lgain;
-        output[1][i] = sample * rgain;
-        lgain += lgain_delta;
-        rgain += rgain_delta;
-    }
-    return CBOX_BLOCK_SIZE;
-}
+    float *left, *right;
+    int offset;
+    float lgain, rgain, lgain_delta, rgain_delta;
+};
 
-#else
-
-static uint32_t process_voice_mono(struct sampler_gen *v, float **output)
+static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
 {
-    float lgain = v->last_lgain;
-    float rgain = v->last_rgain;
-    float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
-    float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
-    PREPARE_LOOP
-    
-    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
+    const float ffrac = 1.0f / 6.0f;
+    const float scaler = 1.0 / (256.0 * 65536.0);
+
+    uint32_t oldpos = v->bigpos >> 32;
+    pos_offset = pos_offset << 1;
+    for (int i = rs->offset; i < endpos; i++)
     {
-        if (v->pos >= loop_end)
-        {
-            if (IS_LOOP_FINISHED)
-            {
-                v->mode = spt_inactive;
-                return i;
-            }
-            v->pos = v->pos - loop_end + v->loop_start;
-        }
-        
-        float t = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
-        
-        float idata[4];
-        if (v->pos + 4 < loop_end)
-        {
-            int16_t *p = &sample_data[v->pos];
-            for (int s = 0; s < 4; s++)
-                idata[s] = p[s];
-        }
-        else
-        {
-            uint32_t nextsample = v->pos;
-            int s;
-            for (s = 0; s < 4; s++)
-            {
-                if (nextsample >= loop_end)
-                {
-                    if (v->loop_start == (uint32_t)-1)
-                        break;
-                    nextsample -= loop_end - v->loop_start;
-                    sample_data = sample_data_loop;
-                }
-                idata[s] = sample_data[nextsample];
-                nextsample++;
-            }
-            while(s < 4)
-                idata[s++] = 0.f;
-        }
-        
-        if (v->loop_start != (uint32_t)-1 && v->pos >= loop_end - v->loop_overlap && v->loop_start > v->loop_overlap)
-        {
-            uint32_t nextsample = v->pos - (loop_end - v->loop_start);
-            float xfade = (v->pos - (loop_end - v->loop_overlap)) * v->loop_overlap_step;
-            for (int s = 0; s < 4 && xfade < 1; s++)
-            {
-                idata[s] += (sample_data_loop[nextsample] - idata[s]) * xfade;
-                nextsample++;
-                xfade += v->loop_overlap_step;
-            }
-        }
-        float sample = (-t*(t-1)*(t-2) * idata[0] + 3*(t+1)*(t-1)*(t-2) * idata[1] - 3*(t+1)*t*(t-2) * idata[2] + (t+1)*t*(t-1) * idata[3]) * (1.0 / 6.0);
-        
-        if (v->frac_pos > ~v->frac_delta)
-            v->pos++;
-        v->frac_pos += v->frac_delta;
-        v->pos += v->delta;
-        
-        output[0][i] = sample * lgain;
-        output[1][i] = sample * rgain;
-        lgain += lgain_delta;
-        rgain += rgain_delta;
-    }
-    return CBOX_BLOCK_SIZE;
-}
-
-#endif
-
-#if LOW_QUALITY_INTERPOLATION
-
-static uint32_t process_voice_stereo_lerp(struct sampler_gen *v, float **output)
-{
-    float lgain = v->last_lgain;
-    float rgain = v->last_rgain;
-    float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
-    float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
-    PREPARE_LOOP
-
-    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
-    {
-        if (v->pos >= loop_end)
-        {
-            if (IS_LOOP_FINISHED)
-            {
-                v->mode = spt_inactive;
-                return i;
-            }
-            v->pos = v->pos - loop_end + v->loop_start;
-            sample_data = sample_data_loop;
-        }
-        
-        float fr = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
-        uint32_t nextsample = v->pos + 1;
-        if (nextsample >= loop_end && v->loop_start != (uint32_t)-1)
-            nextsample -= v->loop_start;
-        
-        float lsample = fr * sample_data[nextsample << 1] + (1 - fr) * sample_data[v->pos << 1];
-        float rsample = fr * sample_data[1 + (nextsample << 1)] + (1 - fr) * sample_data[1 + (v->pos << 1)];
-        
-        if (v->frac_pos > ~v->frac_delta)
-            v->pos++;
-        v->frac_pos += v->frac_delta;
-        v->pos += v->delta;
-        
-        output[0][i] = lsample * lgain;
-        output[1][i] = rsample * rgain;
-        lgain += lgain_delta;
-        rgain += rgain_delta;
-    }
-    return CBOX_BLOCK_SIZE;
-}
-
-#else
-
-static inline uint32_t process_voice_stereo_noloop(struct sampler_gen *v, float **output)
-{
-    float ffrac = 1.0f / 6.0f;
-    float lgain = v->last_lgain * ffrac;
-    float rgain = v->last_rgain * ffrac;
-    float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE * ffrac;
-    float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE * ffrac;
-    float scaler = 1.0 / (256.0 * 65536.0);
-    PREPARE_LOOP
-
-    uint32_t oldpos = v->pos;
-    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
-    {
-        float t = (v->frac_pos >> 8) * scaler;
-        int16_t *p = &sample_data[v->pos << 1];
+        float t = ((v->bigpos >> 8) & 0x00FFFFFF) * scaler;
+        const int16_t *p = &srcdata[((v->bigpos >> 31) - pos_offset) & ~1];
         float b0 = -t*(t-1.f)*(t-2.f);
         float b1 = 3.f*(t+1.f)*(t-1.f)*(t-2.f);
-        float c0 = (b0 * p[0] + b1 * p[2] - 3.f*(t+1.f)*t*(t-2.f) * p[4] + (t+1.f)*t*(t-1.f) * p[6]);
-        float c1 = (b0 * p[1] + b1 * p[3] - 3.f*(t+1.f)*t*(t-2.f) * p[5] + (t+1.f)*t*(t-1.f) * p[7]);
-        output[0][i] = lgain * c0;
-        output[1][i] = rgain * c1;
-        lgain += lgain_delta;
-        rgain += rgain_delta;
-        if (v->frac_pos > ~v->frac_delta)
-            v->pos++;
-        v->frac_pos += v->frac_delta;
-        v->pos += v->delta;
+        float c0 = (b0 * p[0] + b1 * p[2] - 3.f*(t+1.f)*t*(t-2.f) * p[4] + (t+1.f)*t*(t-1.f) * p[6]) * ffrac;
+        float c1 = (b0 * p[1] + b1 * p[3] - 3.f*(t+1.f)*t*(t-2.f) * p[5] + (t+1.f)*t*(t-1.f) * p[7]) * ffrac;
+        rs->left[i] = rs->lgain * c0;
+        rs->right[i] = rs->rgain * c1;
+        rs->lgain += rs->lgain_delta;
+        rs->rgain += rs->rgain_delta;
+        v->bigpos += v->bigdelta;
     }
-    v->consumed += v->pos - oldpos;
-    return CBOX_BLOCK_SIZE;
+    rs->offset = endpos;
+    v->consumed += (v->bigpos >> 32) - oldpos;
 }
 
-static uint32_t process_voice_stereo(struct sampler_gen *v, float **output)
+static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
 {
-    PREPARE_LOOP
+    const float ffrac = 1.0f / 6.0f;
+    const float scaler = 1.0 / (256.0 * 65536.0);
 
-    if (v->pos < loop_end - v->loop_overlap)
+    uint32_t oldpos = v->bigpos >> 32;
+    for (int i = rs->offset; i < endpos; i++)
     {
-        uint32_t remain = loop_end - v->loop_overlap - v->pos;
-        if (remain > CBOX_BLOCK_SIZE * (1 + v->delta))
-            return process_voice_stereo_noloop(v, output);
+        float t = ((v->bigpos >> 8) & 0x00FFFFFF) * scaler;
+        const int16_t *p = &srcdata[(v->bigpos >> 32) - pos_offset];
+        float b0 = -t*(t-1.f)*(t-2.f);
+        float b1 = 3.f*(t+1.f)*(t-1.f)*(t-2.f);
+        float c = (b0 * p[0] + b1 * p[1] - 3.f*(t+1.f)*t*(t-2.f) * p[2] + (t+1.f)*t*(t-1.f) * p[3]) * ffrac;
+        rs->left[i] = rs->lgain * c;
+        rs->right[i] = rs->rgain * c;
+        rs->lgain += rs->lgain_delta;
+        rs->rgain += rs->rgain_delta;
+        v->bigpos += v->bigdelta;
     }
-
-    float lgain = v->last_lgain;
-    float rgain = v->last_rgain;
-    float lgain_delta = (v->lgain - v->last_lgain) / CBOX_BLOCK_SIZE;
-    float rgain_delta = (v->rgain - v->last_rgain) / CBOX_BLOCK_SIZE;
-    uint32_t oldpos = v->pos;
-    int32_t corr = 0;
-
-    for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
-    {
-        if (v->pos >= loop_end)
-        {
-            if (IS_LOOP_FINISHED)
-            {
-                v->mode = spt_inactive;
-                return i;
-            }
-            v->pos = v->pos - loop_end + v->loop_start;
-            corr += loop_end - v->loop_start;
-            sample_data = v->sample_data = v->sample_data_loop;
-            loop_end = v->loop_end = v->loop_end2;
-            v->loop_count++;
-        }
-        
-        float idata[2][4];
-        if (v->pos + 4 < loop_end)
-        {
-            int16_t *p = &sample_data[v->pos << 1];
-            for (int s = 0; s < 4; s++, p += 2)
-            {
-                idata[0][s] = p[0];
-                idata[1][s] = p[1];
-            }
-        }
-        else
-        {
-            uint32_t nextsample = v->pos;
-            int16_t *cur_sample_data = sample_data; 
-            int s;
-            for (s = 0; s < 4; s++)
-            {
-                if (nextsample >= loop_end)
-                {
-                    if (v->loop_start == (uint32_t)-1)
-                        break;
-                    nextsample -= loop_end - v->loop_start;
-                    cur_sample_data = sample_data_loop;
-                }
-                idata[0][s] = cur_sample_data[nextsample << 1];
-                idata[1][s] = cur_sample_data[1 + (nextsample << 1)];
-                nextsample++;
-            }
-            for(; s < 4; s++)
-                idata[0][s] = idata[1][s] = 0;
-        }
-        if (v->loop_start != (uint32_t)-1 && v->pos >= loop_end - v->loop_overlap && v->loop_start > v->loop_overlap)
-        {
-            assert(v->sample_data == v->sample_data_loop);
-            uint32_t nextsample = v->pos - (loop_end - v->loop_start);
-            float xfade = (v->pos - (loop_end - v->loop_overlap)) * v->loop_overlap_step;
-            for (int s = 0; s < 4 && xfade < 1; s++)
-            {
-                idata[0][s] += (sample_data[nextsample << 1] - idata[0][s]) * xfade;
-                idata[1][s] += (sample_data[1 + (nextsample << 1)] - idata[1][s]) * xfade;
-                nextsample++;
-                xfade += v->loop_overlap_step;
-            }
-        }
-        
-        float ch[2] = {0, 0};
-        float t = (v->frac_pos >> 8) * (1.0 / (256.0 * 65536.0));
-        for (int c = 0; c < 2; c++)
-        {
-            ch[c] = (-t*(t-1.f)*(t-2.f) * idata[c][0] + 3.f*(t+1.f)*(t-1.f)*(t-2.f) * idata[c][1] - 3.f*(t+1.f)*t*(t-2.f) * idata[c][2] + (t+1.f)*t*(t-1.f) * idata[c][3]) * (1.0f / 6.0f);
-        }
-        
-        if (v->frac_pos > ~v->frac_delta)
-            v->pos++;
-        v->frac_pos += v->frac_delta;
-        v->pos += v->delta;
-        
-        output[0][i] = ch[0] * lgain;
-        output[1][i] = ch[1] * rgain;
-        lgain += lgain_delta;
-        rgain += rgain_delta;
-    }
-    v->consumed += v->pos - oldpos + corr;
-    return CBOX_BLOCK_SIZE;
+    rs->offset = endpos;
+    v->consumed += (v->bigpos >> 32) - oldpos;
 }
 
-#endif
+static inline void process_voice_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
+{
+    assert(endpos > rs->offset && endpos <= CBOX_BLOCK_SIZE);
+    if (v->mode == spt_stereo16)
+        process_voice_stereo_noloop(v, rs, srcdata, pos_offset, endpos);
+    else
+        process_voice_mono_noloop(v, rs, srcdata, pos_offset, endpos);
+}
+
+#define MAX_INTERPOLATION_ORDER 3
+
+static void process_voice_withloop(struct sampler_gen *v, struct resampler_state *rs)
+{
+    // This is the first frame where interpolation will cross the loop boundary
+    uint32_t loop_end = (v->loop_count && v->streaming_buffer) ? v->streaming_buffer_frames : v->loop_end;
+    uint32_t loop_edge = loop_end - MAX_INTERPOLATION_ORDER;
+    int16_t *post_loop_source_data = v->streaming_buffer ? v->streaming_buffer : v->sample_data;
+    int16_t scratch[2 * MAX_INTERPOLATION_ORDER * 2];
+    
+    while ( rs->offset < CBOX_BLOCK_SIZE ) {
+        uint64_t startframe = v->bigpos >> 32;
+        
+        int16_t *source_data = v->loop_count ? post_loop_source_data : v->sample_data;
+        uint32_t source_offset = 0;
+        uint32_t usable_sample_end = loop_edge;
+        // if the first frame to play is already within 3 frames of loop end
+        // (we need consecutive 4 frames for cubic interpolation) then
+        // "straighten out" the area around the loop, and play that
+        if (startframe >= loop_edge)
+        {
+            // if fully past the loop end, then it's normal wraparound
+            // (or end of the sample if not looping)
+            if (startframe >= loop_end)
+            {
+                if (v->loop_start == (uint32_t)-1)
+                {
+                    v->mode = spt_inactive;
+                    return;
+                }
+                v->bigpos -= (uint64_t)(loop_end - v->loop_start) << 32;
+                v->loop_count++;
+                if (v->streaming_buffer)
+                {
+                    loop_end = v->streaming_buffer_frames;
+                    loop_edge = loop_end - MAX_INTERPOLATION_ORDER;
+                }
+                continue;
+            }
+
+            int shift = (v->mode == spt_stereo16) ? 1 : 0;
+            
+            // 'linearize' the virtual circular buffer - write 3 (or N) frames before end of the loop
+            // and 3 (N) frames at the start of the loop, and play it; in rare cases this will need to be
+            // repeated twice if output write pointer is close to CBOX_BLOCK_SIZE or playback rate is very low,
+            // but that's OK.
+            uint32_t halfscratch = MAX_INTERPOLATION_ORDER << shift;
+            memcpy(&scratch[0], &source_data[(loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
+            if (v->loop_start == (uint32_t)-1)
+                memset(scratch + halfscratch, 0, halfscratch * sizeof(int16_t));
+            else
+                memcpy(scratch + halfscratch, &post_loop_source_data[v->loop_start << shift], halfscratch * sizeof(int16_t));
+
+            usable_sample_end = loop_end;
+            source_data = scratch;
+            source_offset = loop_edge;
+        }
+        uint32_t out_frames = CBOX_BLOCK_SIZE - rs->offset;
+        uint64_t sample_end64 = ((uint64_t)usable_sample_end) << 32;
+        // Check how many frames can be written to output buffer without going
+        // past usable_sample_end.
+        if (v->bigpos + (out_frames - 1) * v->bigdelta >= sample_end64)
+            out_frames = (sample_end64 - v->bigpos) / v->bigdelta + 1;
+        process_voice_noloop(v, rs, source_data, source_offset, rs->offset + out_frames);
+        
+    }
+}
 
 void sampler_gen_reset(struct sampler_gen *v)
 {
     v->mode = spt_inactive;
-    v->frac_pos = 0;
+    v->bigpos = 0;
     v->last_lgain = 0.f;
     v->last_rgain = 0.f;
     v->loop_count = 0;
@@ -355,20 +174,17 @@ void sampler_gen_reset(struct sampler_gen *v)
 
 uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float **tmp_outputs)
 {
-    uint32_t result;
-#if LOW_QUALITY_INTERPOLATION    
-    if (v->mode == spt_stereo16)
-        result = process_voice_stereo_lerp(v, tmp_outputs);
-    else
-        result = process_voice_mono_lerp(v, tmp_outputs);
-#else
-    if (v->mode == spt_stereo16)
-        result = process_voice_stereo(v, tmp_outputs);
-    else
-        result = process_voice_mono(v, tmp_outputs);
-#endif
+    struct resampler_state rs;
+    rs.left = tmp_outputs[0];
+    rs.right = tmp_outputs[1];
+    rs.offset = 0;
+    rs.lgain = v->last_lgain;
+    rs.rgain = v->last_rgain;
+    rs.lgain_delta = (v->lgain - v->last_lgain) * (1.f / CBOX_BLOCK_SIZE);
+    rs.rgain_delta = (v->rgain - v->last_rgain) * (1.f / CBOX_BLOCK_SIZE);
+    process_voice_withloop(v, &rs);
     v->last_lgain = v->lgain;
     v->last_rgain = v->rgain;
-    return result;
+    return rs.offset;
 }
 

@@ -71,16 +71,18 @@ struct sampler_gen
 {
     enum sampler_player_type mode;
     int16_t *sample_data;
-    int16_t *sample_data_loop;
+    int16_t *streaming_buffer;
     
-    uint32_t pos, delta, loop_start, loop_end, cur_sample_end, loop_end2;
-    uint32_t frac_pos, frac_delta;
-    uint32_t loop_overlap;
+    uint64_t bigpos, bigdelta;
+    uint32_t loop_start, loop_end, streaming_buffer_frames;
+    uint32_t loop_overlap, cur_sample_end;
     uint32_t consumed;
     float loop_overlap_step;
     float lgain, rgain;
     float last_lgain, last_rgain;
     uint32_t loop_count;
+    
+    float scratch[CBOX_BLOCK_SIZE * 4][2];
 };
 
 struct sampler_voice

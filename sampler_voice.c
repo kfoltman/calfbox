@@ -158,7 +158,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
         pos += ((uint32_t)(rand() + (rand() << 16))) % l->offset_random;
     if (pos >= end)
         pos = end;
-    v->gen.pos = pos;
+    v->gen.bigpos = ((uint64_t)pos) << 32;
     
     float delay = l->delay;
     if (l->delay_random)
@@ -425,12 +425,12 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->current_pipe->file_loop_end = loop_end;
         v->current_pipe->file_loop_start = loop_start;
         v->gen.sample_data = v->gen.loop_count ? v->current_pipe->data : v->last_waveform->data;
-        v->gen.sample_data_loop = v->current_pipe->data;
+        v->gen.streaming_buffer = v->current_pipe->data;
         
         v->gen.loop_start = 0;
         v->gen.loop_overlap = 0;
-        v->gen.loop_end = v->gen.loop_count ? v->current_pipe->buffer_loop_end : v->last_waveform->preloaded_frames;
-        v->gen.loop_end2 = v->current_pipe->buffer_loop_end;
+        v->gen.loop_end = v->last_waveform->preloaded_frames;
+        v->gen.streaming_buffer_frames = v->current_pipe->buffer_loop_end;
     }
     else
     {
@@ -439,8 +439,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
         
     
-    v->gen.delta = freq64 >> 32;
-    v->gen.frac_delta = freq64 & 0xFFFFFFFF;
+    v->gen.bigdelta = freq64;
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * sampler_channel_addcc(c, 7) * sampler_channel_addcc(c, 11) / (maxv * maxv);
     if (moddests[smdest_gain] != 0.0)
         gain *= dB2gain(moddests[smdest_gain]);
