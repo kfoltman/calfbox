@@ -238,6 +238,9 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     cbox_envelope_reset(&v->pitch_env);
 
     sampler_voice_activate(v, l->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16);
+    
+    if (v->current_pipe && v->gen.bigpos)
+        cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.bigpos >> 32);
 }
 
 void sampler_voice_link(struct sampler_voice **pv, struct sampler_voice *v)
@@ -495,18 +498,27 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     
     float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
-    float *tmp_outputs[2] = {left, right};
-    uint32_t samples = 0;
         
-    samples = sampler_gen_sample_playback(&v->gen, tmp_outputs);
+    uint32_t samples = 0;
+    
 
     if (v->current_pipe)
     {
-        cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.consumed);
-        v->gen.consumed = 0;
+        uint32_t limit = cbox_prefetch_pipe_get_remaining(v->current_pipe) - 4;
+        if (!limit)
+            v->gen.mode = spt_inactive;
+        else
+        {
+            samples = sampler_gen_sample_playback(&v->gen, left, right, limit);
+            cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.consumed);
+            v->gen.consumed = 0;
+        }
     }
     else
+    {
         v->play_count = v->gen.loop_count;
+        samples = sampler_gen_sample_playback(&v->gen, left, right, (uint32_t)-1);
+    }
 
     for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
         left[i] = right[i] = 0.f;

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_PREFETCH_PIPE_H
 #define CBOX_PREFETCH_PIPE_H
 
+#include <assert.h>
 #include <glib.h>
 #include <pthread.h>
 #include <sndfile.h>
@@ -55,11 +56,18 @@ struct cbox_prefetch_pipe
     size_t produced;
     size_t consumed;
     gboolean finished;
+    gboolean returned;
 };
 
 extern void cbox_prefetch_pipe_init(struct cbox_prefetch_pipe *pipe, uint32_t buffer_size);
 extern void cbox_prefetch_pipe_consumed(struct cbox_prefetch_pipe *pipe, uint32_t frames);
 extern void cbox_prefetch_pipe_close(struct cbox_prefetch_pipe *pipe);
+
+static inline uint32_t cbox_prefetch_pipe_get_remaining(struct cbox_prefetch_pipe *pipe)
+{
+    assert(pipe->consumed <= pipe->produced);
+    return pipe->produced - pipe->consumed;
+}
 
 struct cbox_prefetch_stack
 {

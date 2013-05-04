@@ -42,7 +42,6 @@ static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct res
     const float ffrac = 1.0f / 6.0f;
     const float scaler = 1.0 / (256.0 * 65536.0);
 
-    uint32_t oldpos = v->bigpos >> 32;
     pos_offset = pos_offset << 1;
     for (int i = rs->offset; i < endpos; i++)
     {
@@ -59,7 +58,6 @@ static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct res
         v->bigpos += v->bigdelta;
     }
     rs->offset = endpos;
-    v->consumed += (v->bigpos >> 32) - oldpos;
 }
 
 static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
@@ -67,7 +65,6 @@ static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resam
     const float ffrac = 1.0f / 6.0f;
     const float scaler = 1.0 / (256.0 * 65536.0);
 
-    uint32_t oldpos = v->bigpos >> 32;
     for (int i = rs->offset; i < endpos; i++)
     {
         float t = ((v->bigpos >> 8) & 0x00FFFFFF) * scaler;
@@ -82,21 +79,22 @@ static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resam
         v->bigpos += v->bigdelta;
     }
     rs->offset = endpos;
-    v->consumed += (v->bigpos >> 32) - oldpos;
 }
 
-static inline void process_voice_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
+static inline uint32_t process_voice_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
 {
     assert(endpos > rs->offset && endpos <= CBOX_BLOCK_SIZE);
+    uint32_t oldpos = v->bigpos >> 32;
     if (v->mode == spt_stereo16)
         process_voice_stereo_noloop(v, rs, srcdata, pos_offset, endpos);
     else
         process_voice_mono_noloop(v, rs, srcdata, pos_offset, endpos);
+    return (v->bigpos >> 32) - oldpos;
 }
 
 #define MAX_INTERPOLATION_ORDER 3
 
-static void process_voice_withloop(struct sampler_gen *v, struct resampler_state *rs)
+static void process_voice_withloop(struct sampler_gen *v, struct resampler_state *rs, uint32_t limit)
 {
     // This is the first frame where interpolation will cross the loop boundary
     uint32_t loop_end = (v->loop_count && v->streaming_buffer) ? v->streaming_buffer_frames : v->loop_end;
@@ -104,7 +102,7 @@ static void process_voice_withloop(struct sampler_gen *v, struct resampler_state
     int16_t *post_loop_source_data = v->streaming_buffer ? v->streaming_buffer : v->sample_data;
     int16_t scratch[2 * MAX_INTERPOLATION_ORDER * 2];
     
-    while ( rs->offset < CBOX_BLOCK_SIZE ) {
+    while ( limit && rs->offset < CBOX_BLOCK_SIZE ) {
         uint64_t startframe = v->bigpos >> 32;
         
         int16_t *source_data = v->loop_count ? post_loop_source_data : v->sample_data;
@@ -151,14 +149,25 @@ static void process_voice_withloop(struct sampler_gen *v, struct resampler_state
             source_data = scratch;
             source_offset = loop_edge;
         }
+        if (limit != (uint32_t)-1 && usable_sample_end - startframe > limit)
+        {
+            usable_sample_end = startframe + limit;
+        }
+
         uint32_t out_frames = CBOX_BLOCK_SIZE - rs->offset;
         uint64_t sample_end64 = ((uint64_t)usable_sample_end) << 32;
         // Check how many frames can be written to output buffer without going
         // past usable_sample_end.
         if (v->bigpos + (out_frames - 1) * v->bigdelta >= sample_end64)
             out_frames = (sample_end64 - v->bigpos) / v->bigdelta + 1;
-        process_voice_noloop(v, rs, source_data, source_offset, rs->offset + out_frames);
-        
+        uint32_t consumed = process_voice_noloop(v, rs, source_data, source_offset, rs->offset + out_frames);
+        if (consumed > limit)
+            consumed = limit;
+        v->consumed += consumed;
+        if (consumed < limit)
+            limit -= consumed;
+        else
+            break;
     }
 }
 
@@ -172,17 +181,17 @@ void sampler_gen_reset(struct sampler_gen *v)
     v->consumed = 0;
 }
 
-uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float **tmp_outputs)
+uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *left, float *right, uint32_t limit)
 {
     struct resampler_state rs;
-    rs.left = tmp_outputs[0];
-    rs.right = tmp_outputs[1];
+    rs.left = left;
+    rs.right = right;
     rs.offset = 0;
     rs.lgain = v->last_lgain;
     rs.rgain = v->last_rgain;
     rs.lgain_delta = (v->lgain - v->last_lgain) * (1.f / CBOX_BLOCK_SIZE);
     rs.rgain_delta = (v->rgain - v->last_rgain) * (1.f / CBOX_BLOCK_SIZE);
-    process_voice_withloop(v, &rs);
+    process_voice_withloop(v, &rs, limit);
     v->last_lgain = v->lgain;
     v->last_rgain = v->rgain;
     return rs.offset;

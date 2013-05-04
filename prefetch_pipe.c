@@ -44,7 +44,6 @@ gboolean cbox_prefetch_pipe_openfile(struct cbox_prefetch_pipe *pipe)
     if (pipe->file_loop_end > pipe->info.frames)
         pipe->file_loop_end = pipe->info.frames;
     pipe->buffer_loop_end = pipe->buffer_size / (sizeof(int16_t) * pipe->info.channels);
-    pipe->consumed = 0;
     pipe->produced = pipe->file_pos_frame;
     pipe->write_ptr = 0;
     pipe->state = pps_active;
@@ -102,11 +101,18 @@ void cbox_prefetch_pipe_fetch(struct cbox_prefetch_pipe *pipe)
         // If past the file loop end, restart at file loop start
         if (pipe->file_pos_frame >= pipe->file_loop_end)
         {
-            pipe->file_pos_frame = pipe->file_loop_start;
             if (pipe->file_loop_start == (uint32_t)-1)
+            {
                 pipe->finished = TRUE;
+                for (int i = 0; i < readsize * pipe->info.channels; i++)
+                    pipe->data[pipe->write_ptr * pipe->info.channels + i] = rand();
+                break;
+            }
             else
+            {
+                pipe->file_pos_frame = pipe->file_loop_start;
                 sf_seek(pipe->sndfile, pipe->file_loop_start, SEEK_SET);
+            }
         }
         // If reading across file loop boundary, read up to loop end and 
         // retry to restart
@@ -116,19 +122,7 @@ void cbox_prefetch_pipe_fetch(struct cbox_prefetch_pipe *pipe)
             retry = TRUE;
         }
         
-        int32_t actread = readsize;
-        if (!pipe->finished)
-        {
-            actread = sf_readf_short(pipe->sndfile, pipe->data + pipe->write_ptr * pipe->info.channels, readsize);
-        }
-        else {
-            // XXXKF temporary hack
-            // The proper behaviour here would be to instruct the consumer stop
-            // playback at the write_ptr time. However, that requires communication
-            // with sampler_gen, so for now, I'm doing this, just to avoid
-            // playing old data.
-            memset(pipe->data + pipe->write_ptr * pipe->info.channels, 0, readsize * sizeof(int16_t) * pipe->info.channels);
-        }
+        int32_t actread = sf_readf_short(pipe->sndfile, pipe->data + pipe->write_ptr * pipe->info.channels, readsize);
         pipe->produced += actread;
         pipe->file_pos_frame += actread;
         pipe->write_ptr += actread;
@@ -137,6 +131,7 @@ void cbox_prefetch_pipe_fetch(struct cbox_prefetch_pipe *pipe)
 
 void cbox_prefetch_pipe_closefile(struct cbox_prefetch_pipe *pipe)
 {
+    assert(pipe->state == pps_closing);
     assert(pipe->sndfile);
     sf_close(pipe->sndfile);
     pipe->sndfile = NULL;
@@ -175,7 +170,10 @@ static void *prefetch_thread(void *user_data)
                     pipe->state = pps_error;
                 break;
             case pps_active:
-                cbox_prefetch_pipe_fetch(pipe);
+                if (pipe->returned)
+                    pipe->state = pps_closing;
+                else
+                    cbox_prefetch_pipe_fetch(pipe);
                 break;
             case pps_closing:
                 cbox_prefetch_pipe_closefile(pipe);
@@ -221,7 +219,7 @@ struct cbox_prefetch_pipe *cbox_prefetch_stack_pop(struct cbox_prefetch_stack *s
     int pos = stack->last_free_pipe;
     while(pos != -1 && stack->pipes[pos].state != pps_free)
         pos = stack->pipes[pos].next_free_pipe;
-    if (stack->last_free_pipe == -1)
+    if (pos == -1)
         return NULL;    
     
     struct cbox_prefetch_pipe *pipe = &stack->pipes[pos];
@@ -234,6 +232,9 @@ struct cbox_prefetch_pipe *cbox_prefetch_stack_pop(struct cbox_prefetch_stack *s
     pipe->file_loop_end = pipe->file_loop_end;
     pipe->buffer_loop_end = 0;
     pipe->finished = FALSE;
+    pipe->returned = FALSE;
+    pipe->produced = waveform->preloaded_frames;
+    pipe->consumed = 0;
     
     __sync_synchronize();
     pipe->state = pps_opening;
@@ -247,14 +248,20 @@ void cbox_prefetch_stack_push(struct cbox_prefetch_stack *stack, struct cbox_pre
     case pps_free:
         assert(0);
         break;
-    case pps_opening:
+    case pps_error:
     case pps_closed:
         pipe->state = pps_free;
+        break;
+    case pps_opening:
+        // Close the file as soon as open operation completes
+        pipe->returned = TRUE;
         break;
     default:
         pipe->state = pps_closing;
         break;
     }
+    __sync_synchronize();
+
     assert(pipe->next_free_pipe == -1);
     pipe->next_free_pipe = stack->last_free_pipe;
     int pos = pipe - stack->pipes;
