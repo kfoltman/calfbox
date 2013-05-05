@@ -30,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <memory.h>
 #include <stdio.h>
 
+#define LOW_QUALITY_INTERPOLATION 0
+
 struct resampler_state
 {
     float *left, *right;
@@ -47,10 +49,15 @@ static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct res
     {
         float t = ((v->bigpos >> 8) & 0x00FFFFFF) * scaler;
         const int16_t *p = &srcdata[((v->bigpos >> 31) - pos_offset) & ~1];
+#if LOW_QUALITY_INTERPOLATION
+        float c0 = (1.f - t) * p[2] + t * p[4];
+        float c1 = (1.f - t) * p[3] + t * p[5];
+#else
         float b0 = -t*(t-1.f)*(t-2.f);
         float b1 = 3.f*(t+1.f)*(t-1.f)*(t-2.f);
         float c0 = (b0 * p[0] + b1 * p[2] - 3.f*(t+1.f)*t*(t-2.f) * p[4] + (t+1.f)*t*(t-1.f) * p[6]) * ffrac;
         float c1 = (b0 * p[1] + b1 * p[3] - 3.f*(t+1.f)*t*(t-2.f) * p[5] + (t+1.f)*t*(t-1.f) * p[7]) * ffrac;
+#endif
         rs->left[i] = rs->lgain * c0;
         rs->right[i] = rs->rgain * c1;
         rs->lgain += rs->lgain_delta;
@@ -69,9 +76,13 @@ static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resam
     {
         float t = ((v->bigpos >> 8) & 0x00FFFFFF) * scaler;
         const int16_t *p = &srcdata[(v->bigpos >> 32) - pos_offset];
+#if LOW_QUALITY_INTERPOLATION
+        float c = (1.f - t) * p[1] + t * p[2];
+#else
         float b0 = -t*(t-1.f)*(t-2.f);
         float b1 = 3.f*(t+1.f)*(t-1.f)*(t-2.f);
         float c = (b0 * p[0] + b1 * p[1] - 3.f*(t+1.f)*t*(t-2.f) * p[2] + (t+1.f)*t*(t-1.f) * p[3]) * ffrac;
+#endif        
         rs->left[i] = rs->lgain * c;
         rs->right[i] = rs->rgain * c;
         rs->lgain += rs->lgain_delta;
