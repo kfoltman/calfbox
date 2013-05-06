@@ -81,8 +81,7 @@ struct sampler_gen
     float lgain, rgain;
     float last_lgain, last_rgain;
     uint32_t loop_count;
-    
-    float scratch[CBOX_BLOCK_SIZE * 4][2];
+    int16_t *scratch;
 };
 
 struct sampler_voice

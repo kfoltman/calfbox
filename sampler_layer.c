@@ -448,6 +448,23 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         start = i;
     }
     l->eff_use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
+
+    // 'linearize' the virtual circular buffer - write 3 (or N) frames before end of the loop
+    // and 3 (N) frames at the start of the loop, and play it; in rare cases this will need to be
+    // repeated twice if output write pointer is close to CBOX_BLOCK_SIZE or playback rate is very low,
+    // but that's OK.
+    if (l->eff_waveform && l->eff_waveform->preloaded_frames == l->eff_waveform->info.frames)
+    {
+        int shift = l->eff_waveform->info.channels == 2 ? 1 : 0;
+        uint32_t halfscratch = MAX_INTERPOLATION_ORDER << shift;
+        memcpy(&l->scratch_loop[0], &l->eff_waveform->data[(l->loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
+        memcpy(&l->scratch_end[0], &l->eff_waveform->data[(l->loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
+        memset(l->scratch_end + halfscratch, 0, halfscratch * sizeof(int16_t));
+        if (l->loop_start != (uint32_t)-1)
+            memcpy(l->scratch_loop + halfscratch, &l->eff_waveform->data[l->loop_start << shift], halfscratch * sizeof(int16_t));
+        else
+            memset(l->scratch_loop + halfscratch, 0, halfscratch * sizeof(int16_t));
+    }
 }
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)

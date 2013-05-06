@@ -439,6 +439,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     {
         v->gen.loop_start = loop_start;
         v->gen.loop_end = loop_end;
+        v->gen.scratch = loop_start == (uint32_t)-1 ? v->layer->scratch_end : v->layer->scratch_loop;
     }
         
     

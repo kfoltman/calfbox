@@ -23,6 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdint.h>
 
+#define MAX_INTERPOLATION_ORDER 3
+
 struct sampler_program;
 struct sampler_voice;
 struct sampler_noteinitfunc;
@@ -342,6 +344,8 @@ struct sampler_layer_data
     float eff_freq;
     int eff_use_keyswitch;
     struct cbox_waveform *eff_waveform;
+    int16_t scratch_loop[2 * MAX_INTERPOLATION_ORDER * 2];
+    int16_t scratch_end[2 * MAX_INTERPOLATION_ORDER * 2];
 };
 
 struct sampler_layer

@@ -111,20 +111,57 @@ static inline uint32_t process_voice_noloop(struct sampler_gen *v, struct resamp
     return (v->bigpos >> 32) - oldpos;
 }
 
-#define MAX_INTERPOLATION_ORDER 3
-
-static void process_voice_withloop(struct sampler_gen *v, struct resampler_state *rs, uint32_t limit)
+static void process_voice_withloop(struct sampler_gen *v, struct resampler_state *rs)
 {
     // This is the first frame where interpolation will cross the loop boundary
-    uint32_t loop_end = (v->loop_count && v->streaming_buffer) ? v->streaming_buffer_frames : v->loop_end;
+    uint32_t loop_end = v->loop_end;
     uint32_t loop_edge = loop_end - MAX_INTERPOLATION_ORDER;
-    int16_t *post_loop_source_data = v->streaming_buffer ? v->streaming_buffer : v->sample_data;
+    
+    while ( rs->offset < CBOX_BLOCK_SIZE ) {
+        uint64_t startframe = v->bigpos >> 32;
+        
+        int16_t *source_data = v->sample_data;
+        uint32_t source_offset = 0;
+        uint32_t usable_sample_end = loop_edge;
+        // if the first frame to play is already within 3 frames of loop end
+        // (we need consecutive 4 frames for cubic interpolation) then
+        // "straighten out" the area around the loop, and play that
+        if (startframe >= loop_edge)
+        {
+            // if fully past the loop end, then it's normal wraparound
+            // (or end of the sample if not looping)
+            if (startframe >= loop_end)
+            {
+                if (v->loop_start == (uint32_t)-1)
+                {
+                    v->mode = spt_inactive;
+                    return;
+                }
+                v->bigpos -= (uint64_t)(loop_end - v->loop_start) << 32;
+                v->loop_count++;
+                continue;
+            }
+
+            usable_sample_end = loop_end;
+            source_data = v->scratch;
+            source_offset = loop_edge;
+        }
+
+        process_voice_noloop(v, rs, source_data, source_offset, usable_sample_end);
+    }
+}
+
+static void process_voice_streaming(struct sampler_gen *v, struct resampler_state *rs, uint32_t limit)
+{
+    // This is the first frame where interpolation will cross the loop boundary
+    uint32_t loop_end = v->loop_count ? v->streaming_buffer_frames : v->loop_end;
+    uint32_t loop_edge = loop_end - MAX_INTERPOLATION_ORDER;
     int16_t scratch[2 * MAX_INTERPOLATION_ORDER * 2];
     
     while ( limit && rs->offset < CBOX_BLOCK_SIZE ) {
         uint64_t startframe = v->bigpos >> 32;
         
-        int16_t *source_data = v->loop_count ? post_loop_source_data : v->sample_data;
+        int16_t *source_data = v->loop_count ? v->streaming_buffer : v->sample_data;
         uint32_t source_offset = 0;
         uint32_t usable_sample_end = loop_edge;
         // if the first frame to play is already within 3 frames of loop end
@@ -162,7 +199,7 @@ static void process_voice_withloop(struct sampler_gen *v, struct resampler_state
             if (v->loop_start == (uint32_t)-1)
                 memset(scratch + halfscratch, 0, halfscratch * sizeof(int16_t));
             else
-                memcpy(scratch + halfscratch, &post_loop_source_data[v->loop_start << shift], halfscratch * sizeof(int16_t));
+                memcpy(scratch + halfscratch, &v->streaming_buffer[v->loop_start << shift], halfscratch * sizeof(int16_t));
 
             usable_sample_end = loop_end;
             source_data = scratch;
@@ -202,7 +239,10 @@ uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *left, float *
     rs.rgain = v->last_rgain;
     rs.lgain_delta = (v->lgain - v->last_lgain) * (1.f / CBOX_BLOCK_SIZE);
     rs.rgain_delta = (v->rgain - v->last_rgain) * (1.f / CBOX_BLOCK_SIZE);
-    process_voice_withloop(v, &rs, limit);
+    if (v->streaming_buffer)
+        process_voice_streaming(v, &rs, limit);
+    else
+        process_voice_withloop(v, &rs);
     v->last_lgain = v->lgain;
     v->last_rgain = v->rgain;
     return rs.offset;
