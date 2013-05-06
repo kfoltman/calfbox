@@ -92,14 +92,22 @@ static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resam
     rs->offset = endpos;
 }
 
-static inline uint32_t process_voice_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
+static inline uint32_t process_voice_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, uint32_t usable_sample_end)
 {
-    assert(endpos > rs->offset && endpos <= CBOX_BLOCK_SIZE);
+    uint32_t out_frames = CBOX_BLOCK_SIZE - rs->offset;
+
+    uint64_t sample_end64 = ((uint64_t)usable_sample_end) << 32;
+    // Check how many frames can be written to output buffer without going
+    // past usable_sample_end.
+    if (v->bigpos + (out_frames - 1) * v->bigdelta >= sample_end64)
+        out_frames = (sample_end64 - v->bigpos) / v->bigdelta + 1;
+    
+    assert(out_frames > 0 && out_frames <= CBOX_BLOCK_SIZE - rs->offset);
     uint32_t oldpos = v->bigpos >> 32;
     if (v->mode == spt_stereo16)
-        process_voice_stereo_noloop(v, rs, srcdata, pos_offset, endpos);
+        process_voice_stereo_noloop(v, rs, srcdata, pos_offset, rs->offset + out_frames);
     else
-        process_voice_mono_noloop(v, rs, srcdata, pos_offset, endpos);
+        process_voice_mono_noloop(v, rs, srcdata, pos_offset, rs->offset + out_frames);
     return (v->bigpos >> 32) - oldpos;
 }
 
@@ -161,17 +169,9 @@ static void process_voice_withloop(struct sampler_gen *v, struct resampler_state
             source_offset = loop_edge;
         }
         if (limit != (uint32_t)-1 && usable_sample_end - startframe > limit)
-        {
             usable_sample_end = startframe + limit;
-        }
 
-        uint32_t out_frames = CBOX_BLOCK_SIZE - rs->offset;
-        uint64_t sample_end64 = ((uint64_t)usable_sample_end) << 32;
-        // Check how many frames can be written to output buffer without going
-        // past usable_sample_end.
-        if (v->bigpos + (out_frames - 1) * v->bigdelta >= sample_end64)
-            out_frames = (sample_end64 - v->bigpos) / v->bigdelta + 1;
-        uint32_t consumed = process_voice_noloop(v, rs, source_data, source_offset, rs->offset + out_frames);
+        uint32_t consumed = process_voice_noloop(v, rs, source_data, source_offset, usable_sample_end);
         if (consumed > limit)
             consumed = limit;
         v->consumed += consumed;
