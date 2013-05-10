@@ -667,7 +667,6 @@ void sampler_destroyfunc(struct cbox_module *module)
     int i;
     m->deleting = TRUE;
     
-    cbox_prefetch_stack_destroy(m->pipe_stack);
     for (i = 0; i < m->program_count;)
     {
         if (m->programs[i])
@@ -679,6 +678,7 @@ void sampler_destroyfunc(struct cbox_module *module)
     {
         assert (m->channels[i].voices_running == NULL);
     }
+    cbox_prefetch_stack_destroy(m->pipe_stack);
     free(m->programs);
 }
 
