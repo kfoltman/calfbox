@@ -180,7 +180,6 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     v->captured_sostenuto = 0;
     v->channel = c;
     v->layer = l;
-    v->play_count = 0;
     v->program = c->program;
     v->amp_env.shape = &l->amp_env_shape;
     v->filter_env.shape = &l->filter_env_shape;
@@ -409,19 +408,10 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     gboolean post_sustain = v->released && v->loop_mode == slm_loop_sustain;
     uint32_t loop_start, loop_end;
-    if (v->layer->count > 0)
-    {
-        // End the loop on the last time
-        gboolean play_loop = (v->play_count < v->layer->count - 1);
-        loop_start = play_loop ? 0 : (uint32_t)-1;
-        loop_end = v->gen.cur_sample_end;
-    }
-    else
-    {
-        gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || (v->loop_mode == slm_loop_sustain && !post_sustain)) && v->layer->on_cc_number == -1;
-        loop_start = play_loop ? v->layer->loop_start : (uint32_t)-1;
-        loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
-    }
+
+    gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || (v->loop_mode == slm_loop_sustain && !post_sustain)) && v->layer->on_cc_number == -1;
+    loop_start = play_loop ? v->layer->loop_start : (v->layer->count ? 0 : (uint32_t)-1);
+    loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
     
     if (v->current_pipe)
     {
@@ -437,6 +427,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     else
     {
+        v->gen.loop_count = v->layer->count;
         v->gen.loop_start = loop_start;
         v->gen.loop_end = loop_end;
         v->gen.scratch = loop_start == (uint32_t)-1 ? v->layer->scratch_end : v->layer->scratch_loop;
@@ -517,7 +508,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     else
     {
-        v->play_count = v->gen.loop_count;
         samples = sampler_gen_sample_playback(&v->gen, left, right, (uint32_t)-1);
     }
 

@@ -71,17 +71,23 @@ struct sampler_gen
 {
     enum sampler_player_type mode;
     int16_t *sample_data;
-    int16_t *streaming_buffer;
+    int16_t *scratch;
     
     uint64_t bigpos, bigdelta;
-    uint32_t loop_start, loop_end, streaming_buffer_frames;
-    uint32_t loop_overlap, cur_sample_end;
-    uint32_t consumed, consumed_credit;
-    float loop_overlap_step;
+    uint32_t loop_start, loop_end;
+    uint32_t cur_sample_end;
     float lgain, rgain;
     float last_lgain, last_rgain;
-    uint32_t loop_count;
-    int16_t *scratch;
+
+    // In-memory mode only
+    uint32_t loop_overlap;
+    float loop_overlap_step;
+    uint32_t play_count, loop_count;
+    
+    // Streaming mode only
+    int16_t *streaming_buffer;
+    uint32_t consumed, consumed_credit, streaming_buffer_frames;
+    gboolean in_streaming_buffer;
 };
 
 struct sampler_voice
@@ -99,7 +105,6 @@ struct sampler_voice
     int off_by;
     int delay;
     int age;
-    int play_count;
     float pitch_shift;
     float cutoff_shift;
     float gain_shift, gain_fromvel;
