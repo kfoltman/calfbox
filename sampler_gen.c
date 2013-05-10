@@ -153,6 +153,16 @@ static void process_voice_withloop(struct sampler_gen *v, struct resampler_state
 
 static void process_voice_streaming(struct sampler_gen *v, struct resampler_state *rs, uint32_t limit)
 {
+    if (v->consumed_credit > 0)
+    {
+        if (v->consumed_credit >= limit)
+        {
+            v->consumed_credit -= limit;
+            return;
+        }
+        limit -= v->consumed_credit;
+        v->consumed_credit = 0;
+    }
     // This is the first frame where interpolation will cross the loop boundary
     uint32_t loop_end = v->loop_count ? v->streaming_buffer_frames : v->loop_end;
     uint32_t loop_edge = loop_end - MAX_INTERPOLATION_ORDER;
@@ -210,7 +220,19 @@ static void process_voice_streaming(struct sampler_gen *v, struct resampler_stat
 
         uint32_t consumed = process_voice_noloop(v, rs, source_data, source_offset, usable_sample_end);
         if (consumed > limit)
+        {
+            // The number of frames 'consumed' may be greater than the amount
+            // available because of sample-skipping (at least that's the only
+            // *legitimate* reason). This should be accounted for in the,
+            // consumed sample counter (hence temporary storage of the 
+            // 'buffer overconsumption' in the consumed_credit field), but is not
+            // actually causing any use of missing data, as the missing samples
+            // have been skipped.
+            assert(v->consumed_credit == 0);
+            v->consumed_credit = consumed - limit;
+            assert (v->consumed_credit <= 1 + (v->bigdelta >> 32));
             consumed = limit;
+        }
         v->consumed += consumed;
         if (consumed < limit)
             limit -= consumed;
@@ -227,6 +249,7 @@ void sampler_gen_reset(struct sampler_gen *v)
     v->last_rgain = 0.f;
     v->loop_count = 0;
     v->consumed = 0;
+    v->consumed_credit = 0;
 }
 
 uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *left, float *right, uint32_t limit)

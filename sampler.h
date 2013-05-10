@@ -76,7 +76,7 @@ struct sampler_gen
     uint64_t bigpos, bigdelta;
     uint32_t loop_start, loop_end, streaming_buffer_frames;
     uint32_t loop_overlap, cur_sample_end;
-    uint32_t consumed;
+    uint32_t consumed, consumed_credit;
     float loop_overlap_step;
     float lgain, rgain;
     float last_lgain, last_rgain;
