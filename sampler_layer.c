@@ -368,16 +368,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     sampler_layer_data_getdefaults(l, parent);
     
     // Handle change of sample in the prent group without override on region level
-    if (!l->has_sample && parent && l->eff_waveform != parent->eff_waveform)
-    {
-        struct cbox_waveform *oldwf = l->eff_waveform;
-        l->eff_waveform = parent->eff_waveform;
-        if (l->eff_waveform)
-            cbox_waveform_ref(l->eff_waveform);
-        if (oldwf)
-            cbox_waveform_unref(oldwf);
-    }
-    else if (l->has_sample && l->sample_changed)
+    if (parent && (l->sample_changed || parent->sample_changed))
     {
         struct cbox_waveform *oldwf = l->eff_waveform;
         if (l->sample && *l->sample)
