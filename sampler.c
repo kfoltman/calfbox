@@ -294,10 +294,18 @@ static int release_program_voices_execute(void *data)
         {
             FOREACH_VOICE(c->voices_running, v)
             {
+                if (m->deleting)
+                {
+                    sampler_voice_inactivate(v, TRUE);
+                    continue;
+                }
+                // This is a new voice, started after program change, so it
+                // should not be terminated and waited for.
                 if (v->program == rpv->new_pgm)
                     continue;
-                if (!m->deleting)
-                    finished = 0;
+                // The voice is still going, so repeat until it fades out
+                finished = 0;
+                // If not in final fadeout stage, force final fadeout.
                 if (v->amp_env.cur_stage != 15)
                 {
                     v->released = 1;
@@ -318,7 +326,7 @@ static void swap_program(struct sampler_module *m, int index, struct sampler_pro
     if (pgm)
         old_program = cbox_rt_swap_pointers(m->module.rt, (void **)&m->programs[index], pgm);
     else
-        cbox_rt_array_remove(m->module.rt, (void ***)&m->programs, &m->program_count, index);
+        old_program = cbox_rt_array_remove(m->module.rt, (void ***)&m->programs, &m->program_count, index);
 
     struct release_program_voices_data data = {m, old_program, pgm, 0};
 
@@ -666,6 +674,10 @@ void sampler_destroyfunc(struct cbox_module *module)
             CBOX_DELETE(m->programs[i]);
         else
             i++;
+    }
+    for (i = 0; i < 16; i++)
+    {
+        assert (m->channels[i].voices_running == NULL);
     }
     free(m->programs);
 }

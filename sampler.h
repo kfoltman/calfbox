@@ -159,6 +159,7 @@ extern void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft);
 extern void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs);
 extern void sampler_voice_link(struct sampler_voice **pv, struct sampler_voice *v);
 extern void sampler_voice_unlink(struct sampler_voice **pv, struct sampler_voice *v);
+extern void sampler_voice_inactivate(struct sampler_voice *v, gboolean expect_active);
 
 extern float sampler_sine_wave[2049];
 
