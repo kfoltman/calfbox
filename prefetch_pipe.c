@@ -153,7 +153,7 @@ static void *prefetch_thread(void *user_data)
 {
     struct cbox_prefetch_stack *stack = user_data;
     
-    while(TRUE)
+    while(!stack->finished)
     {
         usleep(1000);
         for (int i = 0; i < stack->pipe_count; i++)
@@ -168,6 +168,7 @@ static void *prefetch_thread(void *user_data)
             case pps_opening:
                 if (!cbox_prefetch_pipe_openfile(pipe))
                     pipe->state = pps_error;
+                assert(pipe->state != pps_opening);
                 break;
             case pps_active:
                 if (pipe->returned)
@@ -178,14 +179,11 @@ static void *prefetch_thread(void *user_data)
             case pps_closing:
                 cbox_prefetch_pipe_closefile(pipe);
                 break;
-            case pps_exit_thread:
-                goto exit_thread;
             default:
                 break;
             }
         }
     }
-    exit_thread:
     return 0;
 }
 
@@ -201,6 +199,7 @@ struct cbox_prefetch_stack *cbox_prefetch_stack_new(int npipes, uint32_t buffer_
     }
     stack->pipe_count = npipes;
     stack->last_free_pipe = npipes - 1;
+    stack->finished = FALSE;
     
     if (pthread_create(&stack->thr_prefetch, NULL, prefetch_thread, stack))
     {
@@ -273,7 +272,7 @@ void cbox_prefetch_stack_push(struct cbox_prefetch_stack *stack, struct cbox_pre
 void cbox_prefetch_stack_destroy(struct cbox_prefetch_stack *stack)
 {
     void *result = NULL;
-    stack->pipes[0].state = pps_exit_thread;
+    stack->finished = TRUE;
     pthread_join(stack->thr_prefetch, &result);
     for (int i = 0; i < stack->pipe_count; i++)
         cbox_prefetch_pipe_close(&stack->pipes[i]);

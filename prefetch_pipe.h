@@ -36,7 +36,6 @@ enum cbox_prefetch_pipe_state
     pps_error,
     pps_closing,
     pps_closed,
-    pps_exit_thread,
 };
 
 struct cbox_prefetch_pipe
@@ -75,6 +74,7 @@ struct cbox_prefetch_stack
     int pipe_count;
     pthread_t thr_prefetch;
     int last_free_pipe;
+    gboolean finished;
 };
 
 extern struct cbox_prefetch_stack *cbox_prefetch_stack_new(int npipes, uint32_t buffer_size);
