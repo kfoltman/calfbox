@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "cmd.h"
 #include "config.h"
+#include "config-api.h"
 #include "dspmath.h"
 #include "errors.h"
 #include "wavebank.h"

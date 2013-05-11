@@ -163,8 +163,6 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
             if (!v->current_pipe)
                 g_warning("Prefetch pipe pool exhausted, no streaming playback will be possible");
         }
-    no_prefetch:
-        ;
     }
     
     v->output_pair_no = l->output % m->output_pairs;
