@@ -16,6 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config.h"
+
+#if USE_FLUIDSYNTH
+
 #include "config-api.h"
 #include "dspmath.h"
 #include "module.h"
@@ -374,3 +378,4 @@ struct cbox_module_keyrange_metadata fluidsynth_keyranges[] = {
 
 DEFINE_MODULE(fluidsynth, 0, 2)
 
+#endif

@@ -49,7 +49,9 @@ extern struct cbox_module_manifest fuzz_module;
 
 struct cbox_module_manifest *cbox_module_list[] = {
     &tonewheel_organ_module,
+#if USE_FLUIDSYNTH
     &fluidsynth_module,
+#endif
     &stream_player_module,
     &tone_control_module,
     &delay_module,
