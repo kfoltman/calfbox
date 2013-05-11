@@ -51,6 +51,7 @@ struct cbox_prefetch_pipe
     uint32_t file_loop_start;
     uint32_t file_loop_end;
     uint32_t buffer_loop_end;
+    uint32_t play_count, loop_count;
     size_t write_ptr;
     size_t produced;
     size_t consumed;
@@ -78,7 +79,7 @@ struct cbox_prefetch_stack
 };
 
 extern struct cbox_prefetch_stack *cbox_prefetch_stack_new(int npipes, uint32_t buffer_size);
-extern struct cbox_prefetch_pipe *cbox_prefetch_stack_pop(struct cbox_prefetch_stack *stack, struct cbox_waveform *waveform, uint32_t file_loop_start, uint32_t file_loop_end);
+extern struct cbox_prefetch_pipe *cbox_prefetch_stack_pop(struct cbox_prefetch_stack *stack, struct cbox_waveform *waveform, uint32_t file_loop_start, uint32_t file_loop_end, uint32_t loop_count);
 extern void cbox_prefetch_stack_push(struct cbox_prefetch_stack *stack, struct cbox_prefetch_pipe *pipe);
 extern void cbox_prefetch_stack_destroy(struct cbox_prefetch_stack *stack);
 

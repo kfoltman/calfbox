@@ -144,7 +144,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     if (end > l->eff_waveform->preloaded_frames)
     {
         // XXXKF allow looping
-        v->current_pipe = cbox_prefetch_stack_pop(m->pipe_stack, l->eff_waveform, -1, end);
+        v->current_pipe = cbox_prefetch_stack_pop(m->pipe_stack, l->eff_waveform, -1, end, l->count);
         if (!v->current_pipe)
             g_warning("Prefetch pipe pool exhausted, no streaming playback will be possible");
     }

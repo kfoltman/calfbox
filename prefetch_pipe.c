@@ -101,7 +101,7 @@ void cbox_prefetch_pipe_fetch(struct cbox_prefetch_pipe *pipe)
         // If past the file loop end, restart at file loop start
         if (pipe->file_pos_frame >= pipe->file_loop_end)
         {
-            if (pipe->file_loop_start == (uint32_t)-1)
+            if (pipe->file_loop_start == (uint32_t)-1 || (pipe->loop_count && pipe->play_count >= pipe->loop_count - 1))
             {
                 pipe->finished = TRUE;
                 for (int i = 0; i < readsize * pipe->info.channels; i++)
@@ -110,6 +110,7 @@ void cbox_prefetch_pipe_fetch(struct cbox_prefetch_pipe *pipe)
             }
             else
             {
+                pipe->play_count++;
                 pipe->file_pos_frame = pipe->file_loop_start;
                 sf_seek(pipe->sndfile, pipe->file_loop_start, SEEK_SET);
             }
@@ -211,7 +212,7 @@ struct cbox_prefetch_stack *cbox_prefetch_stack_new(int npipes, uint32_t buffer_
     return stack;
 }
 
-struct cbox_prefetch_pipe *cbox_prefetch_stack_pop(struct cbox_prefetch_stack *stack, struct cbox_waveform *waveform, uint32_t file_loop_start, uint32_t file_loop_end)
+struct cbox_prefetch_pipe *cbox_prefetch_stack_pop(struct cbox_prefetch_stack *stack, struct cbox_waveform *waveform, uint32_t file_loop_start, uint32_t file_loop_end, uint32_t loop_count)
 {
     // The stack may include some pipes that are already returned but not yet 
     // fully prepared for opening a new file
@@ -227,13 +228,17 @@ struct cbox_prefetch_pipe *cbox_prefetch_stack_pop(struct cbox_prefetch_stack *s
     pipe->next_free_pipe = -1;
     
     pipe->waveform = waveform;
-    pipe->file_loop_start = pipe->file_loop_start;
-    pipe->file_loop_end = pipe->file_loop_end;
+    if (file_loop_start == (uint32_t)-1 && loop_count)
+        file_loop_start = 0;
+    pipe->file_loop_start = file_loop_start;
+    pipe->file_loop_end = file_loop_end;
     pipe->buffer_loop_end = 0;
     pipe->finished = FALSE;
     pipe->returned = FALSE;
     pipe->produced = waveform->preloaded_frames;
     pipe->consumed = 0;
+    pipe->play_count = 0;
+    pipe->loop_count = loop_count;
     
     __sync_synchronize();
     pipe->state = pps_opening;
