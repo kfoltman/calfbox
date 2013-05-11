@@ -169,14 +169,15 @@ static void process_voice_streaming(struct sampler_gen *v, struct resampler_stat
         v->consumed_credit = 0;
     }
     // This is the first frame where interpolation will cross the loop boundary
-    uint32_t loop_end = v->in_streaming_buffer ? v->streaming_buffer_frames : v->loop_end;
-    uint32_t loop_edge = loop_end - MAX_INTERPOLATION_ORDER;
     int16_t scratch[2 * MAX_INTERPOLATION_ORDER * 2];
     
     while ( limit && rs->offset < CBOX_BLOCK_SIZE ) {
         uint64_t startframe = v->bigpos >> 32;
         
         int16_t *source_data = v->in_streaming_buffer ? v->streaming_buffer : v->sample_data;
+        uint32_t loop_start = v->in_streaming_buffer ? 0 : v->loop_start;
+        uint32_t loop_end = v->in_streaming_buffer ? v->streaming_buffer_frames : v->loop_end;
+        uint32_t loop_edge = loop_end - MAX_INTERPOLATION_ORDER;
         uint32_t source_offset = 0;
         uint32_t usable_sample_end = loop_edge;
         // if the first frame to play is already within 3 frames of loop end
@@ -193,10 +194,11 @@ static void process_voice_streaming(struct sampler_gen *v, struct resampler_stat
                     v->mode = spt_inactive;
                     return;
                 }
-                v->bigpos -= (uint64_t)(loop_end - v->loop_start) << 32;
-                v->in_streaming_buffer = TRUE;
-                loop_end = v->streaming_buffer_frames;
-                loop_edge = loop_end - MAX_INTERPOLATION_ORDER;
+                v->bigpos -= (uint64_t)(loop_end - loop_start) << 32;
+                if (v->prefetch_only_loop)
+                    v->consumed -= (loop_end - loop_start);
+                else
+                    v->in_streaming_buffer = TRUE;
                 continue;
             }
 
@@ -207,7 +209,7 @@ static void process_voice_streaming(struct sampler_gen *v, struct resampler_stat
             // repeated twice if output write pointer is close to CBOX_BLOCK_SIZE or playback rate is very low,
             // but that's OK.
             uint32_t halfscratch = MAX_INTERPOLATION_ORDER << shift;
-            memcpy(&scratch[0], &source_data[(loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
+            memcpy(&scratch[0], &source_data[loop_edge << shift], halfscratch * sizeof(int16_t) );
             if (v->loop_start == (uint32_t)-1)
                 memset(scratch + halfscratch, 0, halfscratch * sizeof(int16_t));
             else
@@ -253,6 +255,7 @@ void sampler_gen_reset(struct sampler_gen *v)
     v->consumed = 0;
     v->consumed_credit = 0;
     v->in_streaming_buffer = FALSE;
+    v->prefetch_only_loop = FALSE;
 }
 
 uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *left, float *right, uint32_t limit)

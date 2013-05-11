@@ -87,7 +87,7 @@ struct sampler_gen
     // Streaming mode only
     int16_t *streaming_buffer;
     uint32_t consumed, consumed_credit, streaming_buffer_frames;
-    gboolean in_streaming_buffer;
+    gboolean prefetch_only_loop, in_streaming_buffer;
 };
 
 struct sampler_voice

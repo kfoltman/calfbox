@@ -141,12 +141,30 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     if (end > l->eff_waveform->info.frames)
         end = l->eff_waveform->info.frames;
     
+    assert(!v->current_pipe);
     if (end > l->eff_waveform->preloaded_frames)
     {
-        // XXXKF allow looping
-        v->current_pipe = cbox_prefetch_stack_pop(m->pipe_stack, l->eff_waveform, -1, end, l->count);
-        if (!v->current_pipe)
-            g_warning("Prefetch pipe pool exhausted, no streaming playback will be possible");
+        if (l->loop_mode == slm_loop_continuous && l->loop_end < l->eff_waveform->preloaded_frames)
+        {
+            // Everything fits in prefetch, because loop ends in prefetch and post-loop part is not being played
+        }
+        else
+        {
+            uint32_t loop_start = -1, loop_end = end;
+            // If in loop mode, set the loop over the looped part... unless we're doing sustain-only loop on prefetch area only. Then
+            // streaming will only cover the release part, and it shouldn't be looped.
+            if (l->loop_mode == slm_loop_continuous || (l->loop_mode == slm_loop_sustain && l->loop_end >= l->eff_waveform->preloaded_frames))
+            {
+                loop_start = l->loop_start;
+                loop_end = l->loop_end;
+            }
+            // Those are initial values only, they will be adjusted in process function
+            v->current_pipe = cbox_prefetch_stack_pop(m->pipe_stack, l->eff_waveform, loop_start, loop_end, l->count);
+            if (!v->current_pipe)
+                g_warning("Prefetch pipe pool exhausted, no streaming playback will be possible");
+        }
+    no_prefetch:
+        ;
     }
     
     v->output_pair_no = l->output % m->output_pairs;
@@ -289,7 +307,15 @@ void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
     else
     {
         if (v->loop_mode != slm_one_shot && !v->layer->count)
+        {
             v->released = 1;
+            if (v->loop_mode == slm_loop_sustain && v->current_pipe)
+            {
+                // Break the loop
+                v->current_pipe->file_loop_end = v->gen.cur_sample_end;
+                v->current_pipe->file_loop_start = -1;
+            }
+        }
     }
 }
 
@@ -406,24 +432,33 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             }
         }
     }
-    gboolean post_sustain = v->released && v->loop_mode == slm_loop_sustain;
+    gboolean playing_sustain_loop = !v->released && v->loop_mode == slm_loop_sustain;
     uint32_t loop_start, loop_end;
 
-    gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || (v->loop_mode == slm_loop_sustain && !post_sustain)) && v->layer->on_cc_number == -1;
+    gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || playing_sustain_loop) && v->layer->on_cc_number == -1;
     loop_start = play_loop ? v->layer->loop_start : (v->layer->count ? 0 : (uint32_t)-1);
     loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
     
     if (v->current_pipe)
     {
-        v->current_pipe->file_loop_end = loop_end;
-        v->current_pipe->file_loop_start = loop_start;
         v->gen.sample_data = v->gen.loop_count ? v->current_pipe->data : v->last_waveform->data;
         v->gen.streaming_buffer = v->current_pipe->data;
         
-        v->gen.loop_start = 0;
+        v->gen.prefetch_only_loop = (loop_end < v->last_waveform->preloaded_frames);
         v->gen.loop_overlap = 0;
-        v->gen.loop_end = v->last_waveform->preloaded_frames;
-        v->gen.streaming_buffer_frames = v->current_pipe->buffer_loop_end;
+        if (v->gen.prefetch_only_loop)
+        {
+            assert(!v->gen.in_streaming_buffer); // XXXKF this won't hold true when loops are edited while sound is being played (but that's not supported yet anyway)
+            v->gen.loop_start = loop_start;
+            v->gen.loop_end = loop_end;
+            v->gen.streaming_buffer_frames = 0;
+        }
+        else
+        {
+            v->gen.loop_start = 0;
+            v->gen.loop_end = v->last_waveform->preloaded_frames;
+            v->gen.streaming_buffer_frames = v->current_pipe->buffer_loop_end;
+        }
     }
     else
     {
