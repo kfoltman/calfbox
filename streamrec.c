@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "rt.h"
 #include <assert.h>
 #include <glib.h>
-#include <jack/ringbuffer.h>
 #include <malloc.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -66,7 +65,7 @@ struct stream_recorder
     struct recording_buffer *cur_buffer;
     uint32_t write_ptr;
 
-    jack_ringbuffer_t *rb_for_writing, *rb_just_written;
+    struct cbox_fifo *rb_for_writing, *rb_just_written;
 };
 
 static void *stream_recorder_thread(void *user_data)
@@ -75,7 +74,7 @@ static void *stream_recorder_thread(void *user_data)
     
     do {
         int8_t buf_idx;
-        if (!jack_ringbuffer_read(self->rb_for_writing, (char *)&buf_idx, 1))
+        if (!cbox_fifo_read_atomic(self->rb_for_writing, &buf_idx, 1))
         {
             usleep(10000);
             continue;
@@ -97,7 +96,7 @@ static void *stream_recorder_thread(void *user_data)
         {
             sf_write_float(self->sndfile, self->buffers[buf_idx].data, self->buffers[buf_idx].write_ptr);
             self->buffers[buf_idx].write_ptr = 0;
-            jack_ringbuffer_write(self->rb_just_written, (char *)&buf_idx, 1);
+            cbox_fifo_write_atomic(self->rb_just_written, &buf_idx, 1);
             sf_command(self->sndfile, SFC_UPDATE_HEADER_NOW, NULL, 0);
         }
     } while(1);
@@ -145,13 +144,13 @@ void stream_recorder_record_block(struct cbox_recorder *handler, const float **b
     if (self->cur_buffer && (self->cur_buffer->write_ptr + numsamples * self->info.channels) * sizeof(float) >= STREAM_BUFFER_SIZE)
     {
         int8_t idx = self->cur_buffer - self->buffers;
-        jack_ringbuffer_write(self->rb_for_writing, (char *)&idx, 1);
+        cbox_fifo_write_atomic(self->rb_for_writing, &idx, 1);
         self->cur_buffer = NULL;
     }
     if (!self->cur_buffer)
     {
         int8_t buf_idx = -1;
-        if (!jack_ringbuffer_read(self->rb_just_written, (char *)&buf_idx, 1)) // underrun
+        if (!cbox_fifo_read_atomic(self->rb_just_written, &buf_idx, 1)) // underrun
             return;
         self->cur_buffer = &self->buffers[buf_idx];
     }
@@ -177,7 +176,7 @@ gboolean stream_recorder_detach(struct cbox_recorder *handler, GError **error)
     }
 
     int8_t cmd = STREAM_CMD_SYNC;
-    jack_ringbuffer_write(self->rb_for_writing, (char *)&cmd, 1);
+    cbox_fifo_write_atomic(self->rb_for_writing, (char *)&cmd, 1);
     sem_wait(&self->sem_sync_completed);
     return TRUE;
 }
@@ -189,10 +188,12 @@ void stream_recorder_destroy(struct cbox_recorder *handler)
     if (self->sndfile)
     {
         int8_t cmd = STREAM_CMD_QUIT;
-        jack_ringbuffer_write(self->rb_for_writing, (char *)&cmd, 1);
+        cbox_fifo_write_atomic(self->rb_for_writing, (char *)&cmd, 1);
         pthread_join(self->thr_writeout, NULL);
     }
     
+    cbox_fifo_destroy(self->rb_for_writing);
+    cbox_fifo_destroy(self->rb_just_written);
     free(self);
 }
 
@@ -230,14 +231,14 @@ struct cbox_recorder *cbox_recorder_new_stream(struct cbox_engine *engine, struc
     self->filename = g_strdup(filename);
     self->cur_buffer = NULL;
 
-    self->rb_for_writing = jack_ringbuffer_create(STREAM_BUFFER_COUNT + 1);
-    self->rb_just_written = jack_ringbuffer_create(STREAM_BUFFER_COUNT + 1);
+    self->rb_for_writing = cbox_fifo_new(STREAM_BUFFER_COUNT + 1);
+    self->rb_just_written = cbox_fifo_new(STREAM_BUFFER_COUNT + 1);
     sem_init(&self->sem_sync_completed, 0, 0);
     
     CBOX_OBJECT_REGISTER(&self->iface);
 
     for (uint8_t i = 0; i < STREAM_BUFFER_COUNT; i++)
-        jack_ringbuffer_write(self->rb_just_written, (char *)&i, 1);
+        cbox_fifo_write_atomic(self->rb_just_written, (char *)&i, 1);
     
     return &self->iface;
 }

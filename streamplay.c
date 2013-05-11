@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010-2011 Krzysztof Foltman
+Copyright (C) 2010-2013 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
+#include "fifo.h"
 #include "module.h"
 #include "rt.h"
 #include <errno.h>
 #include <glib.h>
-#include <jack/ringbuffer.h>
 #include <malloc.h>
 #include <math.h>
 #include <memory.h>
@@ -82,7 +82,7 @@ struct stream_state
     int cp_readahead_ready[MAX_READAHEAD_BUFFERS];
     struct stream_player_cue_point *pcp_current, *pcp_next;
     
-    jack_ringbuffer_t *rb_for_reading, *rb_just_read;
+    struct cbox_fifo *rb_for_reading, *rb_just_read;
     float gain, fade_gain, fade_increment;
     enum stream_state_phase phase;
 
@@ -169,10 +169,10 @@ void request_load(struct stream_state *ss, int buf_idx, uint64_t pos)
     pt->queued = 1;
 
 #ifdef NDEBUG
-    jack_ringbuffer_write(ss->rb_for_reading, (char *)&cidx, 1);
+    cbox_fifo_write_atomic(ss->rb_for_reading, &cidx, 1);
 #else
-    int wlen = jack_ringbuffer_write(ss->rb_for_reading, (char *)&cidx, 1);
-    assert(wlen);
+    gboolean result = cbox_fifo_write_atomic(ss->rb_for_reading, &cidx, 1);
+    assert(result);
 #endif
 }
 
@@ -208,7 +208,7 @@ static void *sample_preload_thread(void *user_data)
     
     do {
         unsigned char buf_idx;
-        if (!jack_ringbuffer_read(ss->rb_for_reading, (char *)&buf_idx, 1))
+        if (!cbox_fifo_read_atomic(ss->rb_for_reading, &buf_idx, 1))
         {
             usleep(5000);
             continue;
@@ -218,7 +218,7 @@ static void *sample_preload_thread(void *user_data)
         // fprintf(stderr, "Preload: %d, %lld\n", (int)buf_idx, (long long)m->cp_readahead[buf_idx].position);
         load_at_cue(ss, &ss->cp_readahead[buf_idx]);
         // fprintf(stderr, "Preloaded\n", (int)buf_idx, (long long)m->cp_readahead[buf_idx].position);
-        jack_ringbuffer_write(ss->rb_just_read, (char *)&buf_idx, 1);
+        cbox_fifo_write_atomic(ss->rb_just_read, &buf_idx, 1);
     } while(1);
     return NULL;
 }
@@ -341,7 +341,7 @@ void stream_player_process_block(struct cbox_module *module, cbox_sample_t **inp
     }
 
     // receive buffer completion messages from the queue
-    while(jack_ringbuffer_read(ss->rb_just_read, (char *)&buf_idx, 1))
+    while(cbox_fifo_read_atomic(ss->rb_just_read, &buf_idx, 1))
     {
         ss->cp_readahead_ready[buf_idx] = 1;
     }
@@ -409,14 +409,14 @@ static void stream_state_destroy(struct stream_state *ss)
     
     if (ss->rb_for_reading && ss->thread_started)
     {
-        jack_ringbuffer_write(ss->rb_for_reading, (char *)&cmd, 1);
+        cbox_fifo_write_atomic(ss->rb_for_reading, &cmd, 1);
         pthread_join(ss->thr_preload, NULL);
     }
     
     if (ss->rb_for_reading)
-        jack_ringbuffer_free(ss->rb_for_reading);
+        cbox_fifo_destroy(ss->rb_for_reading);
     if (ss->rb_just_read)
-        jack_ringbuffer_free(ss->rb_just_read);
+        cbox_fifo_destroy(ss->rb_just_read);
     if (ss->sndfile)
         sf_close(ss->sndfile);
     if (ss->filename)
@@ -445,8 +445,8 @@ static struct stream_state *stream_state_new(const char *context, const gchar *f
     }
     g_message("Frames %d channels %d", (int)stream->info.frames, (int)stream->info.channels);
     
-    stream->rb_for_reading = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
-    stream->rb_just_read = jack_ringbuffer_create(MAX_READAHEAD_BUFFERS + 1);
+    stream->rb_for_reading = cbox_fifo_new(MAX_READAHEAD_BUFFERS + 1);
+    stream->rb_just_read = cbox_fifo_new(MAX_READAHEAD_BUFFERS + 1);
     
     stream->phase = STOPPED;
     stream->readptr = 0;
