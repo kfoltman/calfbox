@@ -143,6 +143,7 @@ struct cbox_midi_pattern *cbox_midi_pattern_maker_create_pattern(struct cbox_mid
     return p;
 }
 
+#if USE_LIBSMF
 gboolean cbox_midi_pattern_maker_load_smf(struct cbox_midi_pattern_maker *maker, const char *filename, int *length, GError **error)
 {
     smf_t *smf = smf_load(filename);
@@ -166,6 +167,7 @@ gboolean cbox_midi_pattern_maker_load_smf(struct cbox_midi_pattern_maker *maker,
      
     return TRUE;
 }
+#endif
 
 void cbox_midi_pattern_maker_destroy(struct cbox_midi_pattern_maker *maker)
 {

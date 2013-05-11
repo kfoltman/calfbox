@@ -44,17 +44,25 @@ AC_HELP_STRING([--without-fluidsynth],[disable use of Fluidsynth]),
   [if test "$withval" = "no"; then FLUIDSYNTH_ENABLED="no"; fi],[])
 AC_MSG_RESULT($FLUIDSYNTH_ENABLED)
 
+AC_MSG_CHECKING([whether to enable libsmf])
+AC_ARG_WITH(libsmf,
+AC_HELP_STRING([--without-libsmf],[disable use of libsmf]),
+  [if test "$withval" = "no"; then LIBSMF_ENABLED="no"; fi],[])
+AC_MSG_RESULT($LIBSMF_ENABLED)
 
 # Check dependencies
 AC_CHECK_HEADER(uuid/uuid.h, true, AC_MSG_ERROR([libuuid header (uuid/uuid.h) is required]))
 AC_CHECK_LIB(uuid, uuid_unparse, true, AC_MSG_ERROR([libuuid is required]))
 PKG_CHECK_MODULES(GLIB_DEPS, glib-2.0 >= 2.6, true, AC_MSG_ERROR([libglib-2.0 is required]))
 PKG_CHECK_MODULES(LIBUSB_DEPS, libusb-1.0 >= 1.0, true, AC_MSG_ERROR([libusb-1.0 is required]))
-PKG_CHECK_MODULES(LIBSMF_DEPS, smf >= 1.3, true, AC_MSG_ERROR([libsmf 1.3 is required (libsmf.sourceforge.net)]))
 PKG_CHECK_MODULES(LIBSNDFILE_DEPS, sndfile, true, AC_MSG_ERROR([libsndfile is required]))
 
 if test "$FLUIDSYNTH_ENABLED" = "yes"; then
     PKG_CHECK_MODULES(FLUIDSYNTH_DEPS, fluidsynth >= 1.0.8, true, AC_MSG_ERROR([fluidsynth 1.0.8 is required]))
+fi
+
+if test "$LIBSMF_ENABLED" = "yes"; then
+    PKG_CHECK_MODULES(LIBSMF_DEPS, smf >= 1.3, true, AC_MSG_ERROR([libsmf 1.3 is required (libsmf.sourceforge.net)]))
 fi
 
 if test "$JACK_ENABLED" = "yes"; then
@@ -70,6 +78,7 @@ fi
 AM_CONDITIONAL(USE_PYTHON, test "$PYTHON_ENABLED" = "yes")
 AM_CONDITIONAL(USE_JACK, test "$JACK_ENABLED" = "yes")
 AM_CONDITIONAL(USE_FLUIDSYNTH, test "$FLUIDSYNTH_ENABLED" = "yes")
+AM_CONDITIONAL(USE_LIBSMF, test "$LIBSMF_ENABLED" = "yes")
 
 # Generate config.h conditionals
 if test "$PYTHON_ENABLED" = "yes"; then
@@ -81,7 +90,9 @@ fi
 if test "$FLUIDSYNTH_ENABLED" = "yes"; then
     AC_DEFINE(USE_FLUIDSYNTH, 1, [Fluidsynth will be included])
 fi
-
+if test "$LIBSMF_ENABLED" = "yes"; then
+    AC_DEFINE(USE_LIBSMF, 1, [libsmf will be used])
+fi
 
 # Generate files
 AC_CONFIG_FILES([Makefile])

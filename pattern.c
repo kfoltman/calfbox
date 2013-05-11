@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "blob.h"
+#include "config.h"
 #include "config-api.h"
 #include "pattern.h"
 #include "pattern-maker.h"
@@ -63,6 +64,7 @@ void cbox_midi_pattern_destroyfunc(struct cbox_objhdr *objhdr)
     free(pattern);
 }
 
+#if USE_LIBSMF
 static int cbox_midi_pattern_load_smf_into(struct cbox_midi_pattern_maker *m, const char *smf)
 {
     int length = 0;
@@ -73,6 +75,7 @@ static int cbox_midi_pattern_load_smf_into(struct cbox_midi_pattern_maker *m, co
     }
     return length;
 }
+#endif
 
 static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m, const char *name, int start_pos, int transpose, int transpose_to_note)
 {
@@ -86,8 +89,13 @@ static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m
     }
 
     gchar *smf = cbox_config_get_string(cfg_section, "smf");
+#if USE_LIBSMF
     if (smf)
         return cbox_midi_pattern_load_smf_into(m, smf);
+#else
+    if (smf)
+        g_warning("libsmf disabled at build time, MIDI import functionality not available.");
+#endif
 
     int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
     int gchannel = cbox_config_get_int(cfg_section, "channel", 1);
@@ -184,8 +192,13 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
     }
     
     gchar *smf = cbox_config_get_string(cfg_section, "smf");
+#if USE_LIBSMF
     if (smf)
         return cbox_midi_pattern_load_smf_into(m, smf);
+#else
+    if (smf)
+        g_warning("libsmf disabled at build time, MIDI import functionality not available.");
+#endif
 
     int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
     int channel = cbox_config_get_int(cfg_section, "channel", 10);
