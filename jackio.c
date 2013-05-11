@@ -17,6 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "config.h"
+
+#if USE_JACK
+
 #include "config-api.h"
 #include "errors.h"
 #include "hwcfg.h"
@@ -809,3 +812,4 @@ cleanup:
     return FALSE;
 };
 
+#endif

@@ -59,7 +59,9 @@ struct cbox_module_manifest *cbox_module_list[] = {
     &chorus_module,
     &sampler_module,
     &fxchain_module,
+#if USE_JACK
     &jack_input_module,
+#endif
     &feedback_reducer_module,
     &compressor_module,
     &gate_module,

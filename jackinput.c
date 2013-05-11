@@ -29,6 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 
+#if USE_JACK
+
 struct jack_input_module
 {
     struct cbox_module module;
@@ -101,3 +103,4 @@ struct cbox_module_livecontroller_metadata jack_input_controllers[] = {
 
 DEFINE_MODULE(jack_input, 0, 2)
 
+#endif
