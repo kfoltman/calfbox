@@ -18,6 +18,7 @@ calfbox_SOURCES = \
     eq.c \
     errors.c \
     fbr.c \
+    fifo.c \
     fluid.c \
     fuzz.c \
     fxchain.c \
@@ -84,6 +85,7 @@ noinst_HEADERS = \
     engine.h \
     eq.h \
     errors.h \
+    fifo.h \
     hwcfg.h \
     instr.h \
     io.h \

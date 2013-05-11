@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_RT_H
 
 #include <stdint.h>
-#include <jack/ringbuffer.h>
 
 #include "cmd.h"
 #include "dom.h"
+#include "fifo.h"
 #include "ioenv.h"
 #include "midi.h"
 #include "mididest.h"
@@ -54,7 +54,7 @@ struct cbox_rt
     struct cbox_io *io;
     struct cbox_io_callbacks *cbs;
     
-    jack_ringbuffer_t *rb_execute, *rb_cleanup;
+    struct cbox_fifo *rb_execute, *rb_cleanup;
     
     struct cbox_command_target cmd_target;
     int started, disconnected;

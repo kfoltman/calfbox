@@ -91,8 +91,8 @@ struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
 {
     struct cbox_rt *rt = malloc(sizeof(struct cbox_rt));
     CBOX_OBJECT_HEADER_INIT(rt, cbox_rt, doc);
-    rt->rb_execute = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS);
-    rt->rb_cleanup = jack_ringbuffer_create(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS * 2);
+    rt->rb_execute = cbox_fifo_new(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS);
+    rt->rb_cleanup = cbox_fifo_new(sizeof(struct cbox_rt_cmd_instance) * RT_CMD_QUEUE_ITEMS * 2);
     rt->io = NULL;
     rt->engine = NULL;
     rt->started = FALSE;
@@ -115,8 +115,8 @@ struct cbox_objhdr *cbox_rt_newfunc(struct cbox_class *class_ptr, struct cbox_do
 void cbox_rt_destroyfunc(struct cbox_objhdr *obj_ptr)
 {
     struct cbox_rt *rt = (void *)obj_ptr;
-    jack_ringbuffer_free(rt->rb_execute);
-    jack_ringbuffer_free(rt->rb_cleanup);
+    cbox_fifo_destroy(rt->rb_execute);
+    cbox_fifo_destroy(rt->rb_cleanup);
 
     free(rt);
 }
@@ -230,16 +230,16 @@ void cbox_rt_handle_cmd_queue(struct cbox_rt *rt)
 {
     struct cbox_rt_cmd_instance cmd;
     
-    while(jack_ringbuffer_read(rt->rb_cleanup, (char *)&cmd, sizeof(cmd)))
+    while(cbox_fifo_read_atomic(rt->rb_cleanup, &cmd, sizeof(cmd)))
     {
         cmd.definition->cleanup(cmd.user_data);
     }
 }
 
-static void wait_write_space(jack_ringbuffer_t *rb)
+static void wait_write_space(struct cbox_fifo *rb)
 {
     int t = 0;
-    while (jack_ringbuffer_write_space(rb) < sizeof(struct cbox_rt_cmd_instance))
+    while (cbox_fifo_writespace(rb) < sizeof(struct cbox_rt_cmd_instance))
     {
         // wait until some space frees up in the execute queue
         usleep(1000);
@@ -276,18 +276,17 @@ void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
     cmd.is_async = 0;
     
     wait_write_space(rt->rb_execute);
-    jack_ringbuffer_write(rt->rb_execute, (const char *)&cmd, sizeof(cmd));
+    cbox_fifo_write_atomic(rt->rb_execute, &cmd, sizeof(cmd));
     do
     {
         struct cbox_rt_cmd_instance cmd2;
         
-        if (jack_ringbuffer_read_space(rt->rb_cleanup) < sizeof(cmd2))
+        if (!cbox_fifo_read_atomic(rt->rb_cleanup, &cmd2, sizeof(cmd2)))
         {
             // still no result in cleanup queue - wait
             usleep(10000);
             continue;
         }
-        jack_ringbuffer_read(rt->rb_cleanup, (char *)&cmd2, sizeof(cmd2));
         if (!memcmp(&cmd, &cmd2, sizeof(cmd)))
         {
             if (def->cleanup)
@@ -320,7 +319,7 @@ void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition
     }
     
     wait_write_space(rt->rb_execute);
-    jack_ringbuffer_write(rt->rb_execute, (const char *)&cmd, sizeof(cmd));
+    cbox_fifo_write_atomic(rt->rb_execute, &cmd, sizeof(cmd));
     
     // will be cleaned up by next sync call or by cbox_rt_cmd_handle_queue
 }
@@ -344,16 +343,18 @@ void cbox_rt_handle_rt_commands(struct cbox_rt *rt)
 
     // Process command queue, needs engine's MIDI aux buf to be initialised to work
     int cost = 0;
-    while(cost < RT_MAX_COST_PER_CALL && jack_ringbuffer_peek(rt->rb_execute, (char *)&cmd, sizeof(cmd)))
+    while(cost < RT_MAX_COST_PER_CALL && cbox_fifo_peek(rt->rb_execute, &cmd, sizeof(cmd)))
     {
         int result = (cmd.definition->execute)(cmd.user_data);
         if (!result)
             break;
         cost += result;
-        jack_ringbuffer_read_advance(rt->rb_execute, sizeof(cmd));
+        cbox_fifo_consume(rt->rb_execute, sizeof(cmd));
         if (cmd.definition->cleanup || !cmd.is_async)
         {
-            jack_ringbuffer_write(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
+            gboolean success = cbox_fifo_write_atomic(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
+            if (!success)
+                g_error("Clean-up FIFO full. Main thread deadlock?");
         }
     }
 }

@@ -27,6 +27,7 @@ csources = [
     "engine.c",
     "errors.c",
     "fbr.c",
+    "fifo.c",
     "fluid.c",
     "fuzz.c",
     "fxchain.c",
