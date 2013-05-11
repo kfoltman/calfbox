@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib.h>
 #include <jack/jack.h>
 #include <jack/ringbuffer.h>
+#include "config.h"
 #include "dom.h"
 #include "ioenv.h"
 #include "master.h"

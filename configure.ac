@@ -22,6 +22,7 @@ AC_HEADER_STDC
 # Set initial parameters
 PYTHON_ENABLED="yes"
 JACK_ENABLED="yes"
+FLUIDSYNTH_ENABLED="yes"
 
 # Check options
 
