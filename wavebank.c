@@ -273,13 +273,13 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
         if (value_copy[i] == '\\')
             value_copy[i] = '/';
     }
-    gchar *pathname = g_build_filename(sample_dir, value_copy, NULL);
+    gchar *pathname = value_copy[0] == '/' ? g_strdup(value_copy) : g_build_filename(sample_dir, value_copy, NULL);
     g_free(value_copy);
 
     char *canonical = realpath(pathname, NULL);
     if (!canonical)
     {
-        g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, "%s: cannot find a real path for '%s'", context_name, pathname);
+        g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, "%s: cannot find a real path for '%s': %s", context_name, pathname, strerror(errno));
         g_free(pathname);
         return NULL;
     }
