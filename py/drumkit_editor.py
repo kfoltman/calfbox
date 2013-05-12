@@ -178,7 +178,7 @@ class LayerListView(Gtk.TreeView):
         self.connect('cursor-changed', self.cursor_changed)
         #self.connect('drag-data-get', self.drag_data_get)
         self.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
-        self.drag_dest_set_target_list(None)
+        self.drag_dest_set_target_list([])
         self.drag_dest_add_text_targets()
         self.connect('drag_data_received', self.drag_data_received)
     def cursor_changed(self, w):
@@ -256,7 +256,7 @@ class PadButton(Gtk.RadioButton):
         self.set_size_request(100, 100)
         self.update_label()
         self.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
-        self.drag_dest_set_target_list(None)
+        self.drag_dest_set_target_list([])
         self.drag_dest_add_text_targets()
         self.connect('drag_data_received', self.drag_data_received)
         #self.connect('toggled', lambda widget: widget.controller.on_pad_selected(widget) if widget.get_active() else None)
