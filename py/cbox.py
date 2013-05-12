@@ -526,7 +526,7 @@ class CfgSection:
 class Pattern:
     @staticmethod
     def get_pattern():
-        pat_data = get_thing("/get_pattern", '/pattern', str)
+        pat_data = get_thing("/get_pattern", '/pattern', (str, int))
         if pat_data is not None:
             pat_blob, length = pat_data
             pat_data = []
