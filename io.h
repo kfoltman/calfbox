@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_IO_H
 
 #include <glib.h>
-#include <jack/jack.h>
-#include <jack/ringbuffer.h>
 #include "config.h"
+#if USE_JACK
+#include <jack/jack.h>
+#endif
 #include "dom.h"
 #include "ioenv.h"
 #include "master.h"

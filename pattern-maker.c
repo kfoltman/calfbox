@@ -21,7 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "pattern-maker.h"
 #include "song.h"
 #include <glib.h>
+#if USE_LIBSMF
 #include <smf.h>
+#endif
 
 struct event_entry
 {
