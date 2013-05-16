@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <locale.h>
-#include <xlocale.h>
 
 static void sampler_layer_data_set_modulation(struct sampler_layer_data *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags, gboolean propagating_defaults)
 {
@@ -219,7 +218,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
         sampler_layer_data_clone(&l->data, &parent_group->data, FALSE);
         l->parent_program = parent_program;
         l->parent_group = parent_group;
-        g_hash_table_add(parent_group->child_layers, l);
+        g_hash_table_replace(parent_group->child_layers, l, l);
         l->runtime = NULL;
         CBOX_OBJECT_REGISTER(l);
         return l;
