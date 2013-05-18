@@ -274,6 +274,17 @@ void cbox_prefetch_stack_push(struct cbox_prefetch_stack *stack, struct cbox_pre
     stack->last_free_pipe = pos;
 }
 
+int cbox_prefetch_stack_get_active_pipe_count(struct cbox_prefetch_stack *stack)
+{
+    int count = 0;
+    for (int i = 0; i < stack->pipe_count; i++)
+    {
+        if (stack->pipes[i].state != pps_free)
+            count++;
+    }
+    return count;
+}
+
 void cbox_prefetch_stack_destroy(struct cbox_prefetch_stack *stack)
 {
     void *result = NULL;

@@ -435,6 +435,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         }
         
         return cbox_execute_on(fb, NULL, "/active_voices", "i", error, m->active_voices) &&
+            cbox_execute_on(fb, NULL, "/active_pipes", "i", error, cbox_prefetch_stack_get_active_pipe_count(m->pipe_stack)) &&
             cbox_execute_on(fb, NULL, "/polyphony", "i", error, MAX_SAMPLER_VOICES) && 
             CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
@@ -578,6 +579,7 @@ MODULE_CREATE_FUNCTION(sampler)
     m->serial_no = 0;
     m->deleting = FALSE;
     // XXXKF read defaults from some better place, like config
+    // XXXKF allow dynamic change of the number of the pipes
     m->pipe_stack = cbox_prefetch_stack_new(max_voices, cbox_config_get_int("streaming", "streambuf_size", 65536));
 
     for (i = 0; ; i++)

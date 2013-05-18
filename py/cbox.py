@@ -764,6 +764,8 @@ class SamplerEngine(NonDocObj):
         polyphony = int
         """Current number of voices playing."""
         active_voices = int
+        """Current number of disk streams."""
+        active_pipes = int
         """GM volume (14-bit) per MIDI channel."""
         volume = {int:int}
         """GM pan (14-bit) per MIDI channel."""
