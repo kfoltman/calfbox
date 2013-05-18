@@ -95,36 +95,37 @@ static inline void copybf(float *to, float *from)
 
 static inline float cent2factor(float cent)
 {
-    return pow(2.0, cent / 1200.0); // I think this may be optimised using exp()
+    return powf(2.0, cent * (1.f / 1200.f)); // I think this may be optimised using exp()
 }
 
 static inline float dB2gain(float dB)
 {
-    return pow(2.0, dB / 6.0);
+    return powf(2.f, dB * (1.f / 6.f));
 }
 
 static inline float dB2gain_simple(float dB)
 {
     if (dB <= -96)
         return 0;
-    return pow(2.0, dB / 6.0);
+    return powf(2.f, dB * (1.f / 6.f));
 }
 
 static inline float gain2dB_simple(float gain)
 {
-    if (gain < pow(2.0, -96.0 / 6.0))
-        return -96;
-    return 6.0 * log(gain) / log(2.0);
+    static const float sixoverlog2 = 8.656170245333781; // 6.0 / logf(2.f);
+    if (gain < (1.f / 65536.f))
+        return -96.f;
+    return sixoverlog2 * logf(gain);
 }
 
 static inline float deg2rad(float deg)
 {
-    return deg * M_PI / 180;
+    return deg * (float)(M_PI / 180.f);
 }
 
 static inline float rad2deg(float rad)
 {
-    return rad * 180 / M_PI;
+    return rad * (float)(180.f / M_PI);
 }
 
 // Do a butterfly operation:

@@ -323,7 +323,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     assert(v->gen.mode != spt_inactive);
     
     // if it's a DAHD envelope without sustain, consider the note finished
-    if (v->amp_env.cur_stage == 4 && v->amp_env.shape->stages[3].end_value == 0)
+    if (v->amp_env.cur_stage == 4 && v->amp_env.shape->stages[3].end_value <= 0.f)
         cbox_envelope_go_to(&v->amp_env, 15);                
 
     struct sampler_channel *c = v->channel;
@@ -351,9 +351,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     
     float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100 + v->pitch_shift;
     float modsrcs[smsrc_pernote_count];
-    modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * (1.0 / 127.0);
-    modsrcs[smsrc_pitch - smsrc_pernote_offset] = pitch * (1.0 / 100.0);
-    modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0; // XXXKF not supported yet
+    modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * (1.f / 127.f);
+    modsrcs[smsrc_pitch - smsrc_pernote_offset] = pitch * (1.f / 100.f);
+    modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0.f; // XXXKF not supported yet
     modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released) * 0.01f;
     modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released) * 0.01f;
     modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->amp_env, v->released) * 0.01f;
@@ -390,7 +390,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         struct sampler_modulation *sm = mod->data;
         float value = 0.f, value2 = 1.f;
         if (sm->src < smsrc_pernote_offset)
-            value = c->cc[sm->src]  / 127.0;
+            value = c->cc[sm->src] * (1.f / 127.f);
         else
             value = modsrcs[sm->src - smsrc_pernote_offset];
         value = modoffset[sm->flags & 3] + value * modscale[sm->flags & 3];
@@ -398,7 +398,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (sm->src2 != smsrc_none)
         {
             if (sm->src2 < smsrc_pernote_offset)
-                value2 = c->cc[sm->src2] / 127.0;
+                value2 = c->cc[sm->src2] * (1.f / 127.f);
             else
                 value2 = modsrcs[sm->src2 - smsrc_pernote_offset];
             
@@ -469,34 +469,34 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     
     v->gen.bigdelta = freq64;
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * sampler_channel_addcc(c, 7) * sampler_channel_addcc(c, 11) / (maxv * maxv);
-    if (moddests[smdest_gain] != 0.0)
+    if (moddests[smdest_gain] != 0.f)
         gain *= dB2gain(moddests[smdest_gain]);
     // http://drealm.info/sfz/plj-sfz.xhtml#amp "The overall gain must remain in the range -144 to 6 decibels."
-    if (gain > 2)
-        gain = 2;
-    float pan = (l->pan + 100) * (1.0 / 200.0) + (sampler_channel_addcc(c, 10) * 1.0 / maxv - 0.5) * 2;
-    if (pan < 0)
-        pan = 0;
-    if (pan > 1)
-        pan = 1;
-    v->gen.lgain = gain * (1 - pan)  / 32768.0;
-    v->gen.rgain = gain * pan / 32768.0;
-    if (l->cutoff != -1)
+    if (gain > 2.f)
+        gain = 2.f;
+    float pan = (l->pan + 100.f) * (1.f / 200.f) + (sampler_channel_addcc(c, 10) * 1.f / maxv - 0.5f) * 2.f;
+    if (pan < 0.f)
+        pan = 0.f;
+    if (pan > 1.f)
+        pan = 1.f;
+    v->gen.lgain = gain * (1.f - pan)  / 32768.f;
+    v->gen.rgain = gain * pan / 32768.f;
+    if (l->cutoff != -1.f)
     {
         float cutoff = l->cutoff * cent2factor(moddests[smdest_cutoff]);
-        if (cutoff < 20)
-            cutoff = 20;
-        if (cutoff > m->module.srate * 0.45)
-            cutoff = m->module.srate * 0.45;
+        if (cutoff < 20.f)
+            cutoff = 20.f;
+        if (cutoff > m->module.srate * 0.45f)
+            cutoff = m->module.srate * 0.45f;
         //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
         float resonance = l->resonance_linearized * dB2gain(moddests[smdest_resonance]);
-        if (resonance < 0.7)
-            resonance = 0.7;
-        if (resonance > 32)
-            resonance = 32;
+        if (resonance < 0.7f)
+            resonance = 0.7f;
+        if (resonance > 32.f)
+            resonance = 32.f;
         // XXXKF this is found experimentally and probably far off from correct formula
         if (is_4pole(v->layer))
-            resonance = sqrt(resonance / 0.707) * 0.5;
+            resonance = sqrtf(resonance / 0.707f) * 0.5f;
         switch(l->fil_type)
         {
         case sft_lp12:
@@ -555,7 +555,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (is_4pole(v->layer))
             cbox_biquadf_process(&v->filter_right2, &v->filter_coeffs, right);
     }
-    mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.0);
+    mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.f);
     if ((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0))
     {
         if (v->send1bus > 0 && v->send1gain != 0)

@@ -42,7 +42,7 @@ struct resampler_state
 static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
 {
     const float ffrac = 1.0f / 6.0f;
-    const float scaler = 1.0 / (256.0 * 65536.0);
+    const float scaler = 1.f / 16777216.f;
 
     pos_offset = pos_offset << 1;
     for (int i = rs->offset; i < endpos; i++)
@@ -70,7 +70,7 @@ static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct res
 static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
 {
     const float ffrac = 1.0f / 6.0f;
-    const float scaler = 1.0 / (256.0 * 65536.0);
+    const float scaler = 1.f / 16777216.f;
 
     for (int i = rs->offset; i < endpos; i++)
     {
