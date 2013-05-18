@@ -83,6 +83,7 @@ struct sampler_gen
     uint32_t loop_overlap;
     float loop_overlap_step;
     uint32_t play_count, loop_count;
+    int16_t scratch_bandlimited[2 * MAX_INTERPOLATION_ORDER * 2];
     
     // Streaming mode only
     int16_t *streaming_buffer;

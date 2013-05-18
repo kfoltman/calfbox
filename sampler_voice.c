@@ -413,6 +413,11 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     double maxv = 127 << 7;
     double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;
     uint64_t freq64 = (uint64_t)(freq * 65536.0 * 65536.0 * m->module.srate_inv);
+
+    gboolean playing_sustain_loop = !v->released && v->loop_mode == slm_loop_sustain;
+    uint32_t loop_start, loop_end;
+    gboolean bandlimited = FALSE;
+
     if (!v->current_pipe)
     {
         v->gen.sample_data = v->last_waveform->data;
@@ -425,18 +430,18 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
                 if (freq64 <= v->last_waveform->levels[i].max_rate)
                 {
                     v->gen.sample_data = v->last_waveform->levels[i].data;
+                    bandlimited = TRUE;
+                    
                     break;
                 }
             }
         }
     }
-    gboolean playing_sustain_loop = !v->released && v->loop_mode == slm_loop_sustain;
-    uint32_t loop_start, loop_end;
-
+    
     gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || playing_sustain_loop) && v->layer->on_cc_number == -1;
     loop_start = play_loop ? v->layer->loop_start : (v->layer->count ? 0 : (uint32_t)-1);
     loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
-    
+
     if (v->current_pipe)
     {
         v->gen.sample_data = v->gen.loop_count ? v->current_pipe->data : v->last_waveform->data;
@@ -463,7 +468,26 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->gen.loop_count = v->layer->count;
         v->gen.loop_start = loop_start;
         v->gen.loop_end = loop_end;
-        v->gen.scratch = loop_start == (uint32_t)-1 ? v->layer->scratch_end : v->layer->scratch_loop;
+        
+        if (!bandlimited)
+        {
+            // Use pre-calculated join
+            v->gen.scratch = loop_start == (uint32_t)-1 ? v->layer->scratch_end : v->layer->scratch_loop;
+        }
+        else
+        {
+            // Generate the join for the current wave level
+            // XXXKF optimise: pre-compute the join for full wave
+            int shift = l->eff_waveform->info.channels == 2 ? 1 : 0;
+            uint32_t halfscratch = MAX_INTERPOLATION_ORDER << shift;
+            
+            v->gen.scratch = v->gen.scratch_bandlimited;
+            memcpy(&v->gen.scratch_bandlimited[0], &v->gen.sample_data[(loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
+            if (loop_start != (uint32_t)-1)
+                memcpy(v->gen.scratch_bandlimited + halfscratch, &v->gen.sample_data[loop_start << shift], halfscratch * sizeof(int16_t));
+            else
+                memset(v->gen.scratch_bandlimited + halfscratch, 0, halfscratch * sizeof(int16_t));
+        }
     }
         
     
