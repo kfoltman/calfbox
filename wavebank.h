@@ -22,6 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib.h>
 #include <sndfile.h>
 
+#define MAX_INTERPOLATION_ORDER 3
+
 #define CBOX_WAVEFORM_ERROR cbox_waveform_error_quark()
 
 enum CboxWaveformError

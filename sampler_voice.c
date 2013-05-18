@@ -476,17 +476,28 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         }
         else
         {
-            // Generate the join for the current wave level
-            // XXXKF optimise: pre-compute the join for full wave
-            int shift = l->eff_waveform->info.channels == 2 ? 1 : 0;
-            uint32_t halfscratch = MAX_INTERPOLATION_ORDER << shift;
-            
-            v->gen.scratch = v->gen.scratch_bandlimited;
-            memcpy(&v->gen.scratch_bandlimited[0], &v->gen.sample_data[(loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
-            if (loop_start != (uint32_t)-1)
-                memcpy(v->gen.scratch_bandlimited + halfscratch, &v->gen.sample_data[loop_start << shift], halfscratch * sizeof(int16_t));
+            // The standard waveforms have extra MAX_INTERPOLATION_ORDER of samples from the loop start added past loop_end,
+            // to avoid wasting time generating the joins in all the practical cases. The slow path covers custom loops
+            // (i.e. partial loop or no loop) over bandlimited versions of the standard waveforms, and those are probably
+            // not very useful anyway, as changing the loop removes the guarantee of the waveform being bandlimited and
+            // may cause looping artifacts or introduce DC offset (e.g. if only a positive part of a sine wave is looped).
+            if (loop_start == 0 && loop_end == l->eff_waveform->info.frames)
+                v->gen.scratch = v->gen.sample_data + l->eff_waveform->info.frames - MAX_INTERPOLATION_ORDER;
             else
-                memset(v->gen.scratch_bandlimited + halfscratch, 0, halfscratch * sizeof(int16_t));
+            {
+                // Generate the join for the current wave level
+                // XXXKF this could be optimised further, by checking if waveform and loops are the same as the last
+                // time. However, this code is 
+                int shift = l->eff_waveform->info.channels == 2 ? 1 : 0;
+                uint32_t halfscratch = MAX_INTERPOLATION_ORDER << shift;
+                
+                v->gen.scratch = v->gen.scratch_bandlimited;
+                memcpy(&v->gen.scratch_bandlimited[0], &v->gen.sample_data[(loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
+                if (loop_start != (uint32_t)-1)
+                    memcpy(v->gen.scratch_bandlimited + halfscratch, &v->gen.sample_data[loop_start << shift], halfscratch * sizeof(int16_t));
+                else
+                    memset(v->gen.scratch_bandlimited + halfscratch, 0, halfscratch * sizeof(int16_t));
+            }
         }
     }
         

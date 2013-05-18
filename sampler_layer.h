@@ -20,10 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_SAMPLER_LAYER_H
 
 #include "dom.h"
+#include "wavebank.h"
 #include <stdio.h>
 #include <stdint.h>
-
-#define MAX_INTERPOLATION_ORDER 3
 
 struct sampler_program;
 struct sampler_voice;
