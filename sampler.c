@@ -580,7 +580,7 @@ MODULE_CREATE_FUNCTION(sampler)
     m->deleting = FALSE;
     // XXXKF read defaults from some better place, like config
     // XXXKF allow dynamic change of the number of the pipes
-    m->pipe_stack = cbox_prefetch_stack_new(max_voices, cbox_config_get_int("streaming", "streambuf_size", 65536));
+    m->pipe_stack = cbox_prefetch_stack_new(MAX_SAMPLER_VOICES, cbox_config_get_int("streaming", "streambuf_size", 65536));
 
     for (i = 0; ; i++)
     {
