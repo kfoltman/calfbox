@@ -184,7 +184,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     else
         v->delay = 0;
     v->gen.loop_overlap = l->loop_overlap;
-    v->gen.loop_overlap_step = 1.0 / l->loop_overlap;    
+    v->gen.loop_overlap_step = l->loop_overlap > 0 ? 1.0 / l->loop_overlap : 0;
     v->gain_fromvel = 1.0 + (l->eff_velcurve[vel] - 1.0) * l->amp_veltrack * 0.01;
     v->gain_shift = 0.0;
     v->note = note;
