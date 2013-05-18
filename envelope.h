@@ -90,7 +90,7 @@ static inline float cbox_envelope_get_next(struct cbox_envelope *env, int releas
     {
         // instead of exp, may use 2**x which can be factored
         // into a shift and a table lookup
-        env->cur_value = env->stage_start_value * exp(pos * env->exp_factor);
+        env->cur_value = env->stage_start_value * expf(pos * env->exp_factor);
         if (env->cur_value <= 100.1/16384.0)
             env->cur_value = 0;
     }
