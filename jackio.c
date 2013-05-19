@@ -168,6 +168,12 @@ static int process_cb(jack_nframes_t nframes, void *arg)
                     jii->last_transport_state = state;
             }
             else
+            if (state == JackTransportRolling && jii->last_transport_state == JackTransportStarting)
+            {
+                if (cb->on_transport_sync(cb->user_data, ts_rolling, pos.frame))
+                    jii->last_transport_state = state;
+            }
+            else
                 jii->last_transport_state = state;
         }
     }
@@ -395,6 +401,7 @@ static int sync_cb(jack_transport_state_t state, jack_position_t *pos, void *arg
         case JackTransportStopped:
             return io->cb->on_transport_sync(io->cb->user_data, ts_stopped, pos->frame);
         case JackTransportStarting:
+            jii->last_transport_state = JackTransportStarting;
             return io->cb->on_transport_sync(io->cb->user_data, ts_starting, pos->frame);
         case JackTransportRolling:
             return io->cb->on_transport_sync(io->cb->user_data, ts_rolling, pos->frame);
