@@ -230,6 +230,18 @@ struct seek_command_arg
 static int seek_transport_execute(void *arg_)
 {
     struct seek_command_arg *arg = arg_;
+
+    struct cbox_rt *rt = arg->master->engine->rt;
+    if (rt && rt->io && rt->io->impl->controltransportfunc)
+    {
+        uint32_t pos = arg->target_pos;
+        if (!arg->is_ppqn)
+            pos = cbox_master_ppqn_to_samples(arg->master, pos);
+
+        rt->io->impl->controltransportfunc(rt->io->impl, arg->master->state == CMTS_ROLLING, pos);
+        return 1;
+    }
+
     // On first pass, check if transport is rolling from the DSP thread
     if (!arg->status_known)
     {
