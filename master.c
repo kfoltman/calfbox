@@ -185,6 +185,12 @@ uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct 
 
 DEFINE_RT_VOID_FUNC(cbox_master, master, cbox_master_play)
 {
+    struct cbox_rt *rt = master->engine->rt;
+    if (rt && rt->io && rt->io->impl->controltransportfunc)
+    {
+        rt->io->impl->controltransportfunc(rt->io->impl, TRUE, master->spb ? master->spb->song_pos_samples : (uint32_t)-1);
+        return;
+    }
     // wait for the notes to be released
     if (master->state == CMTS_STOPPING)
     {
@@ -199,6 +205,12 @@ DEFINE_RT_VOID_FUNC(cbox_master, master, cbox_master_play)
 
 DEFINE_RT_VOID_FUNC(cbox_master, master, cbox_master_stop)
 {
+    struct cbox_rt *rt = master->engine->rt;
+    if (rt && rt->io && rt->io->impl->controltransportfunc)
+    {
+        rt->io->impl->controltransportfunc(rt->io->impl, FALSE, -1);
+        return;
+    }
     if (master->state == CMTS_ROLLING)
         master->state = CMTS_STOPPING;
     

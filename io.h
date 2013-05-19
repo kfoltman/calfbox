@@ -56,6 +56,7 @@ struct cbox_io_impl
     struct cbox_midi_input *(*createmidiinfunc)(struct cbox_io_impl *ioi, const char *name, GError **error);
     void (*destroymidiinfunc)(struct cbox_io_impl *ioi, struct cbox_midi_input *midiout);
     void (*updatemidiinroutingfunc)(struct cbox_io_impl *ioi);
+    void (*controltransportfunc)(struct cbox_io_impl *ioi, gboolean roll, uint32_t pos); // (uint32_t)-1 if no change
     void (*destroyfunc)(struct cbox_io_impl *ioi);
 };
 

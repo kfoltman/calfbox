@@ -721,6 +721,26 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static void cbox_jackio_control_transport(struct cbox_io_impl *impl, gboolean roll, uint32_t pos)
+{
+    struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
+    
+    if (roll)
+    {
+        if (pos != (uint32_t)-1)
+            jack_transport_locate(jii->client, pos);
+        jack_transport_start(jii->client);
+    }
+    else
+    {
+        jack_transport_stop(jii->client);
+        if (pos != (uint32_t)-1)
+            jack_transport_locate(jii->client, pos);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error)
 {
     const char *client_name = cbox_config_get_string_with_default("io", "client_name", "cbox");
@@ -771,6 +791,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     jii->ioi.createmidioutfunc = cbox_jackio_create_midi_out;
     jii->ioi.destroymidioutfunc = cbox_jackio_destroy_midi_out;
     jii->ioi.updatemidiinroutingfunc = NULL;
+    jii->ioi.controltransportfunc = cbox_jackio_control_transport;
     jii->ioi.destroyfunc = cbox_jackio_destroy;
     
     jii->client_name = g_strdup(jack_get_client_name(client));
