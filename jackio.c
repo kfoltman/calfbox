@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <jack/ringbuffer.h>
 #include <jack/types.h>
 #include <jack/midiport.h>
+#include <jack/transport.h>
 
 struct cbox_jack_io_impl
 {
@@ -48,6 +49,7 @@ struct cbox_jack_io_impl
     char *error_str; // set to non-NULL if client has been booted out by JACK
     char *client_name;
     gboolean enable_common_midi_input;
+    jack_transport_state_t last_transport_state;
 
     jack_ringbuffer_t *rb_autoconnect;    
 };
@@ -152,6 +154,22 @@ static int process_cb(jack_nframes_t nframes, void *arg)
         }
         else
             cbox_midi_buffer_clear(&input->hdr.buffer);
+    }
+    if (cb->on_transport_sync)
+    {
+        jack_transport_state_t state = jack_transport_query(jii->client, NULL);
+        if (state != jii->last_transport_state)
+        {
+            jack_position_t pos;
+            jack_transport_query(jii->client, &pos);
+            if (state == JackTransportStopped)
+            {
+                if (cb->on_transport_sync(cb->user_data, ts_stopping, pos.frame))
+                    jii->last_transport_state = state;
+            }
+            else
+                jii->last_transport_state = state;
+        }
     }
     cb->process(cb->user_data, io, nframes);
     for (int i = 0; i < io->io_env.input_count; i++)

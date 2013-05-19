@@ -194,6 +194,14 @@ void cbox_rt_on_stopped(void *user_data)
     rt->started = 0;
 }
 
+gboolean cbox_rt_on_transport_sync(void *user_data, enum cbox_transport_state state, uint32_t frame)
+{
+    struct cbox_rt *rt = user_data;
+    if (!rt->engine)
+        return TRUE;
+    return cbox_engine_on_transport_sync(rt->engine, state, frame);
+}
+
 void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
 {
     if (rt->io)
@@ -207,6 +215,7 @@ void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
         rt->cbs->on_reconnected = cbox_rt_on_reconnected;
         rt->cbs->on_midi_inputs_changed = cbox_rt_on_midi_inputs_changed;
         rt->cbs->on_midi_outputs_changed = cbox_rt_on_midi_outputs_changed;
+        rt->cbs->on_transport_sync = cbox_rt_on_transport_sync;
 
         assert(!rt->started);
         cbox_io_start(rt->io, rt->cbs, fb);

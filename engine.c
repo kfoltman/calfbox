@@ -311,6 +311,33 @@ void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_mer
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+gboolean cbox_engine_on_transport_sync(struct cbox_engine *engine, enum cbox_transport_state state, uint32_t frame)
+{
+    if (state == ts_stopping)
+    {
+        if (engine->master->state == CMTS_ROLLING)
+            engine->master->state = CMTS_STOPPING;
+        
+        return engine->master->state == CMTS_STOP;
+    }
+    if (state == ts_starting)
+    {
+        if (engine->master->state == CMTS_STOPPING)
+            return FALSE;
+        if (engine->master->state == CMTS_ROLLING)
+        {
+            engine->master->state = CMTS_STOPPING;
+            return FALSE;
+        }
+        cbox_song_playback_seek_samples(engine->spb, frame);
+        engine->master->state = CMTS_ROLLING;
+        return TRUE;
+    }
+    return TRUE;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 struct cbox_midi_merger *cbox_engine_get_midi_output(struct cbox_engine *engine, struct cbox_uuid *uuid)
 {
     struct cbox_objhdr *objhdr = cbox_document_get_object_by_uuid(CBOX_GET_DOCUMENT(engine), uuid);
