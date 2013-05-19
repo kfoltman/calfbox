@@ -198,7 +198,7 @@ void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
 {
     if (rt->io)
     {
-        rt->cbs = malloc(sizeof(struct cbox_io_callbacks));
+        rt->cbs = calloc(1, sizeof(struct cbox_io_callbacks));
         rt->cbs->user_data = rt;
         rt->cbs->process = cbox_rt_process;
         rt->cbs->on_started = cbox_rt_on_started;

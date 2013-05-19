@@ -368,15 +368,35 @@ static void client_shutdown_cb(jack_status_t code, const char *reason, void *arg
         (io->cb->on_disconnected)(io->cb->user_data);
 }
 
+static int sync_cb(jack_transport_state_t state, jack_position_t *pos, void *arg)
+{
+    struct cbox_jack_io_impl *jii = arg;
+    struct cbox_io *io = jii->ioi.pio;
+    switch(state)
+    {
+        case JackTransportStopped:
+            return io->cb->on_transport_sync(io->cb->user_data, ts_stopped, pos->frame);
+        case JackTransportStarting:
+            return io->cb->on_transport_sync(io->cb->user_data, ts_starting, pos->frame);
+        case JackTransportRolling:
+            return io->cb->on_transport_sync(io->cb->user_data, ts_rolling, pos->frame);
+        default:
+            // assume the client is ready
+            return TRUE;
+    }
+}
+
 gboolean cbox_jackio_start(struct cbox_io_impl *impl, struct cbox_command_target *fb, GError **error)
 {
     struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
+    struct cbox_io *io = jii->ioi.pio;
     
+    if (io->cb->on_transport_sync)
+        jack_set_sync_callback(jii->client, sync_cb, jii);
     jack_set_process_callback(jii->client, process_cb, jii);
     jack_set_port_registration_callback(jii->client, port_connect_cb, jii);
     jack_on_info_shutdown(jii->client, client_shutdown_cb, jii);
 
-    struct cbox_io *io = jii->ioi.pio;
     if (io->cb->on_started)
         io->cb->on_started(io->cb->user_data);
 

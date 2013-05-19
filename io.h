@@ -73,6 +73,14 @@ struct cbox_io
     GSList *midi_outputs;
 };
 
+enum cbox_transport_state
+{
+    ts_stopping,
+    ts_stopped,
+    ts_starting,
+    ts_rolling,
+};
+
 struct cbox_io_callbacks
 {
     void *user_data;
@@ -84,6 +92,7 @@ struct cbox_io_callbacks
     void (*on_reconnected)(void *user_data);
     void (*on_midi_inputs_changed)(void *user_data);
     void (*on_midi_outputs_changed)(void *user_data);
+    gboolean (*on_transport_sync)(void *user_data, enum cbox_transport_state state, uint32_t frame);
 };
 
 struct cbox_midi_input
