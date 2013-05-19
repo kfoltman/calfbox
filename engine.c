@@ -326,11 +326,15 @@ gboolean cbox_engine_on_transport_sync(struct cbox_engine *engine, enum cbox_tra
             return FALSE;
         if (engine->master->state == CMTS_ROLLING)
         {
+            if (engine->spb->song_pos_samples == frame)
+                return TRUE;
             engine->master->state = CMTS_STOPPING;
             return FALSE;
         }
-        if (engine->spb)
+        if (engine->spb && engine->spb->song_pos_samples != frame)
+        {
             cbox_song_playback_seek_samples(engine->spb, frame);
+        }
         engine->master->state = CMTS_ROLLING;
         return TRUE;
     }
