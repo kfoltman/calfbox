@@ -15,6 +15,7 @@ fi
 # Checks for programs.
 AC_PROG_CC_C99
 AC_PROG_INSTALL
+PKG_PROG_PKG_CONFIG
 
 # Checks for headers.
 AC_HEADER_STDC
