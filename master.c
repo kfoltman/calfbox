@@ -187,6 +187,8 @@ DEFINE_RT_VOID_FUNC(cbox_master, master, cbox_master_play)
     if (rt && rt->io && rt->io->impl->controltransportfunc)
     {
         rt->io->impl->controltransportfunc(rt->io->impl, TRUE, master->spb ? master->spb->song_pos_samples : (uint32_t)-1);
+        if (!rt->io->impl->getsynccompletedfunc(rt->io->impl))
+            RT_CALL_AGAIN_LATER();
         return;
     }
     // wait for the notes to be released
@@ -238,11 +240,24 @@ static int seek_transport_execute(void *arg_)
             arg->seek_in_progress = TRUE;
             uint32_t pos = arg->target_pos;
             if (!arg->is_ppqn)
-                pos = cbox_master_ppqn_to_samples(arg->master, pos);
+                arg->target_pos = pos = cbox_master_ppqn_to_samples(arg->master, pos);
 
             rt->io->impl->controltransportfunc(rt->io->impl, arg->master->state == CMTS_ROLLING, pos);
+            // JACK slow-sync won't be performed if unless transport is rolling
+            if (!arg->was_rolling)
+            {
+                if (arg->master->spb)
+                    cbox_song_playback_seek_samples(arg->master->spb, arg->target_pos);
+                return 5;
+            }
         }
-        return rt->io->impl->getsynccompletedfunc(rt->io->impl);
+        if (rt->io->impl->getsynccompletedfunc(rt->io->impl))
+        {
+            if (arg->master->spb)
+                cbox_song_playback_seek_samples(arg->master->spb, arg->target_pos);
+            return 5;
+        }
+        return 0;
     }
 
     // On first pass, check if transport is rolling from the DSP thread
