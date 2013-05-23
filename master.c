@@ -85,15 +85,13 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     else
     if (!strcmp(cmd->command, "/seek_samples") && !strcmp(cmd->arg_types, "i"))
     {
-        if (m->spb)
-            cbox_master_seek_samples(m, CBOX_ARG_I(cmd, 0));
+        cbox_master_seek_samples(m, CBOX_ARG_I(cmd, 0));
         return TRUE;
     }
     else
     if (!strcmp(cmd->command, "/seek_ppqn") && !strcmp(cmd->arg_types, "i"))
     {
-        if (m->spb)
-            cbox_master_seek_ppqn(m, CBOX_ARG_I(cmd, 0));
+        cbox_master_seek_ppqn(m, CBOX_ARG_I(cmd, 0));
         return TRUE;
     }
     else
@@ -225,6 +223,7 @@ struct seek_command_arg
     uint32_t target_pos;
     gboolean was_rolling;
     gboolean status_known;
+    gboolean seek_in_progress;
 };
 
 static int seek_transport_execute(void *arg_)
@@ -234,12 +233,16 @@ static int seek_transport_execute(void *arg_)
     struct cbox_rt *rt = arg->master->engine->rt;
     if (rt && rt->io && rt->io->impl->controltransportfunc)
     {
-        uint32_t pos = arg->target_pos;
-        if (!arg->is_ppqn)
-            pos = cbox_master_ppqn_to_samples(arg->master, pos);
+        if (!arg->seek_in_progress)
+        {
+            arg->seek_in_progress = TRUE;
+            uint32_t pos = arg->target_pos;
+            if (!arg->is_ppqn)
+                pos = cbox_master_ppqn_to_samples(arg->master, pos);
 
-        rt->io->impl->controltransportfunc(rt->io->impl, arg->master->state == CMTS_ROLLING, pos);
-        return 1;
+            rt->io->impl->controltransportfunc(rt->io->impl, arg->master->state == CMTS_ROLLING, pos);
+        }
+        return rt->io->impl->getsynccompletedfunc(rt->io->impl);
     }
 
     // On first pass, check if transport is rolling from the DSP thread
@@ -256,10 +259,13 @@ static int seek_transport_execute(void *arg_)
     if (arg->master->state != CMTS_STOP)
         return 0;
     
-    if (arg->is_ppqn)
-        cbox_song_playback_seek_ppqn(arg->master->spb, arg->target_pos, FALSE);
-    else
-        cbox_song_playback_seek_samples(arg->master->spb, arg->target_pos);
+    if (arg->master->spb)
+    {
+        if (arg->is_ppqn)
+            cbox_song_playback_seek_ppqn(arg->master->spb, arg->target_pos, FALSE);
+        else
+            cbox_song_playback_seek_samples(arg->master->spb, arg->target_pos);
+    }
     if (arg->was_rolling)
         arg->master->state = CMTS_ROLLING;
     return 1;
@@ -267,22 +273,16 @@ static int seek_transport_execute(void *arg_)
 
 void cbox_master_seek_ppqn(struct cbox_master *master, uint32_t pos_ppqn)
 {
-    if (master->spb)
-    {
-        static struct cbox_rt_cmd_definition cmd = { NULL, seek_transport_execute, NULL };
-        struct seek_command_arg arg = { master, TRUE, pos_ppqn, FALSE, FALSE };
-        cbox_rt_execute_cmd_sync(master->engine->rt, &cmd, &arg);
-    }
+    static struct cbox_rt_cmd_definition cmd = { NULL, seek_transport_execute, NULL };
+    struct seek_command_arg arg = { master, TRUE, pos_ppqn, FALSE, FALSE, FALSE };
+    cbox_rt_execute_cmd_sync(master->engine->rt, &cmd, &arg);
 }
 
 void cbox_master_seek_samples(struct cbox_master *master, uint32_t pos_samples)
 {
-    if (master->spb)
-    {
-        static struct cbox_rt_cmd_definition cmd = { NULL, seek_transport_execute, NULL };
-        struct seek_command_arg arg = { master, FALSE, pos_samples, FALSE, FALSE };
-        cbox_rt_execute_cmd_sync(master->engine->rt, &cmd, &arg);
-    }
+    static struct cbox_rt_cmd_definition cmd = { NULL, seek_transport_execute, NULL };
+    struct seek_command_arg arg = { master, FALSE, pos_samples, FALSE, FALSE, FALSE };
+    cbox_rt_execute_cmd_sync(master->engine->rt, &cmd, &arg);
 }
 
 void cbox_master_panic(struct cbox_master *master)

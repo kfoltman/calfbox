@@ -57,6 +57,7 @@ struct cbox_io_impl
     void (*destroymidiinfunc)(struct cbox_io_impl *ioi, struct cbox_midi_input *midiout);
     void (*updatemidiinroutingfunc)(struct cbox_io_impl *ioi);
     void (*controltransportfunc)(struct cbox_io_impl *ioi, gboolean roll, uint32_t pos); // (uint32_t)-1 if no change
+    gboolean (*getsynccompletedfunc)(struct cbox_io_impl *ioi);
     void (*destroyfunc)(struct cbox_io_impl *ioi);
 };
 

@@ -758,6 +758,12 @@ static void cbox_jackio_control_transport(struct cbox_io_impl *impl, gboolean ro
         jack_transport_locate(jii->client, pos);
 }
 
+static gboolean cbox_jackio_get_sync_completed(struct cbox_io_impl *impl)
+{
+    struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
+    return jack_transport_query(jii->client, NULL) != JackTransportStarting;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error)
@@ -813,6 +819,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     jii->ioi.destroymidioutfunc = cbox_jackio_destroy_midi_out;
     jii->ioi.updatemidiinroutingfunc = NULL;
     jii->ioi.controltransportfunc = cbox_jackio_control_transport;
+    jii->ioi.getsynccompletedfunc = cbox_jackio_get_sync_completed;
     jii->ioi.destroyfunc = cbox_jackio_destroy;
     
     jii->client_name = g_strdup(jack_get_client_name(client));
