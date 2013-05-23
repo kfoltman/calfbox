@@ -50,6 +50,7 @@ struct cbox_jack_io_impl
     char *client_name;
     gboolean enable_common_midi_input;
     jack_transport_state_t last_transport_state;
+    gboolean debug_transport;
 
     jack_ringbuffer_t *rb_autoconnect;    
 };
@@ -162,6 +163,8 @@ static int process_cb(jack_nframes_t nframes, void *arg)
         {
             jack_position_t pos;
             jack_transport_query(jii->client, &pos);
+            if (jii->debug_transport)
+                g_message("JACK transport: incoming state change, state = %d, last state = %d, pos = %d\n", (int)state, (int)jii->last_transport_state, (int)pos.frame);
             if (state == JackTransportStopped)
             {
                 if (cb->on_transport_sync(cb->user_data, ts_stopping, pos.frame))
@@ -396,19 +399,26 @@ static int sync_cb(jack_transport_state_t state, jack_position_t *pos, void *arg
 {
     struct cbox_jack_io_impl *jii = arg;
     struct cbox_io *io = jii->ioi.pio;
+    gboolean result = TRUE;
     switch(state)
     {
         case JackTransportStopped:
-            return io->cb->on_transport_sync(io->cb->user_data, ts_stopped, pos->frame);
+            result = io->cb->on_transport_sync(io->cb->user_data, ts_stopped, pos->frame);
+            break;
         case JackTransportStarting:
             jii->last_transport_state = JackTransportStarting;
-            return io->cb->on_transport_sync(io->cb->user_data, ts_starting, pos->frame);
+            result = io->cb->on_transport_sync(io->cb->user_data, ts_starting, pos->frame);
+            break;
         case JackTransportRolling:
-            return io->cb->on_transport_sync(io->cb->user_data, ts_rolling, pos->frame);
+            result = io->cb->on_transport_sync(io->cb->user_data, ts_rolling, pos->frame);
+            break;
         default:
             // assume the client is ready
-            return TRUE;
+            result = TRUE;
     }
+    if (jii->debug_transport)
+        g_message("JACK transport: incoming sync callback, state = %d, last state = %d, pos = %d, result = %d\n", (int)state, (int)jii->last_transport_state, (int)pos->frame, result);
+    return result;
 }
 
 gboolean cbox_jackio_start(struct cbox_io_impl *impl, struct cbox_command_target *fb, GError **error)
@@ -779,6 +789,8 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     struct cbox_jack_io_impl *jii = malloc(sizeof(struct cbox_jack_io_impl));
     io->impl = &jii->ioi;
     jii->enable_common_midi_input = cbox_config_get_int("io", "enable_common_midi_input", 1);
+    jii->debug_transport = cbox_config_get_int("debug", "jack_transport", 0);
+    jii->last_transport_state = -1;
 
     cbox_command_target_init(&io->cmd_target, cbox_jack_io_process_cmd, jii);
     jii->ioi.pio = io;
