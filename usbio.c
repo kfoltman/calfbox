@@ -474,6 +474,7 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     uii->ioi.getmidifunc = cbox_usbio_get_midi_data;
     uii->ioi.destroymidioutfunc = cbox_usbio_destroy_midi_out;
     uii->ioi.destroyfunc = cbox_usbio_destroy;
+    uii->ioi.controltransportfunc = NULL;
     uii->ioi.updatemidiinroutingfunc = usbio_update_port_routing;
     uii->midi_ports = NULL;
     
