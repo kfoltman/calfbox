@@ -239,7 +239,7 @@ static int seek_transport_execute(void *arg_)
         {
             arg->seek_in_progress = TRUE;
             uint32_t pos = arg->target_pos;
-            if (!arg->is_ppqn)
+            if (arg->is_ppqn)
                 arg->target_pos = pos = cbox_master_ppqn_to_samples(arg->master, pos);
 
             rt->io->impl->controltransportfunc(rt->io->impl, arg->master->state == CMTS_ROLLING, pos);
