@@ -316,7 +316,7 @@ gboolean cbox_engine_on_transport_sync(struct cbox_engine *engine, enum cbox_tra
     if (state == ts_stopping)
     {
         if (engine->master->state == CMTS_ROLLING)
-            engine->master->state = CMTS_STOPPING;
+            engine->master->state = engine->spb ? CMTS_STOPPING : CMTS_STOP;
         
         return engine->master->state == CMTS_STOP;
     }
