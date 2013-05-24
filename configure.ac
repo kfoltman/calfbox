@@ -25,6 +25,7 @@ PYTHON_ENABLED="yes"
 JACK_ENABLED="yes"
 FLUIDSYNTH_ENABLED="yes"
 LIBSMF_ENABLED="yes"
+SSE_ENABLED="no"
 
 # Check options
 
@@ -51,6 +52,12 @@ AC_ARG_WITH(libsmf,
 AC_HELP_STRING([--without-libsmf],[disable use of libsmf]),
   [if test "$withval" = "no"; then LIBSMF_ENABLED="no"; fi],[])
 AC_MSG_RESULT($LIBSMF_ENABLED)
+
+AC_MSG_CHECKING([whether to enable SSE (x86 family only)])
+AC_ARG_WITH(sse,
+AC_HELP_STRING([--with-sse],[enable use of SSE]),
+  [if test "$withval" = "yes"; then SSE_ENABLED="yes"; fi],[])
+AC_MSG_RESULT($SSE_ENABLED)
 
 # Check dependencies
 AC_CHECK_HEADER(uuid/uuid.h, true, AC_MSG_ERROR([libuuid header (uuid/uuid.h) is required]))
@@ -81,6 +88,7 @@ AM_CONDITIONAL(USE_PYTHON, test "$PYTHON_ENABLED" = "yes")
 AM_CONDITIONAL(USE_JACK, test "$JACK_ENABLED" = "yes")
 AM_CONDITIONAL(USE_FLUIDSYNTH, test "$FLUIDSYNTH_ENABLED" = "yes")
 AM_CONDITIONAL(USE_LIBSMF, test "$LIBSMF_ENABLED" = "yes")
+AM_CONDITIONAL(USE_SSE, test "$SSE_ENABLED" = "yes")
 
 # Generate config.h conditionals
 if test "$PYTHON_ENABLED" = "yes"; then
@@ -94,6 +102,9 @@ if test "$FLUIDSYNTH_ENABLED" = "yes"; then
 fi
 if test "$LIBSMF_ENABLED" = "yes"; then
     AC_DEFINE(USE_LIBSMF, 1, [libsmf will be used])
+fi
+if test "$SSE_ENABLED" = "yes"; then
+    AC_DEFINE(USE_SSE, 1, [x86 Streaming SIMD Extensions will be used])
 fi
 
 # Generate files

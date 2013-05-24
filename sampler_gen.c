@@ -39,6 +39,108 @@ struct resampler_state
     float lgain, rgain, lgain_delta, rgain_delta;
 };
 
+#if USE_SSE
+
+#include <xmmintrin.h>
+
+typedef __m128 V4SF;
+
+static const V4SF shift1 = {0, 1, 1, 1};
+static const V4SF shift2 = {-1, -1, 0, 0};
+static const V4SF shift3 = {-2, -2, -2, -1};
+static const V4SF scaling = {-1, 3, -3, 1};
+static const V4SF zero = {0, 0, 0, 0};
+
+
+static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
+{
+    uint64_t pos = v->bigpos;
+    const float ffrac = 1.0f / 6.0f;
+    const float _scaler = 1.f / (128.f * 16777216.f);
+    for (int i = rs->offset; i < endpos; i++)
+    {
+        //float t = ((pos >> 8) & 0x00FFFFFF) * scaler;
+        const int16_t *p = &srcdata[(pos >> 32) - pos_offset];
+        
+        V4SF t2 = __builtin_ia32_cvtsi2ss(zero, (pos & 0xFFFFFFFF) >> 1) * _scaler;
+        pos += v->bigdelta;
+        
+        V4SF t4 = __builtin_ia32_shufps(t2, t2, 0);
+        V4SF v4mul = (t4 + shift1) * (t4 + shift2) * (t4 + shift3) * scaling;
+        V4SF samples = {p[0], p[1], p[2], p[3]};
+        v4mul = __builtin_ia32_mulps(samples, v4mul);
+        
+        float c = (v4mul[0] + v4mul[1] + v4mul[2] + v4mul[3]) * ffrac;
+
+        rs->left[i] = rs->lgain * c;
+        rs->right[i] = rs->rgain * c;
+        rs->lgain += rs->lgain_delta;
+        rs->rgain += rs->rgain_delta;
+    }
+    v->bigpos = pos;
+    rs->offset = endpos;
+}
+
+static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
+{
+    uint64_t pos = v->bigpos;
+    const float ffrac = 1.0f / 6.0f;
+    const float _scaler = 1.f / (128.f * 16777216.f);
+    pos_offset = pos_offset << 1;
+    for (int i = rs->offset; i < endpos; i++)
+    {
+        //float t = ((pos >> 8) & 0x00FFFFFF) * scaler;
+        const int16_t *p = &srcdata[((pos >> 31) - pos_offset) & ~1];
+        
+        V4SF t2 = __builtin_ia32_cvtsi2ss(zero, (pos & 0xFFFFFFFF) >> 1) * _scaler;
+        pos += v->bigdelta;
+        
+        V4SF t4 = __builtin_ia32_shufps(t2, t2, 0);
+        V4SF v4mul = (t4 + shift1) * (t4 + shift2) * (t4 + shift3) * scaling;
+        V4SF samples_left = {p[0], p[2], p[4], p[6]};
+        samples_left = __builtin_ia32_mulps(samples_left, v4mul);
+        V4SF samples_right = {p[1], p[3], p[5], p[7]};
+        samples_right = __builtin_ia32_mulps(samples_right, v4mul);
+        
+        float cl = (samples_left[0] + samples_left[1] + samples_left[2] + samples_left[3]) * ffrac;
+        float cr = (samples_right[0] + samples_right[1] + samples_right[2] + samples_right[3]) * ffrac;
+
+        rs->left[i] = rs->lgain * cl;
+        rs->right[i] = rs->rgain * cr;
+        rs->lgain += rs->lgain_delta;
+        rs->rgain += rs->rgain_delta;
+    }
+    v->bigpos = pos;
+    rs->offset = endpos;
+}
+
+#else
+
+static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
+{
+    const float ffrac = 1.0f / 6.0f;
+    const float scaler = 1.f / 16777216.f;
+
+    for (int i = rs->offset; i < endpos; i++)
+    {
+        float t = ((v->bigpos >> 8) & 0x00FFFFFF) * scaler;
+        const int16_t *p = &srcdata[(v->bigpos >> 32) - pos_offset];
+#if LOW_QUALITY_INTERPOLATION
+        float c = (1.f - t) * p[1] + t * p[2];
+#else
+        float b0 = -t*(t-1.f)*(t-2.f);
+        float b1 = 3.f*(t+1.f)*(t-1.f)*(t-2.f);
+        float c = (b0 * p[0] + b1 * p[1] - 3.f*(t+1.f)*t*(t-2.f) * p[2] + (t+1.f)*t*(t-1.f) * p[3]) * ffrac;
+#endif        
+        rs->left[i] = rs->lgain * c;
+        rs->right[i] = rs->rgain * c;
+        rs->lgain += rs->lgain_delta;
+        rs->rgain += rs->rgain_delta;
+        v->bigpos += v->bigdelta;
+    }
+    rs->offset = endpos;
+}
+
 static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
 {
     const float ffrac = 1.0f / 6.0f;
@@ -67,30 +169,7 @@ static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct res
     rs->offset = endpos;
 }
 
-static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, int endpos)
-{
-    const float ffrac = 1.0f / 6.0f;
-    const float scaler = 1.f / 16777216.f;
-
-    for (int i = rs->offset; i < endpos; i++)
-    {
-        float t = ((v->bigpos >> 8) & 0x00FFFFFF) * scaler;
-        const int16_t *p = &srcdata[(v->bigpos >> 32) - pos_offset];
-#if LOW_QUALITY_INTERPOLATION
-        float c = (1.f - t) * p[1] + t * p[2];
-#else
-        float b0 = -t*(t-1.f)*(t-2.f);
-        float b1 = 3.f*(t+1.f)*(t-1.f)*(t-2.f);
-        float c = (b0 * p[0] + b1 * p[1] - 3.f*(t+1.f)*t*(t-2.f) * p[2] + (t+1.f)*t*(t-1.f) * p[3]) * ffrac;
-#endif        
-        rs->left[i] = rs->lgain * c;
-        rs->right[i] = rs->rgain * c;
-        rs->lgain += rs->lgain_delta;
-        rs->rgain += rs->rgain_delta;
-        v->bigpos += v->bigdelta;
-    }
-    rs->offset = endpos;
-}
+#endif
 
 static inline uint32_t process_voice_noloop(struct sampler_gen *v, struct resampler_state *rs, const int16_t *srcdata, uint32_t pos_offset, uint32_t usable_sample_end)
 {
