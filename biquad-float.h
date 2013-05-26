@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_BIQUAD_FLOAT_H
 #define CBOX_BIQUAD_FLOAT_H
 
+#include "config.h"
 #include "dspmath.h"
 
 struct cbox_biquadf_state
@@ -138,7 +139,38 @@ static inline void cbox_biquadf_set_1php(struct cbox_biquadf_coeffs *coeffs, flo
     coeffs->b2 = 0;
 }
 
+#if USE_NEON
 
+#include <arm_neon.h>
+
+static inline void cbox_biquadf_process(struct cbox_biquadf_state *state, struct cbox_biquadf_coeffs *coeffs, float *buffer)
+{
+    int i;
+    float32x2_t c0 = {coeffs->a0, 0};
+    float32x2_t c1 = {coeffs->a1, -coeffs->b1};
+    float32x2_t c2 = {coeffs->a2, -coeffs->b2};
+    float32x2_t s1 = {state->x1, state->y1};
+    float32x2_t s2 = {state->x2, state->y2};
+    
+    for (i = 0; i < CBOX_BLOCK_SIZE; i ++)
+    {
+        float32x2_t in12 = {buffer[i], 0.f};
+        
+        float32x2_t out12 = vmla_f32(vmla_f32(vmul_f32(c1, s1), c2, s2), in12, c0); // [a1 * x1 + a2 * x2 + a0 * in, -b1 * y1 - b2 * y2 + 0]
+        float32x2x2_t trn = vtrn_f32(out12, in12); // [[a1 * x1 + a2 * x2 + a0 * in, in12], [-b1 * y1 - b2 * y2, 0]]
+        float32x2_t out120 = vadd_f32(trn.val[0], trn.val[1]);
+        
+        s2 = s1;
+        s1 = vrev64_f32(out120);
+        buffer[i] = out120[0];
+    }
+    state->x1 = s1[0];
+    state->y1 = s1[1];
+    state->x2 = s2[0];
+    state->y2 = s2[1];
+}
+
+#else
 
 static inline void cbox_biquadf_process(struct cbox_biquadf_state *state, struct cbox_biquadf_coeffs *coeffs, float *buffer)
 {
@@ -165,6 +197,8 @@ static inline void cbox_biquadf_process(struct cbox_biquadf_state *state, struct
     state->y2 = sanef(y2);
     state->y1 = sanef(y1);
 }
+
+#endif
 
 static inline double cbox_biquadf_process_sample(struct cbox_biquadf_state *state, struct cbox_biquadf_coeffs *coeffs, double in)
 {    

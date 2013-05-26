@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config.h"
 #include "config-api.h"
 #include "dspmath.h"
 #include "errors.h"
@@ -95,6 +96,39 @@ static gboolean is_tail_finished(struct sampler_voice *v)
     return TRUE;
 }
 
+#if USE_NEON
+
+#include <arm_neon.h>
+
+static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, float *src_left, float *src_right, float gain)
+{
+    float *dst_left = outputs[oofs];
+    float *dst_right = outputs[oofs + 1];
+    float32x2_t gain2 = {gain, gain};
+    for (size_t i = 0; i < CBOX_BLOCK_SIZE; i += 4)
+    {
+        float32x2_t l1 = vld1_f32(&src_left[i]);
+        float32x2_t l2 = vld1_f32(&src_left[i + 2]);
+        float32x2_t r1 = vld1_f32(&src_right[i]);
+        float32x2_t r2 = vld1_f32(&src_right[i + 2]);
+        float32x2_t dl1 = vld1_f32(&dst_left[i]);
+        float32x2_t dl2 = vld1_f32(&dst_left[i + 2]);
+        float32x2_t dr1 = vld1_f32(&dst_right[i]);
+        float32x2_t dr2 = vld1_f32(&dst_right[i + 2]);
+        
+        l1 = vmla_f32(dl1, l1, gain2);
+        l2 = vmla_f32(dl2, l2, gain2);
+        vst1_f32(&dst_left[i], l1);
+        vst1_f32(&dst_left[i + 2], l2);
+        r1 = vmla_f32(dr1, r1, gain2);
+        r2 = vmla_f32(dr2, r2, gain2);
+        vst1_f32(&dst_right[i], r1);
+        vst1_f32(&dst_right[i + 2], r2);
+    }
+}
+
+#else
+
 static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, float *src_left, float *src_right, float gain)
 {
     cbox_sample_t *dst_left = outputs[oofs];
@@ -105,6 +139,8 @@ static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, f
         dst_right[i] += gain * src_right[i];
     }
 }
+
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 
