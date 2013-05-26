@@ -26,6 +26,7 @@ JACK_ENABLED="yes"
 FLUIDSYNTH_ENABLED="yes"
 LIBSMF_ENABLED="yes"
 SSE_ENABLED="no"
+NEON_ENABLED="no"
 
 # Check options
 
@@ -59,6 +60,12 @@ AC_HELP_STRING([--with-sse],[enable use of SSE]),
   [if test "$withval" = "yes"; then SSE_ENABLED="yes"; fi],[])
 AC_MSG_RESULT($SSE_ENABLED)
 
+AC_MSG_CHECKING([whether to enable NEON (ARM family only)])
+AC_ARG_WITH(neon,
+AC_HELP_STRING([--with-neon],[enable use of NEON]),
+  [if test "$withval" = "yes"; then NEON_ENABLED="yes"; fi],[])
+AC_MSG_RESULT($NEON_ENABLED)
+
 # Check dependencies
 AC_CHECK_HEADER(uuid/uuid.h, true, AC_MSG_ERROR([libuuid header (uuid/uuid.h) is required]))
 AC_CHECK_LIB(uuid, uuid_unparse, true, AC_MSG_ERROR([libuuid is required]))
@@ -89,6 +96,7 @@ AM_CONDITIONAL(USE_JACK, test "$JACK_ENABLED" = "yes")
 AM_CONDITIONAL(USE_FLUIDSYNTH, test "$FLUIDSYNTH_ENABLED" = "yes")
 AM_CONDITIONAL(USE_LIBSMF, test "$LIBSMF_ENABLED" = "yes")
 AM_CONDITIONAL(USE_SSE, test "$SSE_ENABLED" = "yes")
+AM_CONDITIONAL(USE_NEON, test "$NEON_ENABLED" = "yes")
 
 # Generate config.h conditionals
 if test "$PYTHON_ENABLED" = "yes"; then
@@ -105,6 +113,9 @@ if test "$LIBSMF_ENABLED" = "yes"; then
 fi
 if test "$SSE_ENABLED" = "yes"; then
     AC_DEFINE(USE_SSE, 1, [x86 Streaming SIMD Extensions will be used])
+fi
+if test "$NEON_ENABLED" = "yes"; then
+    AC_DEFINE(USE_NEON, 1, [ARM NEON SIMD Extensions will be used])
 fi
 
 # Generate files
