@@ -56,8 +56,8 @@ static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resam
     {
         float32x2_t posposf = vcvt_n_f32_u32(vreinterpret_u32_u64(pos), 32);
         
-        pos = vadd_u64(pos, delta);
         int32x4_t smp = vmovl_s16(vld1_s16(&srcdata[pos >> 32]));
+        pos = vadd_u64(pos, delta);
         
         float32x2_t t2 = vdup_n_f32(posposf[0]);
         float32x2_t samplesa = vcvt_f32_s32(vget_low_s32(smp)), samplesb = vcvt_f32_s32(vget_high_s32(smp));
