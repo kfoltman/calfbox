@@ -345,6 +345,7 @@ struct sampler_layer_data
     struct cbox_waveform *eff_waveform;
     int16_t scratch_loop[2 * MAX_INTERPOLATION_ORDER * 2];
     int16_t scratch_end[2 * MAX_INTERPOLATION_ORDER * 2];
+    float resonance_scaled;
 };
 
 struct sampler_layer
@@ -385,5 +386,12 @@ extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampl
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+
+static inline gboolean sampler_layer_data_is_4pole(struct sampler_layer_data *v)
+{
+    if (v->cutoff == -1)
+        return FALSE;
+    return v->fil_type == sft_lp24 || v->fil_type == sft_hp24 || v->fil_type == sft_bp12;
+}
 
 #endif

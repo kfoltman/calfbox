@@ -455,6 +455,10 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         else
             memset(l->scratch_loop + halfscratch, 0, halfscratch * sizeof(int16_t));
     }
+    if (sampler_layer_data_is_4pole(l))
+        l->resonance_scaled = sqrtf(l->resonance_linearized / 0.707f) * 0.5f;
+    else
+        l->resonance_scaled = l->resonance_linearized;
 }
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)

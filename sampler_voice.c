@@ -69,13 +69,6 @@ static inline float lfo_run(struct sampler_lfo *lfo)
     return v;
 }
 
-static gboolean is_4pole(struct sampler_layer_data *v)
-{
-    if (v->cutoff == -1)
-        return FALSE;
-    return v->fil_type == sft_lp24 || v->fil_type == sft_hp24 || v->fil_type == sft_bp12;
-}
-
 static gboolean is_tail_finished(struct sampler_voice *v)
 {
     if (v->layer->cutoff == -1)
@@ -85,7 +78,7 @@ static gboolean is_tail_finished(struct sampler_voice *v)
         return FALSE;
     if (cbox_biquadf_is_audible(&v->filter_right, eps))
         return FALSE;
-    if (is_4pole(v->layer))
+    if (sampler_layer_data_is_4pole(v->layer))
     {
         if (cbox_biquadf_is_audible(&v->filter_left2, eps))
             return FALSE;
@@ -552,6 +545,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         pan = 1.f;
     v->gen.lgain = gain * (1.f - pan)  / 32768.f;
     v->gen.rgain = gain * pan / 32768.f;
+    gboolean is4p = sampler_layer_data_is_4pole(v->layer);
     if (l->cutoff != -1.f)
     {
         float cutoff = l->cutoff * cent2factor(moddests[smdest_cutoff]);
@@ -560,14 +554,11 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (cutoff > m->module.srate * 0.45f)
             cutoff = m->module.srate * 0.45f;
         //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
-        float resonance = l->resonance_linearized * dB2gain(moddests[smdest_resonance]);
+        float resonance = l->resonance_linearized * dB2gain((is4p ? 0.5 : 1) * moddests[smdest_resonance]);
         if (resonance < 0.7f)
             resonance = 0.7f;
         if (resonance > 32.f)
             resonance = 32.f;
-        // XXXKF this is found experimentally and probably far off from correct formula
-        if (is_4pole(v->layer))
-            resonance = sqrtf(resonance / 0.707f) * 0.5f;
         switch(l->fil_type)
         {
         case sft_lp12:
@@ -620,10 +611,10 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     if (l->cutoff != -1)
     {
         cbox_biquadf_process(&v->filter_left, &v->filter_coeffs, left);
-        if (is_4pole(v->layer))
+        if (is4p)
             cbox_biquadf_process(&v->filter_left2, &v->filter_coeffs, left);
         cbox_biquadf_process(&v->filter_right, &v->filter_coeffs, right);
-        if (is_4pole(v->layer))
+        if (is4p)
             cbox_biquadf_process(&v->filter_right2, &v->filter_coeffs, right);
     }
     mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.f);
