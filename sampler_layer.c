@@ -459,6 +459,10 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         l->resonance_scaled = sqrtf(l->resonance_linearized / 0.707f) * 0.5f;
     else
         l->resonance_scaled = l->resonance_linearized;
+    if (l->cutoff < 20)
+        l->logcutoff = -1;
+    else
+        l->logcutoff = 1200.0 * log(l->cutoff / 440.0) / log(2) + 5700.0;
 }
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)

@@ -137,6 +137,7 @@ struct sampler_module
     uint32_t current_time;
     gboolean deleting;
     struct cbox_prefetch_stack *pipe_stack;
+    struct cbox_sincos sincos[12800];
 };
 
 #define MAX_RELEASED_GROUPS 4

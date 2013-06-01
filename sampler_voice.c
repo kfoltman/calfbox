@@ -548,11 +548,11 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     gboolean is4p = sampler_layer_data_is_4pole(v->layer);
     if (l->cutoff != -1.f)
     {
-        float cutoff = l->cutoff * cent2factor(moddests[smdest_cutoff]);
-        if (cutoff < 20.f)
-            cutoff = 20.f;
-        if (cutoff > m->module.srate * 0.45f)
-            cutoff = m->module.srate * 0.45f;
+        float logcutoff = l->logcutoff + moddests[smdest_cutoff];
+        if (logcutoff < 0)
+            logcutoff = 0;
+        if (logcutoff > 12798)
+            logcutoff = 12798;
         //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
         float resonance = l->resonance_linearized * dB2gain((is4p ? 0.5 : 1) * moddests[smdest_resonance]);
         if (resonance < 0.7f)
@@ -563,21 +563,23 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         {
         case sft_lp12:
         case sft_lp24:
-            cbox_biquadf_set_lp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
+        {
+            cbox_biquadf_set_lp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance);
             break;
+        }
         case sft_hp12:
         case sft_hp24:
-            cbox_biquadf_set_hp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
+            cbox_biquadf_set_hp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance);
             break;
         case sft_bp6:
         case sft_bp12:
-            cbox_biquadf_set_bp_rbj(&v->filter_coeffs, cutoff, resonance, m->module.srate);
+            cbox_biquadf_set_bp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance);
             break;
         case sft_lp6:
-            cbox_biquadf_set_1plp(&v->filter_coeffs, cutoff, m->module.srate);
+            cbox_biquadf_set_1plp_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff]);
             break;
         case sft_hp6:
-            cbox_biquadf_set_1php(&v->filter_coeffs, cutoff, m->module.srate);
+            cbox_biquadf_set_1php_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff]);
             break;
         default:
             assert(0);

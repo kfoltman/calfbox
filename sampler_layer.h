@@ -346,6 +346,7 @@ struct sampler_layer_data
     int16_t scratch_loop[2 * MAX_INTERPOLATION_ORDER * 2];
     int16_t scratch_end[2 * MAX_INTERPOLATION_ORDER * 2];
     float resonance_scaled;
+    float logcutoff;
 };
 
 struct sampler_layer

@@ -32,6 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 typedef float cbox_sample_t;
 
+struct cbox_sincos
+{
+    float sine;
+    float cosine;
+};
+
 static inline float hz2w(float hz, float sr)
 {
     return M_PI * hz / (2 * sr);

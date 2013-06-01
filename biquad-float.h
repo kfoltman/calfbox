@@ -64,6 +64,19 @@ static inline void cbox_biquadf_set_lp_rbj(struct cbox_biquadf_coeffs *coeffs, f
     coeffs->b2 =  (float)((1 - alpha)*inv);
 }
 
+static inline void cbox_biquadf_set_lp_rbj_lookup(struct cbox_biquadf_coeffs *coeffs, const struct cbox_sincos *sincos, float q)
+{
+    float sn=sincos->sine;
+    float cs=sincos->cosine;
+    float alpha=(float)(sn/(2*q));
+    float inv=(float)(1.0/(1.0+alpha));
+
+    coeffs->a2 = coeffs->a0 = (float)(inv*(1 - cs)*0.5f);
+    coeffs->a1 = coeffs->a0 + coeffs->a0;
+    coeffs->b1 =  (float)(-2*cs*inv);
+    coeffs->b2 =  (float)((1 - alpha)*inv);
+}
+
 // Based on filter coefficient equations by Robert Bristow-Johnson
 static inline void cbox_biquadf_set_hp_rbj(struct cbox_biquadf_coeffs *coeffs, float fc, float q, float sr)
 {
@@ -79,12 +92,39 @@ static inline void cbox_biquadf_set_hp_rbj(struct cbox_biquadf_coeffs *coeffs, f
     coeffs->b2 =  (float)((1 - alpha)*inv);
 }
 
+static inline void cbox_biquadf_set_hp_rbj_lookup(struct cbox_biquadf_coeffs *coeffs, const struct cbox_sincos *sincos, float q)
+{
+    float sn=sincos->sine;
+    float cs=sincos->cosine;
+    float alpha=(float)(sn/(2*q));
+    float inv=(float)(1.0/(1.0+alpha));
+
+    coeffs->a2 = coeffs->a0 = (float)(inv*(1 + cs)*0.5f);
+    coeffs->a1 = -2 * coeffs->a0;
+    coeffs->b1 =  (float)(-2*cs*inv);
+    coeffs->b2 =  (float)((1 - alpha)*inv);
+}
+
 // Based on filter coefficient equations by Robert Bristow-Johnson
 static inline void cbox_biquadf_set_bp_rbj(struct cbox_biquadf_coeffs *coeffs, float fc, float q, float sr)
 {
     float omega=(float)(2*M_PI*fc/sr);
     float sn=sin(omega);
     float cs=cos(omega);
+    float alpha=(float)(sn/(2*q));
+    float inv=(float)(1.0/(1.0+alpha));
+
+    coeffs->a0 = (float)(inv*alpha);
+    coeffs->a1 = 0.f;
+    coeffs->a2 = -coeffs->a0;
+    coeffs->b1 =  (float)(-2*cs*inv);
+    coeffs->b2 =  (float)((1 - alpha)*inv);
+}
+
+static inline void cbox_biquadf_set_bp_rbj_lookup(struct cbox_biquadf_coeffs *coeffs, const struct cbox_sincos *sincos, float q)
+{
+    float sn=sincos->sine;
+    float cs=sincos->cosine;
     float alpha=(float)(sn/(2*q));
     float inv=(float)(1.0/(1.0+alpha));
 
@@ -127,7 +167,35 @@ static inline void cbox_biquadf_set_1plp(struct cbox_biquadf_coeffs *coeffs, flo
 static inline void cbox_biquadf_set_1php(struct cbox_biquadf_coeffs *coeffs, float freq, float sr)
 {
     float w = hz2w(freq, sr);
-    float x = tan (w * 0.5f);
+    float x = tan (w * 0.5f); // XXXKF needs to be checked for accuracy
+    float q = 1 / (1 + x);
+    float a01 = x*q;
+    float b1 = a01 - q;
+    
+    coeffs->a0 = q;
+    coeffs->a1 = -q;
+    coeffs->b1 = b1;
+    coeffs->a2 = 0;
+    coeffs->b2 = 0;
+}
+
+static inline void cbox_biquadf_set_1plp_lookup(struct cbox_biquadf_coeffs *coeffs, struct cbox_sincos *sincos)
+{
+    float x = sincos->sine / sincos->cosine;
+    float q = 1 / (1 + x);
+    float a01 = x*q;
+    float b1 = a01 - q;
+    
+    coeffs->a0 = a01;
+    coeffs->a1 = a01;
+    coeffs->b1 = b1;
+    coeffs->a2 = 0;
+    coeffs->b2 = 0;
+}
+
+static inline void cbox_biquadf_set_1php_lookup(struct cbox_biquadf_coeffs *coeffs, struct cbox_sincos *sincos)
+{
+    float x = sincos->sine / sincos->cosine;
     float q = 1 / (1 + x);
     float a01 = x*q;
     float b1 = a01 - q;

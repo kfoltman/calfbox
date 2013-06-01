@@ -582,6 +582,18 @@ MODULE_CREATE_FUNCTION(sampler)
     // XXXKF allow dynamic change of the number of the pipes
     m->pipe_stack = cbox_prefetch_stack_new(MAX_SAMPLER_VOICES, cbox_config_get_int("streaming", "streambuf_size", 65536));
 
+    float srate = m->module.srate;
+    for (i = 0; i < 12800; i++)
+    {
+        float freq = 440 * pow(2, (i - 5700) / 1200.0);
+        if (freq < 20.0)
+            freq = 20.0;
+        if (freq > srate * 0.45)
+            freq = srate * 0.45;
+        float omega=(float)(2*M_PI*freq/srate);
+        m->sincos[i].sine = sinf(omega);
+        m->sincos[i].cosine = cosf(omega);
+    }
     for (i = 0; ; i++)
     {
         gchar *s = g_strdup_printf("program%d", i);
