@@ -187,6 +187,14 @@ struct sampler_lfo_params
     float fade;
 };
 
+struct sampler_eq_params
+{
+    float freq;
+    float bw;
+    float gain;
+    float effective_freq;
+};
+
 typedef int midi_note_t;
 
 /*
@@ -256,6 +264,9 @@ typedef int midi_note_t;
     MACRO##_lfo(amp_lfo, amplfo, 0) \
     MACRO##_lfo(filter_lfo, fillfo, 1) \
     MACRO##_lfo(pitch_lfo, pitchlfo, 2) \
+    MACRO##_eq(eq1, eq1, 0) \
+    MACRO##_eq(eq2, eq2, 1) \
+    MACRO##_eq(eq3, eq3, 2) \
     MACRO##_ccrange(on_) \
     MACRO##_ccrange() \
 
@@ -276,6 +287,11 @@ typedef int midi_note_t;
     MACRO(delay, 1, 0, ## __VA_ARGS__) \
     MACRO(fade, 2, 0, ## __VA_ARGS__) \
     
+#define EQ_FIELDS(MACRO, ...) \
+    MACRO(freq, 0, 0, ## __VA_ARGS__) \
+    MACRO(bw, 1, 1, ## __VA_ARGS__) \
+    MACRO(gain, 2, 0, ## __VA_ARGS__) \
+    
 #define PROC_SUBSTRUCT_HAS_FIELD(name, index, param, def_value) \
     unsigned int name:1;
 #define PROC_SUBSTRUCT_RESET_FIELD(name, index, def_value, param, dst) \
@@ -287,6 +303,7 @@ typedef int midi_note_t;
 #define PROC_SUBSTRUCT_CLONEPARENT(name, index, def_value, param, l) \
     if (!l->has_##param.name) \
         l->param.name = parent ? parent->param.name : def_value;
+
 struct sampler_dahdsr_has_fields
 {
     DAHDSR_FIELDS(PROC_SUBSTRUCT_HAS_FIELD, name)
@@ -295,6 +312,11 @@ struct sampler_dahdsr_has_fields
 struct sampler_lfo_has_fields
 {
     LFO_FIELDS(PROC_SUBSTRUCT_HAS_FIELD, name)
+};
+
+struct sampler_eq_has_fields
+{
+    EQ_FIELDS(PROC_SUBSTRUCT_HAS_FIELD, name)
 };
 
 #define PROC_FIELDS_TO_STRUCT(type, name, def_value) \
@@ -312,6 +334,8 @@ struct sampler_lfo_has_fields
     struct cbox_envelope_shape name##_shape;
 #define PROC_FIELDS_TO_STRUCT_lfo(name, parname, index) \
     struct sampler_lfo_params name;
+#define PROC_FIELDS_TO_STRUCT_eq(name, parname, index) \
+    struct sampler_eq_params name;
 #define PROC_FIELDS_TO_STRUCT_ccrange(name) \
     int8_t name##locc; \
     int8_t name##hicc; \
@@ -328,9 +352,10 @@ struct sampler_lfo_has_fields
 
 #define PROC_HAS_FIELD_dahdsr(name, parname, index) \
     struct sampler_dahdsr_has_fields has_##name;
-
 #define PROC_HAS_FIELD_lfo(name, parname, index) \
     struct sampler_lfo_has_fields has_##name;
+#define PROC_HAS_FIELD_eq(name, parname, index) \
+    struct sampler_eq_has_fields has_##name;
 
 #define PROC_HAS_FIELD_ccrange(name) \
     unsigned int has_##name##locc:1; \

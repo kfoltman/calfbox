@@ -120,6 +120,32 @@ static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, f
     }
 }
 
+static inline void mix_block_into(cbox_sample_t **outputs, int oofs, float *src_left, float *src_right)
+{
+    float *dst_left = outputs[oofs];
+    float *dst_right = outputs[oofs + 1];
+    for (size_t i = 0; i < CBOX_BLOCK_SIZE; i += 4)
+    {
+        float32x2_t l1 = vld1_f32(&src_left[i]);
+        float32x2_t l2 = vld1_f32(&src_left[i + 2]);
+        float32x2_t r1 = vld1_f32(&src_right[i]);
+        float32x2_t r2 = vld1_f32(&src_right[i + 2]);
+        float32x2_t dl1 = vld1_f32(&dst_left[i]);
+        float32x2_t dl2 = vld1_f32(&dst_left[i + 2]);
+        float32x2_t dr1 = vld1_f32(&dst_right[i]);
+        float32x2_t dr2 = vld1_f32(&dst_right[i + 2]);
+        
+        l1 = vadd_f32(dl1, l1);
+        l2 = vadd_f32(dl2, l2);
+        vst1_f32(&dst_left[i], l1);
+        vst1_f32(&dst_left[i + 2], l2);
+        r1 = vadd_f32(dr1, r1);
+        r2 = vadd_f32(dr2, r2);
+        vst1_f32(&dst_right[i], r1);
+        vst1_f32(&dst_right[i + 2], r2);
+    }
+}
+
 #else
 
 static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, float *src_left, float *src_right, float gain)
@@ -130,6 +156,17 @@ static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, f
     {
         dst_left[i] += gain * src_left[i];
         dst_right[i] += gain * src_right[i];
+    }
+}
+
+static inline void mix_block_into(cbox_sample_t **outputs, int oofs, float *src_left, float *src_right)
+{
+    cbox_sample_t *dst_left = outputs[oofs];
+    cbox_sample_t *dst_right = outputs[oofs + 1];
+    for (size_t i = 0; i < CBOX_BLOCK_SIZE; i++)
+    {
+        dst_left[i] += src_left[i];
+        dst_right[i] += src_right[i];
     }
 }
 
@@ -280,6 +317,17 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     cbox_envelope_reset(&v->amp_env);
     cbox_envelope_reset(&v->filter_env);
     cbox_envelope_reset(&v->pitch_env);
+    
+    #define RESET_EQ_IF(index) \
+        if (l->eq##index.gain != 0) \
+        { \
+            cbox_biquadf_set_peakeq_rbj_scaled(&v->eq_coeffs[index - 1], l->eq##index.freq, 1.0 / l->eq##index.bw, dB2gain(0.5 * l->eq##index.gain), m->module.srate); \
+            cbox_biquadf_reset(&v->eq_left[index-1]); \
+            cbox_biquadf_reset(&v->eq_right[index-1]); \
+        }
+    RESET_EQ_IF(1)
+    RESET_EQ_IF(2)
+    RESET_EQ_IF(3)
 
     sampler_voice_activate(v, l->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16);
     
@@ -628,7 +676,17 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (is4p)
             cbox_biquadf_process(&v->filter_right2, second_filter, right);
     }
-    mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.f);
+    #define PROCESS_EQ(index) \
+        if (l->eq##index.gain != 0) \
+        { \
+            cbox_biquadf_process(&v->eq_left[index-1], &v->eq_coeffs[index-1], left); \
+            cbox_biquadf_process(&v->eq_right[index-1], &v->eq_coeffs[index-1], right); \
+        }
+    PROCESS_EQ(1)
+    PROCESS_EQ(2)
+    PROCESS_EQ(3)
+        
+    mix_block_into(outputs, v->output_pair_no * 2, left, right);
     if ((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0))
     {
         if (v->send1bus > 0 && v->send1gain != 0)

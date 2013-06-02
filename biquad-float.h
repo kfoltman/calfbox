@@ -149,6 +149,17 @@ static inline void cbox_biquadf_set_peakeq_rbj(struct cbox_biquadf_coeffs *coeff
     coeffs->b2 = ib0 * (1 - alpha/A);
 }
 
+static inline void cbox_biquadf_set_peakeq_rbj_scaled(struct cbox_biquadf_coeffs *coeffs, float freq, float q, float A, float sr)
+{
+    float w0 = freq * 2 * M_PI * (1.0 / sr);
+    float alpha = sin(w0) / (2 * q);
+    float ib0 = 1.0 / (1 + alpha/A);
+    coeffs->a1 = coeffs->b1 = -2*cos(w0) * ib0;
+    coeffs->a0 = ib0 * (1 + alpha*A);
+    coeffs->a2 = ib0 * (1 - alpha*A);
+    coeffs->b2 = ib0 * (1 - alpha/A);
+}
+
 // This is my math, and it's rather suspect
 static inline void cbox_biquadf_set_1plp(struct cbox_biquadf_coeffs *coeffs, float freq, float sr)
 {

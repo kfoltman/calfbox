@@ -194,6 +194,9 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
 #define PROC_FIELDS_INITIALISER_lfo(name, parname, index) \
     LFO_FIELDS(PROC_SUBSTRUCT_RESET_FIELD, name, ld); \
     LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, ld)
+#define PROC_FIELDS_INITIALISER_eq(name, parname, index) \
+    EQ_FIELDS(PROC_SUBSTRUCT_RESET_FIELD, name, ld); \
+    EQ_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, ld)
 #define PROC_FIELDS_INITIALISER_ccrange(name) \
     ld->name##locc = 0; \
     ld->name##hicc = 127; \
@@ -271,6 +274,10 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
         LFO_FIELDS(PROC_SUBSTRUCT_CLONE, name, dst, src) \
         if (!copy_hasattr) \
             LFO_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst)
+#define PROC_FIELDS_CLONE_eq(name, parname, index) \
+        EQ_FIELDS(PROC_SUBSTRUCT_CLONE, name, dst, src) \
+        if (!copy_hasattr) \
+            EQ_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst)
 #define PROC_FIELDS_CLONE_ccrange(name) \
     dst->name##locc = src->name##locc; \
     dst->name##hicc = src->name##hicc; \
@@ -320,6 +327,8 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
         DAHDSR_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
 #define PROC_FIELDS_CLONEPARENT_lfo(name, parname, index) \
         LFO_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
+#define PROC_FIELDS_CLONEPARENT_eq(name, parname, index) \
+        EQ_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
 #define PROC_FIELDS_CLONEPARENT_ccrange(name) \
     if (!l->has_##name##locc) \
         l->name##locc = parent ? parent->name##locc : 0; \
@@ -357,6 +366,7 @@ static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct 
 #define PROC_FIELDS_FINALISER_dahdsr(name, parname, index) \
     cbox_envelope_init_dahdsr(&l->name##_shape, &l->name, m->module.srate / CBOX_BLOCK_SIZE, 100.f, &l->name##_shape == &l->amp_env_shape);
 #define PROC_FIELDS_FINALISER_lfo(name, parname, index) /* no finaliser required */
+#define PROC_FIELDS_FINALISER_eq(name, parname, index) l->name.effective_freq = (l->name.freq ? l->name.freq : 5 * powf(10.f, 1 + (index)));
 #define PROC_FIELDS_FINALISER_ccrange(name) /* no finaliser required */
 
 void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_layer_data *parent, struct sampler_program *p)
@@ -624,6 +634,19 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     return TRUE;
 }
 
+static gboolean parse_eq_param(struct sampler_layer *layer, struct sampler_eq_params *params, struct sampler_eq_has_fields *has_fields, int eq_index, const char *key, const char *value)
+{
+#define PROC_SET_EQ_FIELD(name, index, def_value) \
+        if (!strcmp(key, #name)) {\
+            params->name = fvalue; \
+            has_fields->name = 1; \
+            return TRUE; \
+        }
+    float fvalue = atof_C(value);
+    EQ_FIELDS(PROC_SET_EQ_FIELD)
+    return FALSE;
+}
+
 #define PARSE_PARAM_midi_note_t(field, strname, valuestr) \
     return ((l->data.field = sfz_note_from_string(value)), (l->data.has_##field = 1));
 #define PARSE_PARAM_int(field, strname, valuestr) \
@@ -657,6 +680,7 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
         l->data.has_##name = 1; \
         return TRUE; \
     }
+    
 // LFO and envelope need special handling now
 #define PROC_APPLY_PARAM_dahdsr(name, parname, index) \
     if (!strncmp(key, #parname "_", sizeof(#parname))) \
@@ -664,6 +688,9 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
 #define PROC_APPLY_PARAM_lfo(name, parname, index) \
     if (!strncmp(key, #parname "_", sizeof(#parname))) \
         return parse_lfo_param(l, &l->data.name, &l->data.has_##name, index, key + sizeof(#parname), value);
+#define PROC_APPLY_PARAM_eq(name, parname, index) \
+    if (!strncmp(key, #parname "_", sizeof(#parname))) \
+        return parse_eq_param(l, &l->data.name, &l->data.has_##name, index, key + sizeof(#parname), value);
 #define PROC_APPLY_PARAM_ccrange(name)  /* handled separately in apply_param */
 
 static void sampler_layer_apply_unknown(struct sampler_layer *l, const char *key, const char *value)
@@ -865,6 +892,8 @@ unknown_key:
     DAHDSR_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
 #define PROC_FIELDS_TO_FILEPTR_lfo(name, parname, index) \
     LFO_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
+#define PROC_FIELDS_TO_FILEPTR_eq(name, parname, index) \
+    EQ_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
 #define PROC_FIELDS_TO_FILEPTR_ccrange(name) \
     if (l->has_##name##locc) \
         g_string_append_printf(outstr, " " #name "locc%d=%d", l->name##cc_number, l->name##locc); \

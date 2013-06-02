@@ -121,6 +121,8 @@ struct sampler_voice
     float send1gain, send2gain;
     int serial_no;
     struct cbox_envelope_shape dyn_envs[3]; // amp, filter, pitch
+    struct cbox_biquadf_state eq_left[3], eq_right[3];
+    struct cbox_biquadf_coeffs eq_coeffs[3];
 };
 
 struct sampler_module
