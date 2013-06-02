@@ -407,6 +407,7 @@ void sampler_gen_reset(struct sampler_gen *v)
     v->play_count = 0;
     v->consumed = 0;
     v->consumed_credit = 0;
+    v->streaming_buffer = NULL;
     v->in_streaming_buffer = FALSE;
     v->prefetch_only_loop = FALSE;
 }
