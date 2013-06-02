@@ -404,7 +404,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     // XXXKF I'm sacrificing sample accuracy for delays for now
     v->delay = 0;
     const float velscl = v->vel * (1.f / 127.f);
-    if (v->layer_changed)
+    if (__builtin_expect(v->layer_changed, 0))
     {
         v->last_level = -1;
         if (v->last_waveform != v->layer->eff_waveform)
@@ -452,7 +452,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     modsrcs[smsrc_fillfo - smsrc_pernote_offset] = lfo_run(&v->filter_lfo);
     modsrcs[smsrc_pitchlfo - smsrc_pernote_offset] = lfo_run(&v->pitch_lfo);
     
-    if (v->amp_env.cur_stage < 0)
+    if (__builtin_expect(v->amp_env.cur_stage < 0, 0))
     {
         if (is_tail_finished(v))
         {
@@ -467,7 +467,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     moddests[smdest_cutoff] = v->cutoff_shift;
     moddests[smdest_resonance] = 0;
     GSList *mod = l->modulations;
-    if (l->trigger == stm_release)
+    if (__builtin_expect(l->trigger == stm_release, 0))
         moddests[smdest_gain] -= v->age * l->rt_decay * m->module.srate_inv;
     
     if (c->pitchwheel)
@@ -513,8 +513,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->gen.sample_data = v->last_waveform->data;
         if (v->last_waveform->levels)
         {
-            if (v->last_level > 0 && v->last_level < v->last_waveform->level_count
-                && freq64 > v->last_level_min_rate && freq64 <= v->last_waveform->levels[v->last_level].max_rate)
+            gboolean use_cached = v->last_level > 0 && v->last_level < v->last_waveform->level_count
+                && freq64 > v->last_level_min_rate && freq64 <= v->last_waveform->levels[v->last_level].max_rate;
+            if (__builtin_expect(use_cached, 1))
             {
                 v->gen.sample_data = v->last_waveform->levels[v->last_level].data;
                 bandlimited = TRUE;
@@ -698,7 +699,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (is4p)
             cbox_biquadf_process(&v->filter_right2, second_filter, right);
     }
-    if (l->eq_bitmask)
+    if (__builtin_expect(l->eq_bitmask, 0))
     {
         for (int eq = 0; eq < 3; eq++)
         {
@@ -711,7 +712,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
         
     mix_block_into(outputs, v->output_pair_no * 2, left, right);
-    if ((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0))
+    if (__builtin_expect((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0), 0))
     {
         if (v->send1bus > 0 && v->send1gain != 0)
         {
