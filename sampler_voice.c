@@ -321,7 +321,6 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     #define RESET_EQ_IF(index) \
         if (l->eq##index.gain != 0) \
         { \
-            cbox_biquadf_set_peakeq_rbj_scaled(&v->eq_coeffs[index - 1], l->eq##index.freq, 1.0 / l->eq##index.bw, dB2gain(0.5 * l->eq##index.gain), m->module.srate); \
             cbox_biquadf_reset(&v->eq_left[index-1]); \
             cbox_biquadf_reset(&v->eq_right[index-1]); \
         }
@@ -333,6 +332,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     
     if (v->current_pipe && v->gen.bigpos)
         cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.bigpos >> 32);
+    v->layer_changed = TRUE;
 }
 
 void sampler_voice_link(struct sampler_voice **pv, struct sampler_voice *v)
@@ -409,22 +409,33 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     if (v->age < v->delay)
         return;
 
-    if (v->last_waveform != v->layer->eff_waveform)
-    {
-        v->last_waveform = v->layer->eff_waveform;
-        if (v->layer->eff_waveform)
-        {
-            v->gen.mode = v->layer->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-            v->gen.cur_sample_end = v->layer->eff_waveform->info.frames;
-        }
-        else
-        {
-            sampler_voice_inactivate(v, TRUE);
-            return;
-        }        
-    }
     // XXXKF I'm sacrificing sample accuracy for delays for now
     v->delay = 0;
+    if (v->layer_changed)
+    {
+        v->last_level = -1;
+        if (v->last_waveform != v->layer->eff_waveform)
+        {
+            v->last_waveform = v->layer->eff_waveform;
+            if (v->layer->eff_waveform)
+            {
+                v->gen.mode = v->layer->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+                v->gen.cur_sample_end = v->layer->eff_waveform->info.frames;
+            }
+            else
+            {
+                sampler_voice_inactivate(v, TRUE);
+                return;
+            }        
+        }
+    #define RECALC_EQ_IF(index) \
+        if (l->eq##index.gain != 0) \
+            cbox_biquadf_set_peakeq_rbj_scaled(&v->eq_coeffs[index - 1], l->eq##index.effective_freq, 1.0 / l->eq##index.bw, dB2gain(0.5 * l->eq##index.gain), m->module.srate);
+        RECALC_EQ_IF(1)
+        RECALC_EQ_IF(2)
+        RECALC_EQ_IF(3)
+        v->layer_changed = FALSE;
+    }
     
     float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100 + v->pitch_shift;
     float modsrcs[smsrc_pernote_count];
@@ -500,16 +511,25 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->gen.sample_data = v->last_waveform->data;
         if (v->last_waveform->levels)
         {
-            // XXXKF: optimise later by caching last lookup value
-            // XXXKF: optimise later by using binary search
-            for (int i = 0; i < v->last_waveform->level_count; i++)
+            if (v->last_level > 0 && v->last_level < v->last_waveform->level_count
+                && freq64 > v->last_level_min_rate && freq64 <= v->last_waveform->levels[v->last_level].max_rate)
             {
-                if (freq64 <= v->last_waveform->levels[i].max_rate)
+                v->gen.sample_data = v->last_waveform->levels[v->last_level].data;
+                bandlimited = TRUE;
+            }
+            else
+            {
+                for (int i = 0; i < v->last_waveform->level_count; i++)
                 {
-                    v->gen.sample_data = v->last_waveform->levels[i].data;
-                    bandlimited = TRUE;
-                    
-                    break;
+                    if (freq64 <= v->last_waveform->levels[i].max_rate)
+                    {
+                        v->last_level = i;
+                        v->gen.sample_data = v->last_waveform->levels[i].data;
+                        bandlimited = TRUE;
+                        
+                        break;
+                    }
+                    v->last_level_min_rate = v->last_waveform->levels[i].max_rate;
                 }
             }
         }
@@ -564,7 +584,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             {
                 // Generate the join for the current wave level
                 // XXXKF this could be optimised further, by checking if waveform and loops are the same as the last
-                // time. However, this code is 
+                // time. However, this code is not likely to be used... ever, so optimising it is not the priority.
                 int shift = l->eff_waveform->info.channels == 2 ? 1 : 0;
                 uint32_t halfscratch = MAX_INTERPOLATION_ORDER << shift;
                 

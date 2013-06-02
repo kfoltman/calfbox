@@ -123,6 +123,9 @@ struct sampler_voice
     struct cbox_envelope_shape dyn_envs[3]; // amp, filter, pitch
     struct cbox_biquadf_state eq_left[3], eq_right[3];
     struct cbox_biquadf_coeffs eq_coeffs[3];
+    gboolean layer_changed;
+    int last_level;
+    uint64_t last_level_min_rate;
 };
 
 struct sampler_module

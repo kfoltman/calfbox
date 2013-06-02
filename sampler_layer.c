@@ -1095,7 +1095,10 @@ static int sampler_layer_update_cmd_execute(void *data)
         FOREACH_VOICE(cmd->module->channels[i].voices_running, v)
         {
             if (v->layer == cmd->old_data)
+            {
                 v->layer = cmd->new_data;
+                v->layer_changed = TRUE;
+            }
         }
     }
     cmd->layer->runtime = cmd->new_data;
