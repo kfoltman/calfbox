@@ -149,6 +149,7 @@ static inline void cbox_biquadf_set_peakeq_rbj(struct cbox_biquadf_coeffs *coeff
     coeffs->b2 = ib0 * (1 - alpha/A);
 }
 
+// This is my math, and it's rather suspect
 static inline void cbox_biquadf_set_1plp(struct cbox_biquadf_coeffs *coeffs, float freq, float sr)
 {
     float w = hz2w(freq, sr);
@@ -167,7 +168,7 @@ static inline void cbox_biquadf_set_1plp(struct cbox_biquadf_coeffs *coeffs, flo
 static inline void cbox_biquadf_set_1php(struct cbox_biquadf_coeffs *coeffs, float freq, float sr)
 {
     float w = hz2w(freq, sr);
-    float x = tan (w * 0.5f); // XXXKF needs to be checked for accuracy
+    float x = tan (w * 0.5f); 
     float q = 1 / (1 + x);
     float a01 = x*q;
     float b1 = a01 - q;
@@ -179,32 +180,46 @@ static inline void cbox_biquadf_set_1php(struct cbox_biquadf_coeffs *coeffs, flo
     coeffs->b2 = 0;
 }
 
-static inline void cbox_biquadf_set_1plp_lookup(struct cbox_biquadf_coeffs *coeffs, struct cbox_sincos *sincos)
+static inline void cbox_biquadf_set_1p(struct cbox_biquadf_coeffs *coeffs, float a0, float a1, float b1, int two_copies)
 {
-    float x = sincos->sine / sincos->cosine;
-    float q = 1 / (1 + x);
-    float a01 = x*q;
-    float b1 = a01 - q;
-    
-    coeffs->a0 = a01;
-    coeffs->a1 = a01;
-    coeffs->b1 = b1;
-    coeffs->a2 = 0;
-    coeffs->b2 = 0;
+    if (two_copies)
+    {
+        // (a0 + a1z) * (a0 + a1z) = a0^2 + 2*a0*a1*z + a1^2*z^2
+        // (1 - b1z) * (1 - b1z) = 1 - 2b1*z + b1^2*z^2
+        coeffs->a0 = a0*a0;
+        coeffs->a1 = 2*a0*a1;
+        coeffs->b1 = 2 * b1;
+        coeffs->a2 = a1*a1;
+        coeffs->b2 = b1*b1;
+    }
+    else
+    {
+        coeffs->a0 = a0;
+        coeffs->a1 = a1;
+        coeffs->b1 = b1;
+        coeffs->a2 = 0;
+        coeffs->b2 = 0;
+    }
 }
 
-static inline void cbox_biquadf_set_1php_lookup(struct cbox_biquadf_coeffs *coeffs, struct cbox_sincos *sincos)
+static inline void cbox_biquadf_set_1plp_lookup(struct cbox_biquadf_coeffs *coeffs, struct cbox_sincos *sincos, int two_copies)
 {
-    float x = sincos->sine / sincos->cosine;
+    float x = sincos->prewarp;
     float q = 1 / (1 + x);
     float a01 = x*q;
     float b1 = a01 - q;
     
-    coeffs->a0 = q;
-    coeffs->a1 = -q;
-    coeffs->b1 = b1;
-    coeffs->a2 = 0;
-    coeffs->b2 = 0;
+    cbox_biquadf_set_1p(coeffs, a01, a01, b1, two_copies);    
+}
+
+static inline void cbox_biquadf_set_1php_lookup(struct cbox_biquadf_coeffs *coeffs, struct cbox_sincos *sincos, int two_copies)
+{
+    float x = sincos->prewarp;
+    float q = 1 / (1 + x);
+    float a01 = x*q;
+    float b1 = a01 - q;
+    
+    cbox_biquadf_set_1p(coeffs, a01, -a01, b1, two_copies);    
 }
 
 #if USE_NEON

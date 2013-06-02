@@ -576,10 +576,14 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             cbox_biquadf_set_bp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance);
             break;
         case sft_lp6:
-            cbox_biquadf_set_1plp_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff]);
+        case sft_lp12nr:
+        case sft_lp24nr:
+            cbox_biquadf_set_1plp_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], l->fil_type != sft_lp6);
             break;
         case sft_hp6:
-            cbox_biquadf_set_1php_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff]);
+        case sft_hp12nr:
+        case sft_hp24nr:
+            cbox_biquadf_set_1php_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], l->fil_type != sft_hp6);
             break;
         default:
             assert(0);

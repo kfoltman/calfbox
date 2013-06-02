@@ -593,6 +593,8 @@ MODULE_CREATE_FUNCTION(sampler)
         float omega=(float)(2*M_PI*freq/srate);
         m->sincos[i].sine = sinf(omega);
         m->sincos[i].cosine = cosf(omega);
+        m->sincos[i].prewarp = 2.0 * tan(hz2w(freq, srate) * 0.5f);
+
     }
     for (i = 0; ; i++)
     {
