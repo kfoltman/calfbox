@@ -698,12 +698,15 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (is4p)
             cbox_biquadf_process(&v->filter_right2, second_filter, right);
     }
-    for (int eq = 0; eq < 3; eq++)
+    if (l->eq_bitmask)
     {
-        if (l->eq_bitmask & (1 << eq))
-        { 
-            cbox_biquadf_process(&v->eq_left[eq], &v->eq_coeffs[eq], left);
-            cbox_biquadf_process(&v->eq_right[eq], &v->eq_coeffs[eq], right);
+        for (int eq = 0; eq < 3; eq++)
+        {
+            if (l->eq_bitmask & (1 << eq))
+            { 
+                cbox_biquadf_process(&v->eq_left[eq], &v->eq_coeffs[eq], left);
+                cbox_biquadf_process(&v->eq_right[eq], &v->eq_coeffs[eq], right);
+            }
         }
     }
         
