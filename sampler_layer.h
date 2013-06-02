@@ -193,6 +193,8 @@ struct sampler_eq_params
     float bw;
     float gain;
     float effective_freq;
+    float vel2freq;
+    float vel2gain;
 };
 
 typedef int midi_note_t;
@@ -291,6 +293,8 @@ typedef int midi_note_t;
     MACRO(freq, 0, 0, ## __VA_ARGS__) \
     MACRO(bw, 1, 1, ## __VA_ARGS__) \
     MACRO(gain, 2, 0, ## __VA_ARGS__) \
+    MACRO(vel2freq, 3, 0, ## __VA_ARGS__) \
+    MACRO(vel2gain, 5, 0, ## __VA_ARGS__) \
     
 #define PROC_SUBSTRUCT_HAS_FIELD(name, index, param, def_value) \
     unsigned int name:1;
@@ -382,6 +386,7 @@ struct sampler_layer_data
     int16_t scratch_end[2 * MAX_INTERPOLATION_ORDER * 2];
     float resonance_scaled;
     float logcutoff;
+    uint32_t eq_bitmask;
 };
 
 struct sampler_layer

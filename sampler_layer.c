@@ -473,6 +473,10 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         l->logcutoff = -1;
     else
         l->logcutoff = 1200.0 * log(l->cutoff / 440.0) / log(2) + 5700.0;
+    
+    l->eq_bitmask = ((l->eq1.gain != 0 || l->eq1.vel2gain != 0) ? 1 : 0)
+        | ((l->eq2.gain != 0 || l->eq2.vel2gain != 0) ? 2 : 0)
+        | ((l->eq3.gain != 0 || l->eq3.vel2gain != 0) ? 4 : 0);
 }
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)

@@ -317,16 +317,8 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     cbox_envelope_reset(&v->amp_env);
     cbox_envelope_reset(&v->filter_env);
     cbox_envelope_reset(&v->pitch_env);
-    
-    #define RESET_EQ_IF(index) \
-        if (l->eq##index.gain != 0) \
-        { \
-            cbox_biquadf_reset(&v->eq_left[index-1]); \
-            cbox_biquadf_reset(&v->eq_right[index-1]); \
-        }
-    RESET_EQ_IF(1)
-    RESET_EQ_IF(2)
-    RESET_EQ_IF(3)
+
+    v->last_eq_bitmask = 0;
 
     sampler_voice_activate(v, l->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16);
     
@@ -411,6 +403,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
 
     // XXXKF I'm sacrificing sample accuracy for delays for now
     v->delay = 0;
+    const float velscl = v->vel * (1.f / 127.f);
     if (v->layer_changed)
     {
         v->last_level = -1;
@@ -429,17 +422,26 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             }        
         }
     #define RECALC_EQ_IF(index) \
-        if (l->eq##index.gain != 0) \
-            cbox_biquadf_set_peakeq_rbj_scaled(&v->eq_coeffs[index - 1], l->eq##index.effective_freq, 1.0 / l->eq##index.bw, dB2gain(0.5 * l->eq##index.gain), m->module.srate);
+        if (l->eq_bitmask & (1 << (index - 1))) \
+        { \
+            cbox_biquadf_set_peakeq_rbj_scaled(&v->eq_coeffs[index - 1], l->eq##index.effective_freq + velscl * l->eq##index.vel2freq, 1.0 / l->eq##index.bw, dB2gain(0.5 * (l->eq##index.gain + velscl * l->eq##index.vel2gain)), m->module.srate); \
+            if (!(v->last_eq_bitmask & (1 << (index - 1)))) \
+            { \
+                cbox_biquadf_reset(&v->eq_left[index-1]); \
+                cbox_biquadf_reset(&v->eq_right[index-1]); \
+            } \
+        }
+
         RECALC_EQ_IF(1)
         RECALC_EQ_IF(2)
         RECALC_EQ_IF(3)
+        v->last_eq_bitmask = l->eq_bitmask;
         v->layer_changed = FALSE;
     }
     
     float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100 + v->pitch_shift;
     float modsrcs[smsrc_pernote_count];
-    modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * (1.f / 127.f);
+    modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * velscl;
     modsrcs[smsrc_pitch - smsrc_pernote_offset] = pitch * (1.f / 100.f);
     modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0.f; // XXXKF not supported yet
     modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released) * 0.01f;
@@ -696,15 +698,14 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (is4p)
             cbox_biquadf_process(&v->filter_right2, second_filter, right);
     }
-    #define PROCESS_EQ(index) \
-        if (l->eq##index.gain != 0) \
-        { \
-            cbox_biquadf_process(&v->eq_left[index-1], &v->eq_coeffs[index-1], left); \
-            cbox_biquadf_process(&v->eq_right[index-1], &v->eq_coeffs[index-1], right); \
+    for (int eq = 0; eq < 3; eq++)
+    {
+        if (l->eq_bitmask & (1 << eq))
+        { 
+            cbox_biquadf_process(&v->eq_left[eq], &v->eq_coeffs[eq], left);
+            cbox_biquadf_process(&v->eq_right[eq], &v->eq_coeffs[eq], right);
         }
-    PROCESS_EQ(1)
-    PROCESS_EQ(2)
-    PROCESS_EQ(3)
+    }
         
     mix_block_into(outputs, v->output_pair_no * 2, left, right);
     if ((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0))
