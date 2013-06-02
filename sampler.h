@@ -111,7 +111,7 @@ struct sampler_voice
     float gain_shift, gain_fromvel;
     struct cbox_biquadf_state filter_left, filter_right;
     struct cbox_biquadf_state filter_left2, filter_right2;
-    struct cbox_biquadf_coeffs filter_coeffs;
+    struct cbox_biquadf_coeffs filter_coeffs, filter_coeffs_extra;
     struct sampler_channel *channel;
     struct cbox_envelope amp_env, filter_env, pitch_env;
     struct sampler_lfo amp_lfo, filter_lfo, pitch_lfo;

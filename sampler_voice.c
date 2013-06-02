@@ -545,6 +545,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         pan = 1.f;
     v->gen.lgain = gain * (1.f - pan)  / 32768.f;
     v->gen.rgain = gain * pan / 32768.f;
+    struct cbox_biquadf_coeffs *second_filter = &v->filter_coeffs;
     gboolean is4p = sampler_layer_data_is_4pole(v->layer);
     if (l->cutoff != -1.f)
     {
@@ -561,12 +562,16 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             resonance = 32.f;
         switch(l->fil_type)
         {
+        case sft_lp24hybrid:
+            cbox_biquadf_set_lp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance * resonance);
+            cbox_biquadf_set_1plp_lookup(&v->filter_coeffs_extra, &m->sincos[(int)logcutoff], 1);
+            second_filter = &v->filter_coeffs_extra;
+            break;
+            
         case sft_lp12:
         case sft_lp24:
-        {
             cbox_biquadf_set_lp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance);
             break;
-        }
         case sft_hp12:
         case sft_hp24:
             cbox_biquadf_set_hp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance);
@@ -618,10 +623,10 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     {
         cbox_biquadf_process(&v->filter_left, &v->filter_coeffs, left);
         if (is4p)
-            cbox_biquadf_process(&v->filter_left2, &v->filter_coeffs, left);
+            cbox_biquadf_process(&v->filter_left2, second_filter, left);
         cbox_biquadf_process(&v->filter_right, &v->filter_coeffs, right);
         if (is4p)
-            cbox_biquadf_process(&v->filter_right2, &v->filter_coeffs, right);
+            cbox_biquadf_process(&v->filter_right2, second_filter, right);
     }
     mix_block_into_with_gain(outputs, v->output_pair_no * 2, left, right, 1.f);
     if ((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0))

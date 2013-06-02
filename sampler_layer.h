@@ -95,6 +95,7 @@ enum sampler_filter_type
     sft_hp12nr,
     sft_lp24nr,
     sft_hp24nr,
+    sft_lp24hybrid,
 };
 
 #define ENUM_VALUES_sampler_filter_type(MACRO) \
@@ -110,6 +111,7 @@ enum sampler_filter_type
     MACRO("hpf_2p_nores", sft_hp12nr)  \
     MACRO("lpf_4p_nores", sft_lp24nr)  \
     MACRO("hpf_4p_nores", sft_hp24nr)  \
+    MACRO("lpf_4p_hybrid", sft_lp24hybrid)  \
 
 #define ENUM_LIST(MACRO) \
     MACRO(sampler_loop_mode) \
@@ -400,7 +402,7 @@ static inline gboolean sampler_layer_data_is_4pole(struct sampler_layer_data *v)
 {
     if (v->cutoff == -1)
         return FALSE;
-    return v->fil_type == sft_lp24 || v->fil_type == sft_lp24nr || v->fil_type == sft_hp24 || v->fil_type == sft_hp24nr || v->fil_type == sft_bp12;
+    return v->fil_type == sft_lp24hybrid || v->fil_type == sft_lp24 || v->fil_type == sft_lp24nr || v->fil_type == sft_hp24 || v->fil_type == sft_hp24nr || v->fil_type == sft_bp12;
 }
 
 #endif
