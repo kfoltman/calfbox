@@ -392,13 +392,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     assert(v->gen.mode != spt_inactive);
     
     // if it's a DAHD envelope without sustain, consider the note finished
-    if (v->amp_env.cur_stage == 4 && v->amp_env.shape->stages[3].end_value <= 0.f)
+    if (__builtin_expect(v->amp_env.cur_stage == 4 && v->amp_env.shape->stages[3].end_value <= 0.f, 0))
         cbox_envelope_go_to(&v->amp_env, 15);                
 
     struct sampler_channel *c = v->channel;
     v->age += CBOX_BLOCK_SIZE;
     
-    if (v->age < v->delay)
+    if (__builtin_expect(v->age < v->delay, 0))
         return;
 
     // XXXKF I'm sacrificing sample accuracy for delays for now

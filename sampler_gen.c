@@ -252,7 +252,7 @@ static inline uint32_t process_voice_noloop(struct sampler_gen *v, struct resamp
     uint64_t sample_end64 = ((uint64_t)usable_sample_end) << 32;
     // Check how many frames can be written to output buffer without going
     // past usable_sample_end.
-    if (v->bigpos + (out_frames - 1) * v->bigdelta >= sample_end64)
+    if (__builtin_expect(v->bigpos + (out_frames - 1) * v->bigdelta >= sample_end64, 0))
         out_frames = (sample_end64 - v->bigpos) / v->bigdelta + 1;
     
     assert(out_frames > 0 && out_frames <= CBOX_BLOCK_SIZE - rs->offset);
@@ -279,7 +279,7 @@ static void process_voice_withloop(struct sampler_gen *v, struct resampler_state
         // if the first frame to play is already within 3 frames of loop end
         // (we need consecutive 4 frames for cubic interpolation) then
         // "straighten out" the area around the loop, and play that
-        if (startframe >= loop_edge)
+        if (__builtin_expect(startframe >= loop_edge, 0))
         {
             // if fully past the loop end, then it's normal wraparound
             // (or end of the sample if not looping)
