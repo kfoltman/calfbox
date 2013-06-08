@@ -230,7 +230,7 @@ static inline void cbox_biquadf_set_1php_lookup(struct cbox_biquadf_coeffs *coef
     float a01 = x*q;
     float b1 = a01 - q;
     
-    cbox_biquadf_set_1p(coeffs, a01, -a01, b1, two_copies);    
+    cbox_biquadf_set_1p(coeffs, q, -q, b1, two_copies);    
 }
 
 #if USE_NEON
