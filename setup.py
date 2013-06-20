@@ -74,6 +74,10 @@ csources = [
     "wavebank.c"
 ]
 
+if '#define USE_SSE 1' in open('config.h').read():
+    eargs.append('-msse')
+    eargs.append('-ffast-math')
+
 setup(name="CalfBox",
     version="0.04", description="Assorted music-related code", 
     author="Krzysztof Foltman", author_email="wdev@foltman.com",
