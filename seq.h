@@ -49,6 +49,7 @@ struct cbox_midi_pattern_playback
     int event_count;
 };
 
+extern struct cbox_midi_pattern_playback *cbox_midi_pattern_playback_new(struct cbox_midi_pattern *pattern);
 extern void cbox_midi_pattern_playback_destroy(struct cbox_midi_pattern_playback *mppb);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -121,6 +122,27 @@ struct cbox_tempo_map_item
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct cbox_adhoc_pattern
+{
+    struct cbox_adhoc_pattern *next;
+    
+    struct cbox_midi_pattern *pattern;
+    struct cbox_midi_pattern_playback *pattern_playback;
+    
+    struct cbox_midi_playback_active_notes active_notes;
+    struct cbox_midi_clip_playback playback;
+
+    struct cbox_midi_buffer output_buffer;
+    int id;
+    gboolean completed;
+};
+
+extern struct cbox_adhoc_pattern *cbox_adhoc_pattern_new(struct cbox_master *master, int id, struct cbox_midi_pattern *pattern);
+extern void cbox_adhoc_pattern_render(struct cbox_adhoc_pattern *adp, int offset, int nsamples);
+extern void cbox_adhoc_pattern_destroy(struct cbox_adhoc_pattern *ap);
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct cbox_song_playback
 {
     struct cbox_master *master;
@@ -135,6 +157,8 @@ struct cbox_song_playback
     GHashTable *pattern_map;
     struct cbox_midi_merger track_merger;
     struct cbox_engine *engine;
+    
+    struct cbox_adhoc_pattern *adhoc_patterns, *retired_adhoc_patterns;
 };
 
 extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_engine *engine, struct cbox_song_playback *old_state);

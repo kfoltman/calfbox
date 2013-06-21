@@ -1,6 +1,6 @@
 /*
 Calf Box, an open source musical instrument.
-Copyright (C) 2010-2011 Krzysztof Foltman
+Copyright (C) 2010-2013 Krzysztof Foltman
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -523,6 +523,8 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
             {
                 for (int i = 0; i < spb->track_count; i++)
                     cbox_track_playback_render(spb->tracks[i], rpos, rend - rpos);
+                for (struct cbox_adhoc_pattern *p = spb->adhoc_patterns; p; p = p->next)
+                    cbox_adhoc_pattern_render(p, rpos, rend - rpos);
             }
             
             if (end_pos < end_samples)
@@ -547,6 +549,14 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
             rpos = rend;
         }
         cbox_midi_merger_render_to(&spb->track_merger, output);
+    }
+    // XXXKF implement full cleanup, not only the front of the queue
+    if(spb->adhoc_patterns && spb->adhoc_patterns->completed)
+    {
+        struct cbox_adhoc_pattern *top = spb->adhoc_patterns;
+        spb->adhoc_patterns = top->next;
+        top->next = spb->retired_adhoc_patterns;
+        spb->retired_adhoc_patterns = top;
     }
 }
 
@@ -620,24 +630,84 @@ int cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, int time
     return spb->tempo_map_item_count - 1;
 }
 
+struct cbox_midi_pattern_playback *cbox_midi_pattern_playback_new(struct cbox_midi_pattern *pattern)
+{
+    struct cbox_midi_pattern_playback *mppb = calloc(1, sizeof(struct cbox_midi_pattern_playback));
+    mppb->events = malloc(sizeof(struct cbox_midi_event) * pattern->event_count);
+    memcpy(mppb->events, pattern->events, sizeof(struct cbox_midi_event) * pattern->event_count);
+    mppb->event_count = pattern->event_count;
+    return mppb;
+}
+
 struct cbox_midi_pattern_playback *cbox_song_playback_get_pattern(struct cbox_song_playback *spb, struct cbox_midi_pattern *pattern)
 {
     struct cbox_midi_pattern_playback *mppb = g_hash_table_lookup(spb->pattern_map, pattern);
     if (mppb)
         return mppb;
     
-    mppb = malloc(sizeof(struct cbox_midi_pattern_playback));
-        
-    mppb->events = malloc(sizeof(struct cbox_midi_event) * pattern->event_count);
-    memcpy(mppb->events, pattern->events, sizeof(struct cbox_midi_event) * pattern->event_count);
-    mppb->event_count = pattern->event_count;
+    mppb = cbox_midi_pattern_playback_new(pattern);
     g_hash_table_insert(spb->pattern_map, pattern, mppb);
 
     return mppb;
 }
 
+struct play_adhoc_pattern_arg
+{
+    struct cbox_song_playback *spb;
+    struct cbox_adhoc_pattern *ap;
+};
+
+static int play_adhoc_pattern_execute(void *arg_)
+{
+    struct play_adhoc_pattern_arg *arg = arg_;
+    
+    struct cbox_adhoc_pattern *ap = arg->spb->adhoc_patterns;
+    
+    // If there is already an adhoc pattern with a given non-zero id, stop it
+    // and release all the pending notes. Retry until all the notes are
+    // released.
+    if (arg->ap->id)
+    {
+        while(ap && ap->id != arg->ap->id)
+            ap = ap->next;
+        if (ap)
+        {
+            ap->completed = TRUE;
+            if (ap->active_notes.channels_active)
+                return 0;
+        }
+    }
+    
+    arg->ap->next = arg->spb->adhoc_patterns;
+    arg->spb->adhoc_patterns = arg->ap;
+    // XXXKF should convert pattern length into sample position instead of assuming 0x7FFFFFFF (though it likely doesn't matter)
+    cbox_midi_clip_playback_set_pattern(&arg->ap->playback, arg->ap->pattern_playback, 0, 0x7FFFFFFF, arg->spb->song_pos_ppqn, 0);
+    return 1;
+}
+
+
+void cbox_song_playback_play_adhoc_pattern(struct cbox_song_playback *spb, struct cbox_adhoc_pattern *ap)
+{
+    static struct cbox_rt_cmd_definition cmd = { NULL, play_adhoc_pattern_execute, NULL };
+    struct play_adhoc_pattern_arg arg = { spb, ap };
+    cbox_rt_execute_cmd_sync(spb->engine->rt, &cmd, &arg);
+}
+
+static void free_adhoc_pattern_list(struct cbox_adhoc_pattern *ap)
+{
+    while(ap)
+    {
+        struct cbox_adhoc_pattern *tmp = ap;
+        ap = ap->next;
+        tmp->next = NULL;
+        cbox_adhoc_pattern_destroy(tmp);
+    }
+}
+
 void cbox_song_playback_destroy(struct cbox_song_playback *spb)
 {
+    free_adhoc_pattern_list(spb->retired_adhoc_patterns);
+    free_adhoc_pattern_list(spb->adhoc_patterns);
     for (int i = 0; i < spb->track_count; i++)
     {
         cbox_track_playback_destroy(spb->tracks[i]);

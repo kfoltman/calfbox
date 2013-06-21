@@ -53,6 +53,7 @@ calfbox_SOURCES = \
     scene.c \
     scripting.c \
     seq.c \
+    seq-adhoc.c \
     sfzloader.c \
     sfzparser.c \
     song.c \
