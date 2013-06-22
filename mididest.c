@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 void cbox_midi_merger_init(struct cbox_midi_merger *dest, struct cbox_midi_buffer *output)
 {
     dest->inputs = NULL;
-    dest->input_count = 0;
     dest->output = output;
     if (dest->output)
         cbox_midi_buffer_clear(dest->output);
@@ -36,44 +35,41 @@ void cbox_midi_merger_render_to(struct cbox_midi_merger *dest, struct cbox_midi_
     if (!output)
         return;
     cbox_midi_buffer_clear(output);
-    for (int i = 0; i < dest->input_count; i++)
+    for (struct cbox_midi_source *p = dest->inputs; p; p = p->next)
     {
-        if (dest->inputs[i]->streaming)
-            dest->inputs[i]->bpos = 0;
+        if (p->streaming)
+            p->bpos = 0;
     }
 
-    while(1)
+    struct cbox_midi_source *first = dest->inputs;
+    struct cbox_midi_source *first_not = NULL;
+    while(first)
     {
         struct cbox_midi_source *earliest_source = NULL;
         uint32_t earliest_time = (uint32_t)-1;
         
-        uint32_t mask = 0;
-        int icount = dest->input_count;
-        int spos = 0;
-        
-        for (int i = spos; i < icount; i++)
+        for (struct cbox_midi_source *p = first; p != first_not; p = p->next)
         {
-            if (mask & (1 << i))
-                continue;
-            struct cbox_midi_source *src = dest->inputs[i];
-            struct cbox_midi_buffer *data = src->data;
-            if (src->bpos < data->count)
+            struct cbox_midi_buffer *data = p->data;
+            if (p->bpos < data->count)
             {
-                const struct cbox_midi_event *event = cbox_midi_buffer_get_event(data, src->bpos);
+                const struct cbox_midi_event *event = cbox_midi_buffer_get_event(data, p->bpos);
                 if (event->time < earliest_time)
                 {
-                    earliest_source = src;
+                    earliest_source = p;
                     earliest_time = event->time;
                 }
             }
             else
             {
-                mask |= 1 << i;
                 // Narrow down the range from top and bottom
-                if (i == spos)
-                    spos = i + 1;
-                if (i == icount - 1)
-                    icount = i;
+                if (p == first)
+                    first = p->next;
+                if (p->next == first_not)
+                {
+                    first_not = p;
+                    break;
+                }
             }
         }
         if (earliest_source)
@@ -86,33 +82,36 @@ void cbox_midi_merger_render_to(struct cbox_midi_merger *dest, struct cbox_midi_
     }    
 }
 
-int cbox_midi_merger_find_source(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer)
+struct cbox_midi_source **cbox_midi_merger_find_source(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer)
 {
-    for (int i = 0; i < dest->input_count; i++)
-        if (dest->inputs[i]->data == buffer)
-            return i;
-    return -1;
+    for (struct cbox_midi_source **pp = &dest->inputs; *pp; pp = &((*pp)->next))
+        if ((*pp)->data == buffer)
+            return pp;
+    return NULL;
 }
 
 void cbox_midi_merger_connect(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt)
 {
-    if (cbox_midi_merger_find_source(dest, buffer) != -1)
+    if (cbox_midi_merger_find_source(dest, buffer) != NULL)
         return;
     
     struct cbox_midi_source *src = calloc(1, sizeof(struct cbox_midi_source));
     src->data = buffer;
     src->bpos = 0;
     src->streaming = TRUE;
-    cbox_rt_array_insert(rt, (void ***)&dest->inputs, &dest->input_count, dest->input_count, src);
+    src->next = dest->inputs;
+    cbox_rt_swap_pointers(rt, (void **)&dest->inputs, src);
 }
 
 void cbox_midi_merger_disconnect(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt)
 {
-    int pos = cbox_midi_merger_find_source(dest, buffer);
-    if (pos == -1)
+    struct cbox_midi_source **pp = cbox_midi_merger_find_source(dest, buffer);
+    if (!pp)
         return;
 
-    cbox_rt_array_remove(rt, (void ***)&dest->inputs, &dest->input_count, pos);
+    struct cbox_midi_source *ms = *pp;
+    cbox_rt_swap_pointers(rt, (void **)pp, ms->next);
+    free(ms);
 }
 
 void cbox_midi_merger_push(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt)
@@ -123,17 +122,22 @@ void cbox_midi_merger_push(struct cbox_midi_merger *dest, struct cbox_midi_buffe
     src.data = buffer;
     src.bpos = 0;
     src.streaming = FALSE;
-    cbox_rt_array_insert(rt, (void ***)&dest->inputs, &dest->input_count, dest->input_count, &src);
+    src.next = dest->inputs;
+    cbox_rt_swap_pointers(rt, (void **)&dest->inputs, &src);
     while(src.bpos < buffer->count)
         cbox_rt_handle_cmd_queue(rt); 
-    cbox_rt_array_remove(rt, (void ***)&dest->inputs, &dest->input_count, dest->input_count - 1);
+    cbox_rt_swap_pointers(rt, (void **)&dest->inputs, src.next);
 }
 
 void cbox_midi_merger_close(struct cbox_midi_merger *dest)
 {
-    for (int i = 0; i < dest->input_count; i++)
-        free(dest->inputs[i]);
-    free(dest->inputs);
+    struct cbox_midi_source *p;
+    while(dest->inputs)
+    {
+        p = dest->inputs;
+        dest->inputs = p->next;
+        free(p);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

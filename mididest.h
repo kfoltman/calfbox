@@ -27,6 +27,7 @@ struct cbox_rt;
 
 struct cbox_midi_source
 {
+    struct cbox_midi_source *next;
     struct cbox_midi_buffer *data;
     int bpos;
     gboolean streaming;
@@ -34,8 +35,7 @@ struct cbox_midi_source
 
 struct cbox_midi_merger
 {
-    struct cbox_midi_source **inputs;
-    int input_count;
+    struct cbox_midi_source *inputs;
     struct cbox_midi_buffer *output;
 };
 
@@ -46,7 +46,7 @@ static inline void cbox_midi_merger_render(struct cbox_midi_merger *dest)
     if (dest->output)
         cbox_midi_merger_render_to(dest, dest->output);
 }
-int cbox_midi_merger_find_source(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer);
+struct cbox_midi_source **cbox_midi_merger_find_source(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer);
 void cbox_midi_merger_connect(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt);
 void cbox_midi_merger_disconnect(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt);
 void cbox_midi_merger_push(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt);
