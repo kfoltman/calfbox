@@ -122,7 +122,7 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
 
 static void cbox_master_init(struct cbox_master *master, struct cbox_engine *engine)
 {
-    master->srate = 0;
+    master->srate = engine->io_env.srate;
     master->tempo = 120.0;
     master->new_tempo = 120.0;
     master->timesig_nom = 4;

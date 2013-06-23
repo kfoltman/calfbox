@@ -58,6 +58,8 @@ struct cbox_scene
 
     struct cbox_recording_source *rec_mono_inputs, *rec_mono_outputs;
     struct cbox_recording_source *rec_stereo_inputs, *rec_stereo_outputs;
+
+    struct cbox_adhoc_pattern *adhoc_patterns, *retired_adhoc_patterns;
 };
 
 extern struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_engine *engine);
@@ -73,6 +75,6 @@ extern void cbox_scene_clear(struct cbox_scene *scene);
 extern void cbox_scene_update_connected_inputs(struct cbox_scene *scene);
 extern struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *scene, const char *name, gboolean load, GError **error);
 extern struct cbox_instrument *cbox_scene_create_instrument(struct cbox_scene *scene, const char *instrument_name, const char *engine_name, GError **error);
-
+extern void cbox_scene_play_adhoc_pattern(struct cbox_scene *scene, struct cbox_adhoc_pattern *ap);
 
 #endif

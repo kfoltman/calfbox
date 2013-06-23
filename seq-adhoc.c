@@ -16,16 +16,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "master.h"
 #include "seq.h"
 
-struct cbox_adhoc_pattern *cbox_adhoc_pattern_new(struct cbox_master *master, int id, struct cbox_midi_pattern *pattern)
+struct cbox_adhoc_pattern *cbox_adhoc_pattern_new(struct cbox_engine *engine, int id, struct cbox_midi_pattern *pattern)
 {
     struct cbox_adhoc_pattern *ap = calloc(1, sizeof(struct cbox_adhoc_pattern));
     ap->next = NULL;
     ap->pattern = pattern;
     ap->pattern_playback = cbox_midi_pattern_playback_new(pattern);
+    ap->master = cbox_master_new(engine);
     cbox_midi_playback_active_notes_init(&ap->active_notes);
-    cbox_midi_clip_playback_init(&ap->playback, &ap->active_notes, master);
+    cbox_midi_clip_playback_init(&ap->playback, &ap->active_notes, ap->master);
     cbox_midi_buffer_init(&ap->output_buffer);
     ap->id = id;
     ap->completed = FALSE;

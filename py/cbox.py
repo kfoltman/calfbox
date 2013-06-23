@@ -913,6 +913,8 @@ class DocScene(DocObj):
             return self.cmd_makeobj("/add_new_instrument_layer", int(1 + pos), name, engine)
     def send_midi_event(self, *data):
         self.cmd('/send_event', None, *data)
+    def play_pattern(self, pattern, tempo, id = 0):
+        self.cmd('/play_pattern', None, pattern.uuid, float(tempo), int(id))
 Document.classmap['cbox_scene'] = DocScene
 
 class DocRt(DocObj):

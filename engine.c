@@ -183,7 +183,7 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
     // Combine various sources of events (song, non-RT thread, JACK input)
     if (engine->spb)
         cbox_song_playback_render(engine->spb, &engine->midibuf_song, nframes);
-
+    
     for (int i = 0; i < engine->scene_count; i++)
         cbox_scene_render(engine->scenes[i], nframes, output_buffers);
     
