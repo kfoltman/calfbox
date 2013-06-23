@@ -593,11 +593,31 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
         }
     }
     
-    for(struct cbox_adhoc_pattern *pat = scene->adhoc_patterns; pat; pat = pat->next)
+    for(struct cbox_adhoc_pattern **ppat = &scene->adhoc_patterns; *ppat; )
     {
-        cbox_midi_buffer_clear(&pat->output_buffer);
-        cbox_adhoc_pattern_render(pat, 0, nframes);
+        cbox_midi_buffer_clear(&(*ppat)->output_buffer);
+        if ((*ppat)->completed)
+        {
+            struct cbox_adhoc_pattern *retired = *ppat;
+            *ppat = retired->next;
+            retired->next = scene->retired_adhoc_patterns;
+            scene->retired_adhoc_patterns = retired;
+        }
+        else
+        {
+            cbox_adhoc_pattern_render((*ppat), 0, nframes);
+            ppat = &((*ppat)->next);
+        }
     }
+    
+        // XXXKF implement full cleanup, not only the front of the queue
+    if(scene->adhoc_patterns && scene->adhoc_patterns->completed)
+    {
+        struct cbox_adhoc_pattern *top = scene->adhoc_patterns;
+        cbox_midi_buffer_clear(&top->output_buffer);
+        scene->adhoc_patterns = top->next;
+    }
+
 
     cbox_midi_buffer_clear(&scene->midibuf_total);
     cbox_midi_merger_render(&scene->scene_input_merger);
@@ -731,16 +751,6 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
             const float *buf[2] = { output_buffers[i * 2], output_buffers[i * 2 + 1] };
             cbox_recording_source_push(&scene->rec_stereo_outputs[i], buf, nframes);
         }
-    }
-
-    // XXXKF implement full cleanup, not only the front of the queue
-    if(scene->adhoc_patterns && scene->adhoc_patterns->completed)
-    {
-        struct cbox_adhoc_pattern *top = scene->adhoc_patterns;
-        cbox_midi_buffer_clear(&top->output_buffer);
-        scene->adhoc_patterns = top->next;
-        top->next = scene->retired_adhoc_patterns;
-        scene->retired_adhoc_patterns = top;
     }
 }
 
@@ -1035,13 +1045,14 @@ void cbox_scene_update_connected_inputs(struct cbox_scene *scene)
     
 }
 
-static void free_adhoc_pattern_list(struct cbox_adhoc_pattern *ap)
+static void free_adhoc_pattern_list(struct cbox_scene *scene, struct cbox_adhoc_pattern *ap)
 {
     while(ap)
     {
         struct cbox_adhoc_pattern *tmp = ap;
         ap = ap->next;
         tmp->next = NULL;
+        cbox_midi_merger_disconnect(&scene->scene_input_merger, &ap->output_buffer, scene->rt);
         cbox_adhoc_pattern_destroy(tmp);
     }
 }
@@ -1050,31 +1061,37 @@ struct play_adhoc_pattern_arg
 {
     struct cbox_scene *scene;
     struct cbox_adhoc_pattern *ap;
+    struct cbox_adhoc_pattern *retired;
 };
 
 static int play_adhoc_pattern_execute(void *arg_)
 {
     struct play_adhoc_pattern_arg *arg = arg_;
     
-    struct cbox_adhoc_pattern *ap = arg->scene->adhoc_patterns;
-    
-    // If there is already an adhoc pattern with a given non-zero id, stop it
-    // and release all the pending notes. Retry until all the notes are
-    // released.
-    if (arg->ap->id)
+    if (arg->ap)
     {
-        while(ap && ap->id != arg->ap->id)
-            ap = ap->next;
-        if (ap)
+        struct cbox_adhoc_pattern *ap = arg->scene->adhoc_patterns;
+        
+        // If there is already an adhoc pattern with a given non-zero id, stop it
+        // and release all the pending notes. Retry until all the notes are
+        // released.
+        if (arg->ap->id)
         {
-            ap->completed = TRUE;
-            if (ap->active_notes.channels_active)
-                return 0;
+            while(ap && ap->id != arg->ap->id)
+                ap = ap->next;
+            if (ap)
+            {
+                ap->completed = TRUE;
+                if (ap->active_notes.channels_active)
+                    return 0;
+            }
         }
+        
+        arg->ap->next = arg->scene->adhoc_patterns;
+        arg->scene->adhoc_patterns = arg->ap;
     }
-    
-    arg->ap->next = arg->scene->adhoc_patterns;
-    arg->scene->adhoc_patterns = arg->ap;
+    arg->retired = arg->scene->retired_adhoc_patterns;
+    arg->scene->retired_adhoc_patterns = NULL;
     // XXXKF should convert pattern length into sample position instead of assuming 0x7FFFFFFF (though it likely doesn't matter)
     cbox_midi_clip_playback_set_pattern(&arg->ap->playback, arg->ap->pattern_playback, 0, 0x7FFFFFFF, 0, 0);
     return 1;
@@ -1083,9 +1100,11 @@ static int play_adhoc_pattern_execute(void *arg_)
 void cbox_scene_play_adhoc_pattern(struct cbox_scene *scene, struct cbox_adhoc_pattern *ap)
 {
     static struct cbox_rt_cmd_definition cmd = { NULL, play_adhoc_pattern_execute, NULL };
-    struct play_adhoc_pattern_arg arg = { scene, ap };
+    struct play_adhoc_pattern_arg arg = { scene, ap, NULL };
     cbox_midi_merger_connect(&scene->scene_input_merger, &ap->output_buffer, scene->rt);
     cbox_rt_execute_cmd_sync(scene->rt, &cmd, &arg);
+    if (arg.retired)
+        free_adhoc_pattern_list(scene, arg.retired);
 }
 
 static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
@@ -1110,8 +1129,8 @@ static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
     destroy_rec_sources(scene->rec_mono_outputs, scene->engine->io_env.output_count);
     destroy_rec_sources(scene->rec_stereo_outputs, scene->engine->io_env.output_count / 2);
     
-    free_adhoc_pattern_list(scene->retired_adhoc_patterns);
-    free_adhoc_pattern_list(scene->adhoc_patterns);
+    free_adhoc_pattern_list(scene, scene->retired_adhoc_patterns);
+    free_adhoc_pattern_list(scene, scene->adhoc_patterns);
     cbox_midi_merger_close(&scene->scene_input_merger);    
     free(scene);
 }

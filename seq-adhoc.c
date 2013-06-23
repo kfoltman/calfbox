@@ -51,5 +51,6 @@ void cbox_adhoc_pattern_destroy(struct cbox_adhoc_pattern *ap)
 {
     // XXXKF decide on pattern ownership and general object lifetime issues
     cbox_midi_pattern_playback_destroy(ap->playback.pattern);
+    cbox_master_destroy(ap->master);
     free(ap);
 }
