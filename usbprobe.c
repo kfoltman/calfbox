@@ -357,7 +357,7 @@ static gboolean parse_audio_class(struct cbox_usb_io_impl *uii, struct cbox_usb_
         return FALSE;
     }
     const struct usbaudio_streaming_interface_descriptor_format_type_pcm *fmt = (struct usbaudio_streaming_interface_descriptor_format_type_pcm *)(asdescr->extra + extra->hdr.bLength);
-    if (fmt->hdr.bLength != 14 || fmt->hdr.bDescriptorType != 36 || fmt->hdr.bDescriptorSubtype != 2)
+    if (fmt->hdr.bLength < 11 || ((fmt->hdr.bLength - 11) % 3) || fmt->hdr.bDescriptorType != 36 || fmt->hdr.bDescriptorSubtype != 2)
     {
         g_warning("The AudioStreaming descriptor does not have a format type descriptor after general descriptor (len %d, type %d, subtype %d)", (int)fmt->hdr.bLength, (int)fmt->hdr.bDescriptorType, (int)fmt->hdr.bDescriptorSubtype);
         return FALSE;
