@@ -697,10 +697,23 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
                     leftbuf = busobj->input_bufs[0];
                     rightbuf = busobj->input_bufs[1];
                 }
-                for (j = 0; j < CBOX_BLOCK_SIZE; j++)
+                if (leftbuf && rightbuf)
                 {
-                    leftbuf[i + j] += gain * channels[2 * o][j];
-                    rightbuf[i + j] += gain * channels[2 * o + 1][j];
+                    for (j = 0; j < CBOX_BLOCK_SIZE; j++)
+                    {
+                        leftbuf[i + j] += gain * channels[2 * o][j];
+                        rightbuf[i + j] += gain * channels[2 * o + 1][j];
+                    }
+                }
+                else
+                {
+                    for (j = 0; j < CBOX_BLOCK_SIZE; j++)
+                    {
+                        if (leftbuf)
+                            leftbuf[i + j] += gain * channels[2 * o][j];
+                        if (rightbuf)
+                            rightbuf[i + j] += gain * channels[2 * o + 1][j];
+                    }
                 }
             }
         }

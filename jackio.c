@@ -110,6 +110,8 @@ void cbox_jack_midi_output_destroy(struct cbox_jack_midi_output *jmo)
 static int copy_midi_data_to_buffer(jack_port_t *port, int buffer_size, struct cbox_midi_buffer *destination)
 {
     void *midi = jack_port_get_buffer(port, buffer_size);
+    if (!midi)
+        return 0;
     uint32_t event_count = jack_midi_get_event_count(midi);
 
     cbox_midi_buffer_clear(destination);
@@ -143,6 +145,8 @@ static int process_cb(jack_nframes_t nframes, void *arg)
     for (int i = 0; i < io->io_env.output_count; i++)
     {
         io->output_buffers[i] = jack_port_get_buffer(jii->outputs[i], nframes);
+        if (!io->output_buffers[i])
+            continue;
         for (int j = 0; j < nframes; j ++)
             io->output_buffers[i][j] = 0.f;
     }
@@ -269,6 +273,9 @@ static void autoconnect_by_spec(jack_client_t *client, const char *port, const c
             if (endptr == use_name + strlen(use_name))
             {
                 const char **names = jack_get_ports(client, ".*", is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
+                // Client killed by JACK
+                if (!names)
+                    return;
                 int i;
                 for (i = 0; i < portidx && names[i]; i++)
                     ;
@@ -284,6 +291,9 @@ static void autoconnect_by_spec(jack_client_t *client, const char *port, const c
         else if (use_name[0] == '~' || use_name[0] == '*')
         {
             const char **names = jack_get_ports(client, use_name + 1, is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
+            // Client killed by JACK
+            if (!names)
+                return;
             
             if (names && names[0])
             {
