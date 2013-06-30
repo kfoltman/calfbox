@@ -32,13 +32,36 @@ static const struct libusb_endpoint_descriptor *get_midi_endpoint(const struct l
     return NULL;
 }
 
-static const struct libusb_endpoint_descriptor *get_audio_output_endpoint(const struct libusb_interface_descriptor *asdescr)
+static const struct libusb_endpoint_descriptor *get_audio_output_endpoint(const struct libusb_interface_descriptor *asdescr, const struct libusb_endpoint_descriptor **sync_endpoint)
 {
     for (int epi = 0; epi < asdescr->bNumEndpoints; epi++)
     {
         const struct libusb_endpoint_descriptor *ep = &asdescr->endpoint[epi];
-        if (ep->bEndpointAddress < 0x80 && (ep->bmAttributes & 0xF) == 9) // output, isochronous, adaptive
+        uint8_t ep_type = (ep->bmAttributes & 0xF);
+        if (ep->bEndpointAddress < 0x80 && (ep_type == 9 || ep_type == 13)) // output, isochronous, adaptive or synchronous
+        {
+            if (sync_endpoint)
+                *sync_endpoint = NULL;
             return ep;
+        }
+        if (ep->bEndpointAddress < 0x80 && ep_type == 5) // output, isochronous, asynchronous
+        {
+            // Look for corresponding synch endpoint. It must be placed after the original output endpoint.
+            if (sync_endpoint && ep->bSynchAddress >= 0x81)
+            {
+                *sync_endpoint = NULL;
+                for(int epi2 = epi + 1; epi2 < asdescr->bNumEndpoints; epi2++)
+                {
+                    const struct libusb_endpoint_descriptor *ep2 = &asdescr->endpoint[epi2];
+                    if (ep2->bEndpointAddress == ep->bSynchAddress && (ep2->bmAttributes & 0xF) == 1) // input, isochronous, no sync
+                    {
+                        *sync_endpoint = ep2;
+                        break;
+                    }
+                }
+            }
+            return ep;
+        }
     }
     return NULL;
 }
@@ -365,7 +388,8 @@ static gboolean parse_audio_class(struct cbox_usb_io_impl *uii, struct cbox_usb_
     
     // We need this to tell inputs from outputs - until I implement reasonable
     // Audio Control support
-    const struct libusb_endpoint_descriptor *ep = get_audio_output_endpoint(asdescr);
+    const struct libusb_endpoint_descriptor *sync_ep = NULL;
+    const struct libusb_endpoint_descriptor *ep = get_audio_output_endpoint(asdescr, &sync_ep);
     if (ep)
     {
         if (fmt->bBitResolution != uii->output_resolution * 8)
@@ -402,10 +426,18 @@ static gboolean parse_audio_class(struct cbox_usb_io_impl *uii, struct cbox_usb_
             return TRUE;
         if (uai->epdesc.found)
             return FALSE;
-        g_warning("Interface %d alt-setting %d endpoint %02x looks promising", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, ep->bEndpointAddress);
+        if (sync_ep)
+            g_warning("Interface %d alt-setting %d endpoint %02x (synched via %02x) looks promising", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, ep->bEndpointAddress, sync_ep->bEndpointAddress);
+        else
+            g_warning("Interface %d alt-setting %d endpoint %02x looks promising", asdescr->bInterfaceNumber, asdescr->bAlternateSetting, ep->bEndpointAddress);
         uai->intf = asdescr->bInterfaceNumber;
         uai->alt_setting = asdescr->bAlternateSetting;
         fill_endpoint_desc(&uai->epdesc, ep);
+        uai->sync_protocol = (sync_ep != NULL) ? USBAUDIOSYNC_PROTOCOL_CLASS : USBAUDIOSYNC_PROTOCOL_NONE;
+        if (sync_ep)
+            fill_endpoint_desc(&uai->sync_epdesc, sync_ep);
+        else
+            uai->sync_epdesc.found = FALSE;
         return TRUE;
     }
     return FALSE;
@@ -564,7 +596,10 @@ static gboolean inspect_device(struct cbox_usb_io_impl *uii, struct libusb_devic
     if (uainf.epdesc.found) // Class-compliant USB audio device
         is_audio = TRUE;
     if (udi->vid == 0x13b2 && udi->pid == 0x0030) // Alesis Multimix 8
+    {
+        uainf.sync_protocol = USBAUDIOSYNC_PROTOCOL_MULTIMIX8; // not used later
         is_audio = TRUE;
+    }
     
     // All configs/interfaces/alts scanned, nothing interesting found -> mark as unsupported
     udi->is_midi = uminf.epdesc_in.found || uminf.epdesc_out.found;

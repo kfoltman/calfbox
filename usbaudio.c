@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <errno.h>
 #include <stdio.h>
 
-#define NUM_SYNC_PACKETS 10
+#define NUM_MULTIMIX_SYNC_PACKETS 10
 
 #define MULTIMIX_EP_PLAYBACK 0x02
 //#define MULTIMIX_EP_CAPTURE 0x86
@@ -67,11 +67,13 @@ gboolean usbio_open_audio_interface(struct cbox_usb_io_impl *uii, struct cbox_us
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set sample rate on class-compliant USB audio device.");
         return FALSE;
     }
-    uii->play_function = usbio_play_buffer_adaptive;
+    uii->is_hispeed = FALSE;
+    uii->sync_protocol = uainf->sync_protocol;
+    uii->play_function = uainf->sync_protocol == USBAUDIOSYNC_PROTOCOL_CLASS ? usbio_play_buffer_asynchronous : usbio_play_buffer_adaptive;
     uii->handle_audiodev = handle;
     uii->audio_output_endpoint = uainf->epdesc.bEndpointAddress;
     uii->audio_output_pktsize = uainf->epdesc.wMaxPacketSize; // 48 * 2 * uii->output_resolution;
-    uii->audio_sync_endpoint = 0;
+    uii->audio_sync_endpoint = uainf->sync_protocol == USBAUDIOSYNC_PROTOCOL_CLASS ? uainf->sync_epdesc.bEndpointAddress : 0;
     return TRUE;
 }
 
@@ -102,8 +104,10 @@ gboolean usbio_open_audio_interface_multimix(struct cbox_usb_io_impl *uii, int b
         return FALSE;
     }
 
+    uii->is_hispeed = TRUE;
     uii->play_function = usbio_play_buffer_asynchronous;
     uii->handle_audiodev = handle;
+    uii->sync_protocol = USBAUDIOSYNC_PROTOCOL_MULTIMIX8;
     uii->audio_output_endpoint = MULTIMIX_EP_PLAYBACK;
     uii->audio_output_pktsize = 156;
     uii->audio_sync_endpoint = MULTIMIX_EP_SYNC;
@@ -322,18 +326,19 @@ void usbio_play_buffer_adaptive(struct cbox_usb_io_impl *uii)
 
 static int calc_packet_lengths(struct cbox_usb_io_impl *uii, struct libusb_transfer *t, int packets)
 {
+    int packets_per_sec = uii->is_hispeed ? 8000 : 1000;
     int tsize = 0;
     int i;
     // printf("sync_freq = %d\n", sync_freq);
     for (i = 0; i < packets; i++)
     {
-        int nsamps = (uii->sync_freq - uii->desync) / 80;
+        int nsamps = (uii->samples_per_sec - uii->desync) / packets_per_sec;
         // assert(nsamps > 0);
-        if ((uii->sync_freq - uii->desync) % 80)
+        if ((uii->samples_per_sec - uii->desync) % packets_per_sec)
             nsamps++;
         //printf("%d sfreq=%d desync=%d nsamps=%d\n", i, uii->sync_freq, uii->desync, nsamps);
         
-        uii->desync = (uii->desync + nsamps * 80) % uii->sync_freq;
+        uii->desync = (uii->desync + nsamps * packets_per_sec) % uii->samples_per_sec;
         int v = (nsamps) * 2 * uii->output_resolution;
         t->iso_packet_desc[i].length = v;
         tsize += v;
@@ -448,14 +453,40 @@ void usbio_play_buffer_asynchronous(struct cbox_usb_io_impl *uii)
  * are either larger (to increase data rate from the host) or smaller than
  * the nominal frequency value - the driver uses that to adjust the sample frame
  * counts of individual packets in an isochronous transfer.
+ *
+ * A similar mechanism is used with USB audio class asynchronous sinks: the
+ * device sends a 10.14 representation of number of audio samples (frames)
+ * per USB frame, and this is used to control packet sizes.
  */
+
+static void use_audioclass_sync_feedback(const uint8_t *data, uint32_t actual_length, int *prate)
+{
+    // 10.14 representation of 'samples' per ms value, see 5.12.4.2 of the USB spec
+    uint32_t value = data[0] + 256 * data[1] + 65536 * data[2];
+    // printf("Ff estimate = %f Hz\n", value * 1000 / 16384.0);
+    // only 1 packet
+    *prate = (1000 * value + 8192) >> 14;
+}
+
+static inline void use_multimix_sync_feedback(const uint8_t *data, uint32_t actual_length, int *prate, const uint8_t *prev_data)
+{
+    // Those assertions never failed, so my understanding of the protocol was likely
+    // correct. They should probably be removed just to not crash the program when
+    // used with flaky devices.
+    assert(actual_length == 3);
+    // this is averaged across all packets in the transfer
+    *prate += 1000 * data[0];
+    if (prev_data)
+        assert(data[1] == prev_data[0]);
+}
 
 static void sync_callback(struct libusb_transfer *transfer)
 {
     struct usbio_transfer *xf = transfer->user_data;
     struct cbox_usb_io_impl *uii = xf->user_data;
     uint8_t *data = transfer->buffer;
-    int i, ofs, size, pkts;
+    int i, ofs, pkts;
+    int rate_est = 0;
     xf->pending = FALSE;
 
     if (transfer->status == LIBUSB_TRANSFER_CANCELLED)
@@ -473,8 +504,9 @@ static void sync_callback(struct libusb_transfer *transfer)
     if (uii->debug_sync)
         printf("Sync callback! %p %d packets:", transfer, transfer->num_iso_packets);
     ofs = 0;
-    size = 0;
     pkts = 0;
+    rate_est = 0;
+    const uint8_t *prev_data = NULL;
     for (i = 0; i < transfer->num_iso_packets; i++) {
         if (transfer->iso_packet_desc[i].status)
         {
@@ -483,10 +515,11 @@ static void sync_callback(struct libusb_transfer *transfer)
         }
         else if (transfer->iso_packet_desc[i].actual_length)
         {
-            assert(transfer->iso_packet_desc[i].actual_length == 3);
-            size += data[ofs];
-            if (i && transfer->iso_packet_desc[i - 1].actual_length)
-                assert(data[ofs + 1] == data[ofs - 64]);
+            if (uii->sync_protocol == USBAUDIOSYNC_PROTOCOL_MULTIMIX8)
+                use_multimix_sync_feedback(&data[ofs], transfer->iso_packet_desc[i].actual_length, &rate_est, prev_data);
+            else
+                use_audioclass_sync_feedback(&data[ofs], transfer->iso_packet_desc[i].actual_length, &rate_est);
+            prev_data = &data[ofs];
             //printf("%d\n", (int)data[ofs]);
             if (uii->debug_sync)
                 printf("%3d ", (int)data[ofs]);
@@ -501,10 +534,13 @@ static void sync_callback(struct libusb_transfer *transfer)
         printf(" (%d of %d)", pkts, transfer->num_iso_packets);
     if (pkts == transfer->num_iso_packets)
     {
-        if (size)
-            uii->sync_freq = size * 10 / pkts;
+        // Divide by the number of packets to compute the mean rate (in case
+        // of Multimix we don't have a proper fractional value, just an integer,
+        // so averaging is required to get more accuracy).
+        if (rate_est)
+            uii->samples_per_sec = rate_est / pkts;
         if (uii->debug_sync)
-            printf(" size = %4d sync_freq = %4d", size, uii->sync_freq);
+            printf("rate_est = %d sync_freq = %d\n", rate_est, uii->samples_per_sec);
     }
     if (uii->no_resubmit)
         return;
@@ -524,8 +560,8 @@ struct usbio_transfer *sync_stuff_asynchronous(struct cbox_usb_io_impl *uii, int
 {
     struct usbio_transfer *t;
     int err;
-    int syncbufsize = 64;
-    int syncbufcount = NUM_SYNC_PACKETS;
+    int syncbufsize = uii->sync_protocol == USBAUDIOSYNC_PROTOCOL_MULTIMIX8 ? 64 : 3;
+    int syncbufcount = uii->sync_protocol == USBAUDIOSYNC_PROTOCOL_MULTIMIX8 ? NUM_MULTIMIX_SYNC_PACKETS : 1;
     t = usbio_transfer_new(uii->usbctx, "sync", index, syncbufcount, uii);
     uint8_t *sync_buf = (uint8_t *)calloc(syncbufcount, syncbufsize);
     libusb_fill_iso_transfer(t->transfer, uii->handle_audiodev, uii->audio_sync_endpoint, sync_buf, syncbufsize * syncbufcount, syncbufcount, sync_callback, t, 20000);
@@ -550,6 +586,8 @@ void cbox_usb_audio_info_init(struct cbox_usb_audio_info *uai, struct cbox_usb_d
     uai->intf = -1;
     uai->alt_setting = -1;
     uai->epdesc.found = FALSE;
+    uai->sync_protocol = USBAUDIOSYNC_PROTOCOL_NONE;
+    uai->sync_epdesc.found = FALSE;
 }
 
 void usbio_start_audio_playback(struct cbox_usb_io_impl *uii)
@@ -563,7 +601,7 @@ void usbio_start_audio_playback(struct cbox_usb_io_impl *uii)
     
     uii->playback_counter = 0;
     uii->device_removed = 0;
-    uii->sync_freq = uii->sample_rate / 100;
+    uii->samples_per_sec = uii->sample_rate;
     uii->play_function(uii);
     uii->setup_error = uii->playback_counter == 0;
 

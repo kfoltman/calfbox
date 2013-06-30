@@ -55,6 +55,13 @@ struct usbio_transfer
     int index;
 };
 
+enum usb_sync_protocol_type
+{
+    USBAUDIOSYNC_PROTOCOL_NONE = 0,
+    USBAUDIOSYNC_PROTOCOL_CLASS,
+    USBAUDIOSYNC_PROTOCOL_MULTIMIX8,
+};
+
 struct cbox_usb_io_impl
 {
     struct cbox_io_impl ioi;
@@ -72,6 +79,7 @@ struct cbox_usb_io_impl
     unsigned int sync_buffers;
     int playback_counter;
     int sync_counter;
+    enum usb_sync_protocol_type sync_protocol;
 
     unsigned int iso_packets, iso_packets_multimix;
 
@@ -91,7 +99,8 @@ struct cbox_usb_io_impl
     void (*play_function)(struct cbox_usb_io_impl *uii);
     int8_t audio_output_endpoint;
     int8_t audio_sync_endpoint;
-    uint32_t sync_freq;
+    gboolean is_hispeed;
+    uint32_t samples_per_sec; // current estimated sample rate / 100
     uint32_t audio_output_pktsize;
     int debug_sync;
 };
@@ -129,6 +138,8 @@ struct cbox_usb_audio_info
     int intf;
     int alt_setting;
     struct usbio_endpoint_descriptor epdesc;
+    enum usb_sync_protocol_type sync_protocol;
+    struct usbio_endpoint_descriptor sync_epdesc;
 };
 
 enum usb_midi_protocol_type
