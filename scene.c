@@ -610,7 +610,7 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
         }
     }
     
-        // XXXKF implement full cleanup, not only the front of the queue
+    // XXXKF implement full cleanup, not only the front of the queue
     if(scene->adhoc_patterns && scene->adhoc_patterns->completed)
     {
         struct cbox_adhoc_pattern *top = scene->adhoc_patterns;

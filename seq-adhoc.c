@@ -42,9 +42,9 @@ void cbox_adhoc_pattern_render(struct cbox_adhoc_pattern *ap, int offset, int ns
         cbox_midi_playback_active_notes_release(&ap->active_notes, &ap->output_buffer);
         return;
     }
-    cbox_midi_clip_playback_render(&ap->playback, &ap->output_buffer, offset, nsamples);
     if (ap->playback.pos >= ap->playback.pattern->event_count)
         ap->completed = TRUE;
+    cbox_midi_clip_playback_render(&ap->playback, &ap->output_buffer, offset, nsamples);
 }
 
 void cbox_adhoc_pattern_destroy(struct cbox_adhoc_pattern *ap)
