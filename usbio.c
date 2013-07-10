@@ -52,6 +52,7 @@ sync. I'm going to clean it up iteratively later.
 #include <errno.h>
 #include <libusb.h>
 #include <math.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
