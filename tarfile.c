@@ -182,8 +182,21 @@ void cbox_tarfile_closeitem(struct cbox_tarfile *tarfile, struct cbox_taritem *i
         close(fd);
 }
 
+static void delete_foreach_func(gpointer key, gpointer value, gpointer user_data)
+{
+    struct cbox_taritem *ti = value;
+    if (!--ti->refs)
+    {
+        g_free(ti->filename);
+        g_free(ti->filename_nc);
+        free(ti);
+    }
+}
+
 void cbox_tarfile_destroy(struct cbox_tarfile *tf)
 {
+    g_hash_table_foreach(tf->items_byname, delete_foreach_func, NULL);
+    g_hash_table_foreach(tf->items_byname_nc, delete_foreach_func, NULL);
     close(tf->fd);
     g_hash_table_destroy(tf->items_byname);
     g_hash_table_destroy(tf->items_byname_nc);
