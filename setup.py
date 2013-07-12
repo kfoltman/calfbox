@@ -65,6 +65,7 @@ csources = [
     "song.c",
     "streamplay.c",
     "streamrec.c",
+    "tarfile.c",
     "tonectl.c",
     "tonewheel.c",
     "track.c",

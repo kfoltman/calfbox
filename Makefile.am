@@ -59,6 +59,7 @@ calfbox_SOURCES = \
     song.c \
     streamplay.c \
     streamrec.c \
+    tarfile.c \
     tonectl.c \
     tonewheel.c \
     track.c \
@@ -125,6 +126,7 @@ noinst_HEADERS = \
     sfzparser.h \
     song.h \
     stm.h \
+    tarfile.h \
     track.h \
     ui.h \
     usbio_impl.h \
