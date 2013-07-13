@@ -76,7 +76,7 @@ if USE_SSE
 ARCH_OPT_CFLAGS=-msse -ffast-math
 else
 if USE_NEON
-ARCH_OPT_CFLAGS=-mfloat-abi=softfp -mfpu=neon -ffast-math
+ARCH_OPT_CFLAGS=-mfloat-abi=hard -mfpu=neon -ffast-math
 endif
 endif
 
