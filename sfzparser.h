@@ -30,6 +30,8 @@ enum CboxSfzParserError
     CBOX_SFZ_PARSER_ERROR_INVALID_HEADER,
 };
 
+struct cbox_tarfile;
+
 struct sfz_parser_client
 {
     void *user_data;
@@ -37,7 +39,7 @@ struct sfz_parser_client
     gboolean (*key_value)(struct sfz_parser_client *client, const char *key, const char *value);
 };
 
-extern gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error);
+extern gboolean load_sfz(const char *name, struct cbox_tarfile *tarfile, struct sfz_parser_client *c, GError **error);
 extern gboolean load_sfz_from_string(const char *buf, int len, struct sfz_parser_client *c, GError **error);
 
 extern GQuark cbox_sfz_parser_error_quark(void);

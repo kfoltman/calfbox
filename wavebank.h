@@ -26,6 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define CBOX_WAVEFORM_ERROR cbox_waveform_error_quark()
 
+struct cbox_tarfile;
+struct cbox_taritem;
+
 enum CboxWaveformError
 {
     CBOX_WAVEFORM_ERROR_FAILED,
@@ -49,6 +52,8 @@ struct cbox_waveform
     gchar *display_name;
     gboolean has_loop;
     uint32_t loop_start, loop_end;
+    struct cbox_tarfile *tarfile;
+    struct cbox_taritem *taritem;
     
     struct cbox_waveform_level *levels;
     int level_count;
@@ -57,7 +62,7 @@ struct cbox_waveform
 extern struct cbox_command_target cbox_waves_cmd_target;
 
 extern void cbox_wavebank_init(void);
-extern struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *sample_dir, const char *filename, GError **error);
+extern struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struct cbox_tarfile *tf, const char *sample_dir, const char *filename, GError **error);
 extern struct cbox_waveform *cbox_wavebank_peek_waveform_by_id(int id);
 extern void cbox_wavebank_foreach(void (*cb)(void *user_data, struct cbox_waveform *waveform), void *user_data);
 extern void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, void *user_data), void *user_data, int levels);

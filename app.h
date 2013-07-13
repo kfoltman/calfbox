@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib.h>
 
 struct cbox_song;
+struct cbox_tarpool;
 
 struct cbox_app
 {
@@ -36,6 +37,7 @@ struct cbox_app
     struct cbox_command_target cmd_target;
     struct cbox_command_target config_cmd_target;
     gchar *current_scene_name;
+    struct cbox_tarpool *tarpool;
 };
 
 struct cbox_menu;

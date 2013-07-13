@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "scene.h"
 #include "scripting.h"
 #include "song.h"
+#include "tarfile.h"
 #include "ui.h"
 #include "wavebank.h"
 
@@ -225,6 +226,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    app.tarpool = cbox_tarpool_new();
     app.document = cbox_document_new();
     app.rt = cbox_rt_new(app.document);
     app.engine = cbox_engine_new(app.document, app.rt);

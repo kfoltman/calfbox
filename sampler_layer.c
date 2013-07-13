@@ -383,7 +383,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         if (l->sample && *l->sample)
         {
             GError *error = NULL;
-            l->eff_waveform = cbox_wavebank_get_waveform(p->name, p->sample_dir, l->sample, &error);
+            l->eff_waveform = cbox_wavebank_get_waveform(p->name, p->tarfile, p->sample_dir, l->sample, &error);
             if (!l->eff_waveform)
             {
                 g_warning("Cannot load waveform %s: %s", l->sample, error ? error->message : "unknown error");

@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "sfzparser.h"
+#include "tarfile.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -152,19 +153,43 @@ static gboolean handle_char(struct sfz_parser_state *state, int ch)
     }
 }
 
-gboolean load_sfz(const char *name, struct sfz_parser_client *c, GError **error)
+gboolean load_sfz(const char *name, struct cbox_tarfile *tarfile, struct sfz_parser_client *c, GError **error)
 {
     g_clear_error(error);
-    FILE *f = fopen(name, "rb");
+    FILE *f;
+    int len = -1;
+    if (tarfile)
+    {
+        struct cbox_taritem *item = cbox_tarfile_get_item_by_name(tarfile, name, TRUE);
+        if (!item)
+        {
+            g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (2), "Cannot find '%s' in the tarfile", name);
+            return FALSE;
+        }
+        int fd = cbox_tarfile_openitem(tarfile, item);
+        if (fd < 0)
+        {
+            g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot open '%s' in the tarfile", name);
+            return FALSE;
+        }
+        f = fdopen(fd, "rb");
+        len = item->size;
+    }
+    else
+        f = fopen(name, "rb");
+
     if (!f)
     {
         g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot open '%s'", name);
         return FALSE;
     }
     
-    fseek(f, 0, 2);
-    int len = ftell(f);
-    fseek(f, 0, 0);
+    if (len == -1)
+    {
+        fseek(f, 0, SEEK_END);
+        len = ftell(f);
+        fseek(f, 0, SEEK_SET);
+    }
     
     unsigned char *buf = malloc(len + 1);
     buf[len] = '\0';

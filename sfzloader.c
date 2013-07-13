@@ -143,7 +143,11 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
     struct sfz_parser_client c = { .user_data = &ls, .token = handle_token, .key_value = load_sfz_key_value };
     g_clear_error(error);
 
-    gboolean status = is_from_string ? load_sfz_from_string(sfz, strlen(sfz), &c, error) : load_sfz(sfz, &c, error);
+    gboolean status;
+    if (is_from_string)
+        status = load_sfz_from_string(sfz, strlen(sfz), &c, error);
+    else
+        status = load_sfz(sfz, prg->tarfile, &c, error);
     if (!status)
     {
         if (ls.region)

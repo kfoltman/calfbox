@@ -16,10 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "app.h"
 #include "rt.h"
 #include "sampler.h"
 #include "sampler_prg.h"
 #include "sfzloader.h"
+#include "tarfile.h"
 
 #include <assert.h>
 
@@ -133,13 +135,21 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
         return cbox_execute_on(fb, NULL, "/uuid", "o", error, l);
     }
     return cbox_object_default_process_cmd(ct, fb, cmd, error);
-    
 }
 
-struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_no, const char *name, const char *sample_dir)
+struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_no, const char *name, struct cbox_tarfile *tarfile, const char *sample_dir, GError **error)
 {
+    gchar *perm_sample_dir = g_strdup(sample_dir);
+    if (!perm_sample_dir)
+        return NULL;
+
     struct cbox_document *doc = CBOX_GET_DOCUMENT(&m->module);
     struct sampler_program *prg = malloc(sizeof(struct sampler_program));
+    if (!prg)
+    {
+        g_free(perm_sample_dir);
+        return NULL;
+    }
     memset(prg, 0, sizeof(*prg));
     CBOX_OBJECT_HEADER_INIT(prg, sampler_program, doc);
     cbox_command_target_init(&prg->cmd_target, sampler_program_process_cmd, prg);
@@ -147,8 +157,9 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->module = m;
     prg->prog_no = prog_no;
     prg->name = g_strdup(name);
-    prg->sample_dir = g_strdup(sample_dir);
+    prg->tarfile = tarfile;
     prg->source_file = NULL;
+    prg->sample_dir = perm_sample_dir;
     prg->all_layers = NULL;
     prg->rll = NULL;
     prg->groups = NULL;
@@ -164,19 +175,50 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
 {
     int i;
     
-    char *name2 = NULL, *sfz_path = NULL, *spath = NULL;
+    char *name2 = NULL, *sfz_path = NULL, *spath = NULL, *tar_name = NULL;
     const char *sfz = NULL;
+    struct cbox_tarfile *tarfile = NULL;
     
     g_clear_error(error);
+    tar_name = cbox_config_get_string(cfg_section, "tar");
     if (!strncmp(cfg_section, "spgm:!", 6))
     {
         sfz = cfg_section + 6;
-        name2 = strrchr(name, '/');
-        if (name2)
-            name2++;
+        if (!strncmp(sfz, "sbtar:", 6))
+        {
+            sfz_path = ".";
+            gchar *p = strchr(sfz + 6, ':');
+            if (p)
+            {
+                char *tmp = g_strndup(sfz + 6, p - sfz - 6);
+                tarfile = cbox_tarpool_get_tarfile(app.tarpool, tmp, error);
+                g_free(tmp);
+                if (!tarfile)
+                    return NULL;
+                sfz = p + 1;
+                name2 = p + 1;
+            }
+            else
+            {
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot load sampler program '%s' from section '%s': missing name of a file inside a tar archive", name, cfg_section);
+                return NULL;
+            }
+        }
+        else
+        {
+            name2 = strrchr(name, '/');
+            if (name2)
+                name2++;
+        }
     }
     else
-    {    
+    { 
+        if (tar_name)
+        {
+            tarfile = cbox_tarpool_get_tarfile(app.tarpool, tar_name, error);
+            if (!tarfile)
+                return NULL;
+        }
         if (!sfz && !cbox_config_has_section(cfg_section))
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot load sampler program '%s' from section '%s': section not found", name, cfg_section);
@@ -187,9 +229,11 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         sfz_path = cbox_config_get_string(cfg_section, "sfz_path");
         spath = cbox_config_get_string(cfg_section, "sample_path");
         sfz = cbox_config_get_string(cfg_section, "sfz");
+        if (tarfile && !sfz_path)
+            sfz_path = ".";
     }
     
-    if (sfz && !sfz_path && !spath)
+    if (sfz && !sfz_path && !spath && !tarfile)
     {
         char *lastslash = strrchr(sfz, '/');
         if (lastslash && !sfz_path && !spath)
@@ -205,8 +249,12 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         m,
         pgm_id != -1 ? pgm_id : cbox_config_get_int(cfg_section, "program", 0),
         name2 ? name2 : name,
-        spath ? spath : (sfz_path ? sfz_path : "")
+        tarfile,
+        spath ? spath : (sfz_path ? sfz_path : ""),
+        error
     );
+    if (!prg)
+        return NULL;
     
     if (sfz)
     {

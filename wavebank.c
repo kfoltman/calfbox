@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config-api.h"
 #include "dspmath.h"
 #include "errors.h"
+#include "tarfile.h"
 #include "wavebank.h"
 #include <assert.h>
 #include <errno.h>
@@ -245,11 +246,8 @@ void cbox_wavebank_init()
     cbox_wavebank_add_std_waveform("*tri", func_tri, NULL, 11);
 }
 
-struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const char *sample_dir, const char *filename, GError **error)
+struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struct cbox_tarfile *tarfile, const char *sample_dir, const char *filename, GError **error)
 {
-    int i;
-    int nshorts;
-    
     if (!filename)
     {
         g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, "%s: no filename specified", context_name);
@@ -277,7 +275,19 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     gchar *pathname = value_copy[0] == '/' ? g_strdup(value_copy) : g_build_filename(sample_dir, value_copy, NULL);
     g_free(value_copy);
 
-    char *canonical = realpath(pathname, NULL);
+    char *canonical = NULL;
+    if (tarfile)
+        canonical = g_strdup(pathname);
+    else
+    {
+        // make sure canonical is always allocated on the same (glib) heap
+        char *p = realpath(pathname, NULL);
+        if (p)
+        {
+            canonical = g_strdup(p);
+            free(p);
+        }
+    }
     if (!canonical)
     {
         g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, "%s: cannot find a real path for '%s': %s", context_name, pathname, strerror(errno));
@@ -288,7 +298,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     if (value)
     {
         g_free(pathname);
-        free(canonical);
+        g_free(canonical);
         
         struct cbox_waveform *waveform = value;
         cbox_waveform_ref(waveform);
@@ -296,15 +306,31 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     }
     
     struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
-    SNDFILE *sndfile = sf_open(pathname, SFM_READ, &waveform->info);
-    SF_INSTRUMENT instrument;
+    SNDFILE *sndfile = NULL;
+    struct cbox_taritem *taritem = NULL;
+    if (tarfile)
+    {
+        taritem = cbox_tarfile_get_item_by_name(tarfile, pathname, TRUE);
+        if (taritem)
+        {
+            int fd = cbox_tarfile_openitem(tarfile, taritem);
+            if (fd >= 0)
+                sndfile = sf_open_fd(fd, SFM_READ, &waveform->info, TRUE);
+        }
+    }
+    else
+        sndfile = sf_open(pathname, SFM_READ, &waveform->info);
     if (!sndfile)
     {
         g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "%s: cannot open '%s'", context_name, pathname);
         g_free(pathname);
-        free(canonical);
+        g_free(canonical);
+        free(waveform);
         return NULL;
     }
+
+    SF_INSTRUMENT instrument;
+    int nshorts;
     if (waveform->info.channels != 1 && waveform->info.channels != 2)
     {
         g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, 
@@ -330,6 +356,8 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     waveform->levels = NULL;
     waveform->level_count = 0;
     waveform->preloaded_frames = preloaded_frames;
+    waveform->tarfile = tarfile;
+    waveform->taritem = taritem;
     
     if (sf_command(sndfile, SFC_GET_INSTRUMENT, &instrument, sizeof(SF_INSTRUMENT)))
     {
@@ -346,7 +374,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, const
     }
 
     nshorts = waveform->info.channels * preloaded_frames;
-    for (i = 0; i < nshorts; i++)
+    for (uint32_t i = 0; i < nshorts; i++)
         waveform->data[i] = 0;
     sf_readf_short(sndfile, waveform->data, preloaded_frames);
     sf_close(sndfile);
@@ -423,7 +451,7 @@ void cbox_waveform_unref(struct cbox_waveform *waveform)
     bank.bytes -= waveform->bytes;
 
     g_free(waveform->display_name);
-    free(waveform->canonical_name);
+    g_free(waveform->canonical_name);
     for (int i = 0; i < waveform->level_count; i++)
         free(waveform->levels[i].data);
     free(waveform->levels);

@@ -383,7 +383,9 @@ void sampler_unselect_program(struct sampler_module *m, struct sampler_program *
 static gboolean load_from_string(struct sampler_module *m, const char *sample_dir, const char *sfz_data, const char *name, int prog_no, struct sampler_program **ppgm, GError **error)
 {
     int index = find_program(m, prog_no);
-    struct sampler_program *pgm = sampler_program_new(m, prog_no, name, sample_dir);
+    struct sampler_program *pgm = sampler_program_new(m, prog_no, name, NULL, sample_dir, error);
+    if (!pgm)
+        return FALSE;
     pgm->source_file = g_strdup("string");
     if (!sampler_module_load_program_sfz(m, pgm, sfz_data, TRUE, error))
     {

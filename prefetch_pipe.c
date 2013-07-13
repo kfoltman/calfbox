@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "prefetch_pipe.h"
+#include "tarfile.h"
 #include "wavebank.h"
 #include <assert.h>
 #include <malloc.h>
@@ -37,7 +38,16 @@ void cbox_prefetch_pipe_init(struct cbox_prefetch_pipe *pipe, uint32_t buffer_si
 
 gboolean cbox_prefetch_pipe_openfile(struct cbox_prefetch_pipe *pipe)
 {
-    pipe->sndfile = sf_open(pipe->waveform->canonical_name, SFM_READ, &pipe->info);
+    if (pipe->waveform->taritem)
+    {
+        int fd = cbox_tarfile_openitem(pipe->waveform->tarfile, pipe->waveform->taritem);
+        if (fd >= 0)
+            pipe->sndfile = sf_open_fd(fd, SFM_READ, &pipe->info, TRUE);
+        else
+            return FALSE;
+    }
+    else
+        pipe->sndfile = sf_open(pipe->waveform->canonical_name, SFM_READ, &pipe->info);
     if (!pipe->sndfile)
         return FALSE;
     pipe->file_pos_frame = sf_seek(pipe->sndfile, pipe->waveform->preloaded_frames, SEEK_SET);

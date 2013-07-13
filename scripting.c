@@ -318,6 +318,7 @@ static PyObject *cbox_python_init_engine(PyObject *self, PyObject *args)
         return PyErr_Format(PyExc_Exception, "Engine already initialised");
  
     cbox_dom_init();
+    app.tarpool = cbox_tarpool_new();
     app.document = cbox_document_new();
     app.rt = cbox_rt_new(app.document);
     app.engine = cbox_engine_new(app.document, app.rt);
