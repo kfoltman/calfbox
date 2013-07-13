@@ -340,6 +340,7 @@ static PyObject *cbox_python_shutdown_engine(PyObject *self, PyObject *args)
     
     CBOX_DELETE(app.engine);
     CBOX_DELETE(app.rt);
+    cbox_tarpool_destroy(app.tarpool);
     cbox_document_destroy(app.document);
     cbox_wavebank_close();
     cbox_config_close();

@@ -366,6 +366,8 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
     g_free(prg->source_file);
     g_slist_free(prg->all_layers);
     g_slist_free(prg->ctrl_init_list);
+    if (prg->tarfile)
+        cbox_tarpool_release_tarfile(app.tarpool, prg->tarfile);
     free(prg);
 }
 

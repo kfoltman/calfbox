@@ -355,6 +355,7 @@ ok:
     }    
     CBOX_DELETE(app.engine);
     CBOX_DELETE(app.rt);
+    cbox_tarpool_destroy(app.tarpool);
     
     if (cbox_wavebank_get_maxbytes() > 0)
         g_message("Max waveform usage: %f MB", (float)(cbox_wavebank_get_maxbytes() / 1048576.0));

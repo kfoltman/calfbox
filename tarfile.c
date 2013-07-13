@@ -220,14 +220,13 @@ void cbox_tarfile_destroy(struct cbox_tarfile *tf)
 struct cbox_tarpool *cbox_tarpool_new()
 {
     struct cbox_tarpool *pool = calloc(1, sizeof(struct cbox_tarpool));
-    pool->files = g_hash_table_new(g_str_hash, g_str_equal);
+    pool->files = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     return pool;
 }
 
 struct cbox_tarfile *cbox_tarpool_get_tarfile(struct cbox_tarpool *pool, const char *name, GError **error)
 {
-    //gchar *c = realpath(name, NULL);
-    gchar *c = g_strdup(name);
+    gchar *c = realpath(name, NULL);
     struct cbox_tarfile *tf = g_hash_table_lookup(pool->files, c);
     if (tf)
         tf->refs++;
@@ -236,23 +235,32 @@ struct cbox_tarfile *cbox_tarpool_get_tarfile(struct cbox_tarpool *pool, const c
         tf = cbox_tarfile_open(c, error);
         if (!tf)
         {
-            g_free(c);
+            free(c);
             return NULL;
         }
         g_hash_table_insert(pool->files, c, tf);
     }
-    g_free(c);
     return tf;
 }
 
 void cbox_tarpool_release_tarfile(struct cbox_tarpool *pool, struct cbox_tarfile *file)
 {
     if (!--file->refs)
+    {
+        // XXXKF the insertion key is realpath(name) but the removal key is realpath(realpath(name))
+        // usually it shouldn't cause problems, but it should be improved.
+        if (!g_hash_table_lookup(pool->files, file->file_pathname))
+            g_warning("Removing tarfile %s not in the pool hash", file->file_pathname);
+        g_hash_table_remove(pool->files, file->file_pathname);
         cbox_tarfile_destroy(file);
+    }
 }
 
 void cbox_tarpool_destroy(struct cbox_tarpool *pool)
 {
+    int nelems = g_hash_table_size(pool->files);
+    if (nelems)
+        g_warning("%d unfreed elements in tar pool %p.", nelems, pool);
     g_hash_table_destroy(pool->files);
     free(pool);
 }
