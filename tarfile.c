@@ -54,9 +54,17 @@ static void remove_item_if(gpointer p);
 struct cbox_tarfile *cbox_tarfile_open(const char *pathname, GError **error)
 {
     gboolean debug = cbox_config_get_int("debug", "tarfile", 0);
-    int fd = open(pathname, O_RDONLY | O_LARGEFILE);
+    gchar *canonical = realpath(pathname, NULL);
+    if (!canonical)
+    {
+        if (error)
+            g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "cannot determine canonical name of '%s'", pathname);
+        return NULL;
+    }
+    int fd = open(canonical, O_RDONLY | O_LARGEFILE);
     if (fd < 0)
     {
+        free(canonical);
         if (error)
             g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "cannot open '%s'", pathname);
         return NULL;
@@ -74,6 +82,8 @@ struct cbox_tarfile *cbox_tarfile_open(const char *pathname, GError **error)
     tf->fd = fd;
     tf->items_byname = byname;
     tf->items_byname_nc = byname_nc;
+    tf->refs = 1;
+    tf->file_pathname = canonical;
     while(1)
     {
         struct tar_record rec;
@@ -136,6 +146,7 @@ error:
         g_hash_table_destroy(byname);
     if (byname_nc)
         g_hash_table_destroy(byname_nc);
+    free(canonical);
     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot allocate memory for tarfile data");
     return NULL;
 }
@@ -170,7 +181,7 @@ struct cbox_taritem *cbox_tarfile_get_item_by_name(struct cbox_tarfile *tarfile,
 
 int cbox_tarfile_openitem(struct cbox_tarfile *tarfile, struct cbox_taritem *item)
 {
-    int fd = dup(tarfile->fd);
+    int fd = open(tarfile->file_pathname, O_RDONLY | O_LARGEFILE);
     if (fd >= 0)
         lseek64(fd, item->offset, SEEK_SET);
     return fd;
@@ -200,6 +211,49 @@ void cbox_tarfile_destroy(struct cbox_tarfile *tf)
     close(tf->fd);
     g_hash_table_destroy(tf->items_byname);
     g_hash_table_destroy(tf->items_byname_nc);
+    free(tf->file_pathname);
     free(tf);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+struct cbox_tarpool *cbox_tarpool_new()
+{
+    struct cbox_tarpool *pool = calloc(1, sizeof(struct cbox_tarpool));
+    pool->files = g_hash_table_new(g_str_hash, g_str_equal);
+    return pool;
+}
+
+struct cbox_tarfile *cbox_tarpool_get_tarfile(struct cbox_tarpool *pool, const char *name, GError **error)
+{
+    //gchar *c = realpath(name, NULL);
+    gchar *c = g_strdup(name);
+    struct cbox_tarfile *tf = g_hash_table_lookup(pool->files, c);
+    if (tf)
+        tf->refs++;
+    else
+    {
+        tf = cbox_tarfile_open(c, error);
+        if (!tf)
+        {
+            g_free(c);
+            return NULL;
+        }
+        g_hash_table_insert(pool->files, c, tf);
+    }
+    g_free(c);
+    return tf;
+}
+
+void cbox_tarpool_release_tarfile(struct cbox_tarpool *pool, struct cbox_tarfile *file)
+{
+    if (!--file->refs)
+        cbox_tarfile_destroy(file);
+}
+
+void cbox_tarpool_destroy(struct cbox_tarpool *pool)
+{
+    g_hash_table_destroy(pool->files);
+    free(pool);
 }
 

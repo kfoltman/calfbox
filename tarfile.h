@@ -34,8 +34,15 @@ struct cbox_taritem
 struct cbox_tarfile
 {
     int fd;
+    int refs;
     GHashTable *items_byname;
     GHashTable *items_byname_nc;
+    char *file_pathname;
+};
+
+struct cbox_tarpool
+{
+    GHashTable *files;
 };
 
 extern struct cbox_tarfile *cbox_tarfile_open(const char *pathname, GError **error);
@@ -45,5 +52,10 @@ extern int cbox_tarfile_openitem(struct cbox_tarfile *tarfile, struct cbox_tarit
 extern void cbox_tarfile_closeitem(struct cbox_tarfile *tarfile, struct cbox_taritem *item, int fd);
 
 extern void cbox_tarfile_destroy(struct cbox_tarfile *tf);
+
+extern struct cbox_tarpool *cbox_tarpool_new();
+extern struct cbox_tarfile *cbox_tarpool_get_tarfile(struct cbox_tarpool *pool, const char *name, GError **error);
+extern void cbox_tarpool_release_tarfile(struct cbox_tarpool *pool, struct cbox_tarfile *file);
+extern void cbox_tarpool_destroy(struct cbox_tarpool *pool);
 
 #endif
