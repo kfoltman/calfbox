@@ -1,4 +1,5 @@
 from _cbox import *
+from io import BytesIO
 import struct
 import traceback
 
@@ -970,7 +971,10 @@ class SamplerProgram(DocObj):
     def delete_control_init(self, controller, which = 0):
         return self.cmd("/delete_control_init", None, controller, which)
     def load_file(self, filename, max_size = -1):
-        return self.get_thing("/load_file", '/data', bytes, filename, max_size)
+        data = self.get_thing("/load_file", '/data', bytes, filename, max_size)
+        if data is None:
+            return data
+        return BytesIO(data)
 Document.classmap['sampler_program'] = SamplerProgram
 
 class SamplerLayer(DocObj):

@@ -64,7 +64,6 @@ static struct cbox_blob *read_from_fd(const char *context_name, const char *path
         return NULL;
     }
     uint8_t *data = blob->data;
-    data[size] = 0;
     size_t nread = 0;
     do {
         size_t chunk = size - nread;
@@ -81,6 +80,10 @@ static struct cbox_blob *read_from_fd(const char *context_name, const char *path
         }
         nread += nv;
     } while(nread < size);
+    // Make sure that the content is 0-padded but still has the original size
+    // (without extra zero byte)
+    data[nread] = '\0';
+    blob->size = nread;
     return blob;
 }
 
