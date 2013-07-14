@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "app.h"
+#include "blob.h"
 #include "rt.h"
 #include "sampler.h"
 #include "sampler_prg.h"
@@ -134,6 +135,15 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
         sampler_program_add_group(program, l);
         return cbox_execute_on(fb, NULL, "/uuid", "o", error, l);
     }
+    if (!strcmp(cmd->command, "/load_file") && !strcmp(cmd->arg_types, "si"))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        struct cbox_blob *blob = cbox_blob_new_from_file(program->name, program->tarfile, program->sample_dir, CBOX_ARG_S(cmd, 0), CBOX_ARG_I(cmd, 1), error);
+        if (!blob)
+            return FALSE;
+        return cbox_execute_on(fb, NULL, "/data", "b", error, blob);
+    }
     return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
@@ -187,7 +197,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         if (!strncmp(sfz, "sbtar:", 6))
         {
             sfz_path = ".";
-            gchar *p = strchr(sfz + 6, ':');
+            gchar *p = strchr(sfz + 6, ';');
             if (p)
             {
                 char *tmp = g_strndup(sfz + 6, p - sfz - 6);

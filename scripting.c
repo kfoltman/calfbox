@@ -304,6 +304,7 @@ static PyObject *cbox_python_do_cmd(PyObject *self, PyObject *args)
 #if CALFBOX_AS_MODULE
 
 #include "config-api.h"
+#include "tarfile.h"
 #include "wavebank.h"
 #include "scene.h"
 

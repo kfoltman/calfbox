@@ -787,6 +787,10 @@ class SamplerEngine(NonDocObj):
         """Load a sampler program from a filesystem file."""
         return self.cmd_makeobj("/load_patch_from_file", int(patch_no), sfz_name, display_name)
         
+    def load_patch_from_tar(self, patch_no, tar_name, sfz_name, display_name):
+        """Load a sampler program from a tar file."""
+        return self.cmd_makeobj("/load_patch_from_file", int(patch_no), "sbtar:%s;%s" % (tar_name, sfz_name), display_name)
+        
     def set_patch(self, channel, patch_no):
         """Select patch identified by patch_no in a specified MIDI channel."""
         self.cmd("/set_patch", None, int(channel), int(patch_no))
@@ -965,6 +969,8 @@ class SamplerProgram(DocObj):
     # which = -1 -> remove all controllers with that number from the list
     def delete_control_init(self, controller, which = 0):
         return self.cmd("/delete_control_init", None, controller, which)
+    def load_file(self, filename, max_size = -1):
+        return self.get_thing("/load_file", '/data', bytes, filename, max_size)
 Document.classmap['sampler_program'] = SamplerProgram
 
 class SamplerLayer(DocObj):

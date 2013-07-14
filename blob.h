@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_BLOB_H
 #define CBOX_BLOB_H
 
+#include <glib.h>
 #include <stddef.h>
 
 struct cbox_blob
@@ -27,7 +28,10 @@ struct cbox_blob
     size_t size;
 };
 
+struct cbox_tarfile;
+
 extern struct cbox_blob *cbox_blob_new(size_t size);
+extern struct cbox_blob *cbox_blob_new_from_file(const char *context_name, struct cbox_tarfile *tarfile, const char *path, const char *name, size_t max_size, GError **error);
 extern struct cbox_blob *cbox_blob_new_copy_data(const void *data, size_t size);
 extern struct cbox_blob *cbox_blob_new_acquire_data(void *data, size_t size);
 extern void cbox_blob_destroy(struct cbox_blob *blob);

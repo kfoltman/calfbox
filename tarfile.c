@@ -217,7 +217,7 @@ void cbox_tarfile_destroy(struct cbox_tarfile *tf)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-struct cbox_tarpool *cbox_tarpool_new()
+struct cbox_tarpool *cbox_tarpool_new(void)
 {
     struct cbox_tarpool *pool = calloc(1, sizeof(struct cbox_tarpool));
     pool->files = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
@@ -227,6 +227,11 @@ struct cbox_tarpool *cbox_tarpool_new()
 struct cbox_tarfile *cbox_tarpool_get_tarfile(struct cbox_tarpool *pool, const char *name, GError **error)
 {
     gchar *c = realpath(name, NULL);
+    if (!c)
+    {
+        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "cannot find a real path for '%s': %s", name, strerror(errno));
+        return NULL;
+    }
     struct cbox_tarfile *tf = g_hash_table_lookup(pool->files, c);
     if (tf)
         tf->refs++;
