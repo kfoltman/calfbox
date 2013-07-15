@@ -312,11 +312,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
     {
         taritem = cbox_tarfile_get_item_by_name(tarfile, pathname, TRUE);
         if (taritem)
-        {
-            int fd = cbox_tarfile_openitem(tarfile, taritem);
-            if (fd >= 0)
-                sndfile = sf_open_fd(fd, SFM_READ, &waveform->info, TRUE);
-        }
+            sndfile = cbox_tarfile_opensndfile(tarfile, taritem, &waveform->sndstream, &waveform->info);
     }
     else
         sndfile = sf_open(pathname, SFM_READ, &waveform->info);

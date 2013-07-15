@@ -39,13 +39,7 @@ void cbox_prefetch_pipe_init(struct cbox_prefetch_pipe *pipe, uint32_t buffer_si
 gboolean cbox_prefetch_pipe_openfile(struct cbox_prefetch_pipe *pipe)
 {
     if (pipe->waveform->taritem)
-    {
-        int fd = cbox_tarfile_openitem(pipe->waveform->tarfile, pipe->waveform->taritem);
-        if (fd >= 0)
-            pipe->sndfile = sf_open_fd(fd, SFM_READ, &pipe->info, TRUE);
-        else
-            return FALSE;
-    }
+        pipe->sndfile = cbox_tarfile_opensndfile(pipe->waveform->tarfile, pipe->waveform->taritem, &pipe->sndstream, &pipe->info);
     else
         pipe->sndfile = sf_open(pipe->waveform->canonical_name, SFM_READ, &pipe->info);
     if (!pipe->sndfile)

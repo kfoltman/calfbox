@@ -217,6 +217,68 @@ void cbox_tarfile_destroy(struct cbox_tarfile *tf)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+sf_count_t tarfile_get_filelen(void *user_data)
+{
+    struct cbox_tarfile_sndstream *ss = user_data;
+    
+    return ss->item->size;
+}
+
+sf_count_t tarfile_seek(sf_count_t offset, int whence, void *user_data)
+{
+    struct cbox_tarfile_sndstream *ss = user_data;
+    switch(whence)
+    {
+        case SEEK_SET:
+            ss->filepos = offset;
+            break;
+        case SEEK_CUR:
+            ss->filepos += offset;
+            break;
+        case SEEK_END:
+            ss->filepos = ss->item->size;
+            break;
+    }
+    if (((int64_t)ss->filepos) < 0)
+        ss->filepos = 0;
+    if (((int64_t)ss->filepos) >= ss->item->size)
+        ss->filepos = ss->item->size;
+    return ss->filepos;
+}
+
+sf_count_t tarfile_read(void *ptr, sf_count_t count, void *user_data)
+{
+    struct cbox_tarfile_sndstream *ss = user_data;
+    ssize_t len = pread64(ss->file->fd, ptr, count, ss->item->offset + ss->filepos);
+    if (len > 0)
+        ss->filepos += len;
+    return len;
+}
+
+sf_count_t tarfile_tell(void *user_data)
+{
+    struct cbox_tarfile_sndstream *ss = user_data;
+    return ss->filepos;
+}
+
+struct SF_VIRTUAL_IO cbox_taritem_virtual_io = {
+    .get_filelen = tarfile_get_filelen,
+    .seek = tarfile_seek,
+    .read = tarfile_read,
+    .write = NULL,
+    .tell = tarfile_tell,
+};
+
+SNDFILE *cbox_tarfile_opensndfile(struct cbox_tarfile *tarfile, struct cbox_taritem *item, struct cbox_tarfile_sndstream *stream, SF_INFO *sfinfo)
+{
+    stream->file = tarfile;
+    stream->item = item;
+    stream->filepos = 0;
+    return sf_open_virtual(&cbox_taritem_virtual_io, SFM_READ, sfinfo, stream);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 struct cbox_tarpool *cbox_tarpool_new(void)
 {
     struct cbox_tarpool *pool = calloc(1, sizeof(struct cbox_tarpool));

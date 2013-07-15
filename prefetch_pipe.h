@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <pthread.h>
 #include <sndfile.h>
 #include <stdint.h>
+#include <tarfile.h>
 
 struct cbox_waveform;
 
@@ -43,6 +44,7 @@ struct cbox_prefetch_pipe
     enum cbox_prefetch_pipe_state state;
     int next_free_pipe;
     struct cbox_waveform *waveform;
+    struct cbox_tarfile_sndstream sndstream;
     int16_t *data;
     uint32_t buffer_size;
     SF_INFO info;
