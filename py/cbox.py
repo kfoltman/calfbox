@@ -971,6 +971,8 @@ class SamplerProgram(DocObj):
     def delete_control_init(self, controller, which = 0):
         return self.cmd("/delete_control_init", None, controller, which)
     def load_file(self, filename, max_size = -1):
+        """Return an in-memory file corresponding to a given file inside sfbank.
+        This can be used for things like scripts, images, descriptions etc."""
         data = self.get_thing("/load_file", '/data', bytes, filename, max_size)
         if data is None:
             return data
