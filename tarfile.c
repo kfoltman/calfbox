@@ -106,8 +106,11 @@ struct cbox_tarfile *cbox_tarfile_open(const char *pathname, GError **error)
         struct cbox_taritem *ti = calloc(1, sizeof(struct cbox_taritem));
         if (ti)
         {
-            ti->filename = g_strndup(rec.name, len);
-            ti->filename_nc = g_utf8_casefold(rec.name, len);
+            int offset = 0;
+            if (len >= 2 && rec.name[0] == '.' && rec.name[1] == '/')
+                offset = 2;
+            ti->filename = g_strndup(rec.name + offset, len - offset);
+            ti->filename_nc = g_utf8_casefold(rec.name + offset, len - offset);
             if (!ti->filename || !ti->filename_nc)
                 goto itemerror;
             ti->offset = lseek64(fd, 0, SEEK_CUR);
@@ -168,6 +171,8 @@ void remove_item_if(gpointer p)
 
 struct cbox_taritem *cbox_tarfile_get_item_by_name(struct cbox_tarfile *tarfile, const char *item_filename, gboolean ignore_case)
 {
+    if (item_filename[0] == '.' && item_filename[1] == '/')
+        item_filename += 2;
     if (ignore_case)
     {
         gchar *folded = g_utf8_casefold(item_filename, -1);
