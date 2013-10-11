@@ -277,7 +277,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
 
     char *canonical = NULL;
     if (tarfile)
-        canonical = g_strdup(pathname);
+        canonical = g_strdup_printf("sbtar:%s;%s", tarfile->file_pathname, pathname);
     else
     {
         // make sure canonical is always allocated on the same (glib) heap
