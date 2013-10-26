@@ -736,6 +736,8 @@ class DocInstrument(DocObj):
         engine = self.status().engine
         if engine in engine_classes:
             self.engine = engine_classes[engine]("/doc/uuid/" + self.uuid + "/engine")
+    def move_to(self, target_scene, pos = 0):
+        return self.cmd_makeobj("/move_to", target_scene.uuid, pos)
 Document.classmap['cbox_instrument'] = DocInstrument
 
 class DocLayer(DocObj):

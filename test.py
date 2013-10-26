@@ -112,6 +112,13 @@ class TestCbox(unittest.TestCase):
         module = aux.slot.engine
         self.verify_uuid(aux.uuid, "cbox_aux_bus", scene.make_path("/aux/piano_reverb"))
         scene.delete_aux("piano_reverb")
+        scene2 = engine.new_scene()
+        layer_status.instrument.move_to(scene2, 0)
+
+        layers = scene.status().layers
+        self.assertEqual(len(layers), 0)
+        layers = scene2.status().layers
+        self.assertEqual(len(layers), 1)
 
     def test_sampler_api(self):
         engine = Document.new_engine(44100, 1024)

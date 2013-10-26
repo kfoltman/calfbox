@@ -1120,6 +1120,41 @@ void cbox_scene_play_adhoc_pattern(struct cbox_scene *scene, struct cbox_adhoc_p
         free_adhoc_pattern_list(scene, arg.retired);
 }
 
+void cbox_scene_move_instrument_to(struct cbox_scene *scene, struct cbox_instrument *instrument, struct cbox_scene *new_scene, int dstpos)
+{
+    int lcount = 0;
+    if (dstpos == -1)
+        dstpos = new_scene->layer_count;
+    for (int i = 0; i < scene->layer_count; i++)
+    {
+        if (scene->layers[i]->instrument == instrument)
+            lcount++;
+    }
+    if (!lcount)
+        return;
+    
+    struct cbox_layer **new_src_layers = malloc(sizeof(struct cbox_layer *) * (scene->layer_count - lcount));
+    struct cbox_layer **new_dst_layers = malloc(sizeof(struct cbox_layer *) * (new_scene->layer_count + lcount));
+    int srcidx = 0, dstidx = 0;
+    memcpy(&new_dst_layers[dstidx], new_scene->layers, dstpos * sizeof(struct cbox_layer **));
+    dstidx = dstpos;
+    for (int i = 0; i < scene->layer_count; i++)
+    {
+        if (scene->layers[i]->instrument != instrument)
+            new_src_layers[srcidx++] = scene->layers[i];
+        else
+            new_dst_layers[dstidx++] = scene->layers[i];
+    }
+    memcpy(&new_dst_layers[dstidx], new_scene->layers, (new_scene->layer_count - dstpos) * sizeof(struct cbox_layer **));
+    dstidx += new_scene->layer_count;
+
+    free(cbox_rt_swap_pointers_and_update_count(scene->rt, (void **)&scene->layers, new_src_layers, &scene->layer_count, srcidx));
+    cbox_rt_array_remove_by_value(scene->rt, (void ***)&scene->instruments, &scene->instrument_count, instrument);
+
+    cbox_rt_array_insert(scene->rt, (void ***)&new_scene->instruments, &new_scene->instrument_count, -1, instrument);
+    free(cbox_rt_swap_pointers_and_update_count(new_scene->rt, (void **)&new_scene->layers, new_dst_layers, &new_scene->layer_count, dstidx));
+}
+
 static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_scene *scene = CBOX_H2O(objhdr);

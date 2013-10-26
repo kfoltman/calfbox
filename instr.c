@@ -156,6 +156,15 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
         }
         return cbox_execute_sub(&instr->module->cmd_target, fb, cmd, cmd->command + 7, error);
     }
+    else if (!strcmp(cmd->command, "/move_to") && !strcmp(cmd->arg_types, "si"))
+    {
+        struct cbox_scene *new_scene = (struct cbox_scene *)CBOX_ARG_O(cmd, 0, instr->scene, cbox_scene, error);
+        if (!new_scene)
+            return FALSE;
+        
+        cbox_scene_move_instrument_to(instr->scene, instr, new_scene, CBOX_ARG_I(cmd, 1));
+        return TRUE;
+    }
     else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
