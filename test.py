@@ -113,6 +113,9 @@ class TestCbox(unittest.TestCase):
         self.verify_uuid(aux.uuid, "cbox_aux_bus", scene.make_path("/aux/piano_reverb"))
         scene.delete_aux("piano_reverb")
         scene2 = engine.new_scene()
+        with self.assertRaises(Exception) as context:
+            layer_status.instrument.move_to(scene2, 1)
+        self.assertEquals(str(context.exception), "Invalid position 2 (valid are 1..1 or 0 for append)")
         layer_status.instrument.move_to(scene2, 0)
 
         layers = scene.status().layers

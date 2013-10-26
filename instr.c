@@ -161,8 +161,15 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
         struct cbox_scene *new_scene = (struct cbox_scene *)CBOX_ARG_O(cmd, 0, instr->scene, cbox_scene, error);
         if (!new_scene)
             return FALSE;
+        int dstpos = CBOX_ARG_I(cmd, 1) - 1;
         
-        return cbox_scene_move_instrument_to(instr->scene, instr, new_scene, CBOX_ARG_I(cmd, 1), error);
+        if (dstpos < 0 || dstpos > new_scene->layer_count)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", dstpos + 1, 1 + new_scene->layer_count);
+            return FALSE;
+        }
+        
+        return cbox_scene_move_instrument_to(instr->scene, instr, new_scene, dstpos, error);
     }
     else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
