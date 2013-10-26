@@ -162,8 +162,7 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
         if (!new_scene)
             return FALSE;
         
-        cbox_scene_move_instrument_to(instr->scene, instr, new_scene, CBOX_ARG_I(cmd, 1));
-        return TRUE;
+        return cbox_scene_move_instrument_to(instr->scene, instr, new_scene, CBOX_ARG_I(cmd, 1), error);
     }
     else
         return cbox_object_default_process_cmd(ct, fb, cmd, error);

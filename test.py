@@ -119,6 +119,10 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(len(layers), 0)
         layers = scene2.status().layers
         self.assertEqual(len(layers), 1)
+        scene.add_instrument_layer("vintage")
+        with self.assertRaises(Exception) as context:
+            layer_status.instrument.move_to(scene, 0)
+        self.assertEquals(str(context.exception), "Instrument 'vintage' already exists in target scene")
 
     def test_sampler_api(self):
         engine = Document.new_engine(44100, 1024)

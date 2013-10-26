@@ -1120,7 +1120,7 @@ void cbox_scene_play_adhoc_pattern(struct cbox_scene *scene, struct cbox_adhoc_p
         free_adhoc_pattern_list(scene, arg.retired);
 }
 
-void cbox_scene_move_instrument_to(struct cbox_scene *scene, struct cbox_instrument *instrument, struct cbox_scene *new_scene, int dstpos)
+gboolean cbox_scene_move_instrument_to(struct cbox_scene *scene, struct cbox_instrument *instrument, struct cbox_scene *new_scene, int dstpos, GError **error)
 {
     int lcount = 0;
     if (dstpos == -1)
@@ -1131,7 +1131,15 @@ void cbox_scene_move_instrument_to(struct cbox_scene *scene, struct cbox_instrum
             lcount++;
     }
     if (!lcount)
-        return;
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Instrument '%s' not found in source scene", instrument->module->instance_name);
+        return FALSE;
+    }
+    if (cbox_scene_get_instrument_by_name(new_scene, instrument->module->instance_name, FALSE, NULL))
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Instrument '%s' already exists in target scene", instrument->module->instance_name);
+        return FALSE;
+    }
     
     struct cbox_layer **new_src_layers = malloc(sizeof(struct cbox_layer *) * (scene->layer_count - lcount));
     struct cbox_layer **new_dst_layers = malloc(sizeof(struct cbox_layer *) * (new_scene->layer_count + lcount));
@@ -1153,6 +1161,8 @@ void cbox_scene_move_instrument_to(struct cbox_scene *scene, struct cbox_instrum
 
     cbox_rt_array_insert(scene->rt, (void ***)&new_scene->instruments, &new_scene->instrument_count, -1, instrument);
     free(cbox_rt_swap_pointers_and_update_count(new_scene->rt, (void **)&new_scene->layers, new_dst_layers, &new_scene->layer_count, dstidx));
+
+    return TRUE;
 }
 
 static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
