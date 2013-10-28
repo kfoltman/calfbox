@@ -343,6 +343,16 @@ static void select_initial_program(struct sampler_module *m)
     cbox_rt_execute_cmd_sync(m->module.rt, &release_program_voices, &data);
 }
 
+void sampler_register_program(struct sampler_module *m, struct sampler_program *pgm)
+{
+    struct sampler_program **programs = malloc(sizeof(struct sampler_program *) * (m->program_count + 1));
+    memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
+    programs[m->program_count] = pgm;
+    free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));
+    if (m->program_count == 1)
+        select_initial_program(m);
+}
+
 static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, struct sampler_program **ppgm, GError **error)
 {
     struct sampler_program *pgm = NULL;
@@ -356,15 +366,10 @@ static gboolean load_program_at(struct sampler_module *m, const char *cfg_sectio
         swap_program(m, index, pgm, TRUE);
         return TRUE;
     }
-    
-    struct sampler_program **programs = malloc(sizeof(struct sampler_program *) * (m->program_count + 1));
-    memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
-    programs[m->program_count] = pgm;
+
+    sampler_register_program(m, pgm);
     if (ppgm)
         *ppgm = pgm;
-    free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));
-    if (m->program_count == 1)
-        select_initial_program(m);
     return TRUE;
 }
 

@@ -115,7 +115,7 @@ class TestCbox(unittest.TestCase):
         scene2 = engine.new_scene()
         with self.assertRaises(Exception) as context:
             layer_status.instrument.move_to(scene2, 1)
-        self.assertEquals(str(context.exception), "Invalid position 2 (valid are 1..1 or 0 for append)")
+        self.assertEqual(str(context.exception), "Invalid position 2 (valid are 1..1 or 0 for append)")
         layer_status.instrument.move_to(scene2, 0)
 
         layers = scene.status().layers
@@ -125,7 +125,7 @@ class TestCbox(unittest.TestCase):
         scene.add_instrument_layer("vintage")
         with self.assertRaises(Exception) as context:
             layer_status.instrument.move_to(scene, 0)
-        self.assertEquals(str(context.exception), "Instrument 'vintage' already exists in target scene")
+        self.assertEqual(str(context.exception), "Instrument 'vintage' already exists in target scene")
 
     def test_sampler_api(self):
         engine = Document.new_engine(44100, 1024)
@@ -213,6 +213,17 @@ class TestCbox(unittest.TestCase):
         print (region.status())
         print (group.as_string())
         print (region.as_string())
+        print ("Engine:", instrument.engine)
+        print ("Patches:", instrument.engine.get_patches())
+        program3 = program2.clone_to(instrument, 1)
+        print ("Program 1")
+        print (program2.status(), program2)
+        print (program2.get_groups())
+        print ("Program 2")
+        print (program3.status(), program3)
+        print (program3.get_groups())
+        print (instrument.engine.get_patches())
+        program3.delete()
         
     def test_rt(self):
         rt = Document.get_rt()

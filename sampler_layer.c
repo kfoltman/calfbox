@@ -1035,6 +1035,32 @@ void sampler_layer_data_destroy(struct sampler_layer_data *l)
     free(l);
 }
 
+struct sampler_layer *sampler_layer_new_clone(struct sampler_layer *layer,
+    struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group)
+{
+    struct sampler_layer *l = sampler_layer_new(m, parent_program, parent_group);
+    sampler_layer_data_clone(&l->data, &layer->data, TRUE);
+    if (layer->unknown_keys)
+    {
+        GHashTableIter iter;
+        g_hash_table_iter_init(&iter, layer->unknown_keys);
+        gpointer key, value;
+        while(g_hash_table_iter_next(&iter, &key, &value))
+            sampler_layer_apply_param(l, (gchar *)key, (gchar *)value, NULL);
+    }
+
+    GHashTableIter iter;
+    g_hash_table_iter_init(&iter, layer->child_layers);
+    gpointer key, value;
+    while(g_hash_table_iter_next(&iter, &key, &value))
+    {
+        sampler_layer_new_clone(key, m, parent_program, l);
+        // g_hash_table_insert(l->child_layers, chl, NULL);
+    }
+
+    return l;
+}
+
 void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct sampler_layer *l = CBOX_H2O(objhdr);

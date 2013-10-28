@@ -150,6 +150,7 @@ struct sampler_module
 
 extern GQuark cbox_sampler_error_quark(void);
 
+extern void sampler_register_program(struct sampler_module *m, struct sampler_program *pgm);
 extern gboolean sampler_select_program(struct sampler_module *m, int channel, const gchar *preset, GError **error);
 extern void sampler_unselect_program(struct sampler_module *m, struct sampler_program *prg);
 

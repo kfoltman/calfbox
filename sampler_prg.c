@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "app.h"
 #include "blob.h"
+#include "instr.h"
 #include "rt.h"
 #include "sampler.h"
 #include "sampler_prg.h"
@@ -134,6 +135,23 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
         struct sampler_layer *l = sampler_layer_new(program->module, program, NULL);
         sampler_program_add_group(program, l);
         return cbox_execute_on(fb, NULL, "/uuid", "o", error, l);
+    }
+    if (!strcmp(cmd->command, "/clone_to") && !strcmp(cmd->arg_types, "si"))
+    {
+        struct cbox_instrument *instrument = (struct cbox_instrument *)CBOX_ARG_O(cmd, 0, program, cbox_instrument, error);
+        if (!instrument)
+            return FALSE;
+        struct cbox_module *module = instrument->module;
+        if (strcmp(module->engine_name, "sampler"))
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot copy sampler program to module '%s' of type '%s'", module->instance_name, module->engine_name);
+            return FALSE;
+        }
+        struct sampler_program *prg = sampler_program_clone(program, (struct sampler_module *)module, CBOX_ARG_I(cmd, 1), error);
+        if (!prg)
+            return FALSE;
+        sampler_register_program((struct sampler_module *)module, prg);
+        return cbox_execute_on(fb, NULL, "/uuid", "o", error, prg);
     }
     if (!strcmp(cmd->command, "/load_file") && !strcmp(cmd->arg_types, "si"))
     {
@@ -388,6 +406,48 @@ void sampler_program_update_layers(struct sampler_program *prg)
     struct sampler_rll *old_rll = cbox_rt_swap_pointers(m->module.rt, (void **)&prg->rll, new_rll);
     if (old_rll)
         sampler_rll_destroy(old_rll);
+}
+
+static void add_child_layers_of_group(struct sampler_program *newprg, struct sampler_layer *group)
+{
+    sampler_layer_update(group);
+
+    GHashTableIter iter;
+    g_hash_table_iter_init(&iter, group->child_layers);
+    gpointer key, value;
+    while(g_hash_table_iter_next(&iter, &key, &value))
+        sampler_program_add_layer(newprg, (struct sampler_layer *)key);
+}
+
+struct sampler_program *sampler_program_clone(struct sampler_program *prg, struct sampler_module *m, int prog_no, GError **error)
+{
+    struct sampler_program *newprg = sampler_program_new(m, prog_no, prg->name, prg->tarfile, prg->sample_dir, error);
+    if (!newprg)
+        return NULL;
+    if (prg->source_file)
+        newprg->source_file = g_strdup(prg->source_file);
+    // The values are stored as a union aliased with the data pointer, so no need to deep-copy
+    newprg->ctrl_init_list = g_slist_copy(prg->ctrl_init_list);
+    newprg->rll = NULL;
+    if (prg->default_group)
+    {
+        // XXXKF remove the original default group
+        newprg->default_group = sampler_layer_new_clone(prg->default_group, m, newprg, NULL);
+        add_child_layers_of_group(newprg, newprg->default_group);
+    }
+    newprg->groups = g_slist_copy(prg->groups);
+    for (GSList *p = newprg->groups; p; p = g_slist_next(p))
+    {
+        struct sampler_layer *l = p->data;
+        l = sampler_layer_new_clone(l, m, newprg, NULL);
+        p->data = l;
+        add_child_layers_of_group(newprg, l);
+    }
+    sampler_program_update_layers(newprg);
+    if (newprg->tarfile)
+        newprg->tarfile->refs++;
+    
+    return newprg;
 }
 
 /////////////////////////////////////////////////////////////////////////////////

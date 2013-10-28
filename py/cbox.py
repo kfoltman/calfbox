@@ -979,6 +979,8 @@ class SamplerProgram(DocObj):
         if data is None:
             return data
         return BytesIO(data)
+    def clone_to(self, dest_module, prog_index):
+        return self.cmd_makeobj('/clone_to', dest_module.uuid, int(prog_index))
 Document.classmap['sampler_program'] = SamplerProgram
 
 class SamplerLayer(DocObj):

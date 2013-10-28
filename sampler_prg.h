@@ -80,5 +80,6 @@ extern void sampler_program_add_group(struct sampler_program *prg, struct sample
 extern void sampler_program_add_controller_init(struct sampler_program *prg, uint8_t controller, uint8_t value);
 extern void sampler_program_remove_controller_init(struct sampler_program *prg, uint8_t controller, int which);
 extern void sampler_program_update_layers(struct sampler_program *prg);
+extern struct sampler_program *sampler_program_clone(struct sampler_program *prg, struct sampler_module *m, int prog_no, GError **error);
 
 #endif
