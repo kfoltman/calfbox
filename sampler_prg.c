@@ -416,7 +416,10 @@ static void add_child_layers_of_group(struct sampler_program *newprg, struct sam
     g_hash_table_iter_init(&iter, group->child_layers);
     gpointer key, value;
     while(g_hash_table_iter_next(&iter, &key, &value))
+    {
+        sampler_layer_reset_switches((struct sampler_layer *)key, newprg->module);
         sampler_program_add_layer(newprg, (struct sampler_layer *)key);
+    }
 }
 
 struct sampler_program *sampler_program_clone(struct sampler_program *prg, struct sampler_module *m, int prog_no, GError **error)
