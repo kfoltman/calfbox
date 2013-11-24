@@ -603,13 +603,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         
     
     v->gen.bigdelta = freq64;
-    float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * sampler_channel_addcc(c, 7) * sampler_channel_addcc(c, 11) / (maxv * maxv);
+    float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * c->channel_volume_cc * sampler_channel_addcc(c, 11) / (maxv * maxv);
     if (moddests[smdest_gain] != 0.f)
         gain *= dB2gain(moddests[smdest_gain]);
     // http://drealm.info/sfz/plj-sfz.xhtml#amp "The overall gain must remain in the range -144 to 6 decibels."
     if (gain > 2.f)
         gain = 2.f;
-    float pan = (l->pan + 100.f) * (1.f / 200.f) + (sampler_channel_addcc(c, 10) * 1.f / maxv - 0.5f) * 2.f;
+    float pan = (l->pan + 100.f) * (1.f / 200.f) + (c->channel_pan_cc * 1.f / maxv - 0.5f) * 2.f;
     if (pan < 0.f)
         pan = 0.f;
     if (pan > 1.f)

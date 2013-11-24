@@ -120,71 +120,6 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     m->current_time += CBOX_BLOCK_SIZE;
 }
 
-void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
-{
-    struct sampler_module *m = c->module;
-    // Handle CC triggering.
-    if (c->program && c->program->rll && c->program->rll->layers_oncc && m->voices_free)
-    {
-        struct sampler_rll *rll = c->program->rll;
-        if (!(rll->cc_trigger_bitmask[cc >> 5] & (1 << (cc & 31))))
-            return;
-        int old_value = c->cc[cc];
-        for (GSList *p = rll->layers_oncc; p; p = p->next)
-        {
-            struct sampler_layer *layer = p->data;
-            assert(layer->runtime);
-            // Only trigger on transition between 'out of range' and 'in range' values.
-            // XXXKF I'm not sure if it's what is expected here, but don't have
-            // the reference implementation handy.
-            if (layer->runtime->on_cc_number == cc && 
-                (val >= layer->runtime->on_locc && val <= layer->runtime->on_hicc) &&
-                !(old_value >= layer->runtime->on_locc && old_value <= layer->runtime->on_hicc))
-            {
-                struct sampler_voice *v = m->voices_free;
-                int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
-                sampler_voice_start(v, c, layer->runtime, layer->runtime->pitch_keycenter, 127, exgroups, &exgroupcount);
-                sampler_channel_release_groups(c, -1, exgroups, exgroupcount);
-            }
-        }        
-    }
-    int was_enabled = c->cc[cc] >= 64;
-    int enabled = val >= 64;
-    switch(cc)
-    {
-        case 64:
-            if (was_enabled && !enabled)
-            {
-                sampler_channel_stop_sustained(c);
-            }
-            break;
-        case 66:
-            if (was_enabled && !enabled)
-                sampler_channel_stop_sostenuto(c);
-            else if (!was_enabled && enabled)
-                sampler_channel_capture_sostenuto(c);
-            break;
-        
-        case 120:
-        case 123:
-            sampler_channel_stop_all(c);
-            break;
-        case 121:
-            // Recommended Practice (RP-015) Response to Reset All Controllers
-            // http://www.midi.org/techspecs/rp15.php
-            sampler_channel_process_cc(c, 64, 0);
-            sampler_channel_process_cc(c, 66, 0);
-            c->cc[11] = 127;
-            c->cc[1] = 0;
-            c->pitchwheel = 0;
-            c->cc[smsrc_chanaft] = 0;
-            // XXXKF reset polyphonic pressure values when supported
-            return;
-    }
-    if (cc < 120)
-        c->cc[cc] = val;
-}
-
 void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len)
 {
     struct sampler_module *m = (struct sampler_module *)module;
@@ -588,6 +523,7 @@ MODULE_CREATE_FUNCTION(sampler)
     // XXXKF read defaults from some better place, like config
     // XXXKF allow dynamic change of the number of the pipes
     m->pipe_stack = cbox_prefetch_stack_new(MAX_SAMPLER_VOICES, cbox_config_get_int("streaming", "streambuf_size", 65536));
+    m->disable_mixer_controls = cbox_config_get_int("sampler", "disable_mixer_controls", 0);
 
     float srate = m->module.srate;
     for (i = 0; i < 12800; i++)

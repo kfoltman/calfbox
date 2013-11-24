@@ -42,8 +42,20 @@ void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
     c->active_voices = 0;
     c->pitchwheel = 0;
     memset(c->cc, 0, sizeof(c->cc));
-    c->cc[7] = 100;
-    c->cc[10] = 64;
+    
+    // default to maximum and pan=centre if MIDI mixing disabled
+    if (m->disable_mixer_controls)
+    {
+        c->channel_volume_cc = 16383;
+        c->channel_pan_cc = 8192;
+    }
+    else
+    {
+        sampler_channel_process_cc(c, 7, 100);
+        sampler_channel_process_cc(c, 7 + 32, 0);
+        sampler_channel_process_cc(c, 10, 64);
+        sampler_channel_process_cc(c, 10 + 32, 0);
+    }
     c->cc[11] = 127;
     c->cc[71] = 64;
     c->cc[74] = 64;
@@ -53,6 +65,83 @@ void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
     memset(c->switchmask, 0, sizeof(c->switchmask));
     memset(c->sustainmask, 0, sizeof(c->sustainmask));
     memset(c->sostenutomask, 0, sizeof(c->sostenutomask));
+}
+
+void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
+{
+    struct sampler_module *m = c->module;
+    // Handle CC triggering.
+    if (c->program && c->program->rll && c->program->rll->layers_oncc && m->voices_free)
+    {
+        struct sampler_rll *rll = c->program->rll;
+        if (!(rll->cc_trigger_bitmask[cc >> 5] & (1 << (cc & 31))))
+            return;
+        int old_value = c->cc[cc];
+        for (GSList *p = rll->layers_oncc; p; p = p->next)
+        {
+            struct sampler_layer *layer = p->data;
+            assert(layer->runtime);
+            // Only trigger on transition between 'out of range' and 'in range' values.
+            // XXXKF I'm not sure if it's what is expected here, but don't have
+            // the reference implementation handy.
+            if (layer->runtime->on_cc_number == cc && 
+                (val >= layer->runtime->on_locc && val <= layer->runtime->on_hicc) &&
+                !(old_value >= layer->runtime->on_locc && old_value <= layer->runtime->on_hicc))
+            {
+                struct sampler_voice *v = m->voices_free;
+                int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
+                sampler_voice_start(v, c, layer->runtime, layer->runtime->pitch_keycenter, 127, exgroups, &exgroupcount);
+                sampler_channel_release_groups(c, -1, exgroups, exgroupcount);
+            }
+        }        
+    }
+    int was_enabled = c->cc[cc] >= 64;
+    int enabled = val >= 64;
+    switch(cc)
+    {
+        case 10:
+        case 10 + 32:
+            c->cc[cc] = val;
+            if (!c->module->disable_mixer_controls)
+                c->channel_pan_cc = sampler_channel_addcc(c, 10);
+            break;
+        case 7:
+        case 7 + 32:
+            c->cc[cc] = val;
+            if (!c->module->disable_mixer_controls)
+                c->channel_volume_cc = sampler_channel_addcc(c, 7);
+            break;
+        case 64:
+            if (was_enabled && !enabled)
+            {
+                sampler_channel_stop_sustained(c);
+            }
+            break;
+        case 66:
+            if (was_enabled && !enabled)
+                sampler_channel_stop_sostenuto(c);
+            else if (!was_enabled && enabled)
+                sampler_channel_capture_sostenuto(c);
+            break;
+        
+        case 120:
+        case 123:
+            sampler_channel_stop_all(c);
+            break;
+        case 121:
+            // Recommended Practice (RP-015) Response to Reset All Controllers
+            // http://www.midi.org/techspecs/rp15.php
+            sampler_channel_process_cc(c, 64, 0);
+            sampler_channel_process_cc(c, 66, 0);
+            c->cc[11] = 127;
+            c->cc[1] = 0;
+            c->pitchwheel = 0;
+            c->cc[smsrc_chanaft] = 0;
+            // XXXKF reset polyphonic pressure values when supported
+            return;
+    }
+    if (cc < 120)
+        c->cc[cc] = val;
 }
 
 void sampler_channel_release_groups(struct sampler_channel *c, int note, int exgroups[MAX_RELEASED_GROUPS], int exgroupcount)

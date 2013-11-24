@@ -59,6 +59,7 @@ struct sampler_channel
     int active_voices;
     uint8_t prev_note_velocity[128];
     uint32_t prev_note_start_time[128];
+    int channel_volume_cc, channel_pan_cc;
 };
 
 struct sampler_lfo
@@ -142,6 +143,7 @@ struct sampler_module
     int output_pairs, aux_pairs;
     uint32_t current_time;
     gboolean deleting;
+    int disable_mixer_controls;
     struct cbox_prefetch_stack *pipe_stack;
     struct cbox_sincos sincos[12800];
 };
@@ -167,6 +169,7 @@ extern void sampler_channel_stop_sostenuto(struct sampler_channel *c);
 extern void sampler_channel_capture_sostenuto(struct sampler_channel *c);
 extern void sampler_channel_release_groups(struct sampler_channel *c, int note, int exgroups[MAX_RELEASED_GROUPS], int exgroupcount);
 extern void sampler_channel_stop_all(struct sampler_channel *c);
+extern void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val);
 
 extern void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel, int *exgroups, int *pexgroupcount);
 extern void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft);
