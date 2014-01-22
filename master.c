@@ -39,7 +39,8 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
             cbox_execute_on(fb, NULL, "/timesig", "ii", error, m->timesig_nom, m->timesig_denom) &&
             cbox_execute_on(fb, NULL, "/playing", "i", error, (int)m->state) &&
             cbox_execute_on(fb, NULL, "/pos", "i", error, m->spb->song_pos_samples) &&
-            cbox_execute_on(fb, NULL, "/pos_ppqn", "i", error, m->spb->song_pos_ppqn);
+            cbox_execute_on(fb, NULL, "/pos_ppqn", "i", error, m->spb->song_pos_ppqn) &&
+            cbox_execute_on(fb, NULL, "/ppqn_factor", "i", error, (int)m->ppqn_factor);
     }
     else
     if (!strcmp(cmd->command, "/tell") && !*cmd->arg_types)
@@ -62,6 +63,12 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
     if (!strcmp(cmd->command, "/set_timesig") && !strcmp(cmd->arg_types, "ii"))
     {
         cbox_master_set_timesig(m, CBOX_ARG_I(cmd, 0), CBOX_ARG_I(cmd, 1));
+        return TRUE;
+    }
+    else
+    if (!strcmp(cmd->command, "/set_ppqn_factor") && !strcmp(cmd->arg_types, "i"))
+    {
+        m->ppqn_factor = CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     else
@@ -131,6 +138,7 @@ static void cbox_master_init(struct cbox_master *master, struct cbox_engine *eng
     master->engine = engine;
     master->song = NULL;
     master->spb = NULL;
+    master->ppqn_factor = 48;
     cbox_command_target_init(&master->cmd_target, master_process_cmd, master);
 }
 
@@ -159,25 +167,6 @@ void cbox_master_set_timesig(struct cbox_master *master, int beats, int unit)
     master->timesig_nom = beats;
     master->timesig_denom = unit;
 }
-
-/*
-void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt, int time_samples)
-{
-    double second = ((double)time_samples) / master->srate;
-    double beat = master->tempo * second / 60;
-    int beat_int = (int)beat;
-    bbt->bar = beat_int / master->timesig_nom;
-    bbt->beat = beat_int % master->timesig_nom;
-    bbt->tick = (beat - beat_int) * PPQN; // XXXKF what if timesig_denom is not 4?
-    
-}
-
-uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct cbox_bbt *bbt)
-{
-    double beat = bbt->bar * master->timesig_nom + bbt->beat + bbt->tick * 1.0 / PPQN;
-    return (uint32_t)(master->srate * 60 / master->tempo);
-}
-*/
 
 #define cbox_master_play_args(ARG)
 
@@ -330,7 +319,7 @@ int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn)
             offset = tmi->time_samples;
         }
     }
-    return offset + (int)(master->srate * 60.0 * time_ppqn / (tempo * PPQN));
+    return offset + (int)(master->srate * 60.0 * time_ppqn / (tempo * master->ppqn_factor));
 }
 
 int cbox_master_samples_to_ppqn(struct cbox_master *master, int time_samples)
@@ -348,7 +337,7 @@ int cbox_master_samples_to_ppqn(struct cbox_master *master, int time_samples)
             offset = tmi->time_ppqn;
         }
     }
-    return offset + (int)(tempo * PPQN * time_samples / (master->srate * 60.0));
+    return offset + (int)(tempo * master->ppqn_factor * time_samples / (master->srate * 60.0));
 }
 
 void cbox_master_destroy(struct cbox_master *master)

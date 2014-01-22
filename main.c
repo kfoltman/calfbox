@@ -309,11 +309,11 @@ int main(int argc, char *argv[])
     }
     cbox_rt_start(app.rt, NULL);
     if (drum_pattern_name)
-        cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_load(app.engine->master->song, drum_pattern_name, 1));
+        cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_load(app.engine->master->song, drum_pattern_name, 1, app.engine->master->ppqn_factor));
     else if (drum_track_name)
-        cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_load_track(app.engine->master->song, drum_track_name, 1));
+        cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_load_track(app.engine->master->song, drum_track_name, 1, app.engine->master->ppqn_factor));
     else if (metronome)
-        cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_new_metronome(app.engine->master->song, app.engine->master->timesig_nom));
+        cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_new_metronome(app.engine->master->song, app.engine->master->timesig_nom, app.engine->master->ppqn_factor));
     
     gboolean has_song = drum_pattern_name || drum_track_name || metronome;
     if (play_immediately == 1 || (play_immediately != -1 && has_song))

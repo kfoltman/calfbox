@@ -29,11 +29,11 @@ extern void cbox_song_remove_pattern(struct cbox_song *song, struct cbox_midi_pa
 
 CBOX_CLASS_DEFINITION_ROOT(cbox_midi_pattern)
 
-struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_song *song, int ts)
+struct cbox_midi_pattern *cbox_midi_pattern_new_metronome(struct cbox_song *song, int ts, uint64_t ppqn_factor)
 {
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(ppqn_factor);
     
-    int length = PPQN;
+    int length = (int)ppqn_factor;
     int channel = cbox_config_get_int("metronome", "channel", 10);
     int accnote = cbox_config_get_note("metronome", "note_accent", 37);
     int note = cbox_config_get_note("metronome", "note", 37);
@@ -77,7 +77,7 @@ static int cbox_midi_pattern_load_smf_into(struct cbox_midi_pattern_maker *m, co
 }
 #endif
 
-static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m, const char *name, int start_pos, int transpose, int transpose_to_note)
+static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m, const char *name, int start_pos, int transpose, int transpose_to_note, uint64_t ppqn_factor)
 {
     gchar *cfg_section = g_strdup_printf("pattern:%s", name);
     
@@ -97,7 +97,7 @@ static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m
         g_warning("libsmf disabled at build time, MIDI import functionality not available.");
 #endif
 
-    int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
+    int length = ppqn_factor * cbox_config_get_int(cfg_section, "beats", 4);
     int gchannel = cbox_config_get_int(cfg_section, "channel", 1);
     int gswing = cbox_config_get_int(cfg_section, "swing", 0);
     int gres = cbox_config_get_int(cfg_section, "resolution", 4);
@@ -155,13 +155,13 @@ static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m
                 {
                     int pitch = note_from_string(note);
                     
-                    int pos = t * PPQN / res + start_pos;
+                    int pos = t * ppqn_factor / res + start_pos;
                     if (t & 1)
-                        pos += PPQN * swing / (res * 24);
+                        pos += ppqn_factor * swing / (res * 24);
                     
-                    int pos2 = (t + 1) * PPQN / res + start_pos;
+                    int pos2 = (t + 1) * ppqn_factor / res + start_pos;
                     if (t & 1)
-                        pos2 += PPQN * swing / (res * 24);
+                        pos2 += ppqn_factor * swing / (res * 24);
                     
                     pitch += transpose;
 
@@ -180,7 +180,7 @@ static int cbox_midi_pattern_load_melodic_into(struct cbox_midi_pattern_maker *m
     return length;
 }
 
-static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, const char *name, int start_pos)
+static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, const char *name, int start_pos, uint64_t ppqn_factor)
 {
     gchar *cfg_section = g_strdup_printf("drumpattern:%s", name);
     
@@ -200,7 +200,7 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
         g_warning("libsmf disabled at build time, MIDI import functionality not available.");
 #endif
 
-    int length = PPQN * cbox_config_get_int(cfg_section, "beats", 4);
+    int length = ppqn_factor * cbox_config_get_int(cfg_section, "beats", 4);
     int channel = cbox_config_get_int(cfg_section, "channel", 10);
     int gswing = cbox_config_get_int(cfg_section, "swing", 0);
     int gres = cbox_config_get_int(cfg_section, "resolution", 4);
@@ -231,9 +231,9 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
             int t = 0;
             for (int i = 0; trigger[i]; i++)
             {
-                int pos = t * PPQN / res + start_pos;
+                int pos = t * ppqn_factor / res + start_pos;
                 if (t & 1)
-                    pos += PPQN * swing / (res * 24);
+                    pos += ppqn_factor * swing / (res * 24);
                 if (trigger[i] >= '1' && trigger[i] <= '9')
                 {
                     int amt = (trigger[i] - '0') * 127 / 9;
@@ -243,7 +243,7 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
                 }
                 if (trigger[i] == 'F') // flam
                 {
-                    int dflam = PPQN / 4;
+                    int dflam = ppqn_factor / 4;
                     int rnd = rand() & 7;
                     dflam += rnd / 2;
                     cbox_midi_pattern_maker_add(m, pos - dflam, 0x90 + channel - 1, note, 90+rnd);
@@ -254,10 +254,10 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
                 }
                 if (trigger[i] == 'D') // drag
                 {
-                    pos = (t + 1) * PPQN / res + start_pos;
+                    pos = (t + 1) * ppqn_factor / res + start_pos;
                     //if (!(t & 1))
-                    //    pos += PPQN * swing / (res * 24);
-                    float dflam = PPQN/8.0;
+                    //    pos += ppqn_factor * swing / (res * 24);
+                    float dflam = ppqn_factor/8.0;
                     int rnd = rand() & 7;
                     cbox_midi_pattern_maker_add(m, pos - dflam*2, 0x90 + channel - 1, note, 70+rnd);
                     cbox_midi_pattern_maker_add(m, pos - dflam*2 + 1, 0x80 + channel - 1, note, 0);
@@ -278,15 +278,15 @@ static int cbox_midi_pattern_load_drum_into(struct cbox_midi_pattern_maker *m, c
     return length;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_load(struct cbox_song *song, const char *name, int is_drum)
+struct cbox_midi_pattern *cbox_midi_pattern_load(struct cbox_song *song, const char *name, int is_drum, uint64_t ppqn_factor)
 {
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(ppqn_factor);
     
     int length = 0;
     if (is_drum)
-        length = cbox_midi_pattern_load_drum_into(m, name, 0);
+        length = cbox_midi_pattern_load_drum_into(m, name, 0, ppqn_factor);
     else
-        length = cbox_midi_pattern_load_melodic_into(m, name, 0, 0, -1);
+        length = cbox_midi_pattern_load_melodic_into(m, name, 0, 0, -1, ppqn_factor);
     struct cbox_midi_pattern *p = cbox_midi_pattern_maker_create_pattern(m, song, g_strdup(name));
     p->loop_end = length;
     
@@ -295,10 +295,10 @@ struct cbox_midi_pattern *cbox_midi_pattern_load(struct cbox_song *song, const c
     return p;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_song *song, const char *name, int is_drum)
+struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_song *song, const char *name, int is_drum, uint64_t ppqn_factor)
 {
     int length = 0;
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(ppqn_factor);
     
     gchar *cfg_section = g_strdup_printf(is_drum ? "drumtrack:%s" : "track:%s", name);
     
@@ -351,9 +351,9 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_song *song, c
                     is_drum_pat = !is_drum_pat;
                 }
                 if (is_drum_pat)
-                    plen = cbox_midi_pattern_load_drum_into(m, v + nofs, length); 
+                    plen = cbox_midi_pattern_load_drum_into(m, v + nofs, length, ppqn_factor); 
                 else
-                    plen = cbox_midi_pattern_load_melodic_into(m, v + nofs, length, xpval, xpnote); 
+                    plen = cbox_midi_pattern_load_melodic_into(m, v + nofs, length, xpval, xpnote, ppqn_factor); 
                 g_free(v);
                 if (plen < 0)
                 {
@@ -381,9 +381,9 @@ struct cbox_midi_pattern *cbox_midi_pattern_load_track(struct cbox_song *song, c
     return p;
 }
 
-struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(struct cbox_song *song, const struct cbox_blob *blob, int length)
+struct cbox_midi_pattern *cbox_midi_pattern_new_from_blob(struct cbox_song *song, const struct cbox_blob *blob, int length, uint64_t ppqn_factor)
 {
-    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new();
+    struct cbox_midi_pattern_maker *m = cbox_midi_pattern_maker_new(ppqn_factor);
     
     struct cbox_blob_serialized_event event;
     for (size_t i = 0; i < blob->size; i += sizeof(event))

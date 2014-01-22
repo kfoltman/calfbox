@@ -71,12 +71,14 @@ struct cbox_midi_pattern_maker
 {
     CBOX_OBJECT_HEADER()    
     GTree *events;
+    uint64_t ppqn_factor;
 };
 
-struct cbox_midi_pattern_maker *cbox_midi_pattern_maker_new(void)
+struct cbox_midi_pattern_maker *cbox_midi_pattern_maker_new(uint64_t ppqn_factor)
 {
     struct cbox_midi_pattern_maker *maker = malloc(sizeof(struct cbox_midi_pattern_maker));
     maker->events = g_tree_new_full(event_entry_compare, NULL, event_entry_destroy, NULL);
+    maker->ppqn_factor = ppqn_factor;
     return maker;
 }
 
@@ -162,10 +164,10 @@ gboolean cbox_midi_pattern_maker_load_smf(struct cbox_midi_pattern_maker *maker,
         if (smf_event_is_metadata(event))
                 continue;
 
-        cbox_midi_pattern_maker_add_mem(maker, event->time_pulses * 1.0 * PPQN / ppqn, event->midi_buffer, event->midi_buffer_length);
+        cbox_midi_pattern_maker_add_mem(maker, event->time_pulses * 1.0 * maker->ppqn_factor / ppqn, event->midi_buffer, event->midi_buffer_length);
     }
     if (length)
-        *length = smf_get_length_pulses(smf) * 1.0 * PPQN / ppqn;
+        *length = smf_get_length_pulses(smf) * 1.0 * maker->ppqn_factor / ppqn;
     smf_delete(smf);
      
     return TRUE;

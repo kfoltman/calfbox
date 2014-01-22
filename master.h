@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include "cmd.h"
 
-#define PPQN 48
+extern uint64_t PPQN;
 
 struct cbox_song;
 struct cbox_rt;
@@ -42,6 +42,7 @@ struct cbox_master
     float tempo, new_tempo;
     int timesig_nom;
     int timesig_denom; // must be 4 for now
+    uint64_t ppqn_factor;
     enum cbox_master_transport_state state;
     struct cbox_engine *engine;
     struct cbox_song *song;

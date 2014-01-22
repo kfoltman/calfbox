@@ -401,6 +401,9 @@ class Transport:
     def set_timesig(nom, denom):
         do_cmd('/master/set_timesig', None, [int(nom), int(denom)])
     @staticmethod
+    def set_ppqn_factor(factor):
+        do_cmd('/master/set_ppqn_factor', None, [int(factor)])
+    @staticmethod
     def play():
         do_cmd('/master/play', None, [])
     @staticmethod
@@ -411,7 +414,7 @@ class Transport:
         do_cmd('/master/panic', None, [])
     @staticmethod
     def status():
-        return GetThings("/master/status", ['pos', 'pos_ppqn', 'tempo', 'timesig', 'sample_rate', 'playing'], [])
+        return GetThings("/master/status", ['pos', 'pos_ppqn', 'tempo', 'timesig', 'sample_rate', 'playing', 'ppqn_factor'], [])
     @staticmethod
     def tell():
         return GetThings("/master/tell", ['pos', 'pos_ppqn', 'playing'], [])

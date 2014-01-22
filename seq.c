@@ -411,7 +411,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
         tmi->timesig_denom = timesig_denom;
         
         pos_ppqn += mti->duration_ppqn;
-        pos_samples += spb->master->srate * 60.0 * mti->duration_ppqn / (tempo * PPQN);
+        pos_samples += spb->master->srate * 60.0 * mti->duration_ppqn / (tempo * master->ppqn_factor);
         pos++;
     }
     return spb;
