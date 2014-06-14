@@ -244,7 +244,7 @@ void cbox_midi_clip_playback_set_pattern(struct cbox_midi_clip_playback *pb, str
     pb->end_time_samples = end_time_samples;
     pb->item_start_ppqn = item_start_ppqn;
     pb->offset_ppqn = offset_ppqn;
-    pb->min_time_ppqn = 0;
+    pb->min_time_ppqn = offset_ppqn;
 }
 
 void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, int offset, int nsamples)
