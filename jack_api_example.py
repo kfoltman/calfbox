@@ -61,6 +61,7 @@ inputs = cbox.JackIO.get_ports(".*", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS
 outputs = cbox.JackIO.get_ports(".*", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SINK | cbox.JackIO.PORT_IS_PHYSICAL)
 cbox.JackIO.port_connect(inputs[0], outputs[0])
 cbox.JackIO.port_connect(inputs[1], outputs[1])
+assert "cbox:in_3" in cbox.JackIO.get_connected_ports(inputs[0])
 
 scene = Document.get_scene()
 scene.clear()

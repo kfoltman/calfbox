@@ -495,6 +495,9 @@ class JackIO:
     @staticmethod
     def get_ports(name_mask = ".*", type_mask = ".*", flag_mask = 0):
         return get_thing("/io/get_ports", '/port', [str], name_mask, type_mask, int(flag_mask))
+    @staticmethod
+    def get_connected_ports(port):
+        return get_thing("/io/get_connected_ports", '/port', [str], port)
 
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])
