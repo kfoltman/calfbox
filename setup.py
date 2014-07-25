@@ -8,6 +8,8 @@ packages = ['glib-2.0', 'jack', 'fluidsynth', 'libusb-1.0', 'smf', 'sndfile']
 
 eargs = os.popen("pkg-config --cflags %s" % (" ".join(packages)), "r").read().split()
 eargs.append("-std=c99")
+# Workaround for Python3.4 headers
+eargs.append("-Wno-error=declaration-after-statement")
 
 libs = os.popen("pkg-config --libs %s" % (" ".join(packages)), "r").read().split()
 libs.append("-luuid")
