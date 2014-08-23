@@ -525,7 +525,7 @@ void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_secti
 
 struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, const char *cfg_section)
 {
-    struct sampler_layer *l = sampler_layer_new(m, parent_program, NULL);
+    struct sampler_layer *l = sampler_layer_new(m, parent_program, parent_program->default_group);
     sampler_layer_load_overrides(l, cfg_section);
     sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, parent_program);
     sampler_layer_reset_switches(l, m);
