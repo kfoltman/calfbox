@@ -755,6 +755,14 @@ try_now:
         else
             goto unknown_key;
     }
+    else if (!strncmp(key, "pitch_cc", 8))
+    {
+        int ccno = atoi(key + 8);
+        if (ccno > 0 && ccno < 120)
+            sampler_layer_set_modulation1(l, ccno, smdest_pitch, atof_C(value), 0);
+        else
+            goto unknown_key;
+    }
     else if (!strncmp(key, "gain_cc", 7))
     {
         int ccno = atoi(key + 7);
