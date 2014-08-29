@@ -155,6 +155,7 @@ enum sampler_moddest
     smdest_pitch,
     smdest_cutoff,
     smdest_resonance,
+    smdest_tonectl,
     
     smdestcount
 };
@@ -260,6 +261,8 @@ typedef int midi_note_t;
     MACRO(int, bend_up, 200) \
     MACRO(int, bend_down, 200) \
     MACRO(float, rt_decay, 0) \
+    MACRO(float, tonectl, 0) \
+    MACRO(float, tonectl_freq, 0) \
     MACRO##_dahdsr(amp_env, ampeg, 0) \
     MACRO##_dahdsr(filter_env, fileg, 1) \
     MACRO##_dahdsr(pitch_env, pitcheg, 2) \

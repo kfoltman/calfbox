@@ -763,6 +763,14 @@ try_now:
         else
             goto unknown_key;
     }
+    else if (!strncmp(key, "tonectl_cc", 10))
+    {
+        int ccno = atoi(key + 10);
+        if (ccno > 0 && ccno < 120)
+            sampler_layer_set_modulation1(l, ccno, smdest_tonectl, atof_C(value), 0);
+        else
+            goto unknown_key;
+    }
     else if (!strncmp(key, "gain_cc", 7))
     {
         int ccno = atoi(key + 7);
@@ -923,7 +931,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     
     static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
     static const char *modsrc_names[] = { "chanaft", "vel", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
-    static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance" };
+    static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl" };
     for(GSList *nif = l->nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;

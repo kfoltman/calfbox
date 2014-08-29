@@ -305,6 +305,8 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     cbox_biquadf_reset(&v->filter_right);
     cbox_biquadf_reset(&v->filter_left2);
     cbox_biquadf_reset(&v->filter_right2);
+    cbox_onepolef_reset(&v->onepole_left);
+    cbox_onepolef_reset(&v->onepole_right);
     
     GSList *nif = v->layer->nifs;
     while(nif)
@@ -466,6 +468,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     moddests[smdest_pitch] = pitch;
     moddests[smdest_cutoff] = v->cutoff_shift;
     moddests[smdest_resonance] = 0;
+    moddests[smdest_tonectl] = 0;
     GSList *mod = l->modulations;
     if (__builtin_expect(l->trigger == stm_release, 0))
         moddests[smdest_gain] -= v->age * l->rt_decay * m->module.srate_inv;
@@ -665,6 +668,14 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             assert(0);
         }
     }
+    if (l->tonectl_freq != 0)
+    {
+        float ctl = l->tonectl + moddests[smdest_tonectl];
+        if (fabs(ctl) > 0.0001f)
+            cbox_onepolef_set_highshelf_tonectl(&v->onepole_coeffs, l->tonectl_freq * M_PI * m->module.srate_inv, dB2gain(l->tonectl + moddests[smdest_tonectl]));
+        else
+            cbox_onepolef_set_highshelf_tonectl(&v->onepole_coeffs, l->tonectl_freq * M_PI * m->module.srate_inv, 1.0);
+    }
     
     float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
         
@@ -698,6 +709,11 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         cbox_biquadf_process(&v->filter_right, &v->filter_coeffs, right);
         if (is4p)
             cbox_biquadf_process(&v->filter_right2, second_filter, right);
+    }
+    if (l->tonectl != -1)
+    {
+        cbox_onepolef_process(&v->onepole_left, &v->onepole_coeffs, left);
+        cbox_onepolef_process(&v->onepole_right, &v->onepole_coeffs, right);
     }
     if (__builtin_expect(l->eq_bitmask, 0))
     {

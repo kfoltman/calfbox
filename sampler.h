@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "biquad-float.h"
 #include "envelope.h"
 #include "module.h"
+#include "onepole-float.h"
 #include "prefetch_pipe.h"
 #include "sampler_layer.h"
 #include "sampler_prg.h"
@@ -113,6 +114,8 @@ struct sampler_voice
     struct cbox_biquadf_state filter_left, filter_right;
     struct cbox_biquadf_state filter_left2, filter_right2;
     struct cbox_biquadf_coeffs filter_coeffs, filter_coeffs_extra;
+    struct cbox_onepolef_state onepole_left, onepole_right;
+    struct cbox_onepolef_coeffs onepole_coeffs;
     struct sampler_channel *channel;
     struct cbox_envelope amp_env, filter_env, pitch_env;
     struct sampler_lfo amp_lfo, filter_lfo, pitch_lfo;
