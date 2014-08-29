@@ -307,6 +307,9 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     cbox_biquadf_reset(&v->filter_right2);
     cbox_onepolef_reset(&v->onepole_left);
     cbox_onepolef_reset(&v->onepole_right);
+    // set gain later (it's a less expensive operation)
+    if (l->tonectl_freq != 0)
+        cbox_onepolef_set_highshelf_tonectl(&v->onepole_coeffs, l->tonectl_freq * M_PI * m->module.srate_inv, 1.0);
     
     GSList *nif = v->layer->nifs;
     while(nif)
@@ -672,9 +675,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     {
         float ctl = l->tonectl + moddests[smdest_tonectl];
         if (fabs(ctl) > 0.0001f)
-            cbox_onepolef_set_highshelf_tonectl(&v->onepole_coeffs, l->tonectl_freq * M_PI * m->module.srate_inv, dB2gain(l->tonectl + moddests[smdest_tonectl]));
+            cbox_onepolef_set_highshelf_setgain(&v->onepole_coeffs, dB2gain(ctl));
         else
-            cbox_onepolef_set_highshelf_tonectl(&v->onepole_coeffs, l->tonectl_freq * M_PI * m->module.srate_inv, 1.0);
+            cbox_onepolef_set_highshelf_setgain(&v->onepole_coeffs, 1.0);
     }
     
     float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
@@ -710,7 +713,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (is4p)
             cbox_biquadf_process(&v->filter_right2, second_filter, right);
     }
-    if (l->tonectl != -1)
+    if (l->tonectl_freq != 0)
     {
         cbox_onepolef_process(&v->onepole_left, &v->onepole_coeffs, left);
         cbox_onepolef_process(&v->onepole_right, &v->onepole_coeffs, right);

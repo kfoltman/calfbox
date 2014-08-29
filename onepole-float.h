@@ -74,6 +74,12 @@ static inline void cbox_onepolef_set_highshelf_tonectl(struct cbox_onepolef_coef
     coeffs->b1 = b1;
 }
 
+static inline void cbox_onepolef_set_highshelf_setgain(struct cbox_onepolef_coeffs *coeffs, float g0)
+{
+    coeffs->a0 = 0.5 * (1 + coeffs->b1 + g0 - coeffs->b1 * g0);
+    coeffs->a1 = 0.5 * (1 + coeffs->b1 - g0 + coeffs->b1 * g0);
+}
+
 static inline void cbox_onepolef_set_allpass(struct cbox_onepolef_coeffs *coeffs, float w)
 {
     float x = tan (w * 0.5f);
