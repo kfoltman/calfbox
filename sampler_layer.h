@@ -306,7 +306,8 @@ typedef int midi_note_t;
 #define PROC_SUBSTRUCT_RESET_HAS_FIELD(name, index, def_value, param, dst) \
     dst->has_##param.name = 0;
 #define PROC_SUBSTRUCT_CLONE(name, index, def_value, param, dst, src) \
-    dst->param.name = src->param.name;
+    dst->param.name = src->param.name; \
+    dst->has_##param.name = src->has_##param.name;
 #define PROC_SUBSTRUCT_CLONEPARENT(name, index, def_value, param, l) \
     if (!l->has_##param.name) \
         l->param.name = parent ? parent->param.name : def_value;
