@@ -4,7 +4,12 @@ from distutils.core import setup, Extension
 import glob
 import os
 
-packages = ['glib-2.0', 'jack', 'fluidsynth', 'libusb-1.0', 'smf', 'sndfile']
+packages = ['glib-2.0', 'libusb-1.0', 'smf', 'sndfile']
+
+if '#define USE_FLUIDSYNTH 1' in open('config.h').read():
+    packages.append('fluidsynth')
+if '#define USE_JACK 1' in open('config.h').read():
+    packages.append('jack')
 
 eargs = os.popen("pkg-config --cflags %s" % (" ".join(packages)), "r").read().split()
 eargs.append("-std=c99")
@@ -80,6 +85,10 @@ csources = [
 
 if '#define USE_SSE 1' in open('config.h').read():
     eargs.append('-msse')
+    eargs.append('-ffast-math')
+if '#define USE_NEON 1' in open('config.h').read():
+    eargs.append('-mfloat-abi=hard')
+    eargs.append('-mfpu=neon')
     eargs.append('-ffast-math')
 
 setup(name="CalfBox",
