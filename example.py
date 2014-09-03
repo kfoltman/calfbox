@@ -10,7 +10,7 @@ from gui_tools import *
 import fx_gui
 import instr_gui
 import drumkit_editor
-import drum_pattern_editor
+#import drum_pattern_editor
 
 class SceneDialog(SelectObjectDialog):
     title = "Select a scene"
@@ -163,7 +163,7 @@ class MainWindow(Gtk.Window):
         self.add(self.vbox)
         self.create()
         set_timer(self, 30, self.update)
-        self.drum_pattern_editor = None
+        #self.drum_pattern_editor = None
         self.drumkit_editor = None
 
     def create(self):
@@ -186,7 +186,7 @@ class MainWindow(Gtk.Window):
         self.menu_bar.append(create_menu("_Tools", [
             ("_Drum Kit Editor", self.tools_drumkit_editor),
             ("_Play Drum Pattern", self.tools_play_drum_pattern),
-            ("_Edit Drum Pattern", self.tools_drum_pattern_editor),
+            #("_Edit Drum Pattern", self.tools_drum_pattern_editor),
             ("_Un-zombify", self.tools_unzombify),
             ("_Object list", self.tools_object_list),
             ("_Wave bank dump", self.tools_wave_bank_dump),
