@@ -46,6 +46,7 @@ extern struct cbox_module_manifest compressor_module;
 extern struct cbox_module_manifest gate_module;
 extern struct cbox_module_manifest distortion_module;
 extern struct cbox_module_manifest fuzz_module;
+extern struct cbox_module_manifest limiter_module;
 
 struct cbox_module_manifest *cbox_module_list[] = {
     &tonewheel_organ_module,
@@ -69,6 +70,7 @@ struct cbox_module_manifest *cbox_module_list[] = {
     &gate_module,
     &distortion_module,
     &fuzz_module,
+    &limiter_module,
     NULL
 };
 

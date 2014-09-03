@@ -459,7 +459,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     
     if (__builtin_expect(v->amp_env.cur_stage < 0, 0))
     {
-        if (is_tail_finished(v))
+        if (__builtin_expect(is_tail_finished(v), 0))
         {
             sampler_voice_inactivate(v, TRUE);
             return;
@@ -671,7 +671,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             assert(0);
         }
     }
-    if (l->tonectl_freq != 0)
+    if (__builtin_expect(l->tonectl_freq != 0, 0))
     {
         float ctl = l->tonectl + moddests[smdest_tonectl];
         if (fabs(ctl) > 0.0001f)
@@ -713,7 +713,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (is4p)
             cbox_biquadf_process(&v->filter_right2, second_filter, right);
     }
-    if (l->tonectl_freq != 0)
+    if (__builtin_expect(l->tonectl_freq != 0, 0))
     {
         cbox_onepolef_process(&v->onepole_left, &v->onepole_coeffs, left);
         cbox_onepolef_process(&v->onepole_right, &v->onepole_coeffs, right);

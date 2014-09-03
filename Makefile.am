@@ -29,6 +29,7 @@ calfbox_SOURCES = \
     jackinput.c \
     jackio.c \
     layer.c \
+    limiter.c \
     main.c \
     master.c \
     menu.c \

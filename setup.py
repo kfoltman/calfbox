@@ -49,6 +49,7 @@ csources = [
     "jackinput.c",
     "jackio.c",
     "layer.c",
+    "limiter.c",
     "master.c",
     "meter.c",
     "midi.c",

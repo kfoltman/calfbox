@@ -177,6 +177,15 @@ class FuzzWindow(EffectWindow):
     engine_name = "fuzz"
     effect_name = "Fuzz"
 
+class LimiterWindow(EffectWindow):
+    params = [
+        SliderRow("Threshold", "threshold", -100, 12),
+        MappedSliderRow("Attack", "attack", LogMapper(1, 1000, ms_format)),
+        MappedSliderRow("Release", "release", LogMapper(1, 5000, ms_format)),
+    ]
+    engine_name = "limiter"
+    effect_name = "Limiter"
+
 class EQCommon(object):
     columns = [
         CheckBoxRow("Active", "active"),
@@ -302,9 +311,10 @@ class FXChainWindow(EffectWindow):
         cbox.do_cmd(self.path + "/move", None, [pos, pos + 1])
         self.refresh_table()
 
+
 #################################################################################################################################
 
-effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor', 'gate', 'distortion', 'fuzz', 'fxchain']
+effect_engines = ['', 'phaser', 'reverb', 'chorus', 'feedback_reducer', 'tone_control', 'delay', 'parametric_eq', 'compressor', 'gate', 'distortion', 'fuzz', 'fxchain', 'limiter']
 
 effect_window_map = {
     'phaser': PhaserWindow,
@@ -318,6 +328,7 @@ effect_window_map = {
     'gate': GateWindow,
     'distortion': DistortionWindow,
     'fuzz': FuzzWindow,
+    'limiter': LimiterWindow,
     'fxchain': FXChainWindow,
 }
 
