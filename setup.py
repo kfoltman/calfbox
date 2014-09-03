@@ -6,7 +6,7 @@ import os
 import sys
 
 if sys.version_info[0] < 3:
-    raise Exception, "Python 3 required."
+    raise Exception("Python 3 required.")
 
 packages = ['glib-2.0', 'libusb-1.0', 'smf', 'sndfile']
 
@@ -49,6 +49,7 @@ csources = [
     "jackinput.c",
     "jackio.c",
     "layer.c",
+    "limiter.c",
     "master.c",
     "meter.c",
     "midi.c",
