@@ -84,7 +84,7 @@ MODULE_CREATE_FUNCTION({name})
     }
     
     struct {name}_module *m = malloc(sizeof(struct {name}_module));
-    CALL_MODULE_INIT(&m->module, m, 0, 2, {name}_process_cmd);
+    CALL_MODULE_INIT(m, 0, 2, {name});
     m->module.process_event = {name}_process_event;
     m->module.process_block = {name}_process_block;
     struct {name}_params *p = malloc(sizeof(struct {name}_params));
