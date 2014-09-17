@@ -16,6 +16,11 @@ pgm_no = instrument.engine.get_unused_program()
 pgm = instrument.engine.load_patch_from_file(pgm_no, 'synthbass.sfz', 'SynthBass')
 instrument.engine.set_patch(1, pgm_no)
 print (instrument.engine.get_patches())
+print (instrument.get_output_slot(0))
+print (instrument.get_output_slot(0).status())
+instrument.get_output_slot(0).set_insert_engine("reverb")
+print (instrument.get_output_slot(0).status())
+instrument.get_output_slot(0).engine.cmd("/wet_amt", None, 1.0)
 for i in pgm.get_groups():
     print ("<group>", i.as_string())
     for j in i.get_children():

@@ -732,6 +732,25 @@ class DocSong(DocObj):
         do_cmd("/update_playback", None, [])
 Document.classmap['cbox_song'] = DocSong
 
+class UnknownModule(NonDocObj):
+    class Status:
+        pass
+    
+class EffectSlot(NonDocObj):
+    class Status:
+        insert_preset = SettableProperty(str)
+        insert_engine = SettableProperty(str)
+        bypass = SettableProperty(bool)
+    def init_object(self):
+        # XXXKF add wrapper classes for effect engines
+        self.engine = UnknownModule(self.path + "/engine")
+
+class InstrumentOutput(EffectSlot):
+    class Status(EffectSlot.Status):
+        gain_linear = float
+        gain = float
+        output = int
+
 class DocInstrument(DocObj):
     class Status:
         name = str
@@ -739,11 +758,19 @@ class DocInstrument(DocObj):
         aux_offset = int
         engine = str
     def init_object(self):
-        engine = self.status().engine
+        s = self.status()
+        engine = s.engine
         if engine in engine_classes:
             self.engine = engine_classes[engine]("/doc/uuid/" + self.uuid + "/engine")
+        self.output_slots = []
+        for i in range(s.outputs):
+            io = InstrumentOutput(self.make_path('/output/%d' % (i + 1)))
+            io.init_object()
+            self.output_slots.append(io)
     def move_to(self, target_scene, pos = 0):
         return self.cmd_makeobj("/move_to", target_scene.uuid, pos + 1)
+    def get_output_slot(self, slot):
+        return self.output_slots[slot]
 Document.classmap['cbox_instrument'] = DocInstrument
 
 class DocLayer(DocObj):
@@ -863,19 +890,6 @@ engine_classes = {
     'tonewheel_organ' : TonewheelOrganEngine,
 }
 
-class UnknownModule(NonDocObj):
-    class Status:
-        pass
-    
-class EffectSlot(NonDocObj):
-    class Status:
-        insert_preset = str
-        insert_engine = str
-        bypass = bool
-    def init_object(self):
-        # XXXKF add wrapper classes for effect engines
-        self.engine = UnknownModule(self.path+ "/engine")
-    
 class DocAuxBus(DocObj):
     class Status:
         name = str
