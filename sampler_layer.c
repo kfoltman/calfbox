@@ -864,6 +864,12 @@ try_now:
         key = "off_by";
         goto try_now;
     }
+    else if (!strncmp(key, "genericmod_", 11))
+    {
+        char **tokens = g_strsplit(key, "_", 5);
+        sampler_layer_set_modulation(l, atoi(tokens[1]), atoi(tokens[2]), atoi(tokens[3]), atof(value), atoi(tokens[4]));
+        g_strfreev(tokens);
+    }
     else
         goto unknown_key;
     
@@ -1010,7 +1016,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                 continue;
             }
         }
-        g_string_append_printf(outstr, " genericmod_from_%d_and_%d_to_%d=%s", md->src, md->src2, md->dest, floatbuf);
+        g_string_append_printf(outstr, " genericmod_%d_%d_%d_%d=%s", md->src, md->src2, md->dest, md->flags, floatbuf);
     }
 
     if (lr->unknown_keys)
