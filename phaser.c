@@ -144,6 +144,8 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     float32x2_t a0 = {m->coeffs[0].a0, m->coeffs[1].a0};
     float32x2_t a1 = {m->coeffs[0].a1, m->coeffs[1].a1};
     float32x2_t b1 = {m->coeffs[0].b1, m->coeffs[1].b1};
+    float32x2_t zero = {0.f, 0.f};
+    const float32x2_t thresh = {(1.0 / (65536.0 * 65536.0)), (1.0 / (65536.0 * 65536.0))};
     for (i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
         float32x2_t dry = {input1[i], input2[i]};
@@ -152,7 +154,10 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
         {
             // wet = sanef(coeffs->a0 * wet + coeffs->a1 * state->x1 - coeffs->b1 * state->y1);
             float32x2_t pre = wet;
-            m->state[s].y1 = wet = vadd_f32(vmul_f32(a0, wet), vsub_f32(vmul_f32(a1, m->state[s].x1), vmul_f32(b1, m->state[s].y1)));
+            wet = vadd_f32(vmul_f32(a0, wet), vsub_f32(vmul_f32(a1, m->state[s].x1), vmul_f32(b1, m->state[s].y1)));
+            // zero values < threshold
+            wet = vbsl_f32(vcage_f32(wet, thresh), wet, zero);
+            m->state[s].y1 = wet;
             m->state[s].x1 = pre;
         }
         fb = wet;
