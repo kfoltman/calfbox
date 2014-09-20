@@ -694,7 +694,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     {
         cbox_biquadf_process_stereo(&v->filter_left, &v->filter_right, &v->filter_coeffs, leftright);
         if (is4p)
-            cbox_biquadf_process_stereo(&v->filter_left, &v->filter_right, second_filter, leftright);
+            cbox_biquadf_process_stereo(&v->filter_left2, &v->filter_right2, second_filter, leftright);
     }
     if (__builtin_expect(l->tonectl_freq != 0, 0))
     {
