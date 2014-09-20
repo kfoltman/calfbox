@@ -44,11 +44,24 @@ struct phaser_params
     int stages;
 };
 
+#if USE_NEON
+#include <arm_neon.h>
+
+struct cbox_onepolef_stereo_state_neon {
+    float32x2_t x1;
+    float32x2_t y1;
+};
+#endif
+
 struct phaser_module
 {
     struct cbox_module module;
 
+#if USE_NEON
+    struct cbox_onepolef_stereo_state_neon state[NO_STAGES];
+#else
     struct cbox_onepolef_state state[NO_STAGES][2];
+#endif
     struct cbox_onepolef_coeffs coeffs[2];
     float fb[2];
     float tpdsr;
@@ -102,7 +115,7 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
 {
     struct phaser_module *m = (struct phaser_module *)module;
     struct phaser_params *p = m->params;
-    int s, c, i;
+    int s, i;
     int stages = p->stages;
     float fb_amt = p->fb_amt;
     if (stages < 0 || stages > NO_STAGES)
@@ -120,7 +133,37 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     }
     m->phase += p->lfo_freq * CBOX_BLOCK_SIZE * m->tpdsr;
     
-    for (c = 0; c < 2; c++)
+#if USE_NEON
+    float *__restrict input1 = inputs[0];
+    float *__restrict input2 = inputs[1];
+    float *__restrict output1 = outputs[0];
+    float *__restrict output2 = outputs[1];
+    float32x2_t wetdry = {p->wet_dry, p->wet_dry};
+    float32x2_t fb_amt2 = {fb_amt, fb_amt};
+    float32x2_t fb = {m->fb[0], m->fb[1]};
+    float32x2_t a0 = {m->coeffs[0].a0, m->coeffs[1].a0};
+    float32x2_t a1 = {m->coeffs[0].a1, m->coeffs[1].a1};
+    float32x2_t b1 = {m->coeffs[0].b1, m->coeffs[1].b1};
+    for (i = 0; i < CBOX_BLOCK_SIZE; i++)
+    {
+        float32x2_t dry = {input1[i], input2[i]};
+        float32x2_t wet = vsub_f32(dry, vmul_f32(fb, fb_amt2));
+        for (s = 0; s < stages; s++)
+        {
+            // wet = sanef(coeffs->a0 * wet + coeffs->a1 * state->x1 - coeffs->b1 * state->y1);
+            float32x2_t pre = wet;
+            m->state[s].y1 = wet = vadd_f32(vmul_f32(a0, wet), vsub_f32(vmul_f32(a1, m->state[s].x1), vmul_f32(b1, m->state[s].y1)));
+            m->state[s].x1 = pre;
+        }
+        fb = wet;
+        wet = vadd_f32(dry, vmul_f32(vsub_f32(wet, dry), wetdry));
+        output1[i] = wet[0];
+        output2[i] = wet[1];
+    }
+    m->fb[0] = fb[0];
+    m->fb[1] = fb[1];
+#else
+    for (int c = 0; c < 2; c++)
     {
         for (i = 0; i < CBOX_BLOCK_SIZE; i++)
         {
@@ -132,6 +175,7 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
             outputs[c][i] = dry + (wet - dry) * p->wet_dry;
         }
     }
+#endif
 }
 
 MODULE_SIMPLE_DESTROY_FUNCTION(phaser)
@@ -162,10 +206,19 @@ MODULE_CREATE_FUNCTION(phaser)
     p->wet_dry = cbox_config_get_float(cfg_section, "wet_dry", 0.5f);
     p->stages = cbox_config_get_int(cfg_section, "stages", NO_STAGES);
     
+#if USE_NEON
+    for (b = 0; b < NO_STAGES; b++)
+    {
+        float32x2_t zero = {0.f, 0.f};
+        m->state[b].x1 = zero;
+        m->state[b].y1 = zero;
+    }
+#else
     for (b = 0; b < NO_STAGES; b++)
         for (c = 0; c < 2; c++)
             cbox_onepolef_reset(&m->state[b][c]);
-    
+#endif
+
     return &m->module;
 }
 
