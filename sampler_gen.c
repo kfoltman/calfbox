@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct resampler_state
 {
-    float *left, *right;
+    float *leftright;
     int offset;
     float lgain, rgain, lgain_delta, rgain_delta;
 };
@@ -68,8 +68,8 @@ static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resam
         float32x2_t result = vmul_f32(gains, vadd_f32(v, vrev64_f32(v)));
         gains = vadd_f32(gains, gaindeltas);
         
-        rs->left[i] = result[0];
-        rs->right[i] = result[1];
+        rs->leftright[2 * i] = result[0];
+        rs->leftright[2 * i + 1] = result[1];
     }
     rs->lgain = gains[0];
     rs->rgain = gains[1];
@@ -106,8 +106,8 @@ static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct res
         float32x2_t result = vmul_f32(gains, vadd_f32(transposed.val[0], transposed.val[1]));
         gains = vadd_f32(gains, gaindeltas);
         
-        rs->left[i] = result[0];
-        rs->right[i] = result[1];
+        rs->leftright[2 * i] = result[0];
+        rs->leftright[2 * i + 1] = result[1];
     }
     rs->lgain = gains[0];
     rs->rgain = gains[1];
@@ -148,8 +148,8 @@ static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resam
         
         float c = (v4mul[0] + v4mul[1] + v4mul[2] + v4mul[3]) * ffrac;
 
-        rs->left[i] = rs->lgain * c;
-        rs->right[i] = rs->rgain * c;
+        rs->leftright[2 * i] = rs->lgain * c;
+        rs->leftright[2 * i + 1] = rs->rgain * c;
         rs->lgain += rs->lgain_delta;
         rs->rgain += rs->rgain_delta;
     }
@@ -180,8 +180,8 @@ static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct res
         float cl = (samples_left[0] + samples_left[1] + samples_left[2] + samples_left[3]) * ffrac;
         float cr = (samples_right[0] + samples_right[1] + samples_right[2] + samples_right[3]) * ffrac;
 
-        rs->left[i] = rs->lgain * cl;
-        rs->right[i] = rs->rgain * cr;
+        rs->leftright[2 * i] = rs->lgain * cl;
+        rs->leftright[2 * i + 1] = rs->rgain * cr;
         rs->lgain += rs->lgain_delta;
         rs->rgain += rs->rgain_delta;
     }
@@ -207,8 +207,8 @@ static inline void process_voice_mono_noloop(struct sampler_gen *v, struct resam
         float b1 = 3.f*(t+1.f)*(t-1.f)*(t-2.f);
         float c = (b0 * p[0] + b1 * p[1] - 3.f*(t+1.f)*t*(t-2.f) * p[2] + (t+1.f)*t*(t-1.f) * p[3]) * ffrac;
 #endif        
-        rs->left[i] = rs->lgain * c;
-        rs->right[i] = rs->rgain * c;
+        rs->leftright[2 * i] = rs->lgain * c;
+        rs->leftright[2 * i + 1] = rs->rgain * c;
         rs->lgain += rs->lgain_delta;
         rs->rgain += rs->rgain_delta;
         v->bigpos += v->bigdelta;
@@ -234,8 +234,8 @@ static inline void process_voice_stereo_noloop(struct sampler_gen *v, struct res
         float c0 = (b0 * p[0] + b1 * p[2] - 3.f*(t+1.f)*t*(t-2.f) * p[4] + (t+1.f)*t*(t-1.f) * p[6]) * ffrac;
         float c1 = (b0 * p[1] + b1 * p[3] - 3.f*(t+1.f)*t*(t-2.f) * p[5] + (t+1.f)*t*(t-1.f) * p[7]) * ffrac;
 #endif
-        rs->left[i] = rs->lgain * c0;
-        rs->right[i] = rs->rgain * c1;
+        rs->leftright[2 * i] = rs->lgain * c0;
+        rs->leftright[2 * i + 1] = rs->rgain * c1;
         rs->lgain += rs->lgain_delta;
         rs->rgain += rs->rgain_delta;
         v->bigpos += v->bigdelta;
@@ -412,11 +412,10 @@ void sampler_gen_reset(struct sampler_gen *v)
     v->prefetch_only_loop = FALSE;
 }
 
-uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *left, float *right, uint32_t limit)
+uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *leftright, uint32_t limit)
 {
     struct resampler_state rs;
-    rs.left = left;
-    rs.right = right;
+    rs.leftright = leftright;
     rs.offset = 0;
     rs.lgain = v->last_lgain;
     rs.rgain = v->last_rgain;

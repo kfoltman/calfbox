@@ -93,80 +93,66 @@ static gboolean is_tail_finished(struct sampler_voice *v)
 
 #include <arm_neon.h>
 
-static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, float *src_left, float *src_right, float gain)
+static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, float *src_leftright, float gain)
 {
     float *dst_left = outputs[oofs];
     float *dst_right = outputs[oofs + 1];
     float32x2_t gain2 = {gain, gain};
-    for (size_t i = 0; i < CBOX_BLOCK_SIZE; i += 4)
+    for (size_t i = 0; i < CBOX_BLOCK_SIZE; i += 2)
     {
-        float32x2_t l1 = vld1_f32(&src_left[i]);
-        float32x2_t l2 = vld1_f32(&src_left[i + 2]);
-        float32x2_t r1 = vld1_f32(&src_right[i]);
-        float32x2_t r2 = vld1_f32(&src_right[i + 2]);
+        float32x2_t lr1 = vld1_f32(&src_leftright[2 * i]);
+        float32x2_t lr2 = vld1_f32(&src_leftright[2 * i + 2]);
+        float32x2x2_t lr12 = vtrn_f32(lr1, lr2);
         float32x2_t dl1 = vld1_f32(&dst_left[i]);
-        float32x2_t dl2 = vld1_f32(&dst_left[i + 2]);
         float32x2_t dr1 = vld1_f32(&dst_right[i]);
-        float32x2_t dr2 = vld1_f32(&dst_right[i + 2]);
         
-        l1 = vmla_f32(dl1, l1, gain2);
-        l2 = vmla_f32(dl2, l2, gain2);
+        float32x2_t l1 = vmla_f32(dl1, lr12.val[0], gain2);
         vst1_f32(&dst_left[i], l1);
-        vst1_f32(&dst_left[i + 2], l2);
-        r1 = vmla_f32(dr1, r1, gain2);
-        r2 = vmla_f32(dr2, r2, gain2);
+        float32x2_t r1 = vmla_f32(dr1, lr12.val[1], gain2);
         vst1_f32(&dst_right[i], r1);
-        vst1_f32(&dst_right[i + 2], r2);
     }
 }
 
-static inline void mix_block_into(cbox_sample_t **outputs, int oofs, float *src_left, float *src_right)
+static inline void mix_block_into(cbox_sample_t **outputs, int oofs, float *src_leftright)
 {
     float *dst_left = outputs[oofs];
     float *dst_right = outputs[oofs + 1];
-    for (size_t i = 0; i < CBOX_BLOCK_SIZE; i += 4)
+    for (size_t i = 0; i < CBOX_BLOCK_SIZE; i += 2)
     {
-        float32x2_t l1 = vld1_f32(&src_left[i]);
-        float32x2_t l2 = vld1_f32(&src_left[i + 2]);
-        float32x2_t r1 = vld1_f32(&src_right[i]);
-        float32x2_t r2 = vld1_f32(&src_right[i + 2]);
+        float32x2_t lr1 = vld1_f32(&src_leftright[2 * i]);
+        float32x2_t lr2 = vld1_f32(&src_leftright[2 * i + 2]);
+        float32x2x2_t lr12 = vtrn_f32(lr1, lr2);
         float32x2_t dl1 = vld1_f32(&dst_left[i]);
-        float32x2_t dl2 = vld1_f32(&dst_left[i + 2]);
         float32x2_t dr1 = vld1_f32(&dst_right[i]);
-        float32x2_t dr2 = vld1_f32(&dst_right[i + 2]);
         
-        l1 = vadd_f32(dl1, l1);
-        l2 = vadd_f32(dl2, l2);
+        float32x2_t l1 = vadd_f32(dl1, lr12.val[0]);
         vst1_f32(&dst_left[i], l1);
-        vst1_f32(&dst_left[i + 2], l2);
-        r1 = vadd_f32(dr1, r1);
-        r2 = vadd_f32(dr2, r2);
+        float32x2_t r1 = vadd_f32(dr1, lr12.val[1]);
         vst1_f32(&dst_right[i], r1);
-        vst1_f32(&dst_right[i + 2], r2);
     }
 }
 
 #else
 
-static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, float *src_left, float *src_right, float gain)
+static inline void mix_block_into_with_gain(cbox_sample_t **outputs, int oofs, float *src_leftright, float gain)
 {
     cbox_sample_t *dst_left = outputs[oofs];
     cbox_sample_t *dst_right = outputs[oofs + 1];
     for (size_t i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
-        dst_left[i] += gain * src_left[i];
-        dst_right[i] += gain * src_right[i];
+        dst_left[i] += gain * src_leftright[2 * i];
+        dst_right[i] += gain * src_leftright[2 * i + 1];
     }
 }
 
-static inline void mix_block_into(cbox_sample_t **outputs, int oofs, float *src_left, float *src_right)
+static inline void mix_block_into(cbox_sample_t **outputs, int oofs, float *src_leftright)
 {
     cbox_sample_t *dst_left = outputs[oofs];
     cbox_sample_t *dst_right = outputs[oofs + 1];
     for (size_t i = 0; i < CBOX_BLOCK_SIZE; i++)
     {
-        dst_left[i] += src_left[i];
-        dst_right[i] += src_right[i];
+        dst_left[i] += src_leftright[2 * i];
+        dst_right[i] += src_leftright[2 * i + 1];
     }
 }
 
@@ -680,7 +666,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             cbox_onepolef_set_highshelf_setgain(&v->onepole_coeffs, 1.0);
     }
     
-    float left[CBOX_BLOCK_SIZE], right[CBOX_BLOCK_SIZE];
+    float leftright[2 * CBOX_BLOCK_SIZE];
         
     uint32_t samples = 0;
     
@@ -692,31 +678,27 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             v->gen.mode = spt_inactive;
         else
         {
-            samples = sampler_gen_sample_playback(&v->gen, left, right, limit);
+            samples = sampler_gen_sample_playback(&v->gen, leftright, limit);
             cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.consumed);
             v->gen.consumed = 0;
         }
     }
     else
     {
-        samples = sampler_gen_sample_playback(&v->gen, left, right, (uint32_t)-1);
+        samples = sampler_gen_sample_playback(&v->gen, leftright, (uint32_t)-1);
     }
 
-    for (int i = samples; i < CBOX_BLOCK_SIZE; i++)
-        left[i] = right[i] = 0.f;
+    for (int i = 2 * samples; i < 2 * CBOX_BLOCK_SIZE; i++)
+        leftright[i] = 0.f;
     if (l->cutoff != -1)
     {
-        cbox_biquadf_process(&v->filter_left, &v->filter_coeffs, left);
+        cbox_biquadf_process_stereo(&v->filter_left, &v->filter_right, &v->filter_coeffs, leftright);
         if (is4p)
-            cbox_biquadf_process(&v->filter_left2, second_filter, left);
-        cbox_biquadf_process(&v->filter_right, &v->filter_coeffs, right);
-        if (is4p)
-            cbox_biquadf_process(&v->filter_right2, second_filter, right);
+            cbox_biquadf_process_stereo(&v->filter_left, &v->filter_right, second_filter, leftright);
     }
     if (__builtin_expect(l->tonectl_freq != 0, 0))
     {
-        cbox_onepolef_process(&v->onepole_left, &v->onepole_coeffs, left);
-        cbox_onepolef_process(&v->onepole_right, &v->onepole_coeffs, right);
+        cbox_onepolef_process_stereo(&v->onepole_left, &v->onepole_right, &v->onepole_coeffs, leftright);
     }
     if (__builtin_expect(l->eq_bitmask, 0))
     {
@@ -724,24 +706,23 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         {
             if (l->eq_bitmask & (1 << eq))
             { 
-                cbox_biquadf_process(&v->eq_left[eq], &v->eq_coeffs[eq], left);
-                cbox_biquadf_process(&v->eq_right[eq], &v->eq_coeffs[eq], right);
+                cbox_biquadf_process_stereo(&v->eq_left[eq], &v->eq_right[eq], &v->eq_coeffs[eq], leftright);
             }
         }
     }
         
-    mix_block_into(outputs, v->output_pair_no * 2, left, right);
+    mix_block_into(outputs, v->output_pair_no * 2, leftright);
     if (__builtin_expect((v->send1bus > 0 && v->send1gain != 0) || (v->send2bus > 0 && v->send2gain != 0), 0))
     {
         if (v->send1bus > 0 && v->send1gain != 0)
         {
             int oofs = m->module.aux_offset + (v->send1bus - 1) * 2;
-            mix_block_into_with_gain(outputs, oofs, left, right, v->send1gain);
+            mix_block_into_with_gain(outputs, oofs, leftright, v->send1gain);
         }
         if (v->send2bus > 0 && v->send2gain != 0)
         {
             int oofs = m->module.aux_offset + (v->send2bus - 1) * 2;
-            mix_block_into_with_gain(outputs, oofs, left, right, v->send2gain);
+            mix_block_into_with_gain(outputs, oofs, leftright, v->send2gain);
         }
     }
     if (v->gen.mode == spt_inactive)

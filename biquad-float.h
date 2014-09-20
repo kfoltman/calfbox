@@ -294,6 +294,43 @@ static inline void cbox_biquadf_process(struct cbox_biquadf_state *state, struct
 
 #endif
 
+static inline void cbox_biquadf_process_stereo(struct cbox_biquadf_state *lstate, struct cbox_biquadf_state *rstate, struct cbox_biquadf_coeffs *coeffs, float *buffer)
+{
+    int i;
+    float a0 = coeffs->a0;
+    float a1 = coeffs->a1;
+    float a2 = coeffs->a2;
+    float b1 = coeffs->b1;
+    float b2 = coeffs->b2;
+    double ly1 = lstate->y1;
+    double ly2 = lstate->y2;
+    double ry1 = rstate->y1;
+    double ry2 = rstate->y2;
+    
+    for (i = 0; i < 2 * CBOX_BLOCK_SIZE; i += 2)
+    {
+        float inl = buffer[i], inr = buffer[i + 1];
+        float outl = a0 * inl + a1 * lstate->x1 + a2 * lstate->x2 - b1 * ly1 - b2 * ly2;
+        float outr = a0 * inr + a1 * rstate->x1 + a2 * rstate->x2 - b1 * ry1 - b2 * ry2;
+        
+        lstate->x2 = lstate->x1;
+        lstate->x1 = inl;
+        ly2 = ly1;
+        ly1 = outl;
+        buffer[i] = outl;
+
+        rstate->x2 = rstate->x1;
+        rstate->x1 = inr;
+        ry2 = ry1;
+        ry1 = outr;
+        buffer[i + 1] = outr;
+    }
+    lstate->y2 = sanef(ly2);
+    lstate->y1 = sanef(ly1);
+    rstate->y2 = sanef(ry2);
+    rstate->y1 = sanef(ry1);
+}
+
 static inline double cbox_biquadf_process_sample(struct cbox_biquadf_state *state, struct cbox_biquadf_coeffs *coeffs, double in)
 {    
     double out = sanef(coeffs->a0 * sanef(in) + coeffs->a1 * state->x1 + coeffs->a2 * state->x2 - coeffs->b1 * state->y1 - coeffs->b2 * state->y2);
