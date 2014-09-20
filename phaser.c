@@ -150,13 +150,25 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
     {
         float32x2_t dry = {input1[i], input2[i]};
         float32x2_t wet = vsub_f32(dry, vmul_f32(fb, fb_amt2));
-        for (s = 0; s < stages; s++)
+        for (s = 0; s < (stages & ~1); s += 2)
         {
             // wet = sanef(coeffs->a0 * wet + coeffs->a1 * state->x1 - coeffs->b1 * state->y1);
             float32x2_t pre = wet;
             wet = vadd_f32(vmul_f32(a0, wet), vsub_f32(vmul_f32(a1, m->state[s].x1), vmul_f32(b1, m->state[s].y1)));
-            m->state[s].y1 = wet;
             m->state[s].x1 = pre;
+            m->state[s].y1 = wet;
+            pre = wet;
+            wet = vadd_f32(vmul_f32(a0, wet), vsub_f32(vmul_f32(a1, m->state[s + 1].x1), vmul_f32(b1, m->state[s + 1].y1)));
+            m->state[s + 1].x1 = pre;
+            m->state[s + 1].y1 = wet;
+        }
+        for (; s < stages; s++)
+        {
+            // wet = sanef(coeffs->a0 * wet + coeffs->a1 * state->x1 - coeffs->b1 * state->y1);
+            float32x2_t pre = wet;
+            wet = vadd_f32(vmul_f32(a0, wet), vsub_f32(vmul_f32(a1, m->state[s].x1), vmul_f32(b1, m->state[s].y1)));
+            m->state[s].x1 = pre;
+            m->state[s].y1 = wet;
         }
         fb = wet;
         wet = vadd_f32(dry, vmul_f32(vsub_f32(wet, dry), wetdry));
@@ -188,7 +200,7 @@ MODULE_SIMPLE_DESTROY_FUNCTION(phaser)
 
 MODULE_CREATE_FUNCTION(phaser)
 {
-    int b, c;
+    int b;
     
     static int inited = 0;
     if (!inited)
@@ -221,7 +233,7 @@ MODULE_CREATE_FUNCTION(phaser)
     }
 #else
     for (b = 0; b < NO_STAGES; b++)
-        for (c = 0; c < 2; c++)
+        for (int c = 0; c < 2; c++)
             cbox_onepolef_reset(&m->state[b][c]);
 #endif
 
