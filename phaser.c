@@ -154,11 +154,11 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
         {
             // wet = sanef(coeffs->a0 * wet + coeffs->a1 * state->x1 - coeffs->b1 * state->y1);
             float32x2_t pre = wet;
-            wet = vadd_f32(vmul_f32(a0, wet), vsub_f32(vmul_f32(a1, m->state[s].x1), vmul_f32(b1, m->state[s].y1)));
+            wet = vmla_f32(vmls_f32(vmul_f32(a1, m->state[s].x1), b1, m->state[s].y1), a0, wet);
             m->state[s].x1 = pre;
             m->state[s].y1 = wet;
             pre = wet;
-            wet = vadd_f32(vmul_f32(a0, wet), vsub_f32(vmul_f32(a1, m->state[s + 1].x1), vmul_f32(b1, m->state[s + 1].y1)));
+            wet = vmla_f32(vmls_f32(vmul_f32(a1, m->state[s + 1].x1), b1, m->state[s + 1].y1), a0, wet);
             m->state[s + 1].x1 = pre;
             m->state[s + 1].y1 = wet;
         }
@@ -166,7 +166,7 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
         {
             // wet = sanef(coeffs->a0 * wet + coeffs->a1 * state->x1 - coeffs->b1 * state->y1);
             float32x2_t pre = wet;
-            wet = vadd_f32(vmul_f32(a0, wet), vsub_f32(vmul_f32(a1, m->state[s].x1), vmul_f32(b1, m->state[s].y1)));
+            wet = vmla_f32(vmls_f32(vmul_f32(a1, m->state[s].x1), b1, m->state[s].y1), a0, wet);
             m->state[s].x1 = pre;
             m->state[s].y1 = wet;
         }
