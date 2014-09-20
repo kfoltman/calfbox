@@ -155,8 +155,6 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
             // wet = sanef(coeffs->a0 * wet + coeffs->a1 * state->x1 - coeffs->b1 * state->y1);
             float32x2_t pre = wet;
             wet = vadd_f32(vmul_f32(a0, wet), vsub_f32(vmul_f32(a1, m->state[s].x1), vmul_f32(b1, m->state[s].y1)));
-            // zero values < threshold
-            wet = vbsl_f32(vcage_f32(wet, thresh), wet, zero);
             m->state[s].y1 = wet;
             m->state[s].x1 = pre;
         }
@@ -165,6 +163,9 @@ void phaser_process_block(struct cbox_module *module, cbox_sample_t **inputs, cb
         output1[i] = wet[0];
         output2[i] = wet[1];
     }
+    // set values < threshold to zero
+    for (s = 0; s < stages; s++)
+        m->state[s].y1 = vbsl_f32(vcage_f32(m->state[s].y1, thresh), m->state[s].y1, zero);
     m->fb[0] = fb[0];
     m->fb[1] = fb[1];
 #else
