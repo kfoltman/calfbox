@@ -806,6 +806,8 @@ class SamplerEngine(NonDocObj):
         volume = {int:int}
         """GM pan (14-bit) per MIDI channel."""
         pan = {int:int}
+        """Output offset per MIDI channel."""
+        output = {int:int}
         """Current number of voices playing per MIDI channel."""
         channel_voices = AltPropName('/channel_voices', {int:int})
         """MIDI channel -> (program number, program name)"""
@@ -830,6 +832,9 @@ class SamplerEngine(NonDocObj):
     def set_patch(self, channel, patch_no):
         """Select patch identified by patch_no in a specified MIDI channel."""
         self.cmd("/set_patch", None, int(channel), int(patch_no))
+    def set_output(self, channel, output):
+        """Set output offset value in a specified MIDI channel."""
+        self.cmd("/set_output", None, int(channel), int(output))
     def get_unused_program(self):
         """Returns first program number that has no program associated with it."""
         return self.get_thing("/get_unused_program", '/program_no', int)

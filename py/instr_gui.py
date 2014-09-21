@@ -168,6 +168,7 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         self.engine = iobj.engine
         self.path = self.engine.path
         
+        iattribs = iobj.status()
         attribs = self.engine.status()
 
         panel = Gtk.VBox(spacing=5)
@@ -198,7 +199,12 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         panel.pack_start(hpanel, False, False, 5)
         
         set_timer(self, 200, self.voices_update)
+        self.output_model = Gtk.ListStore(GObject.TYPE_INT, GObject.TYPE_STRING)
+        for i in range(iattribs.outputs):
+            self.output_model.append((i + 1, "Out %d" % (i + 1)))
+            
         self.polyphony_labels = {}
+        self.output_combos = {}
         for i in range(16):
             button = Gtk.Button("Dump SFZ")
             button.connect("clicked", self.dump_sfz, i + 1)
@@ -206,7 +212,27 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
             label = Gtk.Label("")
             self.table.attach(label, 3, 4, i, i + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
             self.polyphony_labels[i + 1] = label
+            combo = standard_combo(self.output_model, column = 1)
+            combo.connect('changed', self.output_combo_changed, i + 1)
+            self.table.attach(combo, 4, 5, i, i + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
+            self.output_combos[i + 1] = combo
+        self.output_combo_update()
 
+    def output_combo_update(self):
+        output = self.engine.status().output
+        for i in range(16):
+            cb = self.output_combos[i + 1]
+            old_channel_index = cb.get_active() if cb.get_active() >= 0 else -1
+            if old_channel_index != output[1 + i]:
+                cb.set_active(output[1 + i])
+        #self.status_label.set_markup(s)
+        return True
+
+    def output_combo_changed(self, combo, channel):
+        if combo.get_active() == -1:
+            return
+        self.engine.set_output(channel, combo.get_active())
+    
     def dump_sfz(self, w, channel):
         attribs = cbox.GetThings("%s/status" % self.path, ['%patch', 'polyphony', 'active_voices'], [])
         prog_no, patch_name = attribs.patch[channel]
