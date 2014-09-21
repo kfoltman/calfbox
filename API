@@ -34,6 +34,13 @@
 /config/delete_section(string section)
 /config/save(string ?filename)
 
+/engine/
+/engine/status() -> /scene(object scene)
+/engine/render_stereo(int nframes)
+/engine/master_effect/{add: @moduleslot}
+/engine/new_scene() -> uuid
+/engine/new_recorder() -> uuid
+
 /scene/
 /scene/transpose(int semitones)
 /scene/clear()

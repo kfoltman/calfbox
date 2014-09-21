@@ -965,6 +965,7 @@ class DocEngine(DocObj):
         scenes = AltPropName('/scene', [DocScene])
     def init_object(self):
         self.master_effect = EffectSlot(self.path + "/master_effect")
+        self.master_effect.init_object()
     def new_scene(self):
         return self.cmd_makeobj('/new_scene')
     def new_recorder(self, filename):
