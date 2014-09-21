@@ -41,6 +41,7 @@ void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
     c->voices_running = NULL;
     c->active_voices = 0;
     c->pitchwheel = 0;
+    c->output_shift = 0;
     memset(c->cc, 0, sizeof(c->cc));
     
     // default to maximum and pan=centre if MIDI mixing disabled

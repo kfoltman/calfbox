@@ -614,6 +614,9 @@ MODULE_CREATE_FUNCTION(sampler)
             }
         }
         g_free(key);
+        key = g_strdup_printf("channel%d_output", i + 1);
+        m->channels[i].output_shift = cbox_config_get_int(cfg_section, key, 1) - 1;
+        g_free(key);
     }
     
 

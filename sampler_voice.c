@@ -217,7 +217,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
         }
     }
     
-    v->output_pair_no = l->output % m->output_pairs;
+    v->output_pair_no = (l->output + c->output_shift) % m->output_pairs;
     v->serial_no = m->serial_no;
     
     uint32_t pos = l->offset;
