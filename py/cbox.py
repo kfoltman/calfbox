@@ -97,7 +97,7 @@ class SettableProperty(PropertyDecorator):
     """Decorator that creates a setter method for the property."""
     def execute(self, property, proptype, klass):
         if type(proptype) is dict:
-            setattr(klass, 'set_' + property, lambda self, key, value: self.cmd('/' + property, None, key, proptype(value)))
+            setattr(klass, 'set_' + property, lambda self, key, value: self.cmd('/' + property, None, key, value))
         elif type(proptype) is bool:
             setattr(klass, 'set_' + property, lambda self, value: self.cmd('/' + property, None, 1 if value else 0))
         else:
