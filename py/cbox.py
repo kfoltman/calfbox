@@ -592,8 +592,8 @@ class Document:
         return Document.map_path("/scene")
     @staticmethod
     def get_engine():
-        """Retrieve the current scene object of a given document. Each document can
-        only have one current scene."""
+        """Retrieve the current RT engine object of a given document. Each document can
+        only have one current RT engine."""
         return Document.map_path("/rt/engine")
     @staticmethod
     def get_rt():
@@ -963,6 +963,8 @@ Document.classmap['cbox_module'] = DocModule
 class DocEngine(DocObj):
     class Status:
         scenes = AltPropName('/scene', [DocScene])
+    def init_object(self):
+        self.master_effect = EffectSlot(self.path + "/master_effect")
     def new_scene(self):
         return self.cmd_makeobj('/new_scene')
     def new_recorder(self, filename):

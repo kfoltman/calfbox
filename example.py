@@ -251,11 +251,24 @@ class MainWindow(Gtk.Window):
         
         self.layers_model = SceneLayersModel()
         self.layers_view = SceneLayersView(self.layers_model)
-        t.attach(standard_vscroll_window(-1, 160, self.layers_view), 0, 3, 6, 7, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(standard_vscroll_window(-1, 160, self.layers_view), 0, 3, 7, 8, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
         
         self.auxes_model = SceneAuxBusesModel()
         self.auxes_view = SceneAuxBusesView(self.auxes_model)
-        t.attach(standard_vscroll_window(-1, 120, self.auxes_view), 0, 3, 7, 8, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(standard_vscroll_window(-1, 120, self.auxes_view), 0, 3, 8, 9, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+
+        me = cbox.Document.get_engine().master_effect
+        me_status = me.status()
+        
+        hb = Gtk.HBox(spacing = 5)
+        self.master_chooser = fx_gui.InsertEffectChooser(me.path, "slot", me_status.insert_engine, me_status.insert_preset, me_status.bypass, self)
+        hb.pack_start(self.master_chooser.fx_engine, True, True, 0)
+        hb.pack_start(self.master_chooser.fx_preset, True, True, 5)
+        hb.pack_start(self.master_chooser.fx_edit, False, False, 5)
+        hb.pack_start(self.master_chooser.fx_bypass, False, False, 5)
+        
+        t.attach(bold_label("Master effect"), 0, 1, 6, 7, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
+        t.attach(standard_align(hb, 0, 0, 0, 0), 1, 3, 6, 7, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
         
         self.layers_model.refresh(scene_status)
         self.auxes_model.refresh(scene_status)

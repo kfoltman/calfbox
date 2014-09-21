@@ -138,8 +138,11 @@ static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct c
             return FALSE;
         return TRUE;
     }
-    else
-    if (!strcmp(cmd->command, "/new_scene") && !strcmp(cmd->arg_types, ""))
+    else if (!strncmp(cmd->command, "/master_effect/",15))
+    {
+        return cbox_module_slot_process_cmd(&engine->effect, fb, cmd, cmd->command + 14, CBOX_GET_DOCUMENT(engine), engine->rt, engine, error);
+    }
+    else if (!strcmp(cmd->command, "/new_scene") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
@@ -148,8 +151,7 @@ static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct c
 
         return s ? cbox_execute_on(fb, NULL, "/uuid", "o", error, s) : FALSE;
     }
-    else
-    if (!strcmp(cmd->command, "/new_recorder") && !strcmp(cmd->arg_types, "s"))
+    else if (!strcmp(cmd->command, "/new_recorder") && !strcmp(cmd->arg_types, "s"))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
