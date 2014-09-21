@@ -371,6 +371,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
             if (!result)
                 return FALSE;
             if (!(cbox_execute_on(fb, NULL, "/channel_voices", "ii", error, i + 1, channel->active_voices) &&
+                cbox_execute_on(fb, NULL, "/output", "ii", error, i + 1, channel->output_shift) &&
                 cbox_execute_on(fb, NULL, "/volume", "ii", error, i + 1, sampler_channel_addcc(channel, 7)) &&
                 cbox_execute_on(fb, NULL, "/pan", "ii", error, i + 1, sampler_channel_addcc(channel, 10))))
                 return FALSE;
@@ -424,6 +425,23 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
             }
         }
         sampler_channel_set_program(&m->channels[channel - 1], pgm);
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/set_output") && !strcmp(cmd->arg_types, "ii"))
+    {
+        int channel = CBOX_ARG_I(cmd, 0);
+        int output = CBOX_ARG_I(cmd, 1);
+        if (channel < 1 || channel > 16)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid channel %d", channel);
+            return FALSE;
+        }
+        if (output < 0 || output >= m->output_pairs)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid output %d", output);
+            return FALSE;
+        }
+        m->channels[channel - 1].output_shift = output;
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/load_patch") && !strcmp(cmd->arg_types, "iss"))
