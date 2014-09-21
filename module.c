@@ -231,13 +231,13 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm,
         cbox_rt_swap_pointers(rt, (void **)psm, effect);
         return TRUE;
     }
+    if (!sm)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine on module in path '%s'", cmd->command);
+        return FALSE;
+    }
     if (!strncmp(subcmd, "/engine/", 8))
     {
-        if (!sm)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine on module in path '%s'", cmd->command);
-            return FALSE;
-        }
         if (!sm->cmd_target.process_cmd)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "The engine %s has no command target defined", sm->engine_name);
@@ -247,11 +247,6 @@ gboolean cbox_module_slot_process_cmd(struct cbox_module **psm,
     }
     if (!strcmp(subcmd, "/set_bypass") && !strcmp(cmd->arg_types, "i"))
     {
-        if (!sm)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "No engine on module in path '%s'", cmd->command);
-            return FALSE;
-        }
         sm->bypass = CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
