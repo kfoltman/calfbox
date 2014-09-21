@@ -372,9 +372,17 @@ static PyObject *cbox_python_start_audio(PyObject *self, PyObject *args)
     if (!cbox_io_init(&app.io, &params, (callback && callback != Py_None) ? &target : NULL, &error))
         return PyErr_Format(PyExc_IOError, "Cannot initialise sound I/O: %s", (error && error->message) ? error->message : "Unknown error");
 
+    const char *effect_preset_name = cbox_config_get_string("master", "effect");
+    
     cbox_rt_set_io(app.rt, &app.io);
     cbox_scene_new(app.document, app.engine);
     cbox_rt_start(app.rt, (callback && callback != Py_None) ? &target : NULL);
+    if (effect_preset_name && *effect_preset_name)
+    {
+        app.engine->effect = cbox_module_new_from_fx_preset(effect_preset_name, app.document, app.rt, app.engine, &error);
+        if (!app.engine->effect)
+            return PyErr_Format(PyExc_IOError, "Cannot load master effect preset %s: %s", effect_preset_name, (error && error->message) ? error->message : "Unknown error");
+    }
     audio_running = TRUE;
 
     Py_INCREF(Py_None);
