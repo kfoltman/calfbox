@@ -411,7 +411,7 @@ struct sampler_layer
 };
 
 extern struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group);
-extern struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, const char *cfg_section);
+extern struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group, const char *cfg_section);
 extern struct sampler_layer *sampler_layer_new_clone(struct sampler_layer *layer, struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group);
 extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);

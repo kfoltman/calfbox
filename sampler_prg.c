@@ -297,8 +297,53 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
             return prg;
         CBOX_DELETE(prg);
         return NULL;
+    } else {
+        prg->source_file = g_strdup_printf("config:%s", cfg_section);
     }
     
+    for (i = 0; ; i++)
+    {
+        gchar *s = g_strdup_printf("group%d", 1 + i);
+        const char *group_section = cbox_config_get_string(cfg_section, s);
+        g_free(s);
+        if (!group_section)
+            break;
+        
+        gchar *swhere = g_strdup_printf("sgroup:%s", group_section);
+        struct sampler_layer *g = sampler_layer_new_from_section(m, prg, NULL, swhere);
+        if (!g)
+            g_warning("Sample layer '%s' cannot be created - skipping", group_section);
+        else
+        {
+            sampler_program_add_group(prg, g);
+            for (int j = 0; ; j++)
+            {
+                char *where = NULL;
+                gchar *s = g_strdup_printf("layer%d", 1 + j);
+                const char *layer_section = cbox_config_get_string(swhere, s);
+                g_free(s);
+                if (!layer_section)
+                    break;
+                where = g_strdup_printf("slayer:%s", layer_section);
+                struct sampler_layer *l = sampler_layer_new_from_section(m, prg, g, where);
+                if (!l)
+                    g_warning("Sample layer '%s' cannot be created - skipping", layer_section);
+                else 
+                {
+                    sampler_layer_update(l);
+                    if (!l->data.eff_waveform)
+                    {
+                        g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
+                        CBOX_DELETE((struct sampler_layer *)l);
+                    }
+                    else
+                        sampler_program_add_layer(prg, l);
+                }
+                g_free(where);
+            }
+        }
+        g_free(swhere);
+    }
     for (i = 0; ; i++)
     {
         char *where = NULL;
@@ -309,8 +354,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
             break;
         where = g_strdup_printf("slayer:%s", layer_section);
         
-        prg->source_file = g_strdup_printf("config:%s", cfg_section);
-        struct sampler_layer *l = sampler_layer_new_from_section(m, prg, where);
+        struct sampler_layer *l = sampler_layer_new_from_section(m, prg, NULL, where);
         if (!l)
             g_warning("Sample layer '%s' cannot be created - skipping", layer_section);
         else 

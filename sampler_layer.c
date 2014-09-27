@@ -498,6 +498,9 @@ static void layer_foreach_func(void *user_data, const char *key)
     // import is handled in sampler_load_layer_overrides
     if (!strcmp(key, "import"))
         return;
+    // layer%d should be ignored, it's handled by sampler_program_new_from_cfg
+    if (!strncmp(key, "layer", 5) && isdigit(key[5]))
+        return;
     struct layer_foreach_struct *lfs = user_data;
     const char *value = cbox_config_get_string(lfs->cfg_section, key);
     GError *error = NULL;
@@ -523,9 +526,9 @@ void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_secti
     cbox_config_foreach_key(layer_foreach_func, cfg_section, &lfs);
 }
 
-struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, const char *cfg_section)
+struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group, const char *cfg_section)
 {
-    struct sampler_layer *l = sampler_layer_new(m, parent_program, parent_program->default_group);
+    struct sampler_layer *l = sampler_layer_new(m, parent_program, parent_group ? parent_group : parent_program->default_group);
     sampler_layer_load_overrides(l, cfg_section);
     sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, parent_program);
     sampler_layer_reset_switches(l, m);
