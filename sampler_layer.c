@@ -1149,13 +1149,14 @@ static int sampler_layer_update_cmd_execute(void *data)
     {
         FOREACH_VOICE(cmd->module->channels[i].voices_running, v)
         {
-            if (v->layer == cmd->old_data)
+            if (v->layer == cmd->layer->runtime)
             {
                 v->layer = cmd->new_data;
                 v->layer_changed = TRUE;
             }
         }
     }
+    cmd->old_data = cmd->layer->runtime;
     cmd->layer->runtime = cmd->new_data;
     return 10;
 }
@@ -1165,6 +1166,7 @@ static void sampler_layer_update_cmd_cleanup(void *data)
     struct sampler_layer_update_cmd *cmd = data;
     
     sampler_layer_data_destroy(cmd->old_data);
+    free(cmd);
 }
 
 void sampler_layer_update(struct sampler_layer *l)
@@ -1188,15 +1190,12 @@ void sampler_layer_update(struct sampler_layer *l)
         .cleanup = sampler_layer_update_cmd_cleanup,
     };
     
-    struct sampler_layer_update_cmd lcmd;
-    lcmd.module = l->module;
-    lcmd.layer = l;
-    lcmd.new_data = NULL;
-    lcmd.old_data = NULL;
+    struct sampler_layer_update_cmd *lcmd = malloc(sizeof(struct sampler_layer_update_cmd));
+    lcmd->module = l->module;
+    lcmd->layer = l;
+    lcmd->new_data = NULL;
+    lcmd->old_data = NULL;
     
-    // In order to be able to use the async call, it would be necessary to
-    // identify old data by layer pointer, not layer data pointer. For now,
-    // it might be good enough to just use sync calls for this.
-    cbox_rt_execute_cmd_sync(l->module->module.rt, &rtcmd, &lcmd);
+    cbox_rt_execute_cmd_async(l->module->module.rt, &rtcmd, lcmd);
 }
 
