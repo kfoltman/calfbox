@@ -1153,6 +1153,7 @@ static int sampler_layer_update_cmd_execute(void *data)
             {
                 v->layer = cmd->new_data;
                 v->layer_changed = TRUE;
+                sampler_voice_update_params_from_layer(v);
             }
         }
     }

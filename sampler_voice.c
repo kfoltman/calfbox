@@ -37,13 +37,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 
 
+static void lfo_update_freq(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, int srate, double srate_inv)
+{
+    lfo->delta = (uint32_t)(lfop->freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE * srate_inv);
+    lfo->delay = (uint32_t)(lfop->delay * srate);
+    lfo->fade = (uint32_t)(lfop->fade * srate);
+}
+
 static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, int srate, double srate_inv)
 {
     lfo->phase = 0;
     lfo->age = 0;
-    lfo->delta = (uint32_t)(lfop->freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE * srate_inv);
-    lfo->delay = (uint32_t)(lfop->delay * srate);
-    lfo->fade = (uint32_t)(lfop->fade * srate);
+    lfo_update_freq(lfo, lfop, srate, srate_inv);
 }
 
 static inline float lfo_run(struct sampler_lfo *lfo)
@@ -375,6 +380,18 @@ void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
             }
         }
     }
+}
+
+void sampler_voice_update_params_from_layer(struct sampler_voice *v)
+{
+    struct sampler_layer_data *l = v->layer;
+    struct sampler_module *m = v->program->module;
+    lfo_update_freq(&v->amp_lfo, &l->amp_lfo, m->module.srate, m->module.srate_inv);
+    lfo_update_freq(&v->filter_lfo, &l->filter_lfo, m->module.srate, m->module.srate_inv);
+    lfo_update_freq(&v->pitch_lfo, &l->pitch_lfo, m->module.srate, m->module.srate_inv);
+    v->amp_env.shape = &l->amp_env_shape;
+    v->filter_env.shape = &l->filter_env_shape;
+    v->pitch_env.shape = &l->pitch_env_shape;
 }
 
 void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs)
