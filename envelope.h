@@ -75,6 +75,20 @@ static inline void cbox_envelope_reset(struct cbox_envelope *env)
     cbox_envelope_init_stage(env);
 }
 
+static inline void cbox_envelope_update_shape(struct cbox_envelope *env, struct cbox_envelope_shape *shape)
+{
+    struct cbox_envelope_shape *old_shape = env->shape;
+    env->shape = shape;
+    if (env->cur_stage < 0)
+        return;
+    struct cbox_envstage *ns = &env->shape->stages[env->cur_stage];
+    struct cbox_envstage *os = &old_shape->stages[env->cur_stage];
+    if (os->time > 0)
+        env->cur_time = env->cur_time * ns->time / os->time;
+    if (env->cur_time > ns->time)
+        env->cur_time = ns->time;
+}
+
 static inline float cbox_envelope_get_next(struct cbox_envelope *env, int released)
 {
     if (env->cur_stage < 0)

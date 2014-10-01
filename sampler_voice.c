@@ -389,9 +389,9 @@ void sampler_voice_update_params_from_layer(struct sampler_voice *v)
     lfo_update_freq(&v->amp_lfo, &l->amp_lfo, m->module.srate, m->module.srate_inv);
     lfo_update_freq(&v->filter_lfo, &l->filter_lfo, m->module.srate, m->module.srate_inv);
     lfo_update_freq(&v->pitch_lfo, &l->pitch_lfo, m->module.srate, m->module.srate_inv);
-    v->amp_env.shape = &l->amp_env_shape;
-    v->filter_env.shape = &l->filter_env_shape;
-    v->pitch_env.shape = &l->pitch_env_shape;
+    cbox_envelope_update_shape(&v->amp_env, &l->amp_env_shape);
+    cbox_envelope_update_shape(&v->filter_env, &l->filter_env_shape);
+    cbox_envelope_update_shape(&v->pitch_env, &l->pitch_env_shape);
 }
 
 void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs)
