@@ -132,6 +132,8 @@ struct sampler_voice
     int last_level;
     uint64_t last_level_min_rate;
     uint32_t last_eq_bitmask;
+    float reloffset;
+    uint32_t offset;
 };
 
 struct sampler_module

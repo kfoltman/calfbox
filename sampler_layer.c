@@ -742,11 +742,21 @@ try_now:
         sampler_layer_add_nif(l, sampler_nif_addrandom, 2, atof_C(value));
     else if (!strcmp(key, "pitch_veltrack"))
         sampler_layer_add_nif(l, sampler_nif_vel2pitch, 0, atof_C(value));
+    else if (!strcmp(key, "reloffset_veltrack"))
+        sampler_layer_add_nif(l, sampler_nif_vel2reloffset, 0, atof_C(value));
     else if (!strncmp(key, "delay_cc", 8))
     {
         int ccno = atoi(key + 8);
         if (ccno > 0 && ccno < 120)
             sampler_layer_add_nif(l, sampler_nif_cc2delay, ccno, atof_C(value));
+        else
+            goto unknown_key;
+    }
+    else if (!strncmp(key, "reloffset_cc", 12))
+    {
+        int ccno = atoi(key + 12);
+        if (ccno > 0 && ccno < 120)
+            sampler_layer_add_nif(l, sampler_nif_cc2reloffset, ccno, atof_C(value));
         else
             goto unknown_key;
     }
@@ -955,8 +965,12 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             g_string_append_printf(outstr, " %s_random=%s", addrandom_variants[nd->variant], floatbuf);
         else if (nd->notefunc == sampler_nif_vel2pitch)
             g_string_append_printf(outstr, " pitch_veltrack=%s", floatbuf);
+        else if (nd->notefunc == sampler_nif_vel2reloffset)
+            g_string_append_printf(outstr, " reloffset_veltrack=%s", floatbuf);
         else if (nd->notefunc == sampler_nif_cc2delay && v >= 0 && v < 120)
             g_string_append_printf(outstr, " delay_cc%d=%s", nd->variant, floatbuf);
+        else if (nd->notefunc == sampler_nif_cc2reloffset && v >= 0 && v < 120)
+            g_string_append_printf(outstr, " reloffset_cc%d=%s", nd->variant, floatbuf);
         else if (nd->notefunc == sampler_nif_vel2env && v >= 0 && (v & 15) < 6 && (v >> 4) < 3)
             g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], floatbuf);
     }

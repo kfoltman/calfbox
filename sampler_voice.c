@@ -225,14 +225,6 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     v->output_pair_no = (l->output + c->output_shift) % m->output_pairs;
     v->serial_no = m->serial_no;
     
-    uint32_t pos = l->offset;
-    pos = l->offset;
-    if (l->offset_random)
-        pos += ((uint32_t)(rand() + (rand() << 16))) % l->offset_random;
-    if (pos >= end)
-        pos = end;
-    v->gen.bigpos = ((uint64_t)pos) << 32;
-    
     float delay = l->delay;
     if (l->delay_random)
         delay += rand() * (1.0 / RAND_MAX) * l->delay_random;
@@ -261,6 +253,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     v->cutoff_shift = vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack;
     v->loop_mode = l->loop_mode;
     v->off_by = l->off_by;
+    v->reloffset = l->reloffset;
     int auxes = (m->module.outputs - m->module.aux_offset) / 2;
     if (l->effect1bus >= 1 && l->effect1bus < 1 + auxes)
         v->send1bus = l->effect1bus;
@@ -309,6 +302,17 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
         p->notefunc(p, v);
         nif = nif->next;
     }
+    v->offset = l->offset;
+    if (v->reloffset != 0)
+    {
+        uint32_t maxend = v->current_pipe ? (l->eff_waveform->preloaded_frames >> 1) : l->eff_waveform->preloaded_frames;
+        int32_t pos = v->offset + v->reloffset * maxend * 0.01;
+        if (pos < 0)
+            pos = 0;
+        if (pos > maxend)
+            pos = maxend;
+        v->offset = pos;
+    }
     
     cbox_envelope_reset(&v->amp_env);
     cbox_envelope_reset(&v->filter_env);
@@ -317,6 +321,13 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     v->last_eq_bitmask = 0;
 
     sampler_voice_activate(v, l->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16);
+    
+    uint32_t pos = v->offset;
+    if (l->offset_random)
+        pos += ((uint32_t)(rand() + (rand() << 16))) % l->offset_random;
+    if (pos >= end)
+        pos = end;
+    v->gen.bigpos = ((uint64_t)pos) << 32;
     
     if (v->current_pipe && v->gen.bigpos)
         cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.bigpos >> 32);

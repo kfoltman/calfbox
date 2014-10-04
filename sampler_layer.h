@@ -263,6 +263,7 @@ typedef int midi_note_t;
     MACRO(float, rt_decay, 0) \
     MACRO(float, tonectl, 0) \
     MACRO(float, tonectl_freq, 0) \
+    MACRO(float, reloffset, 0) \
     MACRO##_dahdsr(amp_env, ampeg, 0) \
     MACRO##_dahdsr(filter_env, fileg, 1) \
     MACRO##_dahdsr(pitch_env, pitcheg, 2) \
@@ -429,8 +430,10 @@ extern void sampler_layer_data_close(struct sampler_layer_data *l);
 extern void sampler_layer_data_destroy(struct sampler_layer_data *l);
 
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+extern void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+extern void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 
 static inline gboolean sampler_layer_data_is_4pole(struct sampler_layer_data *v)
