@@ -337,7 +337,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
         return NULL;
     }
     g_free(pathname);
-    uint32_t preloaded_frames = waveform->info.frames + 1;
+    uint32_t preloaded_frames = waveform->info.frames;
     // If sample is larger than 2x prefetch buffer size, then load only
     // a prefetch buffer worth of data, and stream the rest.
     if (preloaded_frames > 2 * bank.streaming_prefetch_size)
