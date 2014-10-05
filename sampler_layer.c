@@ -398,21 +398,22 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     }
     
     l->eff_freq = (l->eff_waveform && l->eff_waveform->info.samplerate) ? l->eff_waveform->info.samplerate : 44100;
-    // XXXKF should have a distinction between 'configured' and 'effective' loop start/end
+    l->eff_loop_mode = l->loop_mode;
     if (l->loop_mode == slm_unknown)
     {
         if (l->eff_waveform && l->eff_waveform->has_loop)
-            l->loop_mode = slm_loop_continuous;
+            l->eff_loop_mode = slm_loop_continuous;
         else
-            l->loop_mode = l->loop_end == 0 ? slm_no_loop : slm_loop_continuous;
+        if (l->eff_waveform)
+            l->eff_loop_mode = l->loop_end == 0 ? slm_no_loop : slm_loop_continuous;
     }
     
-    if (l->loop_mode == slm_one_shot || l->loop_mode == slm_no_loop || l->loop_mode == slm_one_shot_chokeable)
+    if (l->eff_loop_mode == slm_one_shot || l->eff_loop_mode == slm_no_loop || l->eff_loop_mode == slm_one_shot_chokeable)
         l->loop_start = -1;
 
-    if ((l->loop_mode == slm_loop_continuous || l->loop_mode == slm_loop_sustain) && l->loop_start == -1)
+    if ((l->eff_loop_mode == slm_loop_continuous || l->eff_loop_mode == slm_loop_sustain) && l->loop_start == -1)
         l->loop_start = 0;
-    if ((l->loop_mode == slm_loop_continuous || l->loop_mode == slm_loop_sustain) && l->loop_start == 0 && l->eff_waveform && l->eff_waveform->has_loop)
+    if ((l->eff_loop_mode == slm_loop_continuous || l->eff_loop_mode == slm_loop_sustain) && l->loop_start == 0 && l->eff_waveform && l->eff_waveform->has_loop)
         l->loop_start = l->eff_waveform->loop_start;
     if (l->loop_end == 0 && l->eff_waveform != NULL && l->eff_waveform->has_loop)
         l->loop_end = l->eff_waveform->loop_end;

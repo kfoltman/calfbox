@@ -201,7 +201,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     assert(!v->current_pipe);
     if (end > l->eff_waveform->preloaded_frames)
     {
-        if (l->loop_mode == slm_loop_continuous && l->loop_end < l->eff_waveform->preloaded_frames)
+        if (l->eff_loop_mode == slm_loop_continuous && l->loop_end < l->eff_waveform->preloaded_frames)
         {
             // Everything fits in prefetch, because loop ends in prefetch and post-loop part is not being played
         }
@@ -210,7 +210,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
             uint32_t loop_start = -1, loop_end = end;
             // If in loop mode, set the loop over the looped part... unless we're doing sustain-only loop on prefetch area only. Then
             // streaming will only cover the release part, and it shouldn't be looped.
-            if (l->loop_mode == slm_loop_continuous || (l->loop_mode == slm_loop_sustain && l->loop_end >= l->eff_waveform->preloaded_frames))
+            if (l->eff_loop_mode == slm_loop_continuous || (l->eff_loop_mode == slm_loop_sustain && l->loop_end >= l->eff_waveform->preloaded_frames))
             {
                 loop_start = l->loop_start;
                 loop_end = l->loop_end;
@@ -251,7 +251,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     v->pitch_env.shape = &l->pitch_env_shape;
     
     v->cutoff_shift = vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack;
-    v->loop_mode = l->loop_mode;
+    v->loop_mode = l->eff_loop_mode;
     v->off_by = l->off_by;
     v->reloffset = l->reloffset;
     int auxes = (m->module.outputs - m->module.aux_offset) / 2;

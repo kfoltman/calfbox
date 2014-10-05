@@ -386,6 +386,7 @@ struct sampler_layer_data
     // computed values:
     float eff_freq;
     int eff_use_keyswitch;
+    enum sampler_loop_mode eff_loop_mode;
     struct cbox_waveform *eff_waveform;
     int16_t scratch_loop[2 * MAX_INTERPOLATION_ORDER * 2];
     int16_t scratch_end[2 * MAX_INTERPOLATION_ORDER * 2];
