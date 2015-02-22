@@ -415,8 +415,8 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         l->loop_start = 0;
     if ((l->eff_loop_mode == slm_loop_continuous || l->eff_loop_mode == slm_loop_sustain) && l->loop_start == 0 && l->eff_waveform && l->eff_waveform->has_loop)
         l->loop_start = l->eff_waveform->loop_start;
-    if (l->loop_end == 0 && l->eff_waveform != NULL && l->eff_waveform->has_loop)
-        l->loop_end = l->eff_waveform->loop_end;
+    if (l->loop_end == 0 && l->eff_waveform != NULL)
+        l->loop_end = l->eff_waveform->has_loop ? l->eff_waveform->loop_end : l->eff_waveform->info.frames;
 
     if (l->off_mode == som_unknown)
         l->off_mode = l->off_by != 0 ? som_fast : som_normal;
