@@ -379,7 +379,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         
         return cbox_execute_on(fb, NULL, "/active_voices", "i", error, m->active_voices) &&
             cbox_execute_on(fb, NULL, "/active_pipes", "i", error, cbox_prefetch_stack_get_active_pipe_count(m->pipe_stack)) &&
-            cbox_execute_on(fb, NULL, "/polyphony", "i", error, MAX_SAMPLER_VOICES) && 
+            cbox_execute_on(fb, NULL, "/polyphony", "i", error, m->max_voices) && 
             CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
     else
