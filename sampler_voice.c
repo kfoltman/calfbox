@@ -218,7 +218,11 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
             // Those are initial values only, they will be adjusted in process function
             v->current_pipe = cbox_prefetch_stack_pop(m->pipe_stack, l->eff_waveform, loop_start, loop_end, l->count);
             if (!v->current_pipe)
+            {
                 g_warning("Prefetch pipe pool exhausted, no streaming playback will be possible");
+                end = l->eff_waveform->preloaded_frames;
+                v->gen.cur_sample_end = end;
+            }
         }
     }
     
