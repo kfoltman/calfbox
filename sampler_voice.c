@@ -701,16 +701,16 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float leftright[2 * CBOX_BLOCK_SIZE];
         
     uint32_t samples = 0;
-    
+
 
     if (v->current_pipe)
     {
-        uint32_t limit = cbox_prefetch_pipe_get_remaining(v->current_pipe) - 4;
-        if (!limit)
+        uint32_t limit = cbox_prefetch_pipe_get_remaining(v->current_pipe);
+        if (limit < 4)
             v->gen.mode = spt_inactive;
         else
         {
-            samples = sampler_gen_sample_playback(&v->gen, leftright, limit);
+            samples = sampler_gen_sample_playback(&v->gen, leftright, limit - 4);
             cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.consumed);
             v->gen.consumed = 0;
         }
