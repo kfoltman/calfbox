@@ -260,7 +260,7 @@ typedef int midi_note_t;
     MACRO(int, count, 0) \
     MACRO(int, bend_up, 200) \
     MACRO(int, bend_down, 200) \
-    MACRO(int, timestretch, 1) \
+    MACRO(int, timestretch, 0) \
     MACRO(float, timestretch_jump, 500) \
     MACRO(float, timestretch_crossfade, 100) \
     MACRO(float, rt_decay, 0) \
