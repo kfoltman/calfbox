@@ -433,6 +433,11 @@ uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *leftright, ui
     if (!v->streaming_buffer)
     {
         v->virtpos += written * v->virtdelta;
+        if (v->virtpos != v->bigpos)
+        {
+            while ((v->virtpos >> 32) >= v->loop_end && v->loop_start != -1)
+                v->virtpos -= ((uint64_t)(v->loop_end - v->loop_start)) << 32;
+        }
         // XXXKF looping
         if (v->fadein_counter == -1 && fabs((v->bigpos - v->virtpos) / (65536.0 * 65536.0)) > v->stretching_jump)
         {
