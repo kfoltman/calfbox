@@ -630,6 +630,8 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     {
         v->gen.bigdelta = freq64;
         v->gen.virtdelta = (uint64_t)(l->eff_freq * 65536.0 * 65536.0 * m->module.srate_inv);
+        v->gen.stretching_jump = l->timestretch_jump;
+        v->gen.stretching_crossfade = l->timestretch_crossfade;
     }
     else
     {

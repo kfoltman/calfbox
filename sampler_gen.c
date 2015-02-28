@@ -413,21 +413,6 @@ void sampler_gen_reset(struct sampler_gen *v)
     v->fadein_counter = -1.f;
 }
 
-//#define STRETCH_VALUE 179
-//zdun
-//#define STRETCH_VALUE 320 
-#define STRETCH_VALUE 356
-
-static int64_t adjchunk(int64_t playpos, int64_t virtpos)
-{
-    //int64_t newpos = playpos + (virtpos - playpos) / (65536LL*65536LL*STRETCH_VALUE) * (65536LL*65536LL*STRETCH_VALUE);
-    int sv = STRETCH_VALUE;
-    int64_t newpos = virtpos < playpos ? playpos - 65536LL*65536LL*sv : playpos + 65536LL*65536LL*sv;
-    if (newpos < 0)
-        newpos = 0;
-    return newpos;
-}
-
 uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *leftright, uint32_t limit)
 {
     struct resampler_state rs;
@@ -449,11 +434,18 @@ uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *leftright, ui
     {
         v->virtpos += written * v->virtdelta;
         // XXXKF looping
-        if (v->fadein_counter == -1 && abs((v->bigpos - v->virtpos) >> 32) > STRETCH_VALUE)
+        if (v->fadein_counter == -1 && fabs((v->bigpos - v->virtpos) / (65536.0 * 65536.0)) > v->stretching_jump)
         {
-            v->fadein_pos = adjchunk(v->bigpos, v->virtpos);
-            if ((v->fadein_pos >> 32) >= v->cur_sample_end - 4)
-                v->fadein_pos = ((uint64_t)v->cur_sample_end - 4)<< 32;
+            int64_t jump = (int64_t)(v->stretching_jump * 65536.0 * 65536.0);
+            int64_t newpos = v->bigpos > v->virtpos ? v->bigpos - jump : v->bigpos + jump;
+            if (newpos < 0)
+                newpos = 0;
+            // XXXKF beware of extremely short loops
+            while ((newpos >> 32) >= v->loop_end && v->loop_start != -1)
+                newpos -= ((uint64_t)(v->loop_end - v->loop_start)) << 32;
+            if ((newpos >> 32) >= v->cur_sample_end - 4)
+                newpos = ((uint64_t)v->cur_sample_end - 4)<< 32;
+            v->fadein_pos = newpos;
             v->fadein_counter = 0;
         }
         else if (v->fadein_counter != -1)
@@ -488,8 +480,7 @@ uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *leftright, ui
                 written2 = written;
             }
             float cnt = v->fadein_counter;
-            const int fadein_len = 64;
-            float scl = 1.0 / fadein_len * v->bigdelta / v->virtdelta;
+            float scl = v->bigdelta / (v->stretching_crossfade * v->virtdelta);
             for (i = 0; i < 2 * written2; i += 2)
             {
                 leftright[i] += (leftright_fadein[i] - leftright[i]) * cnt;
