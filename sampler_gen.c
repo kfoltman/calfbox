@@ -410,6 +410,22 @@ void sampler_gen_reset(struct sampler_gen *v)
     v->streaming_buffer = NULL;
     v->in_streaming_buffer = FALSE;
     v->prefetch_only_loop = FALSE;
+    v->fadein_counter = -1.f;
+}
+
+//#define STRETCH_VALUE 179
+//zdun
+//#define STRETCH_VALUE 320 
+#define STRETCH_VALUE 356
+
+static int64_t adjchunk(int64_t playpos, int64_t virtpos)
+{
+    //int64_t newpos = playpos + (virtpos - playpos) / (65536LL*65536LL*STRETCH_VALUE) * (65536LL*65536LL*STRETCH_VALUE);
+    int sv = STRETCH_VALUE;
+    int64_t newpos = virtpos < playpos ? playpos - 65536LL*65536LL*sv : playpos + 65536LL*65536LL*sv;
+    if (newpos < 0)
+        newpos = 0;
+    return newpos;
 }
 
 uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *leftright, uint32_t limit)
@@ -424,9 +440,74 @@ uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *leftright, ui
     if (v->streaming_buffer)
         process_voice_streaming(v, &rs, limit);
     else
+    {
         process_voice_withloop(v, &rs);
+    }
+    uint32_t written = rs.offset;
+    
+    if (!v->streaming_buffer)
+    {
+        v->virtpos += written * v->virtdelta;
+        // XXXKF looping
+        if (v->fadein_counter == -1 && abs((v->bigpos - v->virtpos) >> 32) > STRETCH_VALUE)
+        {
+            v->fadein_pos = adjchunk(v->bigpos, v->virtpos);
+            if ((v->fadein_pos >> 32) >= v->cur_sample_end - 4)
+                v->fadein_pos = ((uint64_t)v->cur_sample_end - 4)<< 32;
+            v->fadein_counter = 0;
+        }
+        else if (v->fadein_counter != -1)
+        {
+            float leftright_fadein[2 * CBOX_BLOCK_SIZE];
+
+            rs.offset = 0;
+            rs.leftright = leftright_fadein;
+            rs.lgain = v->last_lgain;
+            rs.rgain = v->last_rgain;
+
+            uint64_t oldpos = v->bigpos;
+            v->bigpos = v->fadein_pos;            
+            process_voice_withloop(v, &rs);
+            v->fadein_pos = v->bigpos;
+            v->bigpos = oldpos;
+            
+            uint32_t written2 = rs.offset;
+            
+            // XXXKF not the best set of special cases
+            int i;
+            if (written2 > written)
+            {
+                for (i = 2 * written; i < 2 * written2; i += 2)
+                    leftright[i] = leftright[i + 1] = 0.f;
+                written = written2;
+            }
+            if (written2 < written)
+            {
+                for (i = 2 * written2; i < 2 * written; i += 2)
+                    leftright_fadein[i] = leftright_fadein[i + 1] = 0.f;
+                written2 = written;
+            }
+            float cnt = v->fadein_counter;
+            const int fadein_len = 64;
+            float scl = 1.0 / fadein_len * v->bigdelta / v->virtdelta;
+            for (i = 0; i < 2 * written2; i += 2)
+            {
+                leftright[i] += (leftright_fadein[i] - leftright[i]) * cnt;
+                leftright[i + 1] += (leftright_fadein[i + 1] - leftright[i + 1]) * cnt;
+                cnt += scl;
+                if (cnt > 1.f)
+                    cnt = 1.f;
+            }
+            if (cnt >= 1.f)
+            {
+                cnt = -1.f;
+                v->bigpos = v->fadein_pos;
+            }
+            v->fadein_counter = cnt;
+        }
+    }
     v->last_lgain = v->lgain;
     v->last_rgain = v->rgain;
-    return rs.offset;
+    return written;
 }
 

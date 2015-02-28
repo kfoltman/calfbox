@@ -77,10 +77,13 @@ struct sampler_gen
     int16_t *scratch;
     
     uint64_t bigpos, bigdelta;
+    uint64_t virtpos, virtdelta;
     uint32_t loop_start, loop_end;
     uint32_t cur_sample_end;
     float lgain, rgain;
     float last_lgain, last_rgain;
+    float fadein_counter;
+    uint64_t fadein_pos;
 
     // In-memory mode only
     uint32_t loop_overlap;

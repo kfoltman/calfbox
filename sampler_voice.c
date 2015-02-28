@@ -332,6 +332,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     if (pos >= end)
         pos = end;
     v->gen.bigpos = ((uint64_t)pos) << 32;
+    v->gen.virtpos = ((uint64_t)pos) << 32;
     
     if (v->current_pipe && v->gen.bigpos)
         cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.bigpos >> 32);
@@ -625,8 +626,16 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         }
     }
         
-    
-    v->gen.bigdelta = freq64;
+    if (l->timestretch)
+    {
+        v->gen.bigdelta = freq64;
+        v->gen.virtdelta = (uint64_t)(l->eff_freq * 65536.0 * 65536.0 * m->module.srate_inv);
+    }
+    else
+    {
+        v->gen.bigdelta = freq64;
+        v->gen.virtdelta = freq64;
+    }
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * c->channel_volume_cc * sampler_channel_addcc(c, 11) / (maxv * maxv);
     if (moddests[smdest_gain] != 0.f)
         gain *= dB2gain(moddests[smdest_gain]);
