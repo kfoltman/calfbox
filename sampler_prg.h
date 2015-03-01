@@ -45,7 +45,7 @@ struct sampler_ctrlinit
 union sampler_ctrlinit_union {
     gpointer ptr;
     struct sampler_ctrlinit cinit;
-} u;
+};
 
 
 struct sampler_program
