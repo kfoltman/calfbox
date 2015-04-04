@@ -544,7 +544,7 @@ static int sfz_note_from_string(const char *note)
     int nv;
     if (nn >= '0' && nn <= '9')
         return atoi(note);
-    if (nn < 'a' && nn > 'g')
+    if (nn < 'a' || nn > 'g')
         return -1;
     nv = semis[nn - 'a'];
     
