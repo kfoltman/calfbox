@@ -72,7 +72,7 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
 {
     struct sampler_module *m = c->module;
     // Handle CC triggering.
-    if (c->program && c->program->rll && c->program->rll->layers_oncc && m->voices_free)
+    if (c->program && c->program->rll && c->program->rll->layers_oncc)
     {
         struct sampler_rll *rll = c->program->rll;
         if (!(rll->cc_trigger_bitmask[cc >> 5] & (1 << (cc & 31))))
@@ -90,6 +90,8 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
                 !(old_value >= layer->runtime->on_locc && old_value <= layer->runtime->on_hicc))
             {
                 struct sampler_voice *v = m->voices_free;
+                if (!v)
+                    break;
                 int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
                 sampler_voice_start(v, c, layer->runtime, layer->runtime->pitch_keycenter, 127, exgroups, &exgroupcount);
                 sampler_channel_release_groups(c, -1, exgroups, exgroupcount);
