@@ -172,13 +172,16 @@ void cbox_waveform_generate_levels(struct cbox_waveform *waveform, int levels, d
         int harmonics = N / 2 / (rate / orig_rate);
         bandlimited[0] = 0;
         
-        for (int j = 1; j <= harmonics; j++)
+        if (harmonics > 0)
         {
-            bandlimited[j] = output[j];
-            bandlimited[N - j] = output[N - j];
+            for (int j = 1; j <= harmonics; j++)
+            {
+                bandlimited[j] = output[j];
+                bandlimited[N - j] = output[N - j];
+            }
+            for (int j = harmonics; j <= N / 2; j++)
+                bandlimited[j] = bandlimited [N - j] = 0;
         }
-        for (int j = harmonics; j <= N / 2; j++)
-            bandlimited[j] = bandlimited [N - j] = 0;
         
         waveform->levels[i].data = calloc(N + MAX_INTERPOLATION_ORDER, sizeof(int16_t));
         my_ifft_c2r(waveform->levels[i].data, bandlimited);
