@@ -717,7 +717,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     if (v->current_pipe)
     {
         uint32_t limit = cbox_prefetch_pipe_get_remaining(v->current_pipe);
-        if (limit < 4)
+        if (limit <= 4)
             v->gen.mode = spt_inactive;
         else
         {
