@@ -15,3 +15,7 @@ config.log
 config.status
 stamp-h1
 calfbox
+
+__pycache__/
+*.py[cod]
+*$py.class
