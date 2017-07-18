@@ -51,6 +51,8 @@ struct cbox_engine *cbox_engine_new(struct cbox_document *doc, struct cbox_rt *r
     engine->master = cbox_master_new(engine);
     engine->master->song = cbox_song_new(doc);
     engine->spb = NULL;
+    engine->spb_lock = 0;
+    engine->spb_retry = 0;
     
     if (rt)
         cbox_io_env_copy(&engine->io_env, &rt->io_env);
@@ -225,9 +227,9 @@ void cbox_engine_remove_scene(struct cbox_engine *engine, struct cbox_scene *sce
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-#define cbox_engine_set_song_playback_args(ARG) ARG(struct cbox_song_playback *, new_song) ARG(int, new_time_ppqn)
+#define cbox_engine_set_song_playback_args(ARG) ARG(struct cbox_song_playback *, old_song) ARG(struct cbox_song_playback *, new_song) ARG(int, new_time_ppqn)
 
-DEFINE_RT_VOID_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
+DEFINE_ASYNC_RT_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
 {
     // If there's no new song, silence all ongoing notes. Otherwise, copy the
     // ongoing notes to the new playback structure so that the notes get released
@@ -243,7 +245,6 @@ DEFINE_RT_VOID_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
             return;
         }
     }
-    struct cbox_song_playback *old_song = engine->spb;
     engine->spb = new_song;
     engine->master->spb = new_song;
     if (new_song)
@@ -264,14 +265,37 @@ DEFINE_RT_VOID_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
     }
 }
 
+ASYNC_PREPARE_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
+{
+    // If update is already in progress, reschedule another at the end of it
+    if (engine->spb_lock)
+    {
+        engine->spb_retry = 1;
+        return 1;
+    }
+    ++engine->spb_lock;
+    args->old_song = engine->spb;
+    args->new_song = cbox_song_playback_new(engine->master->song, engine->master, engine, args->old_song);
+
+    return 0;
+}
+
+ASYNC_CLEANUP_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
+{
+    --engine->spb_lock;
+    if (args->old_song)
+        cbox_song_playback_destroy(args->old_song);
+    // If another update was requested while this one was in progress, repeat
+    // the operation
+    if (engine->spb_retry) {
+        engine->spb_retry = 0;
+        cbox_engine_set_song_playback(engine, NULL, NULL, args->new_time_ppqn);
+    }
+}
+
 void cbox_engine_update_song(struct cbox_engine *engine, int new_pos_ppqn)
 {
-    struct cbox_song_playback *old_song, *new_song;
-    old_song = engine->spb;
-    new_song = cbox_song_playback_new(engine->master->song, engine->master, engine, old_song );
-    cbox_engine_set_song_playback(engine, new_song, new_pos_ppqn);
-    if (old_song)
-        cbox_song_playback_destroy(old_song);
+    cbox_engine_set_song_playback(engine, NULL, NULL, new_pos_ppqn);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

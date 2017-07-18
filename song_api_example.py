@@ -13,6 +13,9 @@ global Transport
 Document = cbox.Document
 Transport = cbox.Transport
 
+# Make sure playback doesn't start prematurely
+Transport.stop()
+
 song = Document.get_song()
 
 # Delete all the tracks and patterns
@@ -42,6 +45,7 @@ pattern = song.pattern_from_blob(pblob, pattern_len)
 clip = trk.add_clip(0, 0, pattern_len, pattern)
 
 # Stop the song at the end
+#song.set_loop(pattern_len, pattern_len)
 song.set_loop(pattern_len, pattern_len)
 
 # Set tempo - the argument must be a float
@@ -49,6 +53,9 @@ Transport.set_tempo(160.0)
 
 # Send the updated song data to the realtime thread
 song.update_playback()
+
+# Flush
+Transport.stop()
 
 print ("Song length (seconds) is %f" % (cbox.Transport.ppqn_to_samples(pattern_len) * 1.0 / Transport.status().sample_rate))
 

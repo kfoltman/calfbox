@@ -92,6 +92,7 @@ extern struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, stru
 #define RT_FUNC_ARG_PASS2(type, name) , _args.name
 #define RT_FUNC_ARG_PASS3(type, name) , _args->name
 #define RT_FUNC_ARG_PASS4(type, name) , name
+#define RT_FUNC_ARG_PASS5(type, name) _args->name = name;
 #define DEFINE_RT_FUNC(restype, objtype, argname, name) \
     struct rt_function_args_##name { \
         struct objtype *_obj; \
@@ -156,6 +157,48 @@ extern struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, stru
         } \
     } \
     void RT_IMPL_##name(struct objtype *argname, int *_cost name##_args(RT_FUNC_ARG_LIST))
+
+#define DEFINE_ASYNC_RT_FUNC(objtype, argname, name) \
+    struct rt_function_args_##name { \
+        struct objtype *_obj; \
+        name##_args(RT_FUNC_ARG_MEMBER) \
+    }; \
+    static void RT_IMPL_##name(struct objtype *_obj, int *_cost name##_args(RT_FUNC_ARG_LIST)); \
+    static int prepare_##name(void *user_data); \
+    static void cleanup_##name(void *user_data); \
+    static int exec_##name(void *user_data) { \
+        int cost = 1; \
+        struct rt_function_args_##name *_args = user_data;\
+        RT_IMPL_##name(_args->_obj, &cost name##_args(RT_FUNC_ARG_PASS3)); \
+        return cost; \
+    } \
+    void name(struct objtype *_obj name##_args(RT_FUNC_ARG_LIST)) \
+    { \
+        struct cbox_rt *rt = GET_RT_FROM_##objtype(_obj); \
+        struct rt_function_args_##name *_args = malloc(sizeof(struct rt_function_args_##name)); \
+        _args->_obj = _obj; \
+        name##_args(RT_FUNC_ARG_PASS5) \
+        static struct cbox_rt_cmd_definition _cmd = { .prepare = prepare_##name, .execute = exec_##name, .cleanup = cleanup_##name }; \
+        cbox_rt_execute_cmd_async(rt, &_cmd, _args);  \
+    } \
+    void RT_IMPL_##name(struct objtype *argname, int *_cost name##_args(RT_FUNC_ARG_LIST))
+
+#define ASYNC_PREPARE_FUNC(objtype, argname, name) \
+    static int PREPARE_IMPL_##name(struct objtype *argname, struct rt_function_args_##name *args); \
+    int prepare_##name(void *user_data) {\
+        struct rt_function_args_##name *_args = user_data;\
+        return PREPARE_IMPL_##name(_args->_obj, _args); \
+    } \
+    int PREPARE_IMPL_##name(struct objtype *argname, struct rt_function_args_##name *args)
+
+#define ASYNC_CLEANUP_FUNC(objtype, argname, name) \
+    static void CLEANUP_IMPL_##name(struct objtype *argname, struct rt_function_args_##name *args); \
+    void cleanup_##name(void *user_data) {\
+        struct rt_function_args_##name *_args = user_data;\
+        CLEANUP_IMPL_##name(_args->_obj, _args); \
+        free(_args); \
+    } \
+    void CLEANUP_IMPL_##name(struct objtype *argname, struct rt_function_args_##name *args)
 
 #define RT_CALL_AGAIN_LATER() ((*_cost) = 0)
 #define RT_SET_COST(n) ((*_cost) = (n))

@@ -42,6 +42,8 @@ struct cbox_engine
     struct cbox_master *master;
     struct cbox_midi_buffer midibuf_aux, midibuf_jack, midibuf_song;
     struct cbox_midi_appsink appsink;
+
+    int spb_lock, spb_retry;
 };
 
 // These use an RT command internally
