@@ -74,7 +74,7 @@ extern void cbox_rt_stop(struct cbox_rt *rt);
 
 // Those are for calling from the main thread. I will add a RT-thread version later.
 extern void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition *cmd, void *user_data);
-extern void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *cmd, void *user_data);
+extern int cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *cmd, void *user_data);
 extern void *cbox_rt_swap_pointers(struct cbox_rt *rt, void **ptr, void *new_value);
 extern void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, void *new_value, int *pcount, int new_count);
 
@@ -179,7 +179,8 @@ extern struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, stru
         _args->_obj = _obj; \
         name##_args(RT_FUNC_ARG_PASS5) \
         static struct cbox_rt_cmd_definition _cmd = { .prepare = prepare_##name, .execute = exec_##name, .cleanup = cleanup_##name }; \
-        cbox_rt_execute_cmd_async(rt, &_cmd, _args);  \
+        if (cbox_rt_execute_cmd_async(rt, &_cmd, _args))  \
+            free(_args);  \
     } \
     void RT_IMPL_##name(struct objtype *argname, int *_cost name##_args(RT_FUNC_ARG_LIST))
 

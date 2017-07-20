@@ -241,7 +241,8 @@ void cbox_rt_handle_cmd_queue(struct cbox_rt *rt)
     
     while(cbox_fifo_read_atomic(rt->rb_cleanup, &cmd, sizeof(cmd)))
     {
-        cmd.definition->cleanup(cmd.user_data);
+        if (cmd.definition->cleanup)
+            cmd.definition->cleanup(cmd.user_data);
     }
 }
 
@@ -303,19 +304,20 @@ void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
             break;
         }
         // async command - clean it up
-        if (cmd2.definition->cleanup)
-            cmd2.definition->cleanup(cmd2.user_data);
+        assert(cmd2.is_async);
+        cmd2.definition->cleanup(cmd2.user_data);
     } while(1);
 }
 
-void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
+int cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
 {
     struct cbox_rt_cmd_instance cmd = { def, user_data, 1 };
     
     if (def->prepare)
     {
-        if (def->prepare(user_data))
-            return;
+        int error = def->prepare(user_data);
+        if (error)
+            return error;
     }
     // No realtime thread - do it all in the main thread
     if (!rt || !rt->started || rt->disconnected)
@@ -324,13 +326,13 @@ void cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition
             ;
         if (def->cleanup)
             def->cleanup(user_data);
-        return;
+    } else {
+        wait_write_space(rt->rb_execute);
+        cbox_fifo_write_atomic(rt->rb_execute, &cmd, sizeof(cmd));
+        // will be cleaned up by next sync call or by cbox_rt_cmd_handle_queue
     }
-    
-    wait_write_space(rt->rb_execute);
-    cbox_fifo_write_atomic(rt->rb_execute, &cmd, sizeof(cmd));
-    
-    // will be cleaned up by next sync call or by cbox_rt_cmd_handle_queue
+
+    return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

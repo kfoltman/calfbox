@@ -283,6 +283,7 @@ ASYNC_PREPARE_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
 ASYNC_CLEANUP_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
 {
     --engine->spb_lock;
+    assert(!engine->spb_lock);
     if (args->old_song)
         cbox_song_playback_destroy(args->old_song);
     // If another update was requested while this one was in progress, repeat
