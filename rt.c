@@ -35,7 +35,7 @@ struct cbox_rt_cmd_instance
 {
     struct cbox_rt_cmd_definition *definition;
     void *user_data;
-    int is_async;
+    int *completed_ptr; // for synchronous commands only
 };
 
 static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -241,8 +241,8 @@ void cbox_rt_handle_cmd_queue(struct cbox_rt *rt)
     
     while(cbox_fifo_read_atomic(rt->rb_cleanup, &cmd, sizeof(cmd)))
     {
-        if (cmd.definition->cleanup)
-            cmd.definition->cleanup(cmd.user_data);
+        assert(!cmd.completed_ptr);
+        cmd.definition->cleanup(cmd.user_data);
     }
 }
 
@@ -280,15 +280,22 @@ void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
         return;
     }
     
+    int completed = 0;
     memset(&cmd, 0, sizeof(cmd));
     cmd.definition = def;
     cmd.user_data = user_data;
-    cmd.is_async = 0;
+    cmd.completed_ptr = &completed;
     
     wait_write_space(rt->rb_execute);
     cbox_fifo_write_atomic(rt->rb_execute, &cmd, sizeof(cmd));
     do
     {
+        if (completed)
+        {
+            if (def->cleanup)
+                def->cleanup(user_data);
+            break;
+        }
         struct cbox_rt_cmd_instance cmd2;
         
         if (!cbox_fifo_read_atomic(rt->rb_cleanup, &cmd2, sizeof(cmd2)))
@@ -297,21 +304,14 @@ void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_definition 
             usleep(10000);
             continue;
         }
-        if (!memcmp(&cmd, &cmd2, sizeof(cmd)))
-        {
-            if (def->cleanup)
-                def->cleanup(user_data);
-            break;
-        }
-        // async command - clean it up
-        assert(cmd2.is_async);
+        // async command or something from outer layer - clean it up
         cmd2.definition->cleanup(cmd2.user_data);
     } while(1);
 }
 
 int cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *def, void *user_data)
 {
-    struct cbox_rt_cmd_instance cmd = { def, user_data, 1 };
+    struct cbox_rt_cmd_instance cmd = { def, user_data, NULL };
     
     if (def->prepare)
     {
@@ -361,7 +361,9 @@ void cbox_rt_handle_rt_commands(struct cbox_rt *rt)
             break;
         cost += result;
         cbox_fifo_consume(rt->rb_execute, sizeof(cmd));
-        if (cmd.definition->cleanup || !cmd.is_async)
+        if (cmd.completed_ptr)
+            *cmd.completed_ptr = 1;
+        else if (cmd.definition->cleanup)
         {
             gboolean success = cbox_fifo_write_atomic(rt->rb_cleanup, (const char *)&cmd, sizeof(cmd));
             if (!success)
