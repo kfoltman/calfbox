@@ -466,6 +466,7 @@ gboolean cbox_jackio_stop(struct cbox_io_impl *impl, GError **error)
         return FALSE;
     }
     jack_deactivate(jii->client);
+    jack_set_process_callback(jii->client, NULL, 0);
     return TRUE;
 }
 
