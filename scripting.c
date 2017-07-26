@@ -452,6 +452,23 @@ static PyModuleDef CboxModule = {
 
 #if CALFBOX_AS_MODULE
 
+static void cbox_python_atexit()
+{
+    if (audio_running) {
+        cbox_rt_stop(app.rt);
+        cbox_io_close(&app.io);
+        audio_running = FALSE;
+    }
+    if (engine_initialised) {
+        cbox_tarpool_destroy(app.tarpool);
+        cbox_document_destroy(app.document);
+        cbox_wavebank_close();
+        cbox_config_close();
+        cbox_dom_close();
+        engine_initialised = FALSE;
+    }
+}
+
 PyMODINIT_FUNC
 PyInit__cbox(void)
 {    
@@ -462,6 +479,7 @@ PyInit__cbox(void)
     if (PyType_Ready(&CboxCallbackType) < 0)
         return NULL;
     PyModule_AddObject(m, "Callback", (PyObject *)&CboxCallbackType);
+    atexit(cbox_python_atexit);
     
     return m;
 }
