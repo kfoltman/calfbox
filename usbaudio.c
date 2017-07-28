@@ -132,7 +132,7 @@ static void calc_output_buffer(struct cbox_usb_io_impl *uii)
     {
         struct cbox_usb_midi_interface *umi = p->data;
         if (umi->input_port->hdr.enable_appsink && umi->input_port && umi->input_port->hdr.buffer.count)
-            cbox_midi_appsink_supply(&umi->input_port->hdr.appsink, &umi->input_port->hdr.buffer);
+            cbox_midi_appsink_supply(&umi->input_port->hdr.appsink, &umi->input_port->hdr.buffer, io->free_running_frame_counter);
     }
     io->cb->process(io->cb->user_data, io, buffer_size);
     for (GList *p = uii->rt_midi_ports; p; p = p->next)
@@ -158,6 +158,7 @@ static void calc_output_buffer(struct cbox_usb_io_impl *uii)
         if (time1 > 0.0008 || time2 > 0.0008)
             g_warning("CPU time = %f ms, real time = %f ms", time2 * 1000, time1 * 1000);
     }
+    io->free_running_frame_counter += buffer_size;
 }
 
 static void fill_playback_buffer(struct cbox_usb_io_impl *uii, struct libusb_transfer *transfer)

@@ -150,18 +150,6 @@ static int process_cb(jack_nframes_t nframes, void *arg)
         for (int j = 0; j < nframes; j ++)
             io->output_buffers[i][j] = 0.f;
     }
-    for (GSList *p = io->midi_inputs; p; p = p->next)
-    {
-        struct cbox_jack_midi_input *input = p->data;
-        if (input->hdr.output_set || input->hdr.enable_appsink)
-        {
-            copy_midi_data_to_buffer(input->port, io->io_env.buffer_size, &input->hdr.buffer);
-            if (input->hdr.enable_appsink)
-                cbox_midi_appsink_supply(&input->hdr.appsink, &input->hdr.buffer);
-        }
-        else
-            cbox_midi_buffer_clear(&input->hdr.buffer);
-    }
     if (cb->on_transport_sync)
     {
         jack_transport_state_t state = jack_transport_query(jii->client, NULL);
@@ -185,6 +173,18 @@ static int process_cb(jack_nframes_t nframes, void *arg)
             else
                 jii->last_transport_state = state;
         }
+    }
+    for (GSList *p = io->midi_inputs; p; p = p->next)
+    {
+        struct cbox_jack_midi_input *input = p->data;
+        if (input->hdr.output_set || input->hdr.enable_appsink)
+        {
+            copy_midi_data_to_buffer(input->port, io->io_env.buffer_size, &input->hdr.buffer);
+            if (input->hdr.enable_appsink)
+                cbox_midi_appsink_supply(&input->hdr.appsink, &input->hdr.buffer, io->free_running_frame_counter);
+        }
+        else
+            cbox_midi_buffer_clear(&input->hdr.buffer);
     }
     cb->process(cb->user_data, io, nframes);
     for (int i = 0; i < io->io_env.input_count; i++)
@@ -221,6 +221,7 @@ static int process_cb(jack_nframes_t nframes, void *arg)
             }
         }
     }
+    io->free_running_frame_counter += nframes;
     return 0;
 }
 

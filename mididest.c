@@ -150,7 +150,7 @@ void cbox_midi_appsink_init(struct cbox_midi_appsink *appsink, struct cbox_rt *r
     appsink->current_buffer = 0;
 }
 
-void cbox_midi_appsink_supply(struct cbox_midi_appsink *appsink, struct cbox_midi_buffer *buffer)
+void cbox_midi_appsink_supply(struct cbox_midi_appsink *appsink, struct cbox_midi_buffer *buffer, uint32_t time_offset)
 {
     struct cbox_midi_buffer *sinkbuf = &appsink->midibufs[appsink->current_buffer];
     for (int i = 0; i < buffer->count; i++)
@@ -160,7 +160,7 @@ void cbox_midi_appsink_supply(struct cbox_midi_appsink *appsink, struct cbox_mid
         {
             if (!cbox_midi_buffer_can_store_msg(sinkbuf, event->size))
                 break;
-            cbox_midi_buffer_copy_event(sinkbuf, event, 0);
+            cbox_midi_buffer_copy_event(sinkbuf, event, time_offset + event->time);
         }
     }
 }
@@ -202,6 +202,8 @@ gboolean cbox_midi_appsink_send_to(struct cbox_midi_appsink *appsink, struct cbo
         {
             const struct cbox_midi_event *event = cbox_midi_buffer_get_event(midi_in, i);
             const uint8_t *data = cbox_midi_event_get_data(event);
+            if (!cbox_execute_on(fb, NULL, "/io/midi/event_time", "i", error, event->time))
+                return FALSE;
             // XXXKF doesn't handle SysEx properly yet, only 3-byte values
             if (event->size <= 3)
             {

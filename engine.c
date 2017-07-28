@@ -178,8 +178,8 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
     else
         cbox_midi_buffer_clear(&engine->midibuf_jack);
     
-    // Copy MIDI input to the app-sink with no timing information
-    cbox_midi_appsink_supply(&engine->appsink, &engine->midibuf_jack);
+    // Copy MIDI input to the app-sink
+    cbox_midi_appsink_supply(&engine->appsink, &engine->midibuf_jack, io->free_running_frame_counter);
     
     if (engine->rt)
         cbox_rt_handle_rt_commands(engine->rt);
@@ -207,7 +207,6 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
             }
         }
     }
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

@@ -73,6 +73,7 @@ struct cbox_io
     struct cbox_io_callbacks *cb;
     GSList *midi_inputs;
     GSList *midi_outputs;
+    uint32_t free_running_frame_counter;
 };
 
 enum cbox_transport_state
