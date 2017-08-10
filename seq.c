@@ -261,7 +261,7 @@ void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct c
         
         if (src->time - pb->offset_ppqn >= pb->min_time_ppqn)
         {
-            int event_time_samples = cbox_master_ppqn_to_samples(pb->master, src->time - pb->offset_ppqn) + pb->start_time_samples;
+            int event_time_samples = cbox_master_ppqn_to_samples(pb->master, src->time - pb->offset_ppqn + pb->item_start_ppqn);
         
             if (event_time_samples >= end_time_samples)
                 break;
@@ -463,8 +463,9 @@ int cbox_song_playback_get_next_tempo_change(struct cbox_song_playback *spb)
         new_tempo = spb->tempo_map_items[spb->tempo_map_pos + 1].tempo;
         spb->tempo_map_pos++;
     }
-    if (new_tempo != 0.0 && new_tempo != spb->master->tempo)
+    if (new_tempo != 0.0 && new_tempo != spb->master->tempo) {
         cbox_song_playback_set_tempo(spb, new_tempo);
+    }
         
     // No more items?
     if (spb->tempo_map_pos + 1 >= spb->tempo_map_item_count)
@@ -477,9 +478,10 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
 {
     cbox_midi_buffer_clear(output);
     
-    if (spb->master->new_tempo != 0 && spb->master->new_tempo != spb->master->tempo)
+    if (spb->master->new_tempo != 0)
     {
-        cbox_song_playback_set_tempo(spb, spb->master->new_tempo);
+        if (spb->master->new_tempo != spb->master->tempo)
+            cbox_song_playback_set_tempo(spb, spb->master->new_tempo);
         spb->master->new_tempo = 0;
     }
     for(int i = 0; i < spb->track_count; i++)
