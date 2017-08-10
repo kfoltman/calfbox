@@ -259,7 +259,7 @@ void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct c
     {
         const struct cbox_midi_event *src = &pb->pattern->events[pb->pos];
         
-        if (src->time - pb->offset_ppqn >= pb->min_time_ppqn)
+        if (src->time - pb->offset_ppqn + pb->item_start_ppqn >= pb->min_time_ppqn)
         {
             int event_time_samples = cbox_master_ppqn_to_samples(pb->master, src->time - pb->offset_ppqn + pb->item_start_ppqn);
         
