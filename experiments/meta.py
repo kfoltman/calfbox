@@ -444,7 +444,12 @@ def ly2cbox(lilypondString):
 cboxTracks = {}  #trackName:(cboxTrack,cboxMidiOutUuid)
 def cboxSetTrack(trackName, durationInTicks, pattern):
     """Creates or resets calfbox tracks including jack connections
-    Keeps jack connections alive"""
+    Keeps jack connections alive.
+
+    pattern is most likely a single pattern created through cbox.Document.get_song().pattern_from_blob
+    But it can also be a list of such patterns. In this case all patterns must be the same duration
+    and the parameter durationInTicks is the length of ONE pattern.
+    """
 
     if not trackName in cboxTracks:
         cboxMidiOutUuid = cbox.JackIO.create_midi_output(trackName)
@@ -459,7 +464,14 @@ def cboxSetTrack(trackName, durationInTicks, pattern):
     cbox.JackIO.rename_midi_output(cboxMidiOutUuid, trackName)
     calfboxTrack.set_name(trackName)
 
-    calfboxTrack.add_clip(0, 0, durationInTicks, pattern)  #pos, offset, length(and not end-position, but is the same for the complete track), pattern
+    if type(pattern) is cbox.DocPattern:
+        calfboxTrack.add_clip(0, 0, durationInTicks, pattern)  #pos, offset, length(and not end-position, but is the same for the complete track), pattern
+    else: #iterable
+        assert iter(pattern)
+        #durationInTicks is the length of ONE pattern.
+        for i, pat in enumerate(pattern):
+            calfboxTrack.add_clip(i*durationInTicks, 0, durationInTicks, pat) #pos, offset, length, pattern.
+
     return calfboxTrack
 
 
@@ -496,7 +508,7 @@ def initCbox(clientName):
     return scene, cbox, eventLoop
 
 
-def start(autoplay = False):
+def start(autoplay = False, userfunction = None):
     def ask_exit():
         print()
         eventLoop.stop()
@@ -509,6 +521,12 @@ def start(autoplay = False):
 
     for signame in ('SIGINT', 'SIGTERM'):
         eventLoop.add_signal_handler(getattr(signal, signame), ask_exit)
+
+    if userfunction:
+        print ("Send SIGUSR1 with following command to trigger user function")
+        print ("kill -10 {}".format(os.getpid()))
+        print ()
+        eventLoop.add_signal_handler(getattr(signal, "SIGUSR1"), userfunction)
 
     print ("Use jack transport to control playback")
     print ("Press Ctrl+C to abort")
