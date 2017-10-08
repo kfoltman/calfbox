@@ -126,7 +126,11 @@ void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, int time_s
     pb->pos = 0;
     while(pb->pos < pb->items_count && cbox_master_ppqn_to_samples(pb->master, pb->items[pb->pos].time + pb->items[pb->pos].length) < time_samples)
         pb->pos++;
-    cbox_track_playback_start_item(pb, time_samples, FALSE, 0);
+    if (pb->pos < pb->items_count)
+    {
+        int min_time_ppqn = cbox_master_samples_to_ppqn(pb->master, time_samples);
+        cbox_track_playback_start_item(pb, time_samples, FALSE, min_time_ppqn);
+    }
 }
 
 void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, int is_ppqn, int min_time_ppqn)
@@ -163,9 +167,9 @@ void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, in
     else
     {
         if (time_ppqn < start_time_ppqn)
-            cbox_midi_clip_playback_seek_samples(&pb->playback, 0);
+            cbox_midi_clip_playback_seek_samples(&pb->playback, 0, min_time_ppqn);
         else
-            cbox_midi_clip_playback_seek_samples(&pb->playback, time_samples - start_time_samples);
+            cbox_midi_clip_playback_seek_samples(&pb->playback, time_samples - start_time_samples, min_time_ppqn);
     }
 }
 
@@ -289,13 +293,13 @@ void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, int t
     pb->pos = pos;
 }
 
-void cbox_midi_clip_playback_seek_samples(struct cbox_midi_clip_playback *pb, int time_samples)
+void cbox_midi_clip_playback_seek_samples(struct cbox_midi_clip_playback *pb, int time_samples, int min_time_ppqn)
 {
     int pos = 0;
     while (pos < pb->pattern->event_count && time_samples > cbox_master_ppqn_to_samples(pb->master, pb->item_start_ppqn + pb->pattern->events[pos].time - pb->offset_ppqn))
         pos++;
     pb->rel_time_samples = time_samples;
-    pb->min_time_ppqn = 0;
+    pb->min_time_ppqn = min_time_ppqn;
     pb->pos = pos;
 }
 

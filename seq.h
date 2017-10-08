@@ -71,8 +71,8 @@ struct cbox_midi_clip_playback
 
 extern void cbox_midi_clip_playback_init(struct cbox_midi_clip_playback *pb, struct cbox_midi_playback_active_notes *active_notes, struct cbox_master *master);
 extern void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, int offset, int nsamples);
-extern void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, int time_ppqn, int skip_this_pos);
-extern void cbox_midi_clip_playback_seek_samples(struct cbox_midi_clip_playback *pb, int time_samples);
+extern void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, int time_ppqn, int min_time_ppqn);
+extern void cbox_midi_clip_playback_seek_samples(struct cbox_midi_clip_playback *pb, int time_samples, int min_time_ppqn);
 extern void cbox_midi_clip_playback_set_pattern(struct cbox_midi_clip_playback *pb, struct cbox_midi_pattern_playback *pattern, int start_time_samples, int end_time_samples, int item_start_ppqn, int offset_ppqn);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
