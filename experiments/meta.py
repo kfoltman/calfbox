@@ -435,8 +435,8 @@ def ly2cbox(lilypondString):
     startTick = 0
     for midiPitch, durationInTicks in ly(lilypondString):
         endTick = startTick + durationInTicks - 1  #-1 ticks to create a small logical gap. This is nothing compared to our tick value dimensions, but it is enough for the midi protocol to treat two notes as separate ones. Imporant to say that this does NOT affect the next note on. This will be mathematically correct anyway.
-        pblob += cbox.Pattern.serialize_event(startTick, 0x80, midiPitch, 100) # note on
-        pblob += cbox.Pattern.serialize_event(endTick  , 0x90, midiPitch, 100) # note off
+        pblob += cbox.Pattern.serialize_event(startTick, 0x90, midiPitch, 100) # note on
+        pblob += cbox.Pattern.serialize_event(endTick  , 0x80, midiPitch, 100) # note off
         startTick = startTick + durationInTicks #no -1 for the next note
     return pblob, startTick
 
