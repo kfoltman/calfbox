@@ -72,6 +72,7 @@ AC_CHECK_LIB(uuid, uuid_unparse, true, AC_MSG_ERROR([libuuid is required]))
 PKG_CHECK_MODULES(GLIB_DEPS, glib-2.0 >= 2.6, true, AC_MSG_ERROR([libglib-2.0 is required]))
 PKG_CHECK_MODULES(LIBUSB_DEPS, libusb-1.0 >= 1.0, true, AC_MSG_ERROR([libusb-1.0 is required]))
 PKG_CHECK_MODULES(LIBSNDFILE_DEPS, sndfile, true, AC_MSG_ERROR([libsndfile is required]))
+PKG_CHECK_MODULES(NCURSES_DEPS, ncurses, true, AC_MSG_ERROR([libncurses is required]))
 
 if test "$FLUIDSYNTH_ENABLED" = "yes"; then
     PKG_CHECK_MODULES(FLUIDSYNTH_DEPS, fluidsynth >= 1.0.8, true, AC_MSG_ERROR([fluidsynth 1.0.8 is required]))
