@@ -63,7 +63,7 @@ struct cbox_objhdr
     uint64_t stamp;
 };
 
-inline int cbox_class_is_a(const struct cbox_class *c1, const struct cbox_class *c2)
+static inline int cbox_class_is_a(const struct cbox_class *c1, const struct cbox_class *c2)
 {
     while(c1 != c2 && c1->parent)
         c1 = c1->parent;
