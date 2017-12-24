@@ -94,13 +94,10 @@ headers = [
     "dspmath.h",
     "envelope.h",
     "ioenv.h",
-    "menu.h",
-    "menuitem.h",
     "onepole-float.h",
     "onepole-int.h",
     "sampler_impl.h",
     "stm.h",
-    "ui.h",
     "usbio_impl.h",
 ]
 
