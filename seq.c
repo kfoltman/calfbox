@@ -284,9 +284,22 @@ void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct c
 
 void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, int time_ppqn, int min_time_ppqn)
 {
-    int pos = 0;
     int patrel_time_ppqn = time_ppqn + pb->offset_ppqn;
-    while (pos < pb->pattern->event_count && patrel_time_ppqn > pb->pattern->events[pos].time)
+    int L = 0, U = pb->pattern->event_count;
+
+    if (patrel_time_ppqn > 0) {
+        while (U > L + 2) {
+            int32_t M = (L >> 1) + (U >> 1) + (L & U & 1);
+            int time = pb->pattern->events[M].time;
+            if (time < patrel_time_ppqn)
+                L = M + 1;
+            else if (time >= patrel_time_ppqn)
+                U = M + 1; // this might still be the event we're looking for
+        }
+    }
+
+    int pos = L;
+    while (pos < U && pb->pattern->events[pos].time < patrel_time_ppqn)
         pos++;
     pb->rel_time_samples = cbox_master_ppqn_to_samples(pb->master, pb->item_start_ppqn + time_ppqn) - pb->start_time_samples;
     pb->min_time_ppqn = min_time_ppqn;
