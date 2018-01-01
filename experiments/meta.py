@@ -577,5 +577,7 @@ def start(autoplay = False, userfunction = None, tempo = 120):
 
 
 def shutdownCbox():
+    cbox.Transport.stop()
+    cbox.Transport.seek_ppqn(0)
     cbox.stop_audio()
     cbox.shutdown_engine()
