@@ -3,7 +3,7 @@
 import re
 from calfbox import cbox  #use the globally installed calfbox
 from asyncio import get_event_loop
-from sys import stdout
+from sys import stdout, maxsize
 import os, signal
 
 D1024 =210 * 2**0 # = 210. The lcm of 2, 3, 5, 7 . according to www.informatics.indiana.edu/donbyrd/CMNExtremes.htm this is the real world limit.
@@ -20,6 +20,7 @@ D1   = 210 * 2**10  #whole    215040 ticks
 DB   = 210 * 2**11  #brevis   430080 ticks
 DL   = 210 * 2**12  #longa
 DM   = 210 * 2**13  #maxima
+MAXIMUM = 0x7FFFFFFF # 31bit. maximum number of calfbox ticks allowed for its timeline, for example for the song duration
 
 
 ly2pitch = {
@@ -475,6 +476,13 @@ def cboxSetTrack(trackName, durationInTicks, pattern):
     return calfboxTrack
 
 
+def ly2Track(trackName, lyString):
+    """Convert a simple string of lilypond notes to a cbox track and add that to the score"""
+    music = lyString
+    cboxBlob, durationInTicks = ly2cbox(music)
+    pattern = cbox.Document.get_song().pattern_from_blob(cboxBlob, durationInTicks)
+    cboxSetTrack(trackName, durationInTicks, pattern)
+
 def getLongestTrackDuationInTicks():
     return max( max(clip.pos + clip.length for clip in cboxTrack.track.status().clips) for cboxTrack in cbox.Document.get_song().status().tracks if cboxTrack.track.status().clips)
     #for cboxTrack in cbox.Document.get_song().status().tracks:
@@ -539,7 +547,9 @@ def start(autoplay = False, userfunction = None):
         dur = getLongestTrackDuationInTicks()
         cbox.Document.get_song().set_loop(dur, dur) #set playback length for the entire score.
     except ValueError:
-        print ("Starting without a track")
+        print ("Starting without a track. Setting song duration to a high value to generate recording space")
+        cbox.Document.get_song().set_loop(maxsize, maxsize) #set playback length for the entire score.
+
     cbox.Document.get_song().update_playback()
     print ("update playback called")
 
