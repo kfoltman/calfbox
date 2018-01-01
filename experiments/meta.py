@@ -20,8 +20,9 @@ D1   = 210 * 2**10  #whole    215040 ticks
 DB   = 210 * 2**11  #brevis   430080 ticks
 DL   = 210 * 2**12  #longa
 DM   = 210 * 2**13  #maxima
-MAXIMUM = 0x7FFFFFFF # 31bit. maximum number of calfbox ticks allowed for its timeline, for example for the song duration
-
+#MAXIMUM = 0x7FFFFFFF # 31bit. maximum number of calfbox ticks allowed for its timeline, for example for the song duration
+MAXIMUM = 100 * D1
+#max_pulses = min(2**31, 2**31 * ppqn * bpm / (60 * sample_rate))
 
 ly2pitch = {
     "ceses,,," : 00,
@@ -472,6 +473,7 @@ def cboxSetTrack(trackName, durationInTicks, pattern):
         #durationInTicks is the length of ONE pattern.
         for i, pat in enumerate(pattern):
             calfboxTrack.add_clip(i*durationInTicks, 0, durationInTicks, pat) #pos, offset, length, pattern.
+            calfboxTrack.add_clip(i*durationInTicks, 0, durationInTicks, pat) #pos, offset, length, pattern.
 
     return calfboxTrack
 
@@ -537,7 +539,7 @@ def connectPhysicalKeyboards():
     for keyboard in midiKeyboards:
         cbox.JackIO.port_connect(keyboard, ourMidiInPort)
 
-def start(autoplay = False, userfunction = None):
+def start(autoplay = False, userfunction = None, tempo = 120):
     def ask_exit():
         print()
         eventLoop.stop()
@@ -545,13 +547,15 @@ def start(autoplay = False, userfunction = None):
 
     try:
         dur = getLongestTrackDuationInTicks()
+        print("Starting with supplied music data. Setting sond duration to longest track")
+        assert dur > 0
         cbox.Document.get_song().set_loop(dur, dur) #set playback length for the entire score.
     except ValueError:
         print ("Starting without a track. Setting song duration to a high value to generate recording space")
-        cbox.Document.get_song().set_loop(maxsize, maxsize) #set playback length for the entire score.
+        cbox.Document.get_song().set_loop(MAXIMUM, MAXIMUM) #set playback length for the entire score.
 
+    cbox.Transport.set_tempo(float(tempo))
     cbox.Document.get_song().update_playback()
-    print ("update playback called")
 
     for signame in ('SIGINT', 'SIGTERM'):
         eventLoop.add_signal_handler(getattr(signal, signame), ask_exit)
