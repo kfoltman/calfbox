@@ -493,7 +493,7 @@ def cboxLoop(loop):
 
 
 eventLoop = get_event_loop()
-def initCbox(clientName):
+def initCbox(clientName, internalEventProcessor=True):
     cbox.init_engine("")
     cbox.Config.set("io", "client_name", clientName)
     cbox.start_audio()
@@ -504,9 +504,17 @@ def initCbox(clientName):
     cbox.Transport.stop()
     cbox.Transport.seek_ppqn(0)
     cbox.Transport.set_tempo(120.0) #must be float
-    eventLoop.call_soon(cboxLoop, eventLoop)
+
+    if internalEventProcessor:
+        eventLoop.call_soon(cboxLoop, eventLoop)
     return scene, cbox, eventLoop
 
+
+def connectPhysicalKeyboards():
+    midiKeyboards = cbox.JackIO.get_ports(".*", cbox.JackIO.MIDI_TYPE, cbox.JackIO.PORT_IS_SOURCE | cbox.JackIO.PORT_IS_PHYSICAL)
+    ourMidiInPort = cbox.Config.get("io", "client_name",) + ":midi"
+    for keyboard in midiKeyboards:
+        cbox.JackIO.port_connect(keyboard, ourMidiInPort)
 
 def start(autoplay = False, userfunction = None):
     def ask_exit():
@@ -515,9 +523,12 @@ def start(autoplay = False, userfunction = None):
         shutdownCbox()
 
 
-    dur = getLongestTrackDuationInTicks()
-    cbox.Document.get_song().set_loop(dur, dur) #set playback length for the entire score.
-    cbox.Document.get_song().update_playback()
+    try:
+        dur = getLongestTrackDuationInTicks()
+        cbox.Document.get_song().set_loop(dur, dur) #set playback length for the entire score.
+        cbox.Document.get_song().update_playback()
+    except ValueError:
+        print ("Starting without playback data")
 
     for signame in ('SIGINT', 'SIGTERM'):
         eventLoop.add_signal_handler(getattr(signal, signame), ask_exit)
