@@ -659,3 +659,36 @@ void cbox_song_playback_destroy(struct cbox_song_playback *spb)
     cbox_midi_merger_close(&spb->track_merger);
     free(spb);
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+uint32_t cbox_song_time_mapper_map_time(struct cbox_time_mapper *tmap, uint32_t free_running_counter)
+{
+    struct cbox_song_time_mapper *stmap = (struct cbox_song_time_mapper *)tmap;
+    struct cbox_engine *engine = stmap->engine;
+
+    if (!engine->spb || engine->master->state != CMTS_ROLLING)
+        return free_running_counter & 0x7FFFFFFF;
+
+    int32_t rel_samples = free_running_counter - engine->rt->io->free_running_frame_counter;
+    if (rel_samples < 0 || rel_samples >= 1048576)
+        return (uint32_t)-1;
+    uint32_t abs_samples = engine->spb->song_pos_samples + rel_samples;
+    uint32_t loop_end_samples = cbox_master_ppqn_to_samples(engine->master, engine->spb->loop_end_ppqn);
+    if (abs_samples >= loop_end_samples) {
+        // Correct for looping
+        uint32_t loop_start_samples = cbox_master_ppqn_to_samples(engine->master, engine->spb->loop_start_ppqn);
+        if (loop_start_samples < loop_end_samples) {
+            uint32_t loop_length = loop_end_samples - loop_start_samples;
+            abs_samples = loop_start_samples + (abs_samples - loop_start_samples) % loop_length;
+        }
+    }
+    uint32_t abs_ppqn = cbox_master_samples_to_ppqn(engine->master, abs_samples);
+    return abs_ppqn | 0x80000000;
+}
+
+void cbox_song_time_mapper_init(struct cbox_song_time_mapper *tmap, struct cbox_engine *engine)
+{
+    tmap->tmap.map_time = cbox_song_time_mapper_map_time;
+    tmap->engine = engine;
+}

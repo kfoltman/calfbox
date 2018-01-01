@@ -52,16 +52,22 @@ void cbox_midi_merger_disconnect(struct cbox_midi_merger *dest, struct cbox_midi
 void cbox_midi_merger_push(struct cbox_midi_merger *dest, struct cbox_midi_buffer *buffer, struct cbox_rt *rt);
 void cbox_midi_merger_close(struct cbox_midi_merger *dest);
 
+struct cbox_time_mapper
+{
+    uint32_t (*map_time)(struct cbox_time_mapper *, uint32_t free_running_counter);
+};
+
 #define GET_RT_FROM_cbox_midi_appsink(appsink) ((appsink)->rt)
 
 struct cbox_midi_appsink
 {
     struct cbox_rt *rt;
+    struct cbox_time_mapper *tmap;
     struct cbox_midi_buffer midibufs[2];
     int current_buffer;
 };
 
-extern void cbox_midi_appsink_init(struct cbox_midi_appsink *appsink, struct cbox_rt *rt);
+extern void cbox_midi_appsink_init(struct cbox_midi_appsink *appsink, struct cbox_rt *rt, struct cbox_time_mapper *tmap);
 extern void cbox_midi_appsink_supply(struct cbox_midi_appsink *appsink, struct cbox_midi_buffer *buffer, uint32_t time_offset);
 extern const struct cbox_midi_buffer *cbox_midi_appsink_get_input_midi_data(struct cbox_midi_appsink *appsink);
 extern gboolean cbox_midi_appsink_send_to(struct cbox_midi_appsink *appsink, struct cbox_command_target *fb, GError **error);

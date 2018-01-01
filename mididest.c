@@ -142,9 +142,10 @@ void cbox_midi_merger_close(struct cbox_midi_merger *dest)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-void cbox_midi_appsink_init(struct cbox_midi_appsink *appsink, struct cbox_rt *rt)
+void cbox_midi_appsink_init(struct cbox_midi_appsink *appsink, struct cbox_rt *rt, struct cbox_time_mapper *tmap)
 {
     appsink->rt = rt;
+    appsink->tmap = tmap;
     cbox_midi_buffer_init(&appsink->midibufs[0]);
     cbox_midi_buffer_init(&appsink->midibufs[1]);
     appsink->current_buffer = 0;
@@ -160,7 +161,11 @@ void cbox_midi_appsink_supply(struct cbox_midi_appsink *appsink, struct cbox_mid
         {
             if (!cbox_midi_buffer_can_store_msg(sinkbuf, event->size))
                 break;
-            cbox_midi_buffer_copy_event(sinkbuf, event, time_offset + event->time);
+            uint32_t abs_time_samples = time_offset + event->time;
+            uint32_t etime = abs_time_samples;
+            if (appsink->tmap)
+                etime = appsink->tmap->map_time(appsink->tmap, etime);
+            cbox_midi_buffer_copy_event(sinkbuf, event, etime);
         }
     }
 }
@@ -202,7 +207,11 @@ gboolean cbox_midi_appsink_send_to(struct cbox_midi_appsink *appsink, struct cbo
         {
             const struct cbox_midi_event *event = cbox_midi_buffer_get_event(midi_in, i);
             const uint8_t *data = cbox_midi_event_get_data(event);
-            if (!cbox_execute_on(fb, NULL, "/io/midi/event_time", "i", error, event->time))
+            uint32_t time = event->time & 0x7FFFFFFF;
+            uint32_t time_type = event->time >> 31;
+            if (time_type == 0 && !cbox_execute_on(fb, NULL, "/io/midi/event_time_samples", "i", error, time))
+                return FALSE;
+            if (time_type == 1 && !cbox_execute_on(fb, NULL, "/io/midi/event_time_ppqn", "i", error, time))
                 return FALSE;
             // XXXKF doesn't handle SysEx properly yet, only 3-byte values
             if (event->size <= 3)

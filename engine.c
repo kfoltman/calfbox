@@ -67,7 +67,9 @@ struct cbox_engine *cbox_engine_new(struct cbox_document *doc, struct cbox_rt *r
     cbox_midi_buffer_init(&engine->midibuf_aux);
     cbox_midi_buffer_init(&engine->midibuf_jack);
     cbox_midi_buffer_init(&engine->midibuf_song);
-    cbox_midi_appsink_init(&engine->appsink, rt);
+    engine->stmap = malloc(sizeof(struct cbox_song_time_mapper));
+    cbox_song_time_mapper_init(engine->stmap, engine);
+    cbox_midi_appsink_init(&engine->appsink, rt, &engine->stmap->tmap);
 
     cbox_command_target_init(&engine->cmd_target, cbox_engine_process_cmd, engine);
     CBOX_OBJECT_REGISTER(engine);
@@ -92,6 +94,8 @@ void cbox_engine_destroyfunc(struct cbox_objhdr *obj_ptr)
     }
     cbox_master_destroy(engine->master);
     engine->master = NULL;
+    free(engine->stmap);
+    engine->stmap = NULL;
 
     free(engine);
 }

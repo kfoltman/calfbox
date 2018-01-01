@@ -172,4 +172,14 @@ struct cbox_midi_pattern_playback *cbox_song_playback_get_pattern(struct cbox_so
 extern void cbox_song_playback_apply_old_state(struct cbox_song_playback *spb);
 extern void cbox_song_playback_destroy(struct cbox_song_playback *spb);
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct cbox_song_time_mapper
+{
+    struct cbox_time_mapper tmap;
+    struct cbox_engine *engine;
+};
+
+extern void cbox_song_time_mapper_init(struct cbox_song_time_mapper *tmap, struct cbox_engine *engine);
+
 #endif
