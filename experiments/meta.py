@@ -484,13 +484,26 @@ def getLongestTrackDuationInTicks():
     #    print (cboxTrack.status())
 
 
-def cboxLoop(loop):
+def cboxLoop(eventLoop):
     cbox.call_on_idle()
-    status = "[Running]" if cbox.Transport.status().playing else "[Stopped]"
+    assert eventLoop.is_running()
+
+    #it is not that simple. status = "[Running]" if cbox.Transport.status().playing else "[Stopped]"
+    if cbox.Transport.status().playing == 1:
+        status = "[Running]"
+    elif cbox.Transport.status().playing == 0:
+        status = "[Stopped]"
+    elif cbox.Transport.status().playing == 2:
+        status = "[Stopping]"
+    elif cbox.Transport.status().playing is None:
+        status = "[Uninitialized]"
+    else:
+        raise ValueError("Unknown playback status: {}".format(cbox.Transport.status().playing))
+
+    stdout.write("                                           \r") #it is a hack but it cleans the line from old artefacts
     stdout.write('{}: {}\r'.format(status, cbox.Transport.status().pos_ppqn))
     stdout.flush()
-    loop.call_later(0.1, cboxLoop, loop) #100ms delay
-
+    eventLoop.call_later(0.1, cboxLoop, eventLoop) #100ms delay
 
 eventLoop = get_event_loop()
 def initCbox(clientName, internalEventProcessor=True):
@@ -522,13 +535,13 @@ def start(autoplay = False, userfunction = None):
         eventLoop.stop()
         shutdownCbox()
 
-
     try:
         dur = getLongestTrackDuationInTicks()
         cbox.Document.get_song().set_loop(dur, dur) #set playback length for the entire score.
-        cbox.Document.get_song().update_playback()
     except ValueError:
-        print ("Starting without playback data")
+        print ("Starting without a track")
+    cbox.Document.get_song().update_playback()
+    print ("update playback called")
 
     for signame in ('SIGINT', 'SIGTERM'):
         eventLoop.add_signal_handler(getattr(signal, signame), ask_exit)
