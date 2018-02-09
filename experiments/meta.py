@@ -534,9 +534,10 @@ def cboxLoop(eventLoop):
     eventLoop.call_later(0.1, cboxLoop, eventLoop) #100ms delay
 
 eventLoop = get_event_loop()
-def initCbox(clientName, internalEventProcessor=True):
+def initCbox(clientName, internalEventProcessor=True, commonMidiInput=True):
     cbox.init_engine("")
     cbox.Config.set("io", "client_name", clientName)
+    cbox.Config.set("io", "enable_common_midi_input", commonMidiInput) #the default "catch all" midi input
     cbox.start_audio()
     scene = cbox.Document.get_engine().new_scene()
     scene.clear()
@@ -551,9 +552,9 @@ def initCbox(clientName, internalEventProcessor=True):
     return scene, cbox, eventLoop
 
 
-def connectPhysicalKeyboards():
+def connectPhysicalKeyboards(port="midi"):
     midiKeyboards = cbox.JackIO.get_ports(".*", cbox.JackIO.MIDI_TYPE, cbox.JackIO.PORT_IS_SOURCE | cbox.JackIO.PORT_IS_PHYSICAL)
-    ourMidiInPort = cbox.Config.get("io", "client_name",) + ":midi"
+    ourMidiInPort = cbox.Config.get("io", "client_name",) + ":" + port
     for keyboard in midiKeyboards:
         cbox.JackIO.port_connect(keyboard, ourMidiInPort)
 
