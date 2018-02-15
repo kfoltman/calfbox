@@ -19,12 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "app.h"
 #include "config.h"
 #include "config-api.h"
+#include "engine.h"
 #include "errors.h"
 #include "hwcfg.h"
 #include "io.h"
 #include "meter.h"
 #include "midi.h"
+#include "mididest.h"
 #include "recsrc.h"
+#include "seq.h"
 
 #include <errno.h>
 #include <stdlib.h>
@@ -289,6 +292,7 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
         midiin = cbox_io_create_midi_input(io, CBOX_ARG_S(cmd, 0), error);
         if (!midiin)
             return FALSE;
+        cbox_midi_appsink_init(&midiin->appsink, app.rt, &app.engine->stmap->tmap);
         return cbox_uuid_report(&midiin->uuid, fb, error);
     }
     else if (!strcmp(cmd->command, "/route_midi_input") && !strcmp(cmd->arg_types, "ss"))
@@ -353,7 +357,6 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "App sink not enabled for port '%s'", uuidstr);
             return FALSE;
         }
-        midiin->appsink.rt = app.rt; // XXXKF this is a bad hack
         return cbox_midi_appsink_send_to(&midiin->appsink, fb, error);
     }
     else if (io->impl->createmidioutfunc && !strcmp(cmd->command, "/create_midi_output") && !strcmp(cmd->arg_types, "s"))
