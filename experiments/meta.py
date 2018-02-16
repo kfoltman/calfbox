@@ -1,5 +1,23 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Copyright 2017, Nils Hilbricht, Germany ( https://www.hilbricht.net )
+
+This code is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+
 import re
 from calfbox import cbox  #use the globally installed calfbox
 from asyncio import get_event_loop
@@ -516,9 +534,10 @@ def cboxLoop(eventLoop):
     eventLoop.call_later(0.1, cboxLoop, eventLoop) #100ms delay
 
 eventLoop = get_event_loop()
-def initCbox(clientName, internalEventProcessor=True):
+def initCbox(clientName, internalEventProcessor=True, commonMidiInput=True):
     cbox.init_engine("")
     cbox.Config.set("io", "client_name", clientName)
+    cbox.Config.set("io", "enable_common_midi_input", commonMidiInput) #the default "catch all" midi input
     cbox.start_audio()
     scene = cbox.Document.get_engine().new_scene()
     scene.clear()
@@ -533,9 +552,9 @@ def initCbox(clientName, internalEventProcessor=True):
     return scene, cbox, eventLoop
 
 
-def connectPhysicalKeyboards():
+def connectPhysicalKeyboards(port="midi"):
     midiKeyboards = cbox.JackIO.get_ports(".*", cbox.JackIO.MIDI_TYPE, cbox.JackIO.PORT_IS_SOURCE | cbox.JackIO.PORT_IS_PHYSICAL)
-    ourMidiInPort = cbox.Config.get("io", "client_name",) + ":midi"
+    ourMidiInPort = cbox.Config.get("io", "client_name",) + ":" + port
     for keyboard in midiKeyboards:
         cbox.JackIO.port_connect(keyboard, ourMidiInPort)
 
@@ -577,5 +596,7 @@ def start(autoplay = False, userfunction = None, tempo = 120):
 
 
 def shutdownCbox():
+    cbox.Transport.stop()
+    cbox.Transport.seek_ppqn(0)
     cbox.stop_audio()
     cbox.shutdown_engine()

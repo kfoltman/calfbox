@@ -20,13 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from meta import initCbox, start, connectPhysicalKeyboards
 
 def processMidiIn(eventLoop):
-    eventList = cbox.get_new_events()
+    eventList = cbox.JackIO.get_new_events(cboxMidiPortUid)
     if eventList:
         for (address, uninterestingStuff, event) in eventList: #we are only interested in the event, which is a list again.
             print (address, "event:", event, "playback:", cbox.Transport.status().playing)
     eventLoop.call_later(0.1, processMidiIn, eventLoop)
 
-scene, cbox, eventLoop = initCbox("test01", internalEventProcessor=False)
+scene, cbox, eventLoop = initCbox("test01", internalEventProcessor=False, commonMidiInput=False)
+cboxMidiPortUid = cbox.JackIO.create_midi_input("customInput")
+cbox.JackIO.set_appsink_for_midi_input(cboxMidiPortUid, True) #This sounds like a program wide sink, but it is needed for every port.
+cbox.JackIO.route_midi_input(cboxMidiPortUid, scene.uuid)
 eventLoop.call_later(0.1, processMidiIn, eventLoop) #100ms
-connectPhysicalKeyboards()
+connectPhysicalKeyboards(port="customInput")
 start()
