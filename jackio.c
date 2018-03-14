@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #if USE_JACK
 
+#include "app.h"
 #include "config-api.h"
 #include "errors.h"
 #include "hwcfg.h"
@@ -30,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "recsrc.h"
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
@@ -800,6 +802,27 @@ static gboolean cbox_jackio_get_sync_completed(struct cbox_io_impl *impl)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static void cbox_jackio_update_midi_in_routing(struct cbox_io_impl *impl)
+{
+    // XXXKF slow and wasteful, but that's okay for now
+    for (GSList *p = impl->pio->midi_inputs; p; p = g_slist_next(p))
+    {
+        struct cbox_midi_input *midiin = p->data;
+        for (GSList *q = impl->pio->midi_outputs; q; q = g_slist_next(q))
+        {
+            struct cbox_midi_output *midiout = q->data;
+
+            bool add = midiin->output_set && !midiout->removing && cbox_uuid_equal(&midiout->uuid, &midiin->output);
+            if (add)
+                cbox_midi_merger_connect(&midiout->merger, &midiin->buffer, app.rt);
+            else
+                cbox_midi_merger_disconnect(&midiout->merger, &midiin->buffer, app.rt);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error)
 {
     const char *client_name = cbox_config_get_string_with_default("io", "client_name", "cbox");
@@ -851,7 +874,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     jii->ioi.destroymidiinfunc = cbox_jackio_destroy_midi_in;
     jii->ioi.createmidioutfunc = cbox_jackio_create_midi_out;
     jii->ioi.destroymidioutfunc = cbox_jackio_destroy_midi_out;
-    jii->ioi.updatemidiinroutingfunc = NULL;
+    jii->ioi.updatemidiinroutingfunc = cbox_jackio_update_midi_in_routing;
     jii->ioi.controltransportfunc = cbox_jackio_control_transport;
     jii->ioi.getsynccompletedfunc = cbox_jackio_get_sync_completed;
     jii->ioi.destroyfunc = cbox_jackio_destroy;
