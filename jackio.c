@@ -631,6 +631,12 @@ void cbox_jackio_destroy_midi_out(struct cbox_io_impl *ioi, struct cbox_midi_out
     cbox_jack_midi_output_destroy((struct cbox_jack_midi_output *)midiout);
 }
 
+#if JACK_HAS_RENAME
+#define jack_port_rename_fn jack_port_rename
+#else
+#define jack_port_rename_fn(client, handle, name) jack_port_set_name(handle, name)
+#endif
+
 static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)ct->user_data;
@@ -661,7 +667,7 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         jack_port_t *port = midiout ? ((struct cbox_jack_midi_output *)midiout)->port 
             : ((struct cbox_jack_midi_input *)midiin)->port;
         char **pname = midiout ? &midiout->name : &midiin->name;
-        if (0 != jack_port_set_name(port, new_name))
+        if (0 != jack_port_rename_fn(jii->client, port, new_name))
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set port name to '%s'", new_name);
             return FALSE;

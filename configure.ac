@@ -85,6 +85,8 @@ fi
 if test "$JACK_ENABLED" = "yes"; then
     PKG_CHECK_MODULES(JACK_DEPS, jack >= 0.116.0, true, AC_MSG_ERROR([JACK is required (or use --without-jack)]))
     AC_CHECK_HEADER(jack/jack.h, true, AC_MSG_ERROR([JACK is required (or use --without-jack)]))
+    PKG_CHECK_MODULES(JACK_RENAME_PORT, jack >= 0.124.2 jack < 1.9.0, JACK_HAS_RENAME="yes", JACK_HAS_RENAME="no")
+    PKG_CHECK_MODULES(JACK2_RENAME_PORT, jack >= 1.9.11, JACK_HAS_RENAME="yes", JACK_HAS_RENAME_DUMMY="no")
 fi
 
 if test "$PYTHON_ENABLED" = "yes"; then
@@ -105,6 +107,9 @@ if test "$PYTHON_ENABLED" = "yes"; then
 fi
 if test "$JACK_ENABLED" = "yes"; then
     AC_DEFINE(USE_JACK, 1, [JACK I/O will be included])
+fi
+if test "$JACK_HAS_RENAME" = "yes"; then
+  AC_DEFINE(JACK_HAS_RENAME, 1, [JACK function jack_port_rename should be used instead of jack_port_set_name])
 fi
 if test "$FLUIDSYNTH_ENABLED" = "yes"; then
     AC_DEFINE(USE_FLUIDSYNTH, 1, [Fluidsynth will be included])
