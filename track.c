@@ -199,5 +199,20 @@ gboolean cbox_track_item_process_cmd(struct cbox_command_target *ct, struct cbox
         trki->pattern = CBOX_H2O(pattern);
         return TRUE;
     }
+    if (!strcmp(cmd->command, "/length") && !strcmp(cmd->arg_types, "i"))
+    {
+        trki->length = CBOX_ARG_I(cmd, 0);
+        return TRUE;
+    }
+    if (!strcmp(cmd->command, "/pos") && !strcmp(cmd->arg_types, "i"))
+    {
+        trki->time = CBOX_ARG_I(cmd, 0);
+        return TRUE;
+    }
+    if (!strcmp(cmd->command, "/offset") && !strcmp(cmd->arg_types, "i"))
+    {
+        trki->offset = CBOX_ARG_I(cmd, 0);
+        return TRUE;
+    }
     return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }

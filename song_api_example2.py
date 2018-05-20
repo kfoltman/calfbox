@@ -27,17 +27,15 @@ trk = song.add_track()
 # Create a binary blob that contains zero MIDI events
 emptyblob = bytes()
 
+# Create a new empty pattern
+empty_pattern = song.pattern_from_blob(emptyblob, 16)
+
+# Add an instance (clip) of the empty pattern to the track at position 640
+clip = trk.add_clip(640, 8, 16, empty_pattern)
+
 # This will be the length of the pattern (in pulses). It should be large enough
 # to fit all the events
 pattern_len = 10 * 24 * 2
-
-# Create a new empty pattern
-empty_pattern = song.pattern_from_blob(emptyblob, pattern_len)
-
-# Add an instance (clip) of the pattern to the track at position 0
-# The clip will contain the whole pattern (it is also possible to insert
-# a single slice of the pattern)
-clip = trk.add_clip(0, 0, pattern_len, empty_pattern)
 
 # Create a binary blob that contains the MIDI events
 pblob = bytes()
@@ -50,8 +48,11 @@ for noteindex in range(20):
 # Create a new pattern object using events from the blob
 pattern = song.pattern_from_blob(pblob, pattern_len)
 
-# Update pattern attribute of the clip
+# Update all attributes of the clip
 clip.set_pattern(pattern)
+clip.set_pos(0)
+clip.set_offset(0)
+clip.set_length(pattern_len)
 
 # Stop the song at the end
 #song.set_loop(pattern_len, pattern_len)

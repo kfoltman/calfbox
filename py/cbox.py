@@ -658,9 +658,9 @@ class ClipItem:
 
 class DocTrackClip(DocObj):
     class Status:
-        pos = int
-        offset = int
-        length = int
+        pos = SettableProperty(int)
+        offset = SettableProperty(int)
+        length = SettableProperty(int)
         pattern = SettableProperty(DocPattern)
     def __init__(self, uuid):
         DocObj.__init__(self, uuid)
