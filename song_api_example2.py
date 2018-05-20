@@ -30,12 +30,15 @@ emptyblob = bytes()
 # Create a new empty pattern
 empty_pattern = song.pattern_from_blob(emptyblob, 16)
 
-# Add an instance (clip) of the empty pattern to the track at position 640
-clip = trk.add_clip(640, 8, 16, empty_pattern)
-
 # This will be the length of the pattern (in pulses). It should be large enough
 # to fit all the events
 pattern_len = 10 * 24 * 2
+
+# Add an instance (clip) of the empty pattern to the track
+clip1 = trk.add_clip(pattern_len, 0, 16, empty_pattern)
+
+# Add another instance after it
+clip2 = trk.add_clip(2 * pattern_len, 0, 16, empty_pattern)
 
 # Create a binary blob that contains the MIDI events
 pblob = bytes()
@@ -48,14 +51,17 @@ for noteindex in range(20):
 # Create a new pattern object using events from the blob
 pattern = song.pattern_from_blob(pblob, pattern_len)
 
-# Update all attributes of the clip
-clip.set_pattern(pattern)
-clip.set_pos(0)
-clip.set_offset(0)
-clip.set_length(pattern_len)
+# Update all attributes of the second clip, rearranging the order
+clip2.set_pattern(pattern)
+clip2.set_pos(0)
+clip2.set_offset(0)
+clip2.set_length(pattern_len)
+
+# Verify that the clips have been reordered
+clips = [o.clip for o in trk.status().clips]
+assert clips == [clip2, clip1]
 
 # Stop the song at the end
-#song.set_loop(pattern_len, pattern_len)
 song.set_loop(pattern_len, pattern_len)
 
 # Set tempo - the argument must be a float

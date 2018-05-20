@@ -57,6 +57,22 @@ struct cbox_track *cbox_track_new(struct cbox_document *document)
 
 #define CBTI(it) ((struct cbox_track_item *)(it)->data)
 
+void cbox_track_add_item_to_list(struct cbox_track *track, struct cbox_track_item *item)
+{
+    GList *it = track->items;
+    while(it != NULL && CBTI(it)->time < item->time)
+        it = g_list_next(it);
+    // all items earlier than the new one -> append
+    if (it == NULL)
+    {
+        track->items = g_list_append(track->items, item);
+        return;
+    }
+    // Here, I don't really care about overlaps - it's more important to preserve
+    // all clips as sent by the caller.
+    track->items = g_list_insert_before(track->items, it, item);
+}
+
 struct cbox_track_item *cbox_track_add_item(struct cbox_track *track, uint32_t time, struct cbox_midi_pattern *pattern, uint32_t offset, uint32_t length)
 {
     struct cbox_track_item *item = malloc(sizeof(struct cbox_track_item));
@@ -68,19 +84,7 @@ struct cbox_track_item *cbox_track_add_item(struct cbox_track *track, uint32_t t
     item->length = length;
     cbox_command_target_init(&item->cmd_target, cbox_track_item_process_cmd, item);
     
-    GList *it = track->items;
-    while(it != NULL && CBTI(it)->time < item->time)
-        it = g_list_next(it);
-    // all items earlier than the new one -> append
-    if (it == NULL)
-    {
-        track->items = g_list_append(track->items, item);
-        CBOX_OBJECT_REGISTER(item);
-        return item;
-    }
-    // Here, I don't really care about overlaps - it's more important to preserve
-    // all clips as sent by the caller.
-    track->items = g_list_insert_before(track->items, it, item);
+    cbox_track_add_item_to_list(track, item);
     CBOX_OBJECT_REGISTER(item);
     return item;
 }
@@ -206,7 +210,9 @@ gboolean cbox_track_item_process_cmd(struct cbox_command_target *ct, struct cbox
     }
     if (!strcmp(cmd->command, "/pos") && !strcmp(cmd->arg_types, "i"))
     {
+        trki->owner->items = g_list_remove(trki->owner->items, trki);
         trki->time = CBOX_ARG_I(cmd, 0);
+        cbox_track_add_item_to_list(trki->owner, trki);
         return TRUE;
     }
     if (!strcmp(cmd->command, "/offset") && !strcmp(cmd->arg_types, "i"))
