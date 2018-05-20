@@ -100,6 +100,8 @@ class SettableProperty(PropertyDecorator):
             setattr(klass, 'set_' + property, lambda self, key, value: self.cmd('/' + property, None, key, value))
         elif type(proptype) is bool:
             setattr(klass, 'set_' + property, lambda self, value: self.cmd('/' + property, None, 1 if value else 0))
+        elif issubclass(proptype, DocObj):
+            setattr(klass, 'set_' + property, lambda self, value: self.cmd('/' + property, None, value.uuid))
         else:
             setattr(klass, 'set_' + property, lambda self, value: self.cmd('/' + property, None, proptype(value)))        
 
@@ -659,7 +661,7 @@ class DocTrackClip(DocObj):
         pos = int
         offset = int
         length = int
-        pattern = DocPattern
+        pattern = SettableProperty(DocPattern)
     def __init__(self, uuid):
         DocObj.__init__(self, uuid)
 Document.classmap['cbox_track_item'] = DocTrackClip

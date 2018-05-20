@@ -191,5 +191,13 @@ gboolean cbox_track_item_process_cmd(struct cbox_command_target *ct, struct cbox
         cbox_object_destroy(CBOX_O2H(trki));
         return TRUE;
     }
+    if (!strcmp(cmd->command, "/pattern") && !strcmp(cmd->arg_types, "s"))
+    {
+        struct cbox_objhdr *pattern = CBOX_ARG_O(cmd, 0, trki->owner, cbox_midi_pattern, error);
+        if (!pattern)
+            return FALSE;
+        trki->pattern = CBOX_H2O(pattern);
+        return TRUE;
+    }
     return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
