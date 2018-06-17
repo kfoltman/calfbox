@@ -465,7 +465,7 @@ class JackIO:
         do_cmd("/io/rename_midi_port", None, [uuid, new_name])
     rename_midi_input = rename_midi_output
     @staticmethod
-    def disconnect_midi_output(uuid):
+    def disconnect_midi_port(uuid):
         do_cmd("/io/disconnect_midi_port", None, [uuid])
     disconnect_midi_input = disconnect_midi_output
     @staticmethod
