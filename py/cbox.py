@@ -467,10 +467,10 @@ class JackIO:
     @staticmethod
     def disconnect_midi_port(uuid):
         do_cmd("/io/disconnect_midi_port", None, [uuid])
-    disconnect_midi_input = disconnect_midi_output
     @staticmethod
     def disconnect_midi_output(uuid):
         do_cmd("/io/disconnect_midi_output", None, [uuid])
+    disconnect_midi_input = disconnect_midi_output
     @staticmethod
     def delete_midi_input(uuid):
         do_cmd("/io/delete_midi_input", None, [uuid])
