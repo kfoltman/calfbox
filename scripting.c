@@ -234,6 +234,7 @@ static PyObject *cbox_python_do_cmd_on(struct cbox_command_target *ct, PyObject 
             arg_types[i] = 's';
             arg_extra[i] = utf8str;
             arg_values[i] = PyBytes_AsString(utf8str);
+            free_blobs = TRUE;
         }
         else
         if (PyByteArray_Check(value))
