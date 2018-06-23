@@ -35,6 +35,61 @@ print ("Client name: %s" % client_name)
 print ("Audio inputs: %d, outputs: %d" % (status.audio_inputs, status.audio_outputs))
 print ("Sample rate: %d frames/sec" % (status.sample_rate))
 print ("JACK period: %d frames" % (status.buffer_size))
+uuid_bad = cbox.JackIO.create_midi_output('bad')
+uuid_bad2 = cbox.JackIO.create_midi_input('bad2')
+cbox.JackIO.autoconnect_midi_output(uuid_bad, '%s:bad2' % client_name)
+try:
+    cbox.JackIO.disconnect_midi_input(uuid_bad)
+    assert False
+except:
+    pass
+try:
+    cbox.JackIO.disconnect_midi_output(uuid_bad2)
+    assert False
+except:
+    pass
+assert len(cbox.JackIO.get_connected_ports('%s:bad' % client_name)) == 1
+assert cbox.JackIO.get_connected_ports('%s:bad' % client_name) == cbox.JackIO.get_connected_ports(uuid_bad)
+assert cbox.JackIO.get_connected_ports('%s:bad2' % client_name) == cbox.JackIO.get_connected_ports(uuid_bad2)
+cbox.JackIO.disconnect_midi_output(uuid_bad)
+assert cbox.JackIO.get_connected_ports('%s:bad' % client_name) == []
+assert cbox.JackIO.get_connected_ports('%s:bad2' % client_name) == []
+assert cbox.JackIO.get_connected_ports(uuid_bad) == []
+assert cbox.JackIO.get_connected_ports(uuid_bad2) == []
+
+cbox.JackIO.autoconnect_midi_output(uuid_bad2, '%s:bad' % client_name)
+assert len(cbox.JackIO.get_connected_ports('%s:bad' % client_name)) == 1
+assert cbox.JackIO.get_connected_ports('%s:bad' % client_name) == cbox.JackIO.get_connected_ports(uuid_bad)
+assert cbox.JackIO.get_connected_ports('%s:bad2' % client_name) == cbox.JackIO.get_connected_ports(uuid_bad2)
+cbox.JackIO.disconnect_midi_input(uuid_bad2)
+assert cbox.JackIO.get_connected_ports('%s:bad' % client_name) == []
+assert cbox.JackIO.get_connected_ports('%s:bad2' % client_name) == []
+assert cbox.JackIO.get_connected_ports(uuid_bad) == []
+assert cbox.JackIO.get_connected_ports(uuid_bad2) == []
+
+cbox.JackIO.autoconnect_midi_output(uuid_bad2, '%s:bad' % client_name)
+assert len(cbox.JackIO.get_connected_ports('%s:bad' % client_name)) == 1
+assert cbox.JackIO.get_connected_ports('%s:bad' % client_name) == cbox.JackIO.get_connected_ports(uuid_bad)
+assert cbox.JackIO.get_connected_ports('%s:bad2' % client_name) == cbox.JackIO.get_connected_ports(uuid_bad2)
+cbox.JackIO.disconnect_midi_port(uuid_bad)
+assert cbox.JackIO.get_connected_ports('%s:bad' % client_name) == []
+assert cbox.JackIO.get_connected_ports('%s:bad2' % client_name) == []
+assert cbox.JackIO.get_connected_ports(uuid_bad) == []
+assert cbox.JackIO.get_connected_ports(uuid_bad2) == []
+
+cbox.JackIO.autoconnect_midi_output(uuid_bad2, '%s:bad' % client_name)
+assert len(cbox.JackIO.get_connected_ports('%s:bad' % client_name)) == 1
+assert cbox.JackIO.get_connected_ports('%s:bad' % client_name) == cbox.JackIO.get_connected_ports(uuid_bad)
+assert cbox.JackIO.get_connected_ports('%s:bad2' % client_name) == cbox.JackIO.get_connected_ports(uuid_bad2)
+cbox.JackIO.disconnect_midi_port(uuid_bad2)
+assert cbox.JackIO.get_connected_ports('%s:bad' % client_name) == []
+assert cbox.JackIO.get_connected_ports('%s:bad2' % client_name) == []
+assert cbox.JackIO.get_connected_ports(uuid_bad) == []
+assert cbox.JackIO.get_connected_ports(uuid_bad2) == []
+
+cbox.JackIO.delete_midi_output(uuid_bad)
+cbox.JackIO.delete_midi_input(uuid_bad2)
+
 uuid = cbox.JackIO.create_midi_output('drums')
 cbox.JackIO.autoconnect_midi_output(uuid, '*alsa_pcm:.*')
 cbox.JackIO.rename_midi_output(uuid, 'kettles')

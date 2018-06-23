@@ -698,25 +698,31 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
         return FALSE;
     }
-    else if (!strcmp(cmd->command, "/disconnect_midi_port") && !strcmp(cmd->arg_types, "s"))
+    else if (!strncmp(cmd->command, "/disconnect_midi_", 17) && !strcmp(cmd->arg_types, "s"))
     {
-        const char *uuidstr = CBOX_ARG_S(cmd, 0);
-        struct cbox_uuid uuid;
-        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
-            return FALSE;
-        struct cbox_midi_input *midiin = cbox_io_get_midi_input(io, NULL, &uuid);
-        struct cbox_midi_output *midiout = cbox_io_get_midi_output(io, NULL, &uuid);
-        if (!midiout && !midiin)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
-            return FALSE;
+        bool is_both = !strcmp(cmd->command + 17, "port");
+        bool is_in = is_both || !strcmp(cmd->command + 17, "input");
+        bool is_out = is_both || !strcmp(cmd->command + 17, "output");
+        if (is_in || is_out) {
+            const char *uuidstr = CBOX_ARG_S(cmd, 0);
+            struct cbox_uuid uuid;
+            if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+                return FALSE;
+            struct cbox_midi_input *midiin = is_in ? cbox_io_get_midi_input(io, NULL, &uuid) : NULL;
+            struct cbox_midi_output *midiout = is_out ? cbox_io_get_midi_output(io, NULL, &uuid) : NULL;
+            if (!midiout && !midiin)
+            {
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+                return FALSE;
+            }
+            jack_port_t *port = midiout ? ((struct cbox_jack_midi_output *)midiout)->port 
+                : ((struct cbox_jack_midi_input *)midiin)->port; 
+            jack_port_disconnect(jii->client, port);
+            return TRUE;
         }
-        jack_port_t *port = midiout ? ((struct cbox_jack_midi_output *)midiout)->port 
-            : ((struct cbox_jack_midi_input *)midiin)->port; 
-        jack_port_disconnect(jii->client, port);
-        return TRUE;
     }
-    else if (!strcmp(cmd->command, "/port_connect") && !strcmp(cmd->arg_types, "ss"))
+
+    if (!strcmp(cmd->command, "/port_connect") && !strcmp(cmd->arg_types, "ss"))
     {
         const char *port_from = CBOX_ARG_S(cmd, 0);
         const char *port_to = CBOX_ARG_S(cmd, 1);
@@ -741,7 +747,23 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         const char *name = CBOX_ARG_S(cmd, 0);
-        jack_port_t *port = jack_port_by_name(jii->client, name);
+        jack_port_t *port = NULL;
+        if (!strchr(name, ':')) {
+            // try UUID
+            struct cbox_uuid uuid;
+            if (!cbox_uuid_fromstring(&uuid, name, error))
+                return FALSE;
+            struct cbox_midi_output *midiout = cbox_io_get_midi_output(io, NULL, &uuid);
+            if (midiout)
+                port = ((struct cbox_jack_midi_output *)midiout)->port;
+            else {
+                struct cbox_midi_input *midiin = cbox_io_get_midi_input(io, NULL, &uuid);
+                if (midiin)
+                    port = ((struct cbox_jack_midi_input *)midiin)->port;
+            }
+        }
+        else
+            port = jack_port_by_name(jii->client, name);
         if (!port)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", name);
