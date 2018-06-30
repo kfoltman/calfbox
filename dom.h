@@ -35,6 +35,7 @@ struct cbox_uuid
 };
 
 extern guint cbox_uuid_hash(gconstpointer v);
+extern void cbox_uuid_copy(struct cbox_uuid *vto, const struct cbox_uuid *vfrom);
 extern gboolean cbox_uuid_equal(gconstpointer v1, gconstpointer v2);
 extern gboolean cbox_uuid_report(struct cbox_uuid *uuid, struct cbox_command_target *fb, GError **error);
 extern gboolean cbox_uuid_report_as(struct cbox_uuid *uuid, const char *cmd, struct cbox_command_target *fb, GError **error);

@@ -48,7 +48,7 @@ static inline void accumulate_event(struct cbox_midi_playback_active_notes *note
 struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master, struct cbox_song_playback *spb, struct cbox_track_playback *old_state)
 {
     struct cbox_track_playback *pb = malloc(sizeof(struct cbox_track_playback));
-    pb->track = track;
+    cbox_uuid_copy(&pb->track_uuid, &CBOX_O2H(track)->instance_uuid);
     pb->old_state = old_state;
     pb->master = master;
     int len = g_list_length(track->items);
@@ -391,7 +391,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
         {
             for (int i = 0; i < old_state->track_count; i++)
             {
-                if (old_state->tracks[i]->track == trk)
+                if (cbox_uuid_equal(&old_state->tracks[i]->track_uuid, &CBOX_O2H(trk)->instance_uuid))
                 {
                     old_trk = old_state->tracks[i];
                     break;

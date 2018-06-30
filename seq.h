@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <stdint.h>
 
+#include "dom.h"
 #include "midi.h"
 #include "mididest.h"
 
@@ -89,7 +90,7 @@ struct cbox_track_playback_item
 
 struct cbox_track_playback
 {
-    struct cbox_track *track; // used as identification only
+    struct cbox_uuid track_uuid; // used as identification only
     struct cbox_track_playback_item *items;
     struct cbox_master *master;
     int items_count;

@@ -96,6 +96,11 @@ gboolean cbox_uuid_equal(gconstpointer v1, gconstpointer v2)
     return !uuid_compare(p1->uuid, p2->uuid);
 }
 
+void cbox_uuid_copy(struct cbox_uuid *vto, const struct cbox_uuid *vfrom)
+{
+    uuid_copy(vto->uuid, vfrom->uuid);
+}
+
 gboolean cbox_uuid_report_as(struct cbox_uuid *uuid, const char *cmd, struct cbox_command_target *fb, GError **error)
 {
     if (!fb)
