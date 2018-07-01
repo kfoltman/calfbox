@@ -38,6 +38,7 @@ sync. I'm going to clean it up iteratively later.
 
 */
 
+#include "app.h"
 #include "config.h"
 #include "config-api.h"
 #include "errors.h"
@@ -316,7 +317,7 @@ void cbox_usbio_destroy(struct cbox_io_impl *impl)
     
     libusb_exit(uii->usbctx_probe);
     libusb_exit(uii->usbctx);
-    cbox_midi_merger_close(&uii->midi_input_merger);
+    cbox_midi_merger_close(&uii->midi_input_merger, app.rt);
     free(uii);
 }
 

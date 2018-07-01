@@ -659,6 +659,7 @@ struct cbox_midi_pattern_playback *cbox_song_playback_get_pattern(struct cbox_so
 
 void cbox_song_playback_destroy(struct cbox_song_playback *spb)
 {
+    cbox_midi_merger_close(&spb->track_merger, spb->engine->rt);
     for (int i = 0; i < spb->track_count; i++)
     {
         cbox_track_playback_destroy(spb->tracks[i]);
@@ -666,7 +667,6 @@ void cbox_song_playback_destroy(struct cbox_song_playback *spb)
     free(spb->tempo_map_items);
     free(spb->tracks);
     g_hash_table_destroy(spb->pattern_map);
-    cbox_midi_merger_close(&spb->track_merger);
     free(spb);
 }
 

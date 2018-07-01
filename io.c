@@ -164,7 +164,7 @@ void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *mi
     GSList *old = io->midi_outputs;
     io->midi_outputs = copy;
 
-    cbox_midi_merger_close(&midiout->merger);
+    cbox_midi_merger_close(&midiout->merger, app.rt);
     assert(!midiout->merger.inputs);
 
     // Notify client code to disconnect the output and to make sure the RT code
@@ -244,6 +244,8 @@ void cbox_io_destroy_all_midi_ports(struct cbox_io *io)
     while(old_o)
     {
         struct cbox_midi_output *midiout = old_o->data;
+        cbox_midi_merger_close(&midiout->merger, app.rt);
+        assert(!midiout->merger.inputs);
         io->impl->destroymidioutfunc(io->impl, midiout);
         old_o = g_slist_remove(old_o, midiout);
     }

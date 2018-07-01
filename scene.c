@@ -1189,6 +1189,6 @@ static void cbox_scene_destroyfunc(struct cbox_objhdr *objhdr)
     
     free_adhoc_pattern_list(scene, scene->retired_adhoc_patterns);
     free_adhoc_pattern_list(scene, scene->adhoc_patterns);
-    cbox_midi_merger_close(&scene->scene_input_merger);    
+    cbox_midi_merger_close(&scene->scene_input_merger, scene->engine->rt);
     free(scene);
 }

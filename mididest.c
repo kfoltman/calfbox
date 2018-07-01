@@ -101,6 +101,8 @@ void cbox_midi_merger_connect(struct cbox_midi_merger *dest, struct cbox_midi_bu
     src->streaming = TRUE;
     src->next = NULL; // will be updated by the swap
     src->merger_ptr = dest_ptr;
+    if (src->merger_ptr)
+        *src->merger_ptr = dest;
     cbox_rt_swap_pointers_into(rt, (void **)&dest->inputs, src, (void **)&src->next);
 }
 
@@ -126,6 +128,7 @@ void cbox_midi_merger_push(struct cbox_midi_merger *dest, struct cbox_midi_buffe
 {
     if (!buffer->count)
         return;
+    assert(!cbox_midi_merger_find_source(dest, buffer));
     struct cbox_midi_source src;
     src.data = buffer;
     src.bpos = 0;
@@ -138,14 +141,15 @@ void cbox_midi_merger_push(struct cbox_midi_merger *dest, struct cbox_midi_buffe
     cbox_midi_merger_disconnect(dest, buffer, rt);
 }
 
-void cbox_midi_merger_close(struct cbox_midi_merger *dest)
+void cbox_midi_merger_close(struct cbox_midi_merger *dest, struct cbox_rt *rt)
 {
-    while(dest->inputs)
+    struct cbox_midi_source *ms = cbox_rt_swap_pointers(rt, (void **)&dest->inputs, NULL);
+    while(ms)
     {
-        struct cbox_midi_source *p = dest->inputs;
+        struct cbox_midi_source *p = ms;
+        ms = p->next;
         if (p->merger_ptr)
             *p->merger_ptr = NULL;
-        dest->inputs = p->next;
         free(p);
     }
 }
