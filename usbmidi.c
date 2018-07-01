@@ -252,7 +252,7 @@ void usbio_update_port_routing(struct cbox_io_impl *ioi)
         if (umi->input_port)
         {
             if (!umi->input_port->hdr.output_set)
-                cbox_midi_merger_connect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, app.rt);
+                cbox_midi_merger_connect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, app.rt, NULL);
             else
                 cbox_midi_merger_disconnect(&uii->midi_input_merger, &umi->input_port->hdr.buffer, app.rt);
         }

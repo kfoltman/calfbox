@@ -104,6 +104,7 @@ void cbox_jack_midi_output_destroy(struct cbox_jack_midi_output *jmo)
     }
     g_free(jmo->hdr.name);
     g_free(jmo->autoconnect_spec);
+    assert(!jmo->hdr.merger.inputs);
     free(jmo);
 }
 
@@ -842,7 +843,7 @@ static void cbox_jackio_update_midi_in_routing(struct cbox_io_impl *impl)
 
             bool add = midiin->output_set && !midiout->removing && cbox_uuid_equal(&midiout->uuid, &midiin->output);
             if (add)
-                cbox_midi_merger_connect(&midiout->merger, &midiin->buffer, app.rt);
+                cbox_midi_merger_connect(&midiout->merger, &midiin->buffer, app.rt, NULL);
             else
                 cbox_midi_merger_disconnect(&midiout->merger, &midiin->buffer, app.rt);
         }

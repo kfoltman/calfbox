@@ -164,10 +164,15 @@ void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *mi
     GSList *old = io->midi_outputs;
     io->midi_outputs = copy;
 
+    cbox_midi_merger_close(&midiout->merger);
+    assert(!midiout->merger.inputs);
+
     // Notify client code to disconnect the output and to make sure the RT code
     // is not using the old list anymore
     if (io->cb->on_midi_outputs_changed)
         io->cb->on_midi_outputs_changed(io->cb->user_data);
+
+    assert(!midiout->merger.inputs);
     
     g_slist_free(old);
     io->impl->destroymidioutfunc(io->impl, midiout);

@@ -1035,15 +1035,15 @@ void cbox_scene_update_connected_inputs(struct cbox_scene *scene)
             }
             if (!found)
             {
-                cbox_midi_merger_connect(&scene->scene_input_merger, &input->buffer, scene->rt);
+                cbox_midi_merger_connect(&scene->scene_input_merger, &input->buffer, scene->rt, NULL);
                 cbox_rt_array_insert(scene->rt, (void ***)&scene->connected_inputs, &scene->connected_input_count, -1, input);
             }
         }
     }
     if (scene->enable_default_song_input)
     {
-        cbox_midi_merger_connect(&scene->scene_input_merger, &scene->engine->midibuf_aux, scene->rt);
-        cbox_midi_merger_connect(&scene->scene_input_merger, &scene->engine->midibuf_song, scene->rt);
+        cbox_midi_merger_connect(&scene->scene_input_merger, &scene->engine->midibuf_aux, scene->rt, NULL);
+        cbox_midi_merger_connect(&scene->scene_input_merger, &scene->engine->midibuf_song, scene->rt, NULL);
     }
     else
     {
@@ -1052,7 +1052,7 @@ void cbox_scene_update_connected_inputs(struct cbox_scene *scene)
     }
     
     if (scene->enable_default_external_input)
-        cbox_midi_merger_connect(&scene->scene_input_merger, &scene->engine->midibuf_jack, scene->rt);
+        cbox_midi_merger_connect(&scene->scene_input_merger, &scene->engine->midibuf_jack, scene->rt, NULL);
     else
         cbox_midi_merger_disconnect(&scene->scene_input_merger, &scene->engine->midibuf_jack, scene->rt);
     
@@ -1114,7 +1114,7 @@ void cbox_scene_play_adhoc_pattern(struct cbox_scene *scene, struct cbox_adhoc_p
 {
     static struct cbox_rt_cmd_definition cmd = { NULL, play_adhoc_pattern_execute, NULL };
     struct play_adhoc_pattern_arg arg = { scene, ap, NULL };
-    cbox_midi_merger_connect(&scene->scene_input_merger, &ap->output_buffer, scene->rt);
+    cbox_midi_merger_connect(&scene->scene_input_merger, &ap->output_buffer, scene->rt, NULL);
     cbox_rt_execute_cmd_sync(scene->rt, &cmd, &arg);
     if (arg.retired)
         free_adhoc_pattern_list(scene, arg.retired);

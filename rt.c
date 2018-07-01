@@ -81,6 +81,10 @@ static gboolean cbox_rt_process_cmd(struct cbox_command_target *ct, struct cbox_
             return FALSE;
         }
     }
+    else if (!strcmp(cmd->command, "/flush") && !cmd->arg_types[0]) {
+        cbox_rt_handle_cmd_queue(rt);
+        return TRUE;
+    }
     else if (!strncmp(cmd->command, "/engine/", 8))
         return cbox_execute_sub(&rt->engine->cmd_target, fb, cmd, cmd->command + 7, error);
     else

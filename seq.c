@@ -104,10 +104,7 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     {
         struct cbox_midi_merger *merger = cbox_rt_get_midi_output(spb->engine->rt, &track->external_output);
         if (merger)
-        {
-            cbox_midi_merger_connect(merger, &pb->output_buffer, spb->engine->rt);
-            pb->external_merger = merger;
-        }
+            cbox_midi_merger_connect(merger, &pb->output_buffer, spb->engine->rt, &pb->external_merger);
     }
     
     return pb;
@@ -400,7 +397,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
         }
         spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master, spb, old_trk);
         if (!trk->external_output_set)
-            cbox_midi_merger_connect(&spb->track_merger, &spb->tracks[pos - 1]->output_buffer, NULL);
+            cbox_midi_merger_connect(&spb->track_merger, &spb->tracks[pos - 1]->output_buffer, NULL, NULL);
     }
     
     spb->tempo_map_item_count = g_list_length(song->master_track_items);

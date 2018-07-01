@@ -516,7 +516,10 @@ def send_midi_event(*data, output = None):
         
 def send_sysex(data, output = None):
     do_cmd('/send_sysex_to', None, [output if output is not None else '', bytearray(data)])
-        
+
+def flush_rt():
+    do_cmd('/rt/flush', None, [])
+
 class CfgSection:
     def __init__(self, name):
         self.name = name
