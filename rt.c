@@ -383,6 +383,14 @@ DEFINE_RT_FUNC(void *, cbox_rt, rt, cbox_rt_swap_pointers)
     return old_value;
 }
 
+#define cbox_rt_swap_pointers_into_args(ARG) ARG(void **, ptr) ARG(void *, new_value) ARG(void **, old_value_p)
+
+DEFINE_RT_VOID_FUNC(cbox_rt, rt, cbox_rt_swap_pointers_into)
+{
+    *old_value_p = *ptr;
+    *ptr = new_value;
+}
+
 #define cbox_rt_swap_pointers_and_update_count_args(ARG) ARG(void **, ptr) ARG(void *, new_value) ARG(int *, pcount) ARG(int, new_count)
 
 DEFINE_RT_FUNC(void *, cbox_rt, rt, cbox_rt_swap_pointers_and_update_count)
@@ -393,6 +401,8 @@ DEFINE_RT_FUNC(void *, cbox_rt, rt, cbox_rt_swap_pointers_and_update_count)
         *pcount = new_count;
     return old_value;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, int *pcount, int index, void *new_value)
 {
