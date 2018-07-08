@@ -138,7 +138,13 @@ void cbox_midi_merger_push(struct cbox_midi_merger *dest, struct cbox_midi_buffe
     cbox_rt_swap_pointers_into(rt, (void **)&dest->inputs, &src, (void **)&src.next);
     while(src.bpos < buffer->count)
         cbox_rt_handle_cmd_queue(rt); 
-    cbox_midi_merger_disconnect(dest, buffer, rt);
+
+    struct cbox_midi_source **pp = cbox_midi_merger_find_source(dest, buffer);
+    if (!pp)
+        return;
+    assert(*pp == &src);
+    void *old_ptr = cbox_rt_swap_pointers(rt, (void **)pp, src.next);
+    assert(old_ptr == &src);
 }
 
 void cbox_midi_merger_close(struct cbox_midi_merger *dest, struct cbox_rt *rt)
