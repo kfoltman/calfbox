@@ -53,6 +53,7 @@ struct cbox_jack_io_impl
     gboolean enable_common_midi_input;
     jack_transport_state_t last_transport_state;
     gboolean debug_transport;
+    gboolean external_tempo;
 
     jack_ringbuffer_t *rb_autoconnect;    
 };
@@ -153,28 +154,35 @@ static int process_cb(jack_nframes_t nframes, void *arg)
         for (int j = 0; j < nframes; j ++)
             io->output_buffers[i][j] = 0.f;
     }
-    if (cb->on_transport_sync)
-    {
-        jack_transport_state_t state = jack_transport_query(jii->client, NULL);
-        if (state != jii->last_transport_state)
+    if (cb->on_transport_sync || (jii->external_tempo && cb->on_tempo_sync)) {
+        jack_position_t pos;
+        memset(&pos, 0, sizeof(pos));
+        jack_transport_state_t state = jack_transport_query(jii->client, &pos);
+        if (jii->external_tempo && cb->on_tempo_sync && (pos.valid & JackPositionBBT) && pos.beats_per_minute > 0) {
+            cb->on_tempo_sync(cb->user_data, pos.beats_per_minute);
+        }
+        if (cb->on_transport_sync)
         {
-            jack_position_t pos;
-            jack_transport_query(jii->client, &pos);
-            if (jii->debug_transport)
-                g_message("JACK transport: incoming state change, state = %s, last state = %s, pos = %d\n", transport_state_names[state], transport_state_names[(int)jii->last_transport_state], (int)pos.frame);
-            if (state == JackTransportStopped)
+            if (state != jii->last_transport_state)
             {
-                if (cb->on_transport_sync(cb->user_data, ts_stopping, pos.frame))
+                jack_position_t pos;
+                jack_transport_query(jii->client, &pos);
+                if (jii->debug_transport)
+                    g_message("JACK transport: incoming state change, state = %s, last state = %s, pos = %d\n", transport_state_names[state], transport_state_names[(int)jii->last_transport_state], (int)pos.frame);
+                if (state == JackTransportStopped)
+                {
+                    if (cb->on_transport_sync(cb->user_data, ts_stopping, pos.frame))
+                        jii->last_transport_state = state;
+                }
+                else
+                if (state == JackTransportRolling && jii->last_transport_state == JackTransportStarting)
+                {
+                    if (cb->on_transport_sync(cb->user_data, ts_rolling, pos.frame))
+                        jii->last_transport_state = state;
+                }
+                else
                     jii->last_transport_state = state;
             }
-            else
-            if (state == JackTransportRolling && jii->last_transport_state == JackTransportStarting)
-            {
-                if (cb->on_transport_sync(cb->user_data, ts_rolling, pos.frame))
-                    jii->last_transport_state = state;
-            }
-            else
-                jii->last_transport_state = state;
         }
     }
     for (GSList *p = io->midi_inputs; p; p = p->next)
@@ -649,6 +657,7 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             return FALSE;
         return cbox_execute_on(fb, NULL, "/client_type", "s", error, "JACK") &&
             cbox_execute_on(fb, NULL, "/client_name", "s", error, jii->client_name) &&
+            cbox_execute_on(fb, NULL, "/external_tempo", "i", error, jii->external_tempo) &&
             cbox_io_process_cmd(io, fb, cmd, error, &handled);
     }
     else if (!strcmp(cmd->command, "/rename_midi_port") && !strcmp(cmd->arg_types, "ss"))
@@ -795,6 +804,11 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         jack_free(ports);
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/external_tempo") && !strcmp(cmd->arg_types, "i"))
+    {
+        jii->external_tempo = CBOX_ARG_I(cmd, 0);
+        return TRUE;
+    }
     else
     {
         gboolean result = cbox_io_process_cmd(io, fb, cmd, error, &handled);
@@ -889,6 +903,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     jii->enable_common_midi_input = cbox_config_get_int("io", "enable_common_midi_input", 1);
     jii->debug_transport = cbox_config_get_int("debug", "jack_transport", 0);
     jii->last_transport_state = JackTransportStopped;
+    jii->external_tempo = FALSE;
 
     cbox_command_target_init(&io->cmd_target, cbox_jack_io_process_cmd, jii);
     jii->ioi.pio = io;

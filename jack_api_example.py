@@ -135,6 +135,8 @@ track.add_clip(0, 0, pattern.status().loop_end, pattern)
 song.set_loop(0, pattern.status().loop_end)
 song.update_playback()
 cbox.Transport.play()
+cbox.JackIO.external_tempo(True)
+print (cbox.JackIO.status().external_tempo)
 
 print("Ready!")
 

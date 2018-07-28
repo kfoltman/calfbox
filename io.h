@@ -96,6 +96,7 @@ struct cbox_io_callbacks
     void (*on_midi_inputs_changed)(void *user_data);
     void (*on_midi_outputs_changed)(void *user_data);
     gboolean (*on_transport_sync)(void *user_data, enum cbox_transport_state state, uint32_t frame);
+    gboolean (*on_tempo_sync)(void *user_data, double beats_per_minute);
 };
 
 struct cbox_midi_input

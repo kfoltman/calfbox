@@ -206,6 +206,14 @@ gboolean cbox_rt_on_transport_sync(void *user_data, enum cbox_transport_state st
     return cbox_engine_on_transport_sync(rt->engine, state, frame);
 }
 
+void cbox_rt_on_tempo_sync(void *user_data, double tempo)
+{
+    struct cbox_rt *rt = user_data;
+    if (!rt->engine)
+        return TRUE;
+    return cbox_engine_on_tempo_sync(rt->engine, tempo);
+}
+
 void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
 {
     if (rt->io)
@@ -220,6 +228,7 @@ void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
         rt->cbs->on_midi_inputs_changed = cbox_rt_on_midi_inputs_changed;
         rt->cbs->on_midi_outputs_changed = cbox_rt_on_midi_outputs_changed;
         rt->cbs->on_transport_sync = cbox_rt_on_transport_sync;
+        rt->cbs->on_tempo_sync = cbox_rt_on_tempo_sync;
 
         assert(!rt->started);
         cbox_io_start(rt->io, rt->cbs, fb);

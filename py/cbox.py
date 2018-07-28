@@ -66,6 +66,8 @@ class GetThings:
                     getattr(self, cmd)[args[0]] = args[1]
                 else:
                     getattr(self, cmd)[args[0]] = args[1:]
+            elif "?" + cmd in anames:
+                setattr(self, cmd, bool(args[0]))
             elif len(args) == 1:
                 setattr(self, cmd, args[0])
         do_cmd(cmd, update_callback, args)
@@ -439,8 +441,11 @@ class JackIO:
     PORT_IS_TERMINAL = 0x10
     @staticmethod
     def status():
-        # Some of these only make sense for 
-        return GetThings("/io/status", ['client_type', 'client_name', 'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output', '*midi_input', 'sample_rate', 'output_resolution', '*usb_midi_input', '*usb_midi_output'], [])
+        # Some of these only make sense for JACK
+        return GetThings("/io/status", ['client_type', 'client_name',
+            'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output', 
+            '*midi_input', 'sample_rate', 'output_resolution', 
+            '*usb_midi_input', '*usb_midi_output', '?external_tempo'], [])
     @staticmethod
     def create_midi_input(name, autoconnect_spec = None):
         uuid = GetUUID("/io/create_midi_input", name).uuid
@@ -502,6 +507,10 @@ class JackIO:
     @staticmethod
     def get_connected_ports(port):
         return get_thing("/io/get_connected_ports", '/port', [str], port)
+    @staticmethod
+    def external_tempo(enable):
+        """Enable reacting to JACK transport tempo"""
+        do_cmd('/io/external_tempo', None, [1 if enable else 0])
 
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])

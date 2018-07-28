@@ -341,6 +341,17 @@ void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_mer
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+void cbox_engine_on_tempo_sync(struct cbox_engine *engine, double beats_per_minute)
+{
+    if (!engine->master)
+        return;
+    if (beats_per_minute && beats_per_minute != engine->master->tempo && beats_per_minute != engine->master->new_tempo) {
+        engine->master->new_tempo = beats_per_minute;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 gboolean cbox_engine_on_transport_sync(struct cbox_engine *engine, enum cbox_transport_state state, uint32_t frame)
 {
     if (state == ts_stopping)

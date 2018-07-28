@@ -59,6 +59,7 @@ extern void cbox_engine_set_pattern_and_destroy(struct cbox_engine *engine, stru
 extern void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_merger *merger, struct cbox_midi_buffer *buffer);
 extern void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_t nframes, float **output_buffers);
 extern gboolean cbox_engine_on_transport_sync(struct cbox_engine *engine, enum cbox_transport_state state, uint32_t frame);
+extern void cbox_engine_on_tempo_sync(struct cbox_engine *engine, double beats_per_minute);
 extern struct cbox_midi_merger *cbox_engine_get_midi_output(struct cbox_engine *engine, struct cbox_uuid *uuid);
 
 extern int cbox_engine_get_sample_rate(struct cbox_engine *engine);
