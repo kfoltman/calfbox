@@ -1,8 +1,10 @@
 aclocal.m4
 autom4te.cache
 config.h.in
+config.h.in~
 config.h
 configure
+compile
 depcomp
 install-sh
 ltmain.sh

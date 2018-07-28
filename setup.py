@@ -113,13 +113,13 @@ if '#define USE_NEON 1' in open('config.h').read():
     eargs.append('-ffast-math')
 
 setup(name="CalfBox",
-    version="0.04", description="Assorted music-related code", 
+    version="0.04", description="Assorted music-related code",
     author="Krzysztof Foltman", author_email="wdev@foltman.com",
-    url="http://repo.or.cz/w/calfbox.git", 
+    url="https://github.com/kfoltman/calfbox",
     packages=["calfbox"],
     package_dir={'calfbox':'py'},
     ext_modules=[
-        Extension('_cbox', csources, 
+        Extension('_cbox', csources,
             extra_compile_args = eargs,
             include_dirs=['.'],
             extra_link_args=libs,
@@ -129,4 +129,3 @@ setup(name="CalfBox",
         )
     ],
 )
-  
