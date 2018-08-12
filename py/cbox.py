@@ -865,7 +865,7 @@ class FluidsynthEngine(NonDocObj):
     class Status:
         polyphony = int
         soundfont = str
-        patch = {int: int}
+        patch = {int: (int, str)}
     def load_soundfont(self, filename):
         return self.cmd_makeobj("/load_soundfont", filename)
     def set_patch(self, channel, patch_no):
