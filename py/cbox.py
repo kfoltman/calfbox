@@ -873,7 +873,8 @@ class FluidsynthEngine(NonDocObj):
     def set_polyphony(self, polyphony):
         self.cmd("/polyphony", None, int(polyphony))
     def get_patches(self):
-        return self.get_thing("/patches", '/patch', [str])
+        return self.get_thing("/patches", '/patch', {int: str})
+
 
 class StreamPlayerEngine(NonDocObj):
     class Status:
