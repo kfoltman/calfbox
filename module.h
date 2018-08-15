@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 CBOX_EXTERN_CLASS(cbox_module)
 
-#define CBOX_MAX_AUDIO_PORTS 32
+#define CBOX_MAX_AUDIO_PORTS 36
 
 struct cbox_engine;
 struct cbox_rt;
