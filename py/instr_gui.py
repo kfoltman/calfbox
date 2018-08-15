@@ -84,7 +84,7 @@ class WithPatchTable:
     def update_model(self):
         self.patches.clear()
         patches = self.engine.get_patches()
-        ch_patches = self.engine.status().patches
+        ch_patches = self.engine.status().patch
         self.mapping = {}
         for id in patches:
             self.mapping[id] = len(self.mapping)
@@ -97,7 +97,7 @@ class WithPatchTable:
         self.engine.set_patch(channel, self.patches[combo.get_active()][1])
 
     def patch_combo_update(self):
-        patch = self.engine.status().patches
+        patch = self.engine.status().patch
         for i in range(16):
             cb = self.patch_combos[i]
             old_patch_index = cb.get_active() if cb.get_active() >= 0 else -1
