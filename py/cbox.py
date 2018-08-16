@@ -765,7 +765,7 @@ class InstrumentOutput(EffectSlot):
     class Status(EffectSlot.Status):
         gain_linear = float
         gain = float
-        output = int
+        output = SettableProperty(int)
 
 class DocInstrument(DocObj):
     class Status:
