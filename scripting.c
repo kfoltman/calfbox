@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "blob.h"
 #include "engine.h"
 #include "errors.h"
+#include "module.h"
 #include "scripting.h"
 #include <assert.h>
 #include <glib.h>

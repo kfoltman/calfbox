@@ -206,12 +206,12 @@ gboolean cbox_rt_on_transport_sync(void *user_data, enum cbox_transport_state st
     return cbox_engine_on_transport_sync(rt->engine, state, frame);
 }
 
-void cbox_rt_on_tempo_sync(void *user_data, double tempo)
+gboolean cbox_rt_on_tempo_sync(void *user_data, double tempo)
 {
     struct cbox_rt *rt = user_data;
-    if (!rt->engine)
-        return TRUE;
-    return cbox_engine_on_tempo_sync(rt->engine, tempo);
+    if (rt->engine)
+        cbox_engine_on_tempo_sync(rt->engine, tempo);
+    return TRUE;
 }
 
 void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
