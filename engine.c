@@ -132,7 +132,7 @@ static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct c
             buffers[0][i] = 0.f;
             buffers[1][i] = 0.f;
         }
-        cbox_engine_process(engine, NULL, nframes, buffers);
+        cbox_engine_process(engine, NULL, nframes, buffers, 2);
         for (int i = 0; i < nframes; i++)
         {
             data_i[i * 2] = buffers[0][i];
@@ -170,7 +170,7 @@ static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct c
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 
-void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_t nframes, float **output_buffers)
+void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_t nframes, float **output_buffers, uint32_t output_channels)
 {
     struct cbox_module *effect = engine->effect;
     uint32_t i, j;
@@ -193,7 +193,7 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
         cbox_song_playback_render(engine->spb, &engine->midibuf_song, nframes);
     
     for (int i = 0; i < engine->scene_count; i++)
-        cbox_scene_render(engine->scenes[i], nframes, output_buffers);
+        cbox_scene_render(engine->scenes[i], nframes, output_buffers, output_channels);
     
     // Process "master" effect
     if (effect)

@@ -364,6 +364,7 @@ gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *la
     int i;
     
     struct cbox_instrument *instrument = layer->instrument;
+    
     for (i = 0; i < instrument->aux_output_count; i++)
     {
         assert(!instrument->aux_outputs[i]);
@@ -571,7 +572,7 @@ static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbo
     return event_count;
 }
 
-void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output_buffers[])
+void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output_buffers[], uint32_t output_channels)
 {
     int n, i, j;
 
@@ -683,10 +684,14 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
                 float *leftbuf, *rightbuf;
                 if (o < module->aux_offset / 2)
                 {
+                    if (oobj->output_bus < 0)
+                        continue;
                     int leftch = oobj->output_bus * 2;
-                    int rightch = leftch + 1;
+                    if (leftch >= output_channels)
+                        continue;
                     leftbuf = output_buffers[leftch];
-                    rightbuf = output_buffers[rightch];
+                    int rightch = leftch + 1;
+                    rightbuf = rightch >= output_channels ? NULL : output_buffers[rightch];
                 }
                 else
                 {
@@ -707,11 +712,14 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
                 }
                 else
                 {
-                    for (j = 0; j < CBOX_BLOCK_SIZE; j++)
+                    if (leftbuf)
                     {
-                        if (leftbuf)
+                        for (j = 0; j < CBOX_BLOCK_SIZE; j++)
                             leftbuf[i + j] += gain * channels[2 * o][j];
-                        if (rightbuf)
+                    }
+                    if (rightbuf)
+                    {
+                        for (j = 0; j < CBOX_BLOCK_SIZE; j++)
                             rightbuf[i + j] += gain * channels[2 * o + 1][j];
                     }
                 }

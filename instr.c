@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config-api.h"
 #include "instr.h"
 #include "module.h"
+#include "io.h"
 #include "rt.h"
 #include "scene.h"
 #include <assert.h>
@@ -45,7 +46,12 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
     if (!strcmp(subcmd, "/output") && !strcmp(cmd->arg_types, "i"))
     {
         int obus = CBOX_ARG_I(cmd, 0);
-        // XXXKF add error checking
+        int max_outputs = instr->scene->rt->io ? instr->scene->rt->io->io_env.output_count : 2;
+        int max_obus = 1 + (max_outputs - 1) / 2;
+        if (obus < 0 || obus > max_obus) {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid output %d (must be between 1 and %d, or 0 for none)", obus, max_obus);
+            return FALSE;
+        }
         output->output_bus = obus - 1;
         return TRUE;
     }
