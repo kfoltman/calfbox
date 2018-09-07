@@ -49,6 +49,7 @@ struct cbox_track *cbox_track_new(struct cbox_document *document)
     p->pb = NULL;
     p->owner = NULL;
     p->external_output_set = FALSE;
+    p->generation = 0;
 
     cbox_command_target_init(&p->cmd_target, cbox_track_process_cmd, p);
     CBOX_OBJECT_REGISTER(p);
@@ -66,11 +67,13 @@ void cbox_track_add_item_to_list(struct cbox_track *track, struct cbox_track_ite
     if (it == NULL)
     {
         track->items = g_list_append(track->items, item);
+        cbox_track_set_dirty(track);
         return;
     }
     // Here, I don't really care about overlaps - it's more important to preserve
     // all clips as sent by the caller.
     track->items = g_list_insert_before(track->items, it, item);
+    cbox_track_set_dirty(track);
 }
 
 struct cbox_track_item *cbox_track_add_item(struct cbox_track *track, uint32_t time, struct cbox_midi_pattern *pattern, uint32_t offset, uint32_t length)
@@ -87,6 +90,11 @@ struct cbox_track_item *cbox_track_add_item(struct cbox_track *track, uint32_t t
     cbox_track_add_item_to_list(track, item);
     CBOX_OBJECT_REGISTER(item);
     return item;
+}
+
+void cbox_track_set_dirty(struct cbox_track *track)
+{
+    ++track->generation;
 }
 
 void cbox_track_destroyfunc(struct cbox_objhdr *objhdr)
@@ -152,6 +160,7 @@ gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         struct cbox_track_item *trki = cbox_track_add_item(track, pos, mp, offset, length);
         if (fb)
             return cbox_execute_on(fb, NULL, "/uuid", "o", error, trki);
+        cbox_track_set_dirty(track);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/name") && !strcmp(cmd->arg_types, "s"))
@@ -159,17 +168,22 @@ gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         char *old_name = track->name;
         track->name = g_strdup(CBOX_ARG_S(cmd, 0));
         g_free(old_name);
+        cbox_track_set_dirty(track);
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/external_output") && !strcmp(cmd->arg_types, "s"))
     {
         if (*CBOX_ARG_S(cmd, 0))
         {
-            if (cbox_uuid_fromstring(&track->external_output, CBOX_ARG_S(cmd, 0), error))
+            if (cbox_uuid_fromstring(&track->external_output, CBOX_ARG_S(cmd, 0), error)) {
                 track->external_output_set = TRUE;
+                cbox_track_set_dirty(track);
+            }
         }
-        else
+        else {
             track->external_output_set = FALSE;
+            cbox_track_set_dirty(track);
+        }
         return TRUE;
     }
     else
@@ -192,6 +206,7 @@ gboolean cbox_track_item_process_cmd(struct cbox_command_target *ct, struct cbox
     }
     if (!strcmp(cmd->command, "/delete") && !strcmp(cmd->arg_types, ""))
     {
+        cbox_track_set_dirty(trki->owner);
         cbox_object_destroy(CBOX_O2H(trki));
         return TRUE;
     }
@@ -200,25 +215,42 @@ gboolean cbox_track_item_process_cmd(struct cbox_command_target *ct, struct cbox
         struct cbox_objhdr *pattern = CBOX_ARG_O(cmd, 0, trki->owner, cbox_midi_pattern, error);
         if (!pattern)
             return FALSE;
+        if (trki->pattern == CBOX_H2O(pattern)) // no-op
+            return TRUE;
         trki->pattern = CBOX_H2O(pattern);
+        cbox_track_item_set_dirty(trki);
         return TRUE;
     }
     if (!strcmp(cmd->command, "/length") && !strcmp(cmd->arg_types, "i"))
     {
+        if (CBOX_ARG_I(cmd, 0) == trki->length) // no-op
+            return TRUE;
         trki->length = CBOX_ARG_I(cmd, 0);
+        cbox_track_item_set_dirty(trki);
         return TRUE;
     }
     if (!strcmp(cmd->command, "/pos") && !strcmp(cmd->arg_types, "i"))
     {
+        if (CBOX_ARG_I(cmd, 0) == trki->time) // no-op
+            return TRUE;
         trki->owner->items = g_list_remove(trki->owner->items, trki);
         trki->time = CBOX_ARG_I(cmd, 0);
         cbox_track_add_item_to_list(trki->owner, trki);
+        cbox_track_item_set_dirty(trki);
         return TRUE;
     }
     if (!strcmp(cmd->command, "/offset") && !strcmp(cmd->arg_types, "i"))
     {
+        if (CBOX_ARG_I(cmd, 0) == trki->offset) // no-op
+            return TRUE;
+        cbox_track_item_set_dirty(trki);
         trki->offset = CBOX_ARG_I(cmd, 0);
         return TRUE;
     }
     return cbox_object_default_process_cmd(ct, fb, cmd, error);
+}
+
+extern void cbox_track_item_set_dirty(struct cbox_track_item *track_item)
+{
+    cbox_track_set_dirty(track_item->owner);
 }

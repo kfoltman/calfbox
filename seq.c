@@ -50,6 +50,8 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     struct cbox_track_playback *pb = malloc(sizeof(struct cbox_track_playback));
     cbox_uuid_copy(&pb->track_uuid, &CBOX_O2H(track)->instance_uuid);
     pb->old_state = old_state;
+    pb->generation = track->generation;
+    pb->ref_count = 1;
     pb->master = master;
     int len = g_list_length(track->items);
     pb->items = calloc(len, sizeof(struct cbox_track_playback_item));
@@ -395,7 +397,12 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
                 }
             }
         }
-        spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master, spb, old_trk);
+        if (old_trk && trk->generation == old_trk->generation) {
+            ++old_trk->ref_count;
+            spb->tracks[pos++] = old_trk;
+        }
+        else
+            spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master, spb, old_trk);
         if (!trk->external_output_set)
             cbox_midi_merger_connect(&spb->track_merger, &spb->tracks[pos - 1]->output_buffer, NULL, NULL);
     }
@@ -662,7 +669,8 @@ void cbox_song_playback_destroy(struct cbox_song_playback *spb)
     cbox_midi_merger_close(&spb->track_merger, spb->engine->rt);
     for (int i = 0; i < spb->track_count; i++)
     {
-        cbox_track_playback_destroy(spb->tracks[i]);
+        if (!(--spb->tracks[i]->ref_count))
+            cbox_track_playback_destroy(spb->tracks[i]);
     }
     free(spb->tempo_map_items);
     free(spb->tracks);

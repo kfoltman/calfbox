@@ -95,6 +95,8 @@ struct cbox_track_playback
     struct cbox_master *master;
     int items_count;
     int pos;
+    int generation; // of the original track
+    int ref_count;
     struct cbox_midi_buffer output_buffer;
     struct cbox_midi_clip_playback playback;
     struct cbox_midi_playback_active_notes active_notes;
