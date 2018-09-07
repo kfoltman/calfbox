@@ -103,7 +103,7 @@ void cbox_track_destroyfunc(struct cbox_objhdr *objhdr)
     if (track->owner)
         cbox_song_remove_track(track->owner, track);
     // XXXKF I'm not sure if I want the lifecycle of track playback objects to be managed by the track itself
-    if (track->pb)
+    if (track->pb && track->pb->ref_count == 1)
         cbox_track_playback_destroy(track->pb);
     // The items will unlink themselves from the list in destructor
     while(track->items)
