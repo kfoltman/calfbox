@@ -216,7 +216,7 @@ gboolean cbox_object_default_status(struct cbox_objhdr *objhdr, struct cbox_comm
 void cbox_object_destroy(struct cbox_objhdr *hdr_ptr)
 {
     struct cbox_class_per_document *cpd = get_cpd_for_class(hdr_ptr->owner, hdr_ptr->class_ptr);
-    cpd->instances = g_list_remove_link(cpd->instances, hdr_ptr->link_in_document);
+    cpd->instances = g_list_delete_link(cpd->instances, hdr_ptr->link_in_document);
     hdr_ptr->link_in_document = NULL;
     g_hash_table_remove(hdr_ptr->owner->uuids_per_document, &hdr_ptr->instance_uuid);
     
