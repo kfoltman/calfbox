@@ -49,9 +49,12 @@ struct cbox_midi_pattern_playback
 {
     struct cbox_midi_event *events;
     int event_count;
+    int ref_count;
 };
 
 extern struct cbox_midi_pattern_playback *cbox_midi_pattern_playback_new(struct cbox_midi_pattern *pattern);
+extern void cbox_midi_pattern_playback_ref(struct cbox_midi_pattern_playback *mppb);
+extern void cbox_midi_pattern_playback_unref(struct cbox_midi_pattern_playback *mppb);
 extern void cbox_midi_pattern_playback_destroy(struct cbox_midi_pattern_playback *mppb);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -206,16 +206,44 @@ void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int 
     }
 }
 
+void cbox_track_playback_ref(struct cbox_track_playback *pb)
+{
+    ++pb->ref_count;
+}
+
 void cbox_track_playback_destroy(struct cbox_track_playback *pb)
 {
     if (pb->external_merger)
         cbox_midi_merger_disconnect(pb->external_merger, &pb->output_buffer, pb->spb->engine->rt);
 
+    for (int i = 0; i < pb->items_count; ++i)
+        cbox_midi_pattern_playback_unref(pb->items[i].pattern);
     free(pb->items);
     free(pb);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct cbox_midi_pattern_playback *cbox_midi_pattern_playback_new(struct cbox_midi_pattern *pattern)
+{
+    struct cbox_midi_pattern_playback *mppb = calloc(1, sizeof(struct cbox_midi_pattern_playback));
+    mppb->events = malloc(sizeof(struct cbox_midi_event) * pattern->event_count);
+    memcpy(mppb->events, pattern->events, sizeof(struct cbox_midi_event) * pattern->event_count);
+    mppb->event_count = pattern->event_count;
+    mppb->ref_count++;
+    return mppb;
+}
+
+void cbox_midi_pattern_playback_unref(struct cbox_midi_pattern_playback *mppb)
+{
+    if (!(--mppb->ref_count))
+        cbox_midi_pattern_playback_destroy(mppb);
+}
+
+void cbox_midi_pattern_playback_ref(struct cbox_midi_pattern_playback *mppb)
+{
+    ++mppb->ref_count;
+}
 
 void cbox_midi_pattern_playback_destroy(struct cbox_midi_pattern_playback *mppb)
 {
@@ -371,7 +399,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
         old_state = NULL;
     spb->song = song;
     spb->engine = engine;
-    spb->pattern_map = g_hash_table_new_full(NULL, NULL, NULL, (GDestroyNotify)cbox_midi_pattern_playback_destroy);
+    spb->pattern_map = g_hash_table_new(NULL, NULL);
     spb->master = master;
     spb->track_count = g_list_length(song->tracks);
     spb->tracks = malloc(spb->track_count * sizeof(struct cbox_track_playback *));
@@ -398,7 +426,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
             }
         }
         if (old_trk && trk->generation == old_trk->generation) {
-            ++old_trk->ref_count;
+            cbox_track_playback_ref(old_trk);
             spb->tracks[pos++] = old_trk;
         }
         else
@@ -643,20 +671,13 @@ int cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, int time
     return spb->tempo_map_item_count - 1;
 }
 
-struct cbox_midi_pattern_playback *cbox_midi_pattern_playback_new(struct cbox_midi_pattern *pattern)
-{
-    struct cbox_midi_pattern_playback *mppb = calloc(1, sizeof(struct cbox_midi_pattern_playback));
-    mppb->events = malloc(sizeof(struct cbox_midi_event) * pattern->event_count);
-    memcpy(mppb->events, pattern->events, sizeof(struct cbox_midi_event) * pattern->event_count);
-    mppb->event_count = pattern->event_count;
-    return mppb;
-}
-
 struct cbox_midi_pattern_playback *cbox_song_playback_get_pattern(struct cbox_song_playback *spb, struct cbox_midi_pattern *pattern)
 {
     struct cbox_midi_pattern_playback *mppb = g_hash_table_lookup(spb->pattern_map, pattern);
-    if (mppb)
+    if (mppb) {
+        cbox_midi_pattern_playback_ref(mppb);
         return mppb;
+    }
     
     mppb = cbox_midi_pattern_playback_new(pattern);
     g_hash_table_insert(spb->pattern_map, pattern, mppb);
