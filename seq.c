@@ -230,7 +230,7 @@ struct cbox_midi_pattern_playback *cbox_midi_pattern_playback_new(struct cbox_mi
     mppb->events = malloc(sizeof(struct cbox_midi_event) * pattern->event_count);
     memcpy(mppb->events, pattern->events, sizeof(struct cbox_midi_event) * pattern->event_count);
     mppb->event_count = pattern->event_count;
-    mppb->ref_count++;
+    mppb->ref_count = 1;
     return mppb;
 }
 
