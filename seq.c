@@ -471,6 +471,7 @@ void cbox_song_playback_apply_old_state(struct cbox_song_playback *spb)
     for (int i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *tpb = spb->tracks[i];
+        tpb->spb = spb;
         if (tpb->old_state)
         {
             cbox_midi_playback_active_notes_copy(&tpb->active_notes, &tpb->old_state->active_notes);
