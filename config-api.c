@@ -348,5 +348,10 @@ void cbox_config_close()
         g_string_chunk_free(cfg_strings);
         cfg_strings = NULL;
     }
+    if (keyfile_name)
+    {
+        g_free(keyfile_name);
+        keyfile_name = NULL;
+    }
 }
 

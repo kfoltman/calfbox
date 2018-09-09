@@ -286,8 +286,10 @@ static void autoconnect_by_spec(jack_client_t *client, const char *port, const c
             {
                 const char **names = jack_get_ports(client, ".*", is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
                 // Client killed by JACK
-                if (!names)
+                if (!names) {
+                    g_free(copy_spec);
                     return;
+                }
                 int i;
                 for (i = 0; i < portidx && names[i]; i++)
                     ;
@@ -304,8 +306,10 @@ static void autoconnect_by_spec(jack_client_t *client, const char *port, const c
         {
             const char **names = jack_get_ports(client, use_name + 1, is_midi ? JACK_DEFAULT_MIDI_TYPE : JACK_DEFAULT_AUDIO_TYPE, is_cbox_input ? JackPortIsOutput : JackPortIsInput);
             // Client killed by JACK
-            if (!names)
+            if (!names) {
+                g_free(copy_spec);
                 return;
+            }
             
             if (names && names[0])
             {
