@@ -210,12 +210,14 @@ void cbox_song_set_mti(struct cbox_song *song, uint32_t pos, double tempo, int t
             gboolean is_noop_here = new_tempo <= 0 && new_timesig_nom <= 0;
             // If the new item is a no-op and not the first item, delete it
             // and extend the previous item by deleted item's duration
-            if (is_noop_here && prev)
+            if (is_noop_here)
             {
                 uint32_t deleted_duration = mti->duration_ppqn;
                 song->master_track_items = g_list_remove(song->master_track_items, mti);
-                mti = prev->data;
-                mti->duration_ppqn += deleted_duration;
+                if (prev) {
+                    mti = prev->data;
+                    mti->duration_ppqn += deleted_duration;
+                }
                 return;
             }
             goto set_values;
