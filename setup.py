@@ -113,7 +113,7 @@ if '#define USE_NEON 1' in open('config.h').read():
     eargs.append('-ffast-math')
 
 setup(name="CalfBox",
-    version="0.04", description="Assorted music-related code",
+    version="0.0.0.1", description="Assorted music-related code",
     author="Krzysztof Foltman", author_email="wdev@foltman.com",
     url="https://github.com/kfoltman/calfbox",
     packages=["calfbox"],
