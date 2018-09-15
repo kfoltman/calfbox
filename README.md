@@ -7,6 +7,11 @@ Calfbox, the "open source musical instrument", offers assorted music-related cod
 Originally intended as a standalone instrument for Linux and embedded devices (USB TV Sticks)
 it can be used as Python module as well.
 
+# Packaging
+If you are a packager and want to create a binary package for your distribution please package only the python module.
+The binary executable is not maintained and untested at the moment. It should not be used by anyone.
+
+
 # Calfbox as Python Module
 Calfbox can be used as a Python module that can be imported to create short scripts or
 full fledged programs ( https://www.laborejo.org/software ).
@@ -38,7 +43,7 @@ Also there is a directory `/experiments` which contains a small example framewor
 
 Using Calfbox as standalone instrument requires a .cfg config file.
 
-TODO
+This part of the program is currently unmaintained and untested. Please do not use it.
 
 # License
 
