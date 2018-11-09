@@ -512,6 +512,26 @@ class JackIO:
         """Enable reacting to JACK transport tempo"""
         do_cmd('/io/external_tempo', None, [1 if enable else 0])
 
+    #Metadata
+
+    @staticmethod
+    def set_property(port, key, value, jackPropertyType=""):
+        """empty jackPropertyType leads to UTF-8 string
+        for convenience we see if value is a python int and send the right jack_property_t::type
+        jackio.c checks if the port exists, eventhough metadata allows keys for non-existent uuids.
+        """
+        if type(value) is int:
+            jackPropertyType = "http://www.w3.org/2001/XMLSchema#int"
+            value = str(value)
+        elif not type(value) is str:
+            return TypeError("value {} must be int or str but was {}".format(value, type(value)))
+        do_cmd("/io/set_property", None, [port, key, value, jackPropertyType])
+
+    @staticmethod
+    def remove_all_properties():
+        """Remove all metadata from jack server"""
+        do_cmd("/io/remove_all_properties", None, [])
+
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])
 

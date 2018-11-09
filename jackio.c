@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+
 #include "config.h"
 
 #if USE_JACK
@@ -811,6 +812,35 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
     else if (!strcmp(cmd->command, "/external_tempo") && !strcmp(cmd->arg_types, "i"))
     {
         jii->external_tempo = CBOX_ARG_I(cmd, 0);
+        return TRUE;
+    }
+
+    //Metadata
+
+    else if (!strcmp(cmd->command, "/set_property") && !strcmp(cmd->arg_types, "ssss"))
+    //parameters: "client:port", key, value, type according to jack_property_t (empty or NULL for string)
+    {
+        const char *name = CBOX_ARG_S(cmd, 0);
+        const char *key = CBOX_ARG_S(cmd, 1);
+        const char *value = CBOX_ARG_S(cmd, 2);
+        const char *type = CBOX_ARG_S(cmd, 3);
+
+        jack_port_t *port = NULL;
+        port = jack_port_by_name(jii->client, name);
+        const jack_uuid_t *uuid = jack_port_uuid(port);
+        if (!uuid)
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", name);
+
+        const int res = jack_set_property(jii->client, uuid, key, value, type);
+        if (res) // 0 on success
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Set properties was not successful");
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/remove_all_properties"))
+    {
+        const int res = jack_remove_all_properties(jii->client);
+        if (res) // 0 on success, -1 otherwise
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Remove all properties was not successful");
         return TRUE;
     }
     else
