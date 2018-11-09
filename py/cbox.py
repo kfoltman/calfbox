@@ -12,7 +12,7 @@ type_wrapper_debug = False
 class GetUUID:
     """An object that calls a C layer command, receives a /uuid callback from it
     and stores the passed UUID in its uuid attribute.
-    
+
     Example use: GetUUID('/command', arg1, arg2...).uuid
     """
     def __init__(self, cmd, *cmd_args):
@@ -26,11 +26,11 @@ class GetUUID:
         do_cmd(cmd, self, list(cmd_args))
     def __call__(self, *args):
         self.callback(*args)
-    
+
 class GetThings:
     """A generic callback object that receives various forms of information from
     C layer and converts then into object's Python attributes.
-    
+
     This is an obsolete interface, to be replaced by GetUUID or metaclass
     based type-safe autoconverter. However, there are still some cases that
     aren't (yet) handled by either.
@@ -105,7 +105,7 @@ class SettableProperty(PropertyDecorator):
         elif issubclass(proptype, DocObj):
             setattr(klass, 'set_' + property, lambda self, value: self.cmd('/' + property, None, value.uuid))
         else:
-            setattr(klass, 'set_' + property, lambda self, value: self.cmd('/' + property, None, proptype(value)))        
+            setattr(klass, 'set_' + property, lambda self, value: self.cmd('/' + property, None, proptype(value)))
 
 def new_get_things(obj, cmd, settermap, args):
     """Call C command with arguments 'args', populating a return object obj
@@ -172,7 +172,7 @@ def get_thing(cmd, fieldcmd, datatype, *args):
         else:
             print ("Unexpected command %s" % cmd2)
     do_cmd(cmd, callback, list(args))
-    return value    
+    return value
 
 class SetterWithConversion:
     """A setter object class that sets a specific property to a typed value or a tuple of typed value."""
@@ -280,12 +280,12 @@ class CboxObjMetaclass(type):
         classfinaliser, cmdwrapper = _create_unmarshaller(name, status_class, True)
         result = type.__new__(cls, name, bases, namespace, **kwds)
         classfinaliser(result)
-        result.status = cmdwrapper('/status')        
+        result.status = cmdwrapper('/status')
         return result
 
 
 class NonDocObj(object, metaclass = CboxObjMetaclass):
-    """Root class for all wrapper classes that wrap objects that don't have 
+    """Root class for all wrapper classes that wrap objects that don't have
     their own identity/UUID.
     This covers various singletons and inner objects (e.g. engine in instruments)."""
     class Status:
@@ -307,7 +307,7 @@ class NonDocObj(object, metaclass = CboxObjMetaclass):
 
     def make_path(self, path):
         return self.path + path
-        
+
     def __str__(self):
         return "%s<%s>" % (self.__class__.__name__, self.path)
 
@@ -376,7 +376,7 @@ class Config:
             do_cmd('/config/save', None, [])
         else:
             do_cmd('/config/save', None, [str(filename)])
-            
+
     @staticmethod
     def add_section(section, content):
         """Populate a config section based on a string with key=value lists.
@@ -443,8 +443,8 @@ class JackIO:
     def status():
         # Some of these only make sense for JACK
         return GetThings("/io/status", ['client_type', 'client_name',
-            'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output', 
-            '*midi_input', 'sample_rate', 'output_resolution', 
+            'audio_inputs', 'audio_outputs', 'buffer_size', '*midi_output',
+            '*midi_input', 'sample_rate', 'output_resolution',
             '*usb_midi_input', '*usb_midi_output', '?external_tempo'], [])
     @staticmethod
     def create_midi_input(name, autoconnect_spec = None):
@@ -514,15 +514,15 @@ class JackIO:
 
 def call_on_idle(callback = None):
     do_cmd("/on_idle", callback, [])
-        
+
 def get_new_events():
     seq = []
     do_cmd("/on_idle", (lambda cmd, fb, args: seq.append((cmd, fb, args))), [])
     return seq
-    
+
 def send_midi_event(*data, output = None):
     do_cmd('/send_event_to', None, [output if output is not None else ''] + list(data))
-        
+
 def send_sysex(data, output = None):
     do_cmd('/send_sysex_to', None, [output if output is not None else '', bytearray(data)])
 
@@ -532,19 +532,19 @@ def flush_rt():
 class CfgSection:
     def __init__(self, name):
         self.name = name
-        
+
     def __getitem__(self, key):
         return Config.get(self.name, key)
 
     def __setitem__(self, key, value):
         Config.set(self.name, key, value)
-        
+
     def __delitem__(self, key):
         Config.delete(self.name, key)
-        
+
     def keys(self, prefix = ""):
         return Config.keys(self.name, prefix)
-        
+
 
 class Pattern:
     @staticmethod
@@ -561,7 +561,7 @@ class Pattern:
                 ofs += 8
             return pat_data, length
         return None
-        
+
     @staticmethod
     def serialize_event(time, *data):
         if len(data) >= 1 and len(data) <= 3:
@@ -657,7 +657,7 @@ class DocPattern(DocObj):
     def set_name(self, name):
         self.cmd("/name", None, name)
 Document.classmap['cbox_midi_pattern'] = DocPattern
-        
+
 class ClipItem:
     def __init__(self, pos, offset, length, pattern, clip):
         self.pos = pos
@@ -679,7 +679,7 @@ class DocTrackClip(DocObj):
     def __init__(self, uuid):
         DocObj.__init__(self, uuid)
 Document.classmap['cbox_track_item'] = DocTrackClip
-        
+
 class DocTrack(DocObj):
     class Status:
         clips = [ClipItem]
@@ -751,7 +751,7 @@ Document.classmap['cbox_song'] = DocSong
 class UnknownModule(NonDocObj):
     class Status:
         pass
-    
+
 class EffectSlot(NonDocObj):
     class Status:
         insert_preset = SettableProperty(str)
@@ -832,19 +832,19 @@ class SamplerEngine(NonDocObj):
     def load_patch_from_cfg(self, patch_no, cfg_section, display_name):
         """Load a sampler program from an 'spgm:' config section."""
         return self.cmd_makeobj("/load_patch", int(patch_no), cfg_section, display_name)
-        
+
     def load_patch_from_string(self, patch_no, sample_dir, sfz_data, display_name):
         """Load a sampler program from a string, using given filesystem path for sample directory."""
         return self.cmd_makeobj("/load_patch_from_string", int(patch_no), sample_dir, sfz_data, display_name)
-        
+
     def load_patch_from_file(self, patch_no, sfz_name, display_name):
         """Load a sampler program from a filesystem file."""
         return self.cmd_makeobj("/load_patch_from_file", int(patch_no), sfz_name, display_name)
-        
+
     def load_patch_from_tar(self, patch_no, tar_name, sfz_name, display_name):
         """Load a sampler program from a tar file."""
         return self.cmd_makeobj("/load_patch_from_file", int(patch_no), "sbtar:%s;%s" % (tar_name, sfz_name), display_name)
-        
+
     def set_patch(self, channel, patch_no):
         """Select patch identified by patch_no in a specified MIDI channel."""
         self.cmd("/set_patch", None, int(channel), int(patch_no))
@@ -904,7 +904,7 @@ class TonewheelOrganEngine(NonDocObj):
         vibrato_chorus = SettableProperty(int)
         percussion_enable = SettableProperty(bool)
         percussion_3rd = SettableProperty(bool)
-        
+
 engine_classes = {
     'sampler' : SamplerEngine,
     'fluidsynth' : FluidsynthEngine,
@@ -943,7 +943,7 @@ class DocScene(DocObj):
         self.cmd("/delete_layer", None, int(1 + pos))
     def move_layer(self, old_pos, new_pos):
         self.cmd("/move_layer", None, int(old_pos + 1), int(new_pos + 1))
-        
+
     def add_layer(self, aux, pos = None):
         if pos is None:
             return self.cmd_makeobj("/add_layer", 0, aux)
@@ -976,7 +976,7 @@ class DocModule(DocObj):
     class Status:
         pass
 Document.classmap['cbox_module'] = DocModule
-    
+
 class DocEngine(DocObj):
     class Status:
         scenes = AltPropName('/scene', [DocScene])
@@ -990,12 +990,12 @@ class DocEngine(DocObj):
     def render_stereo(self, samples):
         return self.get_thing("/render_stereo", '/data', bytes, samples)
 Document.classmap['cbox_engine'] = DocEngine
-    
+
 class DocRecorder(DocObj):
     class Status:
         filename = str
 Document.classmap['cbox_recorder'] = DocRecorder
-    
+
 class SamplerProgram(DocObj):
     class Status:
         name = str
