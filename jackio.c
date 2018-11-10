@@ -827,20 +827,34 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
 
         jack_port_t *port = NULL;
         port = jack_port_by_name(jii->client, name);
+        if (!port)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", name);
+            return FALSE;
+        }
         const jack_uuid_t *uuid = jack_port_uuid(port);
         if (!uuid)
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", name);
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "JACK Uuid for port '%s' not found", name);
+            return FALSE;
+        }
 
         const int res = jack_set_property(jii->client, uuid, key, value, type);
         if (res) // 0 on success
+        {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Set properties was not successful");
+            return FALSE;
+        }
         return TRUE;
     }
-    else if (!strcmp(cmd->command, "/remove_all_properties"))
+    else if (!strcmp(cmd->command, "/remove_all_properties") && !strcmp(cmd->arg_types, ""))
     {
         const int res = jack_remove_all_properties(jii->client);
         if (res) // 0 on success, -1 otherwise
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Remove all properties was not successful");
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Remove all JACK properties was not successful");
+            return FALSE;
+        }
         return TRUE;
     }
     else
