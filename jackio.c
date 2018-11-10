@@ -839,7 +839,7 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             return FALSE;
         }
 
-        const int res = jack_set_property(jii->client, uuid, key, value, type);
+        int res = jack_set_property(jii->client, uuid, key, value, type);
         if (res) // 0 on success
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Set properties was not successful");
@@ -849,7 +849,7 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
     }
     else if (!strcmp(cmd->command, "/remove_all_properties") && !strcmp(cmd->arg_types, ""))
     {
-        const int res = jack_remove_all_properties(jii->client);
+        int res = jack_remove_all_properties(jii->client);
         if (res) // 0 on success, -1 otherwise
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Remove all JACK properties was not successful");
