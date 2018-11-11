@@ -329,7 +329,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
     }
 
     SF_INSTRUMENT instrument;
-    int nshorts;
+    uint32_t nshorts;
     if (waveform->info.channels != 1 && waveform->info.channels != 2)
     {
         g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, 

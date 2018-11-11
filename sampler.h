@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 
 #define MAX_SAMPLER_VOICES 128
+#define SAMPLER_NO_LOOP ((uint32_t)-1)
 
 #define CBOX_SAMPLER_ERROR cbox_sampler_error_quark()
 
@@ -148,7 +149,7 @@ struct sampler_module
     struct sampler_voice *voices_free, voices_all[MAX_SAMPLER_VOICES];
     struct sampler_channel channels[16];
     struct sampler_program **programs;
-    int program_count;
+    uint32_t program_count;
     int active_voices, max_voices;
     int serial_no;
     int output_pairs, aux_pairs;

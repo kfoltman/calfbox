@@ -408,7 +408,7 @@ struct cbox_blob *cbox_midi_pattern_to_blob(struct cbox_midi_pattern *pat, int *
     
     struct cbox_blob_serialized_event event;
     int size = 0;
-    for (int i = 0; i < pat->event_count; i++)
+    for (uint32_t i = 0; i < pat->event_count; i++)
     {
         // currently sysex events and the like are not supported
         if (pat->events[i].size < 4)
@@ -419,7 +419,7 @@ struct cbox_blob *cbox_midi_pattern_to_blob(struct cbox_midi_pattern *pat, int *
     
     size = 0;
     uint8_t *data = blob->data;
-    for (int i = 0; i < pat->event_count; i++)
+    for (uint32_t i = 0; i < pat->event_count; i++)
     {
         // currently sysex events and the like are not supported
         const struct cbox_midi_event *src = &pat->events[i];

@@ -52,7 +52,7 @@ struct cbox_menu_item *cbox_menu_add_item(struct cbox_menu *menu, struct cbox_me
 
 void cbox_menu_destroy(struct cbox_menu *menu)
 {
-    int i;
+    guint i;
     
     for (i = 0; i < menu->items->len; i++)
         cbox_menu_item_destroy(g_ptr_array_index(menu->items, i));
@@ -100,7 +100,7 @@ gchar *cbox_menu_item_value_format(const struct cbox_menu_item *item, void *cont
 void cbox_menu_state_size(struct cbox_menu_state *menu_state)
 {
     struct cbox_menu *menu = menu_state->menu;
-    int i;
+    guint i;
     menu_state->size.label_width = 0;
     menu_state->size.value_width = 0;
     menu_state->size.height = 0;
@@ -119,7 +119,7 @@ void cbox_menu_state_size(struct cbox_menu_state *menu_state)
 void cbox_menu_state_draw(struct cbox_menu_state *menu_state)
 {
     struct cbox_menu *menu = menu_state->menu;
-    int i;
+    guint i;
     
     werase(menu_state->window);
     box(menu_state->window, 0, 0);
@@ -141,9 +141,9 @@ static void cbox_menu_page_draw(struct cbox_ui_page *p)
     cbox_menu_state_draw(st);
 }
 
-static int cbox_menu_is_item_enabled(struct cbox_menu *menu, int item)
+static int cbox_menu_is_item_enabled(struct cbox_menu *menu, unsigned int item)
 {
-    assert(item >= 0 && item < menu->items->len);
+    assert(item < menu->items->len);
     
     return ((struct cbox_menu_item *)g_ptr_array_index(menu->items, item))->item_class->on_key != NULL;
 }
@@ -225,7 +225,7 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
                 st->yoffset = 0;
         }
         else
-        if (pos >= 0 && pos < menu->items->len)
+        if (pos >= 0 && (guint)pos < menu->items->len)
         {
             int npos = st->cursor;
             int count = 0;
@@ -244,13 +244,13 @@ int cbox_menu_page_on_key(struct cbox_ui_page *p, int ch)
     case KEY_HOME:
     case KEY_DOWN:
         pos = ch == KEY_HOME ? 0 : st->cursor + 1;
-        while(pos < menu->items->len && !cbox_menu_is_item_enabled(menu, pos))
+        while(pos < (int)menu->items->len && !cbox_menu_is_item_enabled(menu, pos))
             pos++;
-        if (pos < menu->items->len)
+        if (pos < (int)menu->items->len)
             st->cursor = pos;
         if (ch == KEY_HOME)
             st->yoffset = 0;
-        else if (pos >= 0 && pos < menu->items->len)
+        else if (pos >= 0 && pos < (int)menu->items->len)
         {
             item = g_ptr_array_index(menu->items, st->cursor);
             if (item->y - 1 - st->yoffset >= st->yspace)

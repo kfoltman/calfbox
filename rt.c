@@ -404,7 +404,7 @@ DEFINE_RT_VOID_FUNC(cbox_rt, rt, cbox_rt_swap_pointers_into)
     *ptr = new_value;
 }
 
-#define cbox_rt_swap_pointers_and_update_count_args(ARG) ARG(void **, ptr) ARG(void *, new_value) ARG(int *, pcount) ARG(int, new_count)
+#define cbox_rt_swap_pointers_and_update_count_args(ARG) ARG(void **, ptr) ARG(void *, new_value) ARG(uint32_t *, pcount) ARG(uint32_t, new_count)
 
 DEFINE_RT_FUNC(void *, cbox_rt, rt, cbox_rt_swap_pointers_and_update_count)
 {
@@ -417,31 +417,31 @@ DEFINE_RT_FUNC(void *, cbox_rt, rt, cbox_rt_swap_pointers_and_update_count)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, int *pcount, int index, void *new_value)
+void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, uint32_t *pcount, int index, void *new_value)
 {
     assert(index >= -1);
-    assert(index <= *pcount);
-    assert(*pcount >= 0);
+    assert((uint32_t)index <= *pcount);
+    assert(*pcount < (1U << 31));
     void **new_array = stm_array_clone_insert(*ptr, *pcount, index, new_value);
     free(cbox_rt_swap_pointers_and_update_count(rt, (void **)ptr, new_array, pcount, *pcount + 1));            
 }
 
-void *cbox_rt_array_remove(struct cbox_rt *rt, void ***ptr, int *pcount, int index)
+void *cbox_rt_array_remove(struct cbox_rt *rt, void ***ptr, uint32_t *pcount, int index)
 {
     if (index == -1)
         index = *pcount - 1;
     assert(index >= 0);
-    assert(index < *pcount);
-    assert(*pcount > 0);
+    assert((uint32_t)index < *pcount);
+    assert(*pcount < (1U << 31));
     void *p = (*ptr)[index];
     void **new_array = stm_array_clone_remove(*ptr, *pcount, index);
     free(cbox_rt_swap_pointers_and_update_count(rt, (void **)ptr, new_array, pcount, *pcount - 1));            
     return p;
 }
 
-gboolean cbox_rt_array_remove_by_value(struct cbox_rt *rt, void ***ptr, int *pcount, void *value_to_remove)
+gboolean cbox_rt_array_remove_by_value(struct cbox_rt *rt, void ***ptr, uint32_t *pcount, void *value_to_remove)
 {
-    for (int i = 0; i < *pcount; i++)
+    for (uint32_t i = 0; i < *pcount; i++)
     {
         if ((*ptr)[i] == value_to_remove)
         {

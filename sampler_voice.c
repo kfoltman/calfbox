@@ -192,7 +192,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     }
     uint32_t end = l->eff_waveform->info.frames;
     if (l->end != 0)
-        end = (l->end == -1) ? 0 : l->end;
+        end = (l->end == SAMPLER_NO_LOOP) ? 0 : l->end;
     v->last_waveform = l->eff_waveform;
     v->gen.cur_sample_end = end;
     if (end > l->eff_waveform->info.frames)
@@ -313,8 +313,8 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
         int32_t pos = v->offset + v->reloffset * maxend * 0.01;
         if (pos < 0)
             pos = 0;
-        if (pos > maxend)
-            pos = maxend;
+        if ((uint32_t)pos > maxend)
+            pos = (int32_t)maxend;
         v->offset = pos;
     }
     

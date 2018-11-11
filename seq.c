@@ -112,7 +112,7 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     return pb;
 }
     
-void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, int time_ppqn, int min_time_ppqn)
+void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, uint32_t time_ppqn, uint32_t min_time_ppqn)
 {
     pb->pos = 0;
     while(pb->pos < pb->items_count && pb->items[pb->pos].time + pb->items[pb->pos].length < time_ppqn)
@@ -120,7 +120,7 @@ void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, int time_ppqn
     cbox_track_playback_start_item(pb, time_ppqn, TRUE, min_time_ppqn);
 }
 
-void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, int time_samples)
+void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, uint32_t time_samples)
 {
     pb->pos = 0;
     while(pb->pos < pb->items_count && cbox_master_ppqn_to_samples(pb->master, pb->items[pb->pos].time + pb->items[pb->pos].length) < time_samples)
@@ -172,18 +172,18 @@ void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, in
     }
 }
 
-void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int nsamples)
+void cbox_track_playback_render(struct cbox_track_playback *pb, uint32_t offset, uint32_t nsamples)
 {
     struct cbox_song_playback *spb = pb->master->spb;
-    int rpos = 0;
+    uint32_t rpos = 0;
     while(rpos < nsamples && pb->pos < pb->items_count)
     {
-        int rend = nsamples;
+        uint32_t rend = nsamples;
         struct cbox_track_playback_item *cur = &pb->items[pb->pos];
         // a gap before the current item
         if (spb->song_pos_samples + rpos < pb->playback.start_time_samples)
         {
-            int space_samples = pb->playback.start_time_samples - (spb->song_pos_samples + rpos);
+            uint32_t space_samples = pb->playback.start_time_samples - (spb->song_pos_samples + rpos);
             if (space_samples >= rend - rpos)
                 return;
             rpos += space_samples;
@@ -216,7 +216,7 @@ void cbox_track_playback_destroy(struct cbox_track_playback *pb)
     if (pb->external_merger)
         cbox_midi_merger_disconnect(pb->external_merger, &pb->output_buffer, pb->spb->engine->rt);
 
-    for (int i = 0; i < pb->items_count; ++i)
+    for (uint32_t i = 0; i < pb->items_count; ++i)
         cbox_midi_pattern_playback_unref(pb->items[i].pattern);
     free(pb->items);
     free(pb);
@@ -278,7 +278,7 @@ void cbox_midi_clip_playback_set_pattern(struct cbox_midi_clip_playback *pb, str
     pb->min_time_ppqn = offset_ppqn;
 }
 
-void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, int offset, int nsamples)
+void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, uint32_t offset, uint32_t nsamples)
 {
     uint32_t end_time_samples = pb->end_time_samples;
     uint32_t cur_time_samples = pb->start_time_samples + pb->rel_time_samples;
@@ -292,7 +292,7 @@ void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct c
         
         if (src->time - pb->offset_ppqn + pb->item_start_ppqn >= pb->min_time_ppqn)
         {
-            int event_time_samples = cbox_master_ppqn_to_samples(pb->master, src->time - pb->offset_ppqn + pb->item_start_ppqn);
+            uint32_t event_time_samples = cbox_master_ppqn_to_samples(pb->master, src->time - pb->offset_ppqn + pb->item_start_ppqn);
         
             if (event_time_samples >= end_time_samples)
                 break;
@@ -309,15 +309,15 @@ void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct c
     pb->rel_time_samples += nsamples;
 }
 
-void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, int time_ppqn, int min_time_ppqn)
+void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, uint32_t time_ppqn, uint32_t min_time_ppqn)
 {
-    int patrel_time_ppqn = time_ppqn + pb->offset_ppqn;
-    int L = 0, U = pb->pattern->event_count;
+    uint32_t patrel_time_ppqn = time_ppqn + pb->offset_ppqn;
+    uint32_t L = 0, U = pb->pattern->event_count;
 
     if (patrel_time_ppqn > 0) {
         while (U > L + 2) {
-            int32_t M = (L >> 1) + (U >> 1) + (L & U & 1);
-            int time = pb->pattern->events[M].time;
+            uint32_t M = (L >> 1) + (U >> 1) + (L & U & 1);
+            uint32_t time = pb->pattern->events[M].time;
             if (time < patrel_time_ppqn)
                 L = M + 1;
             else if (time >= patrel_time_ppqn)
@@ -325,7 +325,7 @@ void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, int t
         }
     }
 
-    int pos = L;
+    uint32_t pos = L;
     while (pos < U && pb->pattern->events[pos].time < patrel_time_ppqn)
         pos++;
     pb->rel_time_samples = cbox_master_ppqn_to_samples(pb->master, pb->item_start_ppqn + time_ppqn) - pb->start_time_samples;
@@ -333,9 +333,9 @@ void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, int t
     pb->pos = pos;
 }
 
-void cbox_midi_clip_playback_seek_samples(struct cbox_midi_clip_playback *pb, int time_samples, int min_time_ppqn)
+void cbox_midi_clip_playback_seek_samples(struct cbox_midi_clip_playback *pb, uint32_t time_samples, uint32_t min_time_ppqn)
 {
-    int pos = 0;
+    uint32_t pos = 0;
     while (pos < pb->pattern->event_count && time_samples > cbox_master_ppqn_to_samples(pb->master, pb->item_start_ppqn + pb->pattern->events[pos].time - pb->offset_ppqn))
         pos++;
     pb->rel_time_samples = time_samples;
@@ -416,7 +416,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
         struct cbox_track_playback *old_trk = NULL;
         if (old_state && old_state->track_count)
         {
-            for (int i = 0; i < old_state->track_count; i++)
+            for (uint32_t i = 0; i < old_state->track_count; i++)
             {
                 if (cbox_uuid_equal(&old_state->tracks[i]->track_uuid, &CBOX_O2H(trk)->instance_uuid))
                 {
@@ -468,7 +468,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
 
 void cbox_song_playback_apply_old_state(struct cbox_song_playback *spb)
 {
-    for (int i = 0; i < spb->track_count; i++)
+    for (uint32_t i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *tpb = spb->tracks[i];
         tpb->spb = spb;
@@ -524,7 +524,7 @@ int cbox_song_playback_get_next_tempo_change(struct cbox_song_playback *spb)
     return spb->tempo_map_items[spb->tempo_map_pos + 1].time_samples;
 }
 
-void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, int nsamples)
+void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, uint32_t nsamples)
 {
     cbox_midi_buffer_clear(output);
     
@@ -534,7 +534,7 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
             cbox_song_playback_set_tempo(spb, spb->master->new_tempo);
         spb->master->new_tempo = 0;
     }
-    for(int i = 0; i < spb->track_count; i++)
+    for(uint32_t i = 0; i < spb->track_count; i++)
     {
         cbox_midi_buffer_clear(&spb->tracks[i]->output_buffer);
     }
@@ -546,25 +546,25 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
     else
     if (spb->master->state == CMTS_ROLLING)
     {                
-        int end_samples = cbox_master_ppqn_to_samples(spb->master, spb->loop_end_ppqn);
+        uint32_t end_samples = cbox_master_ppqn_to_samples(spb->master, spb->loop_end_ppqn);
         
-        int rpos = 0;
+        uint32_t rpos = 0;
         while (rpos < nsamples)
         {
-            int rend = nsamples;
+            uint32_t rend = nsamples;
             
             // 1. Shorten the period so that it doesn't go past a tempo change
             int tmpos = cbox_song_playback_get_next_tempo_change(spb);
             if (tmpos != -1)
             {
                 // Number of samples until the next tempo change
-                int stntc = tmpos - spb->song_pos_samples;
+                uint32_t stntc = tmpos - spb->song_pos_samples;
                 if (rend - rpos > stntc)
                     rend = rpos + stntc;
             }
             
             // 2. Shorten the period so that it doesn't go past the song length
-            int end_pos = spb->song_pos_samples + (rend - rpos);
+            uint32_t end_pos = spb->song_pos_samples + (rend - rpos);
             if (end_pos >= end_samples)
             {
                 rend = end_samples - spb->song_pos_samples;
@@ -573,7 +573,7 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
             
             if (rend > rpos)
             {
-                for (int i = 0; i < spb->track_count; i++)
+                for (uint32_t i = 0; i < spb->track_count; i++)
                     cbox_track_playback_render(spb->tracks[i], rpos, rend - rpos);
             }
             
@@ -604,7 +604,7 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
 
 int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf)
 {
-    for(int i = 0; i < spb->track_count; i++)
+    for(uint32_t i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *trk = spb->tracks[i];
         if (trk->state_copied)
@@ -618,7 +618,7 @@ int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, stru
 
 void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int min_time_ppqn)
 {
-    for(int i = 0; i < spb->track_count; i++)
+    for(uint32_t i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *trk = spb->tracks[i];
         cbox_track_playback_seek_ppqn(trk, time_ppqn, min_time_ppqn);
@@ -629,9 +629,9 @@ void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn,
     spb->tempo_map_pos = cbox_song_playback_tmi_from_ppqn(spb, time_ppqn);
 }
 
-void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_samples)
+void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, uint32_t time_samples)
 {
-    for(int i = 0; i < spb->track_count; i++)
+    for(uint32_t i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *trk = spb->tracks[i];
         cbox_track_playback_seek_samples(trk, time_samples);
@@ -642,7 +642,7 @@ void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_sa
     spb->tempo_map_pos = cbox_song_playback_tmi_from_samples(spb, time_samples);
 }
 
-int cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, int time_ppqn)
+int cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, uint32_t time_ppqn)
 {
     if (!spb->tempo_map_item_count)
         return -1;
@@ -657,7 +657,7 @@ int cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, int time_pp
     return spb->tempo_map_item_count - 1;
 }
 
-int cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, int time_samples)
+int cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, uint32_t time_samples)
 {
     if (!spb->tempo_map_item_count)
         return -1;
@@ -689,7 +689,7 @@ struct cbox_midi_pattern_playback *cbox_song_playback_get_pattern(struct cbox_so
 void cbox_song_playback_destroy(struct cbox_song_playback *spb)
 {
     cbox_midi_merger_close(&spb->track_merger, spb->engine->rt);
-    for (int i = 0; i < spb->track_count; i++)
+    for (uint32_t i = 0; i < spb->track_count; i++)
     {
         if (!(--spb->tracks[i]->ref_count))
             cbox_track_playback_destroy(spb->tracks[i]);

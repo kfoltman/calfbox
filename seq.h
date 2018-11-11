@@ -48,7 +48,7 @@ extern int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_act
 struct cbox_midi_pattern_playback
 {
     struct cbox_midi_event *events;
-    int event_count;
+    uint32_t event_count;
     int ref_count;
 };
 
@@ -64,19 +64,19 @@ struct cbox_midi_clip_playback
     struct cbox_midi_pattern_playback *pattern;
     struct cbox_master *master;
     
-    int pos;
+    uint32_t pos;
     int rel_time_samples;
     // [start, end) of the pattern slice
-    int start_time_samples, end_time_samples;
-    int item_start_ppqn, min_time_ppqn;
+    uint32_t start_time_samples, end_time_samples;
+    uint32_t item_start_ppqn, min_time_ppqn;
     int offset_ppqn;
     struct cbox_midi_playback_active_notes *active_notes;
 };
 
 extern void cbox_midi_clip_playback_init(struct cbox_midi_clip_playback *pb, struct cbox_midi_playback_active_notes *active_notes, struct cbox_master *master);
-extern void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, int offset, int nsamples);
-extern void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, int time_ppqn, int min_time_ppqn);
-extern void cbox_midi_clip_playback_seek_samples(struct cbox_midi_clip_playback *pb, int time_samples, int min_time_ppqn);
+extern void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, uint32_t offset, uint32_t nsamples);
+extern void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, uint32_t time_ppqn, uint32_t min_time_ppqn);
+extern void cbox_midi_clip_playback_seek_samples(struct cbox_midi_clip_playback *pb, uint32_t time_samples, uint32_t min_time_ppqn);
 extern void cbox_midi_clip_playback_set_pattern(struct cbox_midi_clip_playback *pb, struct cbox_midi_pattern_playback *pattern, int start_time_samples, int end_time_samples, int item_start_ppqn, int offset_ppqn);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,9 +96,9 @@ struct cbox_track_playback
     struct cbox_uuid track_uuid; // used as identification only
     struct cbox_track_playback_item *items;
     struct cbox_master *master;
-    int items_count;
-    int pos;
-    int generation; // of the original track
+    uint32_t items_count;
+    uint32_t pos;
+    uint32_t generation; // of the original track
     int ref_count;
     struct cbox_midi_buffer output_buffer;
     struct cbox_midi_clip_playback playback;
@@ -110,9 +110,9 @@ struct cbox_track_playback
 };
 
 extern struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master, struct cbox_song_playback *spb, struct cbox_track_playback *old_state);
-extern void cbox_track_playback_render(struct cbox_track_playback *pb, int offset, int nsamples);
-extern void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, int time_ppqn, int min_time_ppqn);
-extern void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, int time_samples);
+extern void cbox_track_playback_render(struct cbox_track_playback *pb, uint32_t offset, uint32_t nsamples);
+extern void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, uint32_t time_ppqn, uint32_t min_time_ppqn);
+extern void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, uint32_t time_samples);
 extern void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, int is_ppqn, int skip_this_pos);
 extern void cbox_track_playback_destroy(struct cbox_track_playback *pb);
 
@@ -146,7 +146,7 @@ struct cbox_adhoc_pattern
 };
 
 extern struct cbox_adhoc_pattern *cbox_adhoc_pattern_new(struct cbox_engine *engine, int id, struct cbox_midi_pattern *pattern);
-extern void cbox_adhoc_pattern_render(struct cbox_adhoc_pattern *adp, int offset, int nsamples);
+extern void cbox_adhoc_pattern_render(struct cbox_adhoc_pattern *adp, uint32_t offset, uint32_t nsamples);
 extern void cbox_adhoc_pattern_destroy(struct cbox_adhoc_pattern *ap);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +156,7 @@ struct cbox_song_playback
     struct cbox_master *master;
     struct cbox_song *song; // for identification only
     struct cbox_track_playback **tracks;
-    int track_count;
+    uint32_t track_count;
     struct cbox_tempo_map_item *tempo_map_items;
     int tempo_map_item_count;
     int tempo_map_pos;
@@ -168,12 +168,12 @@ struct cbox_song_playback
 };
 
 extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_engine *engine, struct cbox_song_playback *old_state);
-extern void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, int nsamples);
+extern void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, uint32_t nsamples);
 extern int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf);
 extern void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int skip_this_pos);
-extern void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, int time_samples);
-extern int cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, int time_ppqn);
-extern int cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, int time_samples);
+extern void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, uint32_t time_samples);
+extern int cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, uint32_t time_ppqn);
+extern int cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, uint32_t time_samples);
 struct cbox_midi_pattern_playback *cbox_song_playback_get_pattern(struct cbox_song_playback *spb, struct cbox_midi_pattern *pattern);
 extern void cbox_song_playback_apply_old_state(struct cbox_song_playback *spb);
 extern void cbox_song_playback_destroy(struct cbox_song_playback *spb);

@@ -34,15 +34,15 @@ struct fxchain_module
     struct cbox_module module;
 
     struct cbox_module **modules;
-    int module_count;
+    uint32_t module_count;
 };
 
-void fxchain_move(struct fxchain_module *m, int oldpos, int newpos)
+void fxchain_move(struct fxchain_module *m, unsigned int oldpos, unsigned int newpos)
 {
     if (oldpos == newpos)
         return;
     struct cbox_module **modules = malloc(sizeof(struct cbox_module *) * m->module_count);
-    for (int i = 0; i < m->module_count; i++)
+    for (uint32_t i = 0; i < m->module_count; i++)
     {
         int s;
         if (i == newpos)
@@ -70,7 +70,7 @@ gboolean fxchain_process_cmd(struct cbox_command_target *ct, struct cbox_command
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        for (int i = 0; i < m->module_count; i++)
+        for (uint32_t i = 0; i < m->module_count; i++)
         {
             gboolean res = FALSE;
             if (m->modules[i])
@@ -134,9 +134,8 @@ void fxchain_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     struct fxchain_module *m = module->user_data;
     
     float bufs[2][2][CBOX_BLOCK_SIZE];
-    int i;
-
-    for (i = 0; i < m->module_count; i++)
+    
+    for (uint32_t i = 0; i < m->module_count; i++)
     {
         float *input_bufs[2], *output_bufs[2];
         for (int c = 0; c < 2; c++)
@@ -160,7 +159,7 @@ void fxchain_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
 static void fxchain_destroyfunc(struct cbox_module *module)
 {
     struct fxchain_module *m = module->user_data;
-    for (int i = 0; i < m->module_count; i++)
+    for (uint32_t i = 0; i < m->module_count; i++)
     {
         CBOX_DELETE(m->modules[i]);
         m->modules[i] = NULL;

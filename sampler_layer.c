@@ -409,9 +409,9 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     }
     
     if (l->eff_loop_mode == slm_one_shot || l->eff_loop_mode == slm_no_loop || l->eff_loop_mode == slm_one_shot_chokeable)
-        l->loop_start = -1;
+        l->loop_start = SAMPLER_NO_LOOP;
 
-    if ((l->eff_loop_mode == slm_loop_continuous || l->eff_loop_mode == slm_loop_sustain) && l->loop_start == -1)
+    if ((l->eff_loop_mode == slm_loop_continuous || l->eff_loop_mode == slm_loop_sustain) && l->loop_start == SAMPLER_NO_LOOP)
         l->loop_start = 0;
     if ((l->eff_loop_mode == slm_loop_continuous || l->eff_loop_mode == slm_loop_sustain) && l->loop_start == 0 && l->eff_waveform && l->eff_waveform->has_loop)
         l->loop_start = l->eff_waveform->loop_start;

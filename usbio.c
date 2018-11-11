@@ -457,11 +457,11 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     // necessary to add support for the extra inputs (needs to be figured out)
     io->io_env.input_count = 2; //cbox_config_get_int("io", "inputs", 0);
     io->input_buffers = malloc(sizeof(float *) * io->io_env.input_count);
-    for (int i = 0; i < io->io_env.input_count; i++)
+    for (uint32_t i = 0; i < io->io_env.input_count; i++)
         io->input_buffers[i] = calloc(io->io_env.buffer_size, sizeof(float));
     io->io_env.output_count = 2; // cbox_config_get_int("io", "outputs", 2);
     io->output_buffers = malloc(sizeof(float *) * io->io_env.output_count);
-    for (int i = 0; i < io->io_env.output_count; i++)
+    for (uint32_t i = 0; i < io->io_env.output_count; i++)
         io->output_buffers[i] = calloc(io->io_env.buffer_size, sizeof(float));
     io->impl = &uii->ioi;
     cbox_command_target_init(&io->cmd_target, cbox_usb_io_process_cmd, uii);

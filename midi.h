@@ -64,7 +64,7 @@ static inline void cbox_midi_buffer_copy(struct cbox_midi_buffer *dst, const str
     memcpy(dst->events, src->events, src->count * sizeof(struct cbox_midi_event));
     memcpy(dst->long_data, src->long_data, src->long_data_size);
     // for any long events, update data pointers
-    for (int i = 0; i < src->count; i++)
+    for (uint32_t i = 0; i < src->count; i++)
     {
         if (dst->events[i].size > 4)
             dst->events[i].data_ext += &dst->long_data[0] - &src->long_data[0];

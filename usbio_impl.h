@@ -77,8 +77,9 @@ struct cbox_usb_io_impl
 
     unsigned int playback_buffers;
     unsigned int sync_buffers;
-    int playback_counter;
-    int sync_counter;
+    unsigned int playback_counter;
+    unsigned int sync_counter;
+    unsigned int device_removed;
     enum usb_sync_protocol_type sync_protocol;
 
     unsigned int iso_packets, iso_packets_multimix;
@@ -88,7 +89,6 @@ struct cbox_usb_io_impl
     
     int desync;
     uint64_t samples_played;
-    int device_removed;
     struct usbio_transfer **playback_transfers;
     struct usbio_transfer **sync_transfers;
     int read_ptr;

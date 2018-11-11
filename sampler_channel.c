@@ -356,7 +356,7 @@ void sampler_channel_program_change(struct sampler_channel *c, int program)
 {
     struct sampler_module *m = c->module;
     // XXXKF replace with something more efficient
-    for (int i = 0; i < m->program_count; i++)
+    for (uint32_t i = 0; i < m->program_count; i++)
     {
         // XXXKF support banks
         if (m->programs[i]->prog_no == program)

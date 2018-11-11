@@ -49,7 +49,7 @@ gboolean cbox_execute_on_v(struct cbox_command_target *ct, struct cbox_command_t
     struct cbox_osc_command cmd;
     uint8_t *extra_data;
     // XXXKF might be not good enough for weird platforms
-    int unit_size = sizeof(double);
+    uint32_t unit_size = sizeof(double);
     // this must be a power of 2 to guarantee proper alignment
     assert(unit_size >= sizeof(int) && (unit_size == 4 || unit_size == 8));
     cmd.command = cmd_name;

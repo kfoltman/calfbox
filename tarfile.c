@@ -246,7 +246,7 @@ sf_count_t tarfile_seek(sf_count_t offset, int whence, void *user_data)
     }
     if (((int64_t)ss->filepos) < 0)
         ss->filepos = 0;
-    if (((int64_t)ss->filepos) >= ss->item->size)
+    if (((int64_t)ss->filepos) >= (int64_t)ss->item->size)
         ss->filepos = ss->item->size;
     return ss->filepos;
 }

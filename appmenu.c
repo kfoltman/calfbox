@@ -170,7 +170,7 @@ struct cbox_menu *create_scene_menu(struct cbox_menu_item_menu *item, void *menu
 static struct cbox_command_target *find_module_target(const char *type, GError **error)
 {
     struct cbox_scene *scene = app.engine->scenes[0];
-    for (int i = 0; i < scene->instrument_count; i++)
+    for (uint32_t i = 0; i < scene->instrument_count; i++)
     {
         if (!strcmp(scene->instruments[i]->module->engine_name, type))
             return &scene->instruments[i]->module->cmd_target;
@@ -261,7 +261,7 @@ struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *men
     glob_t g;
     if (glob("*.wav", GLOB_TILDE_CHECK, NULL, &g) == 0)
     {
-        for (int i = 0; i < g.gl_pathc; i++)
+        for (size_t i = 0; i < g.gl_pathc; i++)
         {
             cbox_menu_add_item(menu, cbox_menu_item_new_command(g_strdup_printf("Load: %s", g.gl_pathv[i]), cmd_stream_load, g_strdup(g.gl_pathv[i])));
         }

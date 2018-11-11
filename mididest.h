@@ -29,7 +29,7 @@ struct cbox_midi_source
 {
     struct cbox_midi_source *next;
     struct cbox_midi_buffer *data;
-    int bpos;
+    uint32_t bpos;
     gboolean streaming;
     struct cbox_midi_merger **merger_ptr;
 };

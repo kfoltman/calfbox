@@ -255,7 +255,7 @@ static inline uint32_t process_voice_noloop(struct sampler_gen *v, struct resamp
     if (__builtin_expect(v->bigpos + (out_frames - 1) * v->bigdelta >= sample_end64, 0))
         out_frames = (sample_end64 - v->bigpos) / v->bigdelta + 1;
     
-    assert(out_frames > 0 && out_frames <= CBOX_BLOCK_SIZE - rs->offset);
+    assert(out_frames > 0 && out_frames <= (uint32_t)(CBOX_BLOCK_SIZE - rs->offset));
     uint32_t oldpos = v->bigpos >> 32;
     if (v->mode == spt_stereo16)
         process_voice_stereo_noloop(v, rs, srcdata - (pos_offset << 1), rs->offset + out_frames);
@@ -435,7 +435,7 @@ uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *leftright, ui
         v->virtpos += written * v->virtdelta;
         if (v->virtpos != v->bigpos)
         {
-            while ((v->virtpos >> 32) >= v->loop_end && v->loop_start != -1)
+            while ((v->virtpos >> 32) >= v->loop_end && v->loop_start != SAMPLER_NO_LOOP)
                 v->virtpos -= ((uint64_t)(v->loop_end - v->loop_start)) << 32;
         }
         // XXXKF looping
@@ -446,7 +446,7 @@ uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *leftright, ui
             if (newpos < 0)
                 newpos = 0;
             // XXXKF beware of extremely short loops
-            while ((newpos >> 32) >= v->loop_end && v->loop_start != -1)
+            while ((newpos >> 32) >= v->loop_end && v->loop_start != SAMPLER_NO_LOOP)
                 newpos -= ((uint64_t)(v->loop_end - v->loop_start)) << 32;
             if ((newpos >> 32) >= v->cur_sample_end - 4)
                 newpos = ((uint64_t)v->cur_sample_end - 4)<< 32;
@@ -471,7 +471,7 @@ uint32_t sampler_gen_sample_playback(struct sampler_gen *v, float *leftright, ui
             uint32_t written2 = rs.offset;
             
             // XXXKF not the best set of special cases
-            int i;
+            uint32_t i;
             if (written2 > written)
             {
                 for (i = 2 * written; i < 2 * written2; i += 2)

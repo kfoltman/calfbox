@@ -46,7 +46,7 @@ struct cbox_recording_source
     struct cbox_scene *scene;
     
     struct cbox_recorder **handlers;
-    int handler_count;
+    uint32_t handler_count;
     uint32_t max_numsamples;
     int channels;
 };

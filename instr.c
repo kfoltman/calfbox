@@ -84,7 +84,7 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
                 cbox_aux_bus_unref(old_bus);
             return TRUE;            
         }
-        for (int i = 0; i < scene->aux_bus_count; i++)
+        for (uint32_t i = 0; i < scene->aux_bus_count; i++)
         {
             if (!scene->aux_buses[i])
                 continue;
@@ -133,7 +133,7 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
     {
         if (!subcommand)
             return FALSE;
-        if (index < 1 || index > 1 + instr->module->aux_offset)
+        if (index < 1 || index > (int)(1 + instr->module->aux_offset))
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d)", index, instr->module->aux_offset);
             return FALSE;
@@ -169,7 +169,7 @@ gboolean cbox_instrument_process_cmd(struct cbox_command_target *ct, struct cbox
             return FALSE;
         int dstpos = CBOX_ARG_I(cmd, 1) - 1;
         
-        if (dstpos < 0 || dstpos > new_scene->layer_count)
+        if (dstpos < 0 || (uint32_t)dstpos > new_scene->layer_count)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", dstpos + 1, 1 + new_scene->layer_count);
             return FALSE;
@@ -191,12 +191,12 @@ void cbox_instrument_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_instrument *instrument = CBOX_H2O(objhdr);
     assert(instrument->refcount == 0);
-    for (int i = 0; i < instrument->module->outputs / 2; i ++)
+    for (uint32_t i = 0; i < (uint32_t)instrument->module->outputs; i ++)
     {
         cbox_instrument_output_uninit(&instrument->outputs[i]);
     }
     free(instrument->outputs);
-    for (int i = 0; i < instrument->aux_output_count; i++)
+    for (uint32_t i = 0; i < instrument->aux_output_count; i++)
     {
         g_free(instrument->aux_output_names[i]);
     }
@@ -208,7 +208,7 @@ void cbox_instrument_destroyfunc(struct cbox_objhdr *objhdr)
 
 void cbox_instrument_unref_aux_buses(struct cbox_instrument *instrument)
 {
-    for (int j = 0; j < instrument->aux_output_count; j++)
+    for (uint32_t j = 0; j < instrument->aux_output_count; j++)
     {
         if (instrument->aux_outputs[j])
             cbox_aux_bus_unref(instrument->aux_outputs[j]);
@@ -217,7 +217,7 @@ void cbox_instrument_unref_aux_buses(struct cbox_instrument *instrument)
 
 void cbox_instrument_disconnect_aux_bus(struct cbox_instrument *instrument, struct cbox_aux_bus *bus)
 {
-    for (int j = 0; j < instrument->aux_output_count; j++)
+    for (uint32_t j = 0; j < instrument->aux_output_count; j++)
     {
         if (instrument->aux_outputs[j] == bus)
         {

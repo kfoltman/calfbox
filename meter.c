@@ -49,7 +49,7 @@ void cbox_meter_record_block(struct cbox_recorder *handler, const float **buffer
     {
         float peak = m->peak[c];
         float volume = m->volume[c];
-        for (int i = 0; i < numsamples; i++)
+        for (uint32_t i = 0; i < numsamples; i++)
         {
             float s = buffers[c][i];
             if (fabs(s) > peak)

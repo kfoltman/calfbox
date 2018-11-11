@@ -145,14 +145,14 @@ static int process_cb(jack_nframes_t nframes, void *arg)
     struct cbox_io_callbacks *cb = io->cb;
 
     io->io_env.buffer_size = nframes;
-    for (int i = 0; i < io->io_env.input_count; i++)
+    for (uint32_t i = 0; i < io->io_env.input_count; i++)
         io->input_buffers[i] = jack_port_get_buffer(jii->inputs[i], nframes);
-    for (int i = 0; i < io->io_env.output_count; i++)
+    for (uint32_t i = 0; i < io->io_env.output_count; i++)
     {
         io->output_buffers[i] = jack_port_get_buffer(jii->outputs[i], nframes);
         if (!io->output_buffers[i])
             continue;
-        for (int j = 0; j < nframes; j ++)
+        for (uint32_t j = 0; j < nframes; j ++)
             io->output_buffers[i][j] = 0.f;
     }
     if (cb->on_transport_sync || (jii->external_tempo && cb->on_tempo_sync)) {
@@ -199,9 +199,9 @@ static int process_cb(jack_nframes_t nframes, void *arg)
             cbox_midi_buffer_clear(&input->hdr.buffer);
     }
     cb->process(cb->user_data, io, nframes);
-    for (int i = 0; i < io->io_env.input_count; i++)
+    for (uint32_t i = 0; i < io->io_env.input_count; i++)
         io->input_buffers[i] = NULL;
-    for (int i = 0; i < io->io_env.output_count; i++)
+    for (uint32_t i = 0; i < io->io_env.output_count; i++)
         io->output_buffers[i] = NULL;
     for (GSList *p = io->midi_outputs; p; p = g_slist_next(p))
     {
@@ -214,7 +214,7 @@ static int process_cb(jack_nframes_t nframes, void *arg)
         if (midiout->hdr.buffer.count)
         {
             uint8_t tmp_data[4];
-            for (int i = 0; i < midiout->hdr.buffer.count; i++)
+            for (uint32_t i = 0; i < midiout->hdr.buffer.count; i++)
             {
                 const struct cbox_midi_event *event = cbox_midi_buffer_get_event(&midiout->hdr.buffer, i);
                 const uint8_t *pdata = cbox_midi_event_get_data(event);
@@ -358,7 +358,7 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
 {
     struct cbox_io *io = jii->ioi.pio;
 
-    for (int i = 0; i < io->io_env.output_count; i++)
+    for (uint32_t i = 0; i < io->io_env.output_count; i++)
     {
         gchar *cbox_port = g_strdup_printf("%s:out_%d", jii->client_name, 1 + i);
         gchar *config_key = g_strdup_printf("out_%d", 1 + i);
@@ -366,7 +366,7 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
         g_free(cbox_port);
         g_free(config_key);
     }
-    for (int i = 0; i < io->io_env.input_count; i++)
+    for (uint32_t i = 0; i < io->io_env.input_count; i++)
     {
         gchar *cbox_port = g_strdup_printf("%s:in_%d", jii->client_name, 1 + i);
         gchar *config_key = g_strdup_printf("in_%d", 1 + i);
@@ -526,10 +526,10 @@ void cbox_jackio_destroy(struct cbox_io_impl *impl)
         }
         else
         {
-            for (int i = 0; i < io->io_env.input_count; i++)
+            for (uint32_t i = 0; i < io->io_env.input_count; i++)
                 jack_port_unregister(jii->client, jii->inputs[i]);
             free(jii->inputs);
-            for (int i = 0; i < io->io_env.output_count; i++)
+            for (uint32_t i = 0; i < io->io_env.output_count; i++)
                 jack_port_unregister(jii->client, jii->outputs[i]);
             free(jii->outputs);
             if (jii->midi)
@@ -1019,11 +1019,11 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
 
     jii->inputs = malloc(sizeof(jack_port_t *) * io->io_env.input_count);
     jii->outputs = malloc(sizeof(jack_port_t *) * io->io_env.output_count);
-    for (int i = 0; i < io->io_env.input_count; i++)
+    for (uint32_t i = 0; i < io->io_env.input_count; i++)
         jii->inputs[i] = NULL;
-    for (int i = 0; i < io->io_env.output_count; i++)
+    for (uint32_t i = 0; i < io->io_env.output_count; i++)
         jii->outputs[i] = NULL;
-    for (int i = 0; i < io->io_env.input_count; i++)
+    for (uint32_t i = 0; i < io->io_env.input_count; i++)
     {
         gchar *name = g_strdup_printf("in_%d", 1 + i);
         jii->inputs[i] = jack_port_register(jii->client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
@@ -1035,7 +1035,7 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
         }
         g_free(name);
     }
-    for (int i = 0; i < io->io_env.output_count; i++)
+    for (uint32_t i = 0; i < io->io_env.output_count; i++)
     {
         gchar *name = g_strdup_printf("out_%d", 1 + i);
         jii->outputs[i] = jack_port_register(jii->client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
@@ -1069,13 +1069,13 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
 cleanup:
     if (jii->inputs)
     {
-        for (int i = 0; i < io->io_env.input_count; i++)
+        for (uint32_t i = 0; i < io->io_env.input_count; i++)
             free(jii->inputs[i]);
         free(jii->inputs);
     }
     if (jii->outputs)
     {
-        for (int i = 0; i < io->io_env.output_count; i++)
+        for (uint32_t i = 0; i < io->io_env.output_count; i++)
             free(jii->outputs[i]);
         free(jii->outputs);
     }

@@ -168,10 +168,10 @@ static void fill_playback_buffer(struct cbox_usb_io_impl *uii, struct libusb_tra
     uint8_t *data8 = (uint8_t*)transfer->buffer;
     int16_t *data = (int16_t*)transfer->buffer;
     int resolution = uii->output_resolution;
-    int oc = uii->output_channels;
-    int rptr = uii->read_ptr;
-    int nframes = transfer->length / (resolution * oc);
-    int i, j, b;
+    unsigned int oc = uii->output_channels;
+    uint32_t rptr = uii->read_ptr;
+    uint32_t nframes = transfer->length / (resolution * oc);
+    uint32_t i, b, j;
 
     for (i = 0; i < nframes; )
     {
@@ -180,8 +180,8 @@ static void fill_playback_buffer(struct cbox_usb_io_impl *uii, struct libusb_tra
             calc_output_buffer(uii);
             rptr = 0;
         }
-        int left1 = nframes - i;
-        int left2 = buffer_size - rptr;
+        unsigned int left1 = nframes - i;
+        unsigned int left2 = buffer_size - rptr;
         if (left1 > left2)
             left1 = left2;
 
@@ -262,7 +262,7 @@ static void play_callback_adaptive(struct libusb_transfer *transfer)
             printf("ISO error: index = %d i = %d status = %d\n", (int)xf->index, i, transfer->iso_packet_desc[i].status);
     }
     uii->samples_played += olen / (oc * resolution);
-    int nsamps = uii->sample_rate / 1000;
+    uint32_t nsamps = uii->sample_rate / 1000;
     // If time elapsed is greater than 
     int lag = uii->desync / (1000 * transfer->num_iso_packets);
     if (lag > 0 && nsamps < uii->audio_output_pktsize)
@@ -633,7 +633,7 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
     else
     {
         // Cancel all transfers pending, and wait until they get cancelled
-        for (int i = 0; i < uii->playback_counter; i++)
+        for (unsigned int i = 0; i < uii->playback_counter; i++)
         {
             if (uii->playback_transfers[i])
                 usbio_transfer_shutdown(uii->playback_transfers[i]);
@@ -642,7 +642,7 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
     
     // Free the transfers for the buffers allocated so far. In case of setup
     // failure, some buffers transfers might not have been created yet.
-    for (int i = 0; i < uii->playback_counter; i++)
+    for (unsigned int i = 0; i < uii->playback_counter; i++)
     {
         if (uii->playback_transfers[i])
         {
@@ -653,12 +653,12 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
     }
     if (uii->playback_counter && uii->audio_sync_endpoint)
     {
-        for (int i = 0; i < uii->sync_counter; i++)
+        for (unsigned int i = 0; i < uii->sync_counter; i++)
         {
             if (uii->sync_transfers[i])
                 usbio_transfer_shutdown(uii->sync_transfers[i]);
         }
-        for (int i = 0; i < uii->sync_counter; i++)
+        for (unsigned int i = 0; i < uii->sync_counter; i++)
         {
             if (uii->sync_transfers[i])
             {

@@ -47,7 +47,7 @@ GQuark cbox_stream_player_error_quark(void)
 }
 
 #define CUE_BUFFER_SIZE 16000
-#define PREFETCH_THRESHOLD (CUE_BUFFER_SIZE / 4)
+#define PREFETCH_THRESHOLD ((uint32_t)(CUE_BUFFER_SIZE / 4))
 #define MAX_READAHEAD_BUFFERS 3
 
 #define NO_SAMPLE_LOOP ((uint64_t)-1ULL)
@@ -383,14 +383,14 @@ void stream_player_process_block(struct cbox_module *module, cbox_sample_t **inp
         uint32_t data_left = data_end - ss->readptr;
         
         // If we're close to running out of space, prefetch the next bit
-        if (data_left < PREFETCH_THRESHOLD && data_end < ss->info.frames)
+        if (data_left < PREFETCH_THRESHOLD && data_end < (uint64_t)ss->info.frames)
             request_next(ss, data_end);
         
         float *data = ss->pcp_current->data;
         uint32_t pos = ss->readptr - ss->pcp_current->position;
         uint32_t count = data_end - ss->readptr;
-        if (count > CBOX_BLOCK_SIZE - optr)
-            count = CBOX_BLOCK_SIZE - optr;
+        if (count > (uint32_t)(CBOX_BLOCK_SIZE - optr))
+            count = (uint32_t)(CBOX_BLOCK_SIZE - optr);
         
         // printf("Copy samples: copying %d, optr %d, %lld = %d @ [%lld - %lld], left %d\n", count, optr, (long long)m->readptr, pos, (long long)m->pcp_current->position, (long long)data_end, (int)data_left);
         copy_samples(ss, outputs, data, count, optr, pos);

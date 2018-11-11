@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct cbox_io_env
 {
     int srate;
-    int buffer_size;    
-    int input_count, output_count;
+    uint32_t buffer_size;    
+    uint32_t input_count, output_count;
 };
 
 static inline void cbox_io_env_clear(struct cbox_io_env *env)

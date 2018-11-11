@@ -35,7 +35,7 @@ struct cbox_adhoc_pattern *cbox_adhoc_pattern_new(struct cbox_engine *engine, in
     return ap;
 }
 
-void cbox_adhoc_pattern_render(struct cbox_adhoc_pattern *ap, int offset, int nsamples)
+void cbox_adhoc_pattern_render(struct cbox_adhoc_pattern *ap, uint32_t offset, uint32_t nsamples)
 {
     if (ap->completed)
     {

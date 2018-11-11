@@ -83,7 +83,7 @@ void cbox_prefetch_pipe_fetch(struct cbox_prefetch_pipe *pipe)
                 pipe->write_ptr %= pipe->buffer_loop_end;
         }
         //
-        if (supply >= pipe->buffer_loop_end)
+        if ((uint32_t)supply >= pipe->buffer_loop_end)
             return;
         
         // How many frames to read to fill the full prefetch size

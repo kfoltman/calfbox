@@ -57,7 +57,7 @@ void sampler_steal_voice(struct sampler_module *m)
             if (v->amp_env.cur_stage == 15)
                 continue;
             int age = m->serial_no - v->serial_no;
-            if (v->gen.loop_start == -1)
+            if (v->gen.loop_start == (uint32_t)-1)
                 age += (int)((v->gen.bigpos >> 32) * 100.0 / v->gen.cur_sample_end);
             else
             if (v->released)
@@ -179,7 +179,7 @@ static int get_first_free_program_no(struct sampler_module *m)
     do {
         prog_no++;
         found = FALSE;
-        for (int i = 0; i < m->program_count; i++)
+        for (uint32_t i = 0; i < m->program_count; i++)
         {
             if (m->programs[i]->prog_no == prog_no)
             {
@@ -194,7 +194,7 @@ static int get_first_free_program_no(struct sampler_module *m)
 
 static int find_program(struct sampler_module *m, int prog_no)
 {
-    for (int i = 0; i < m->program_count; i++)
+    for (uint32_t i = 0; i < m->program_count; i++)
     {
         if (m->programs[i]->prog_no == prog_no)
             return i;
@@ -284,7 +284,7 @@ void sampler_register_program(struct sampler_module *m, struct sampler_program *
     memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
     programs[m->program_count] = pgm;
     free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));
-    if (m->program_count == 1)
+    if (m->program_count == 1U)
         select_initial_program(m);
 }
 
@@ -313,7 +313,7 @@ void sampler_unselect_program(struct sampler_module *m, struct sampler_program *
     // Ensure no new notes are played on that program
     prg->deleting = TRUE;
     // Remove from the list of available programs, so that it cannot be selected again
-    for (int i = 0; i < m->program_count; i++)
+    for (uint32_t i = 0; i < m->program_count; i++)
     {
         if (m->programs[i] == prg)
             swap_program(m, i, NULL, FALSE);
@@ -387,7 +387,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        for (int i = 0; i < m->program_count; i++)
+        for (uint32_t i = 0; i < m->program_count; i++)
         {
             struct sampler_program *prog = m->programs[i];
             if (!cbox_execute_on(fb, NULL, "/patch", "isoi", error, prog->prog_no, prog->name, prog, prog->in_use))
@@ -416,7 +416,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         }
         int value = CBOX_ARG_I(cmd, 1);
         struct sampler_program *pgm = NULL;
-        for (int i = 0; i < m->program_count; i++)
+        for (uint32_t i = 0; i < m->program_count; i++)
         {
             if (m->programs[i]->prog_no == value)
             {
@@ -485,7 +485,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
 
 gboolean sampler_select_program(struct sampler_module *m, int channel, const gchar *preset, GError **error)
 {
-    for (int i = 0; i < m->program_count; i++)
+    for (uint32_t i = 0; i < m->program_count; i++)
     {
         if (!strcmp(m->programs[i]->name, preset))
         {
@@ -571,7 +571,7 @@ MODULE_CREATE_FUNCTION(sampler)
     }
     m->programs = calloc(m->program_count, sizeof(struct sampler_program *));
     int success = 1;
-    for (i = 0; i < m->program_count; i++)
+    for (i = 0; i < (int)m->program_count; i++)
     {
         gchar *s = g_strdup_printf("program%d", i);
         char *pgm_section = NULL;
@@ -644,7 +644,7 @@ MODULE_CREATE_FUNCTION(sampler)
 void sampler_destroyfunc(struct cbox_module *module)
 {
     struct sampler_module *m = (struct sampler_module *)module;
-    int i;
+    uint32_t i;
     m->deleting = TRUE;
     
     for (i = 0; i < m->program_count;)
@@ -654,7 +654,7 @@ void sampler_destroyfunc(struct cbox_module *module)
         else
             i++;
     }
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < 16U; i++)
     {
         assert (m->channels[i].voices_running == NULL);
     }

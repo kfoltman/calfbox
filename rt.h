@@ -77,11 +77,11 @@ extern void cbox_rt_execute_cmd_sync(struct cbox_rt *rt, struct cbox_rt_cmd_defi
 extern int cbox_rt_execute_cmd_async(struct cbox_rt *rt, struct cbox_rt_cmd_definition *cmd, void *user_data);
 extern void *cbox_rt_swap_pointers(struct cbox_rt *rt, void **ptr, void *new_value);
 extern void cbox_rt_swap_pointers_into(struct cbox_rt *rt, void **ptr, void *new_value, void **old_value_ptr);
-extern void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, void *new_value, int *pcount, int new_count);
+extern void *cbox_rt_swap_pointers_and_update_count(struct cbox_rt *rt, void **ptr, void *new_value, uint32_t *pcount, uint32_t new_count);
 
-extern void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, int *pcount, int index, void *new_value);
-extern void *cbox_rt_array_remove(struct cbox_rt *rt, void ***ptr, int *pcount, int index);
-extern gboolean cbox_rt_array_remove_by_value(struct cbox_rt *rt, void ***ptr, int *pcount, void *value_to_remove);
+extern void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, uint32_t *pcount, int index, void *new_value);
+extern void *cbox_rt_array_remove(struct cbox_rt *rt, void ***ptr, uint32_t *pcount, int index);
+extern gboolean cbox_rt_array_remove_by_value(struct cbox_rt *rt, void ***ptr, uint32_t *pcount, void *value_to_remove);
 extern struct cbox_midi_merger *cbox_rt_get_midi_output(struct cbox_rt *rt, struct cbox_uuid *uuid);
 
 ///////////////////////////////////////////////////////////////////////////////

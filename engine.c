@@ -105,7 +105,7 @@ static gboolean cbox_engine_process_cmd(struct cbox_command_target *ct, struct c
     struct cbox_engine *engine = ct->user_data;
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
-        for (int i = 0; i < engine->scene_count; i++)
+        for (uint32_t i = 0; i < engine->scene_count; i++)
         {
             if (!cbox_execute_on(fb, NULL, "/scene", "o", error, engine->scenes[i]))
                 return FALSE;
@@ -192,7 +192,7 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
     if (engine->spb)
         cbox_song_playback_render(engine->spb, &engine->midibuf_song, nframes);
     
-    for (int i = 0; i < engine->scene_count; i++)
+    for (uint32_t i = 0; i < engine->scene_count; i++)
         cbox_scene_render(engine->scenes[i], nframes, output_buffers, output_channels);
     
     // Process "master" effect
@@ -313,7 +313,7 @@ void cbox_engine_update_song_playback(struct cbox_engine *engine)
 
 void cbox_engine_update_input_connections(struct cbox_engine *engine)
 {
-    for (int i = 0; i < engine->scene_count; i++)
+    for (uint32_t i = 0; i < engine->scene_count; i++)
         cbox_scene_update_connected_inputs(engine->scenes[i]);
 }
 
@@ -327,7 +327,7 @@ void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_mer
         cbox_midi_merger_push(merger, buffer, engine->rt);
     else
     {
-        for (int i = 0; i < engine->scene_count; i++)
+        for (uint32_t i = 0; i < engine->scene_count; i++)
             cbox_midi_merger_push(&engine->scenes[i]->scene_input_merger, buffer, engine->rt);
         if (!engine->rt || !engine->rt->io)
             return;

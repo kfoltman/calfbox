@@ -223,7 +223,7 @@ gboolean cbox_track_item_process_cmd(struct cbox_command_target *ct, struct cbox
     }
     if (!strcmp(cmd->command, "/length") && !strcmp(cmd->arg_types, "i"))
     {
-        if (CBOX_ARG_I(cmd, 0) == trki->length) // no-op
+        if (CBOX_ARG_I(cmd, 0) == (int)trki->length) // no-op
             return TRUE;
         trki->length = CBOX_ARG_I(cmd, 0);
         cbox_track_item_set_dirty(trki);
@@ -231,7 +231,7 @@ gboolean cbox_track_item_process_cmd(struct cbox_command_target *ct, struct cbox
     }
     if (!strcmp(cmd->command, "/pos") && !strcmp(cmd->arg_types, "i"))
     {
-        if (CBOX_ARG_I(cmd, 0) == trki->time) // no-op
+        if (CBOX_ARG_I(cmd, 0) == (int)trki->time) // no-op
             return TRUE;
         trki->owner->items = g_list_remove(trki->owner->items, trki);
         trki->time = CBOX_ARG_I(cmd, 0);
@@ -241,7 +241,7 @@ gboolean cbox_track_item_process_cmd(struct cbox_command_target *ct, struct cbox
     }
     if (!strcmp(cmd->command, "/offset") && !strcmp(cmd->arg_types, "i"))
     {
-        if (CBOX_ARG_I(cmd, 0) == trki->offset) // no-op
+        if (CBOX_ARG_I(cmd, 0) == (int)trki->offset) // no-op
             return TRUE;
         cbox_track_item_set_dirty(trki);
         trki->offset = CBOX_ARG_I(cmd, 0);

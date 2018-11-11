@@ -70,7 +70,7 @@ extern void cbox_master_seek_ppqn(struct cbox_master *master, uint32_t pos_ppqn)
 extern void cbox_master_seek_samples(struct cbox_master *master, uint32_t pos_samples);
 extern void cbox_master_destroy(struct cbox_master *master);
 
-int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn);
-int cbox_master_samples_to_ppqn(struct cbox_master *master, int time_samples);
+uint32_t cbox_master_ppqn_to_samples(struct cbox_master *master, uint32_t time_ppqn);
+uint32_t cbox_master_samples_to_ppqn(struct cbox_master *master, uint32_t time_samples);
 
 #endif

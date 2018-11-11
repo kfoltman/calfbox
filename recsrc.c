@@ -48,7 +48,7 @@ gboolean cbox_recording_source_attach(struct cbox_recording_source *src, struct 
 int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_recorder *rec, GError **error)
 {
     int index = -1;
-    for (int i = 0; i < src->handler_count; i++)
+    for (uint32_t i = 0; i < src->handler_count; i++)
     {
         if (src->handlers[i] == rec)
         {
@@ -72,7 +72,7 @@ int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_
 
 void cbox_recording_source_push(struct cbox_recording_source *src, const float **buffers, uint32_t numsamples)
 {
-    for (int i = 0; i < src->handler_count; i++)
+    for (uint32_t i = 0; i < src->handler_count; i++)
         src->handlers[i]->record_block(src->handlers[i], buffers, numsamples);
 }
 
@@ -90,7 +90,7 @@ gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struc
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         
-        for (int i = 0; i < src->handler_count; i++)
+        for (uint32_t i = 0; i < src->handler_count; i++)
         {
             if (!cbox_execute_on(fb, NULL, "/handler", "o", error, src->handlers[i]))
                 return FALSE;            

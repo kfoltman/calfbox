@@ -38,7 +38,7 @@ CBOX_CLASS_DEFINITION_ROOT(cbox_scene)
 static gboolean cbox_scene_addlayercmd(struct cbox_scene *s, struct cbox_command_target *fb, struct cbox_osc_command *cmd, int cmd_type, GError **error)
 {
     int pos = CBOX_ARG_I(cmd, 0);
-    if (pos < 0 || pos > 1 + s->layer_count)
+    if (pos < 0 || pos > (int)(1 + s->layer_count))
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for append)", pos, 1 + s->layer_count);
         return FALSE;
@@ -122,7 +122,7 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     else if (!strcmp(cmd->command, "/delete_layer") && !strcmp(cmd->arg_types, "i"))
     {
         int pos = CBOX_ARG_I(cmd, 0);
-        if (pos < 0 || pos > s->layer_count)
+        if (pos < 0 || pos > (int)s->layer_count)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d or 0 for last)", pos, s->layer_count);
             return FALSE;
@@ -138,13 +138,13 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     else if (!strcmp(cmd->command, "/move_layer") && !strcmp(cmd->arg_types, "ii"))
     {
         int oldpos = CBOX_ARG_I(cmd, 0);
-        if (oldpos < 1 || oldpos > s->layer_count)
+        if (oldpos < 1 || oldpos > (int)s->layer_count)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d)", oldpos, s->layer_count);
             return FALSE;
         }
         int newpos = CBOX_ARG_I(cmd, 1);
-        if (newpos < 1 || newpos > s->layer_count)
+        if (newpos < 1 || newpos > (int)s->layer_count)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid position %d (valid are 1..%d)", newpos, s->layer_count);
             return FALSE;
@@ -232,17 +232,17 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
             !CBOX_OBJECT_DEFAULT_STATUS(s, fb, error))
             return FALSE;
         
-        for (int i = 0; i < s->layer_count; i++)
+        for (uint32_t i = 0; i < s->layer_count; i++)
         {
             if (!cbox_execute_on(fb, NULL, "/layer", "o", error, s->layers[i]))
                 return FALSE;
         }
-        for (int i = 0; i < s->instrument_count; i++)
+        for (uint32_t i = 0; i < s->instrument_count; i++)
         {
             if (!cbox_execute_on(fb, NULL, "/instrument", "sso", error, s->instruments[i]->module->instance_name, s->instruments[i]->module->engine_name, s->instruments[i]))
                 return FALSE;
         }
-        for (int i = 0; i < s->aux_bus_count; i++)
+        for (uint32_t i = 0; i < s->aux_bus_count; i++)
         {
             if (!cbox_execute_on(fb, NULL, "/aux", "so", error, s->aux_buses[i]->name, s->aux_buses[i]))
                 return FALSE;
@@ -361,7 +361,7 @@ error:
 
 gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *layer, int pos, GError **error)
 {
-    int i;
+    uint32_t i;
     
     struct cbox_instrument *instrument = layer->instrument;
     
@@ -405,12 +405,12 @@ struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos)
     return removed;
 }
 
-void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newpos)
+void cbox_scene_move_layer(struct cbox_scene *scene, unsigned int oldpos, unsigned int newpos)
 {
     if (oldpos == newpos)
         return;
     struct cbox_layer **layers = malloc(sizeof(struct cbox_layer *) * scene->layer_count);
-    for (int i = 0; i < scene->layer_count; i++)
+    for (uint32_t i = 0; i < scene->layer_count; i++)
     {
         int s;
         if (i == newpos)
@@ -430,8 +430,7 @@ void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newpos)
 gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument)
 {
     assert(instrument->scene == scene);
-    int pos;
-    for (pos = 0; pos < scene->instrument_count; pos++)
+    for (uint32_t pos = 0; pos < scene->instrument_count; pos++)
     {
         if (scene->instruments[pos] == instrument)
         {
@@ -456,7 +455,7 @@ gboolean cbox_scene_insert_aux_bus(struct cbox_scene *scene, struct cbox_aux_bus
 void cbox_scene_remove_aux_bus(struct cbox_scene *scene, struct cbox_aux_bus *removed)
 {
     int pos = -1;
-    for (int i = 0; i < scene->aux_bus_count; i++)
+    for (uint32_t i = 0; i < scene->aux_bus_count; i++)
     {
         if (scene->aux_buses[i] == removed)
         {
@@ -465,7 +464,7 @@ void cbox_scene_remove_aux_bus(struct cbox_scene *scene, struct cbox_aux_bus *re
         }
     }
     assert(pos != -1);
-    for (int i = 0; i < scene->instrument_count; i++)
+    for (uint32_t i = 0; i < scene->instrument_count; i++)
         cbox_instrument_disconnect_aux_bus(scene->instruments[i], removed);
     
     struct cbox_aux_bus **aux_buses = malloc(sizeof(struct cbox_aux_bus *) * (scene->aux_bus_count - 1));
@@ -476,7 +475,7 @@ void cbox_scene_remove_aux_bus(struct cbox_scene *scene, struct cbox_aux_bus *re
 
 struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, int allow_load, GError **error)
 {
-    for (int i = 0; i < scene->aux_bus_count; i++)
+    for (uint32_t i = 0; i < scene->aux_bus_count; i++)
     {
         if (!strcmp(scene->aux_buses[i]->name, name))
         {
@@ -513,7 +512,7 @@ static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbo
         if (event->size >= 4)
             continue;
         
-        for (int l = 0; l < scene->layer_count; l++)
+        for (uint32_t l = 0; l < scene->layer_count; l++)
         {
             struct cbox_layer *lp = scene->layers[l];
             if (!lp->enabled)
@@ -574,7 +573,7 @@ static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbo
 
 void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output_buffers[], uint32_t output_channels)
 {
-    int n, i, j;
+    uint32_t i, j, n;
 
     if (scene->rt && scene->rt->io)
     {
@@ -643,7 +642,7 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
         uint32_t highwatermark = 0;
         cbox_sample_t channels[CBOX_MAX_AUDIO_PORTS][CBOX_BLOCK_SIZE];
         cbox_sample_t *outputs[CBOX_MAX_AUDIO_PORTS];
-        for (i = 0; i < module->outputs; i++)
+        for (i= 0; i < module->outputs; i++)
             outputs[i] = channels[i];
         
         for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
@@ -670,7 +669,7 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
                 }
             }
             (*module->process_block)(module, NULL, outputs);
-            for (int o = 0; o < module->outputs / 2; o++)
+            for (uint32_t o = 0; o < module->outputs / 2; o++)
             {
                 struct cbox_instrument_output *oobj = &instr->outputs[o];
                 struct cbox_module *insert = oobj->insert;
@@ -686,11 +685,11 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
                 {
                     if (oobj->output_bus < 0)
                         continue;
-                    int leftch = oobj->output_bus * 2;
+                    uint32_t leftch = oobj->output_bus * 2;
                     if (leftch >= output_channels)
                         continue;
                     leftbuf = output_buffers[leftch];
-                    int rightch = leftch + 1;
+                    uint32_t rightch = leftch + 1;
                     rightbuf = rightch >= output_channels ? NULL : output_buffers[rightch];
                 }
                 else
@@ -758,7 +757,7 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
         }
     }
 
-    int output_count = scene->engine->io_env.output_count;
+    uint32_t output_count = scene->engine->io_env.output_count;
     // XXXKF this assumes that the buffers are zeroed on start - which isn't true if there are multiple scenes
     for (i = 0; i < output_count; i++)
     {
@@ -805,7 +804,7 @@ static struct cbox_instrument *create_instrument(struct cbox_scene *scene, struc
     instr->aux_output_names = calloc(auxes, sizeof(char *));
     instr->aux_output_count = auxes;
 
-    for (int i = 0; i < module->outputs / 2; i ++)
+    for (uint32_t i = 0; i < module->outputs / 2; i ++)
         cbox_instrument_output_init(&instr->outputs[i], scene, module->engine->io_env.buffer_size);
     
     return instr;
@@ -899,7 +898,7 @@ struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *sce
     
     instr = create_instrument(scene, module);
 
-    for (int i = 0; i < module->outputs / 2; i ++)
+    for (uint32_t i = 0; i < module->outputs / 2; i ++)
     {
         struct cbox_instrument_output *oobj = instr->outputs + i;
         
@@ -925,7 +924,7 @@ struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *sce
         }
     }
 
-    for (int i = 0; i < instr->aux_output_count; i++)
+    for (uint32_t i = 0; i < instr->aux_output_count; i++)
     {
         instr->aux_outputs[i] = NULL;
         
@@ -1016,7 +1015,7 @@ void cbox_scene_update_connected_inputs(struct cbox_scene *scene)
     
     // This is called when a MIDI Input port has been created, connected/disconnected
     // or is about to be removed (and then the removing flag will be set)
-    for (int i = 0; i < scene->connected_input_count; )
+    for (uint32_t i = 0; i < scene->connected_input_count; )
     {
         struct cbox_midi_input *input = scene->connected_inputs[i];
         if (input->removing || !cbox_uuid_equal(&input->output, &scene->_obj_hdr.instance_uuid))
@@ -1033,7 +1032,7 @@ void cbox_scene_update_connected_inputs(struct cbox_scene *scene)
         if (cbox_uuid_equal(&input->output, &scene->_obj_hdr.instance_uuid))
         {
             gboolean found = FALSE;
-            for (int i = 0; i < scene->connected_input_count; i++)
+            for (uint32_t i = 0; i < scene->connected_input_count; i++)
             {
                 if (scene->connected_inputs[i] == input)
                 {
@@ -1133,7 +1132,7 @@ gboolean cbox_scene_move_instrument_to(struct cbox_scene *scene, struct cbox_ins
     int lcount = 0;
     if (dstpos == -1)
         dstpos = new_scene->layer_count;
-    for (int i = 0; i < scene->layer_count; i++)
+    for (uint32_t i = 0; i < scene->layer_count; i++)
     {
         if (scene->layers[i]->instrument == instrument)
             lcount++;
@@ -1154,7 +1153,7 @@ gboolean cbox_scene_move_instrument_to(struct cbox_scene *scene, struct cbox_ins
     int srcidx = 0, dstidx = 0;
     memcpy(&new_dst_layers[dstidx], new_scene->layers, dstpos * sizeof(struct cbox_layer **));
     dstidx = dstpos;
-    for (int i = 0; i < scene->layer_count; i++)
+    for (uint32_t i = 0; i < scene->layer_count; i++)
     {
         if (scene->layers[i]->instrument != instrument)
             new_src_layers[srcidx++] = scene->layers[i];

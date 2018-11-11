@@ -36,7 +36,7 @@ struct cbox_engine
     struct cbox_io_env io_env;
     struct cbox_rt *rt;
     struct cbox_scene **scenes;
-    int scene_count;
+    uint32_t scene_count;
     struct cbox_song_playback *spb;
     struct cbox_module *effect;
     struct cbox_master *master;

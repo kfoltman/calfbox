@@ -74,7 +74,7 @@ struct cbox_module
     cbox_sample_t *input_samples;
     cbox_sample_t *output_samples;
     struct cbox_midi_buffer midi_input;
-    int inputs, outputs, aux_offset;
+    uint32_t inputs, outputs, aux_offset;
     int bypass;
     int srate;
     double srate_inv;

@@ -159,7 +159,7 @@ void stream_recorder_record_block(struct cbox_recorder *handler, const float **b
     
     float *wbuf = self->cur_buffer->data + self->cur_buffer->write_ptr;
     for (unsigned int c = 0; c < nc; c++)
-        for (int i = 0; i < numsamples; i++)
+        for (uint32_t i = 0; i < numsamples; i++)
             wbuf[c + i * nc] = buffers[c][i];
     self->cur_buffer->write_ptr += nc * numsamples;
 }

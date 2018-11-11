@@ -193,7 +193,7 @@ gboolean load_sfz(const char *name, struct cbox_tarfile *tarfile, struct sfz_par
     
     unsigned char *buf = malloc(len + 1);
     buf[len] = '\0';
-    if (fread(buf, 1, len, f) != len)
+    if (fread(buf, 1, len, f) != (size_t)len)
     {
         g_set_error(error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot read '%s'", name);
         fclose(f);

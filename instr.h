@@ -46,7 +46,7 @@ struct cbox_instrument
     int refcount;
     gchar **aux_output_names;
     struct cbox_aux_bus **aux_outputs;
-    int aux_output_count;
+    uint32_t aux_output_count;
 };
 
 extern void cbox_instrument_unref_aux_buses(struct cbox_instrument *instrument);

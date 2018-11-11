@@ -304,7 +304,7 @@ void cbox_master_panic(struct cbox_master *master)
     cbox_engine_send_events_to(master->engine, NULL, &buf);
 }
 
-int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn)
+uint32_t cbox_master_ppqn_to_samples(struct cbox_master *master, uint32_t time_ppqn)
 {
     double tempo = master->tempo;
     int offset = 0;
@@ -322,10 +322,10 @@ int cbox_master_ppqn_to_samples(struct cbox_master *master, int time_ppqn)
     return offset + (int)(master->srate * 60.0 * time_ppqn / (tempo * master->ppqn_factor));
 }
 
-int cbox_master_samples_to_ppqn(struct cbox_master *master, int time_samples)
+uint32_t cbox_master_samples_to_ppqn(struct cbox_master *master, uint32_t time_samples)
 {
     double tempo = master->tempo;
-    int offset = 0;
+    uint32_t offset = 0;
     if (master->spb)
     {
         int idx = cbox_song_playback_tmi_from_samples(master->spb, time_samples);
@@ -337,7 +337,7 @@ int cbox_master_samples_to_ppqn(struct cbox_master *master, int time_samples)
             offset = tmi->time_ppqn;
         }
     }
-    return offset + (int)(tempo * master->ppqn_factor * time_samples / (master->srate * 60.0));
+    return offset + (uint32_t)(tempo * master->ppqn_factor * time_samples / (master->srate * 60.0));
 }
 
 void cbox_master_destroy(struct cbox_master *master)

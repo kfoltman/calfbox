@@ -169,7 +169,7 @@ static gboolean push_data_to_umo(struct cbox_usb_midi_output *umo, const uint8_t
 
 static void encode_events_class(struct cbox_usb_midi_output *umo)
 {
-    for (int i = 0; i < umo->hdr.buffer.count; i++)
+    for (uint32_t i = 0; i < umo->hdr.buffer.count; i++)
     {
         const struct cbox_midi_event *event = cbox_midi_buffer_get_event(&umo->hdr.buffer, i);
         const uint8_t *pdata = cbox_midi_event_get_data(event);
@@ -181,7 +181,7 @@ static void encode_events_class(struct cbox_usb_midi_output *umo)
         else
         {
             int i = 0;
-            while(i + 3 < event->size)
+            while(i + 3U < event->size)
             {
                 push_data_to_umo(umo, pdata + i, 3, 4);
                 i += 3;
@@ -193,7 +193,7 @@ static void encode_events_class(struct cbox_usb_midi_output *umo)
 
 static void encode_events_nocturn(struct cbox_usb_midi_output *umo)
 {
-    for (int i = 0; i < umo->hdr.buffer.count; i++)
+    for (uint32_t i = 0; i < umo->hdr.buffer.count; i++)
     {
         const struct cbox_midi_event *event = cbox_midi_buffer_get_event(&umo->hdr.buffer, i);
         const uint8_t *pdata = cbox_midi_event_get_data(event);
@@ -237,7 +237,7 @@ void usbio_send_midi_to_output(struct cbox_usb_midi_output *umo)
         res = libusb_interrupt_transfer(umo->ifptr->handle, umo->ifptr->epdesc_out.bEndpointAddress, umo->endpoint_buffer, umo->endpoint_buffer_pos, &transferred, 10);
     else
         res = libusb_bulk_transfer(umo->ifptr->handle, umo->ifptr->epdesc_out.bEndpointAddress, umo->endpoint_buffer, umo->endpoint_buffer_pos, &transferred, 10);
-    if (res == 0 && transferred == umo->endpoint_buffer_pos)
+    if (res == 0 && (uint32_t)transferred == umo->endpoint_buffer_pos)
         umo->endpoint_buffer_pos = 0;
     else
         g_warning("Failed to send MIDI events, transferred = %d out of %d, result = %d", (int)transferred, (int)umo->endpoint_buffer_pos, res);

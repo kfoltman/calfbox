@@ -41,18 +41,18 @@ struct cbox_scene
     GHashTable *instrument_hash;
     struct cbox_rt *rt;
     struct cbox_layer **layers;
-    int layer_count;
+    uint32_t layer_count;
     struct cbox_instrument **instruments;
-    int instrument_count;
+    uint32_t instrument_count;
     struct cbox_aux_bus **aux_buses;
-    int aux_bus_count;
+    uint32_t aux_bus_count;
     int transpose;
     struct cbox_engine *engine;
     struct cbox_midi_merger scene_input_merger;
     struct cbox_midi_buffer midibuf_total;
     
     struct cbox_midi_input **connected_inputs;
-    int connected_input_count;
+    uint32_t connected_input_count;
     
     gboolean enable_default_song_input, enable_default_external_input;
 
@@ -66,7 +66,7 @@ extern struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct 
 extern gboolean cbox_scene_add_layer(struct cbox_scene *scene, struct cbox_layer *layer, GError **error);
 extern gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *layer, int pos, GError **error);
 extern struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos);
-extern void cbox_scene_move_layer(struct cbox_scene *scene, int oldpos, int newpos);
+extern void cbox_scene_move_layer(struct cbox_scene *scene, unsigned int oldpos, unsigned int newpos);
 extern gboolean cbox_scene_load(struct cbox_scene *scene, const char *section, GError **error);
 extern gboolean cbox_scene_remove_instrument(struct cbox_scene *scene, struct cbox_instrument *instrument);
 extern struct cbox_aux_bus *cbox_scene_get_aux_bus(struct cbox_scene *scene, const char *name, int allow_load, GError **error);

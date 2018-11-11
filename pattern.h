@@ -35,7 +35,7 @@ struct cbox_midi_pattern
     struct cbox_song *owner;
     gchar *name;
     struct cbox_midi_event *events;
-    int event_count;
+    uint32_t event_count;
     int loop_end;
 };
 

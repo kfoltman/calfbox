@@ -213,7 +213,7 @@ typedef int midi_note_t;
     MACRO(uint32_t, loop_start, 0) \
     MACRO(uint32_t, loop_end, 0) \
     MACRO(uint32_t, end, 0) \
-    MACRO(uint32_t, loop_overlap, -1) \
+    MACRO(uint32_t, loop_overlap, (uint32_t)-1) \
     MACRO##_enum(sampler_loop_mode, loop_mode, slm_unknown) \
     MACRO##_enum(sampler_trigger, trigger, stm_attack) \
     MACRO##_dBamp(float, volume, 0) \
