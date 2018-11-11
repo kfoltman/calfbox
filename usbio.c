@@ -428,8 +428,8 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot initialise libusb.");
         return FALSE;
     }
-    libusb_set_debug(uii->usbctx, 3);
-    libusb_set_debug(uii->usbctx_probe, 3);
+    libusb_set_option(uii->usbctx, LIBUSB_OPTION_LOG_LEVEL, 3);
+    libusb_set_option(uii->usbctx_probe, LIBUSB_OPTION_LOG_LEVEL, 3);
     uii->device_table = g_hash_table_new(g_direct_hash, NULL);
 
     uii->sample_rate = cbox_config_get_int(cbox_io_section, "sample_rate", 44100);
