@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <fluidsynth.h>
+#include <fluidsynth/sfont.h>
 
 #define CBOX_FLUIDSYNTH_ERROR cbox_fluidsynth_error_quark()
 
@@ -272,9 +273,10 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             return FALSE;
         for (int i = 0; i < 16; i++)
         {
-            fluid_synth_channel_info_t ci;
-            fluid_synth_get_channel_info(m->synth, i, &ci);
-            if (!cbox_execute_on(fb, NULL, "/patch", "iis", error, 1 + i, ci.program + 128 * ci.bank, ci.name))
+            unsigned int sfont_id, bank_num, preset_num;
+            fluid_synth_get_program(m->synth, i, &sfont_id, &bank_num, &preset_num);
+            fluid_preset_t *preset = fluid_synth_get_channel_preset(m->synth, i);
+            if (!cbox_execute_on(fb, NULL, "/patch", "iis", error, 1 + i, preset_num + 128 * bank_num, preset ? preset->get_name(preset) : "(unknown)"))
                 return FALSE;
         }
         return CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
