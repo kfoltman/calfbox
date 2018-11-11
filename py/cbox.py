@@ -528,6 +528,11 @@ class JackIO:
         do_cmd("/io/set_property", None, [port, key, value, jackPropertyType])
 
     @staticmethod
+    def get_property(port, key):
+        result = get_thing("/io/get_property", "/value", [(str, str)], port, key)
+        return result
+
+    @staticmethod
     def remove_all_properties():
         """Remove all metadata from jack server"""
         do_cmd("/io/remove_all_properties", None, [])

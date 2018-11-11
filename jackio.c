@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include "config.h"
 
 #if USE_JACK
@@ -40,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <jack/types.h>
 #include <jack/midiport.h>
 #include <jack/transport.h>
+#include <jack/metadata.h>
 
 struct cbox_jack_io_impl
 {
@@ -847,6 +847,46 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         }
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/get_property") && !strcmp(cmd->arg_types, "ss"))
+    //parameters: "client:port", key
+    //returns python key, value and type as strings
+    {
+        const char *name = CBOX_ARG_S(cmd, 0);
+        const char *key = CBOX_ARG_S(cmd, 1);
+
+        jack_port_t *port = NULL;
+        port = jack_port_by_name(jii->client, name);
+        if (!port)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", name);
+            return FALSE;
+        }
+        const jack_uuid_t *uuid = jack_port_uuid(port);
+        if (!uuid)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "JACK Uuid for port '%s' not found", name);
+            return FALSE;
+        }
+
+        char* value = NULL;
+        char* type = NULL;
+
+        int res = jack_get_property(uuid, key, &value, &type);
+        if (res) // 0 on success, -1 if the subject has no key property.
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' does not have key '%s'", name, key);
+            return FALSE;
+        }
+
+        if (!cbox_execute_on(fb, NULL, "/value", "ss", error, value, type)) //send return values to Python.
+            return FALSE;
+
+        jack_free(value);
+        jack_free(type);
+        return TRUE;
+    }
+
+
     else if (!strcmp(cmd->command, "/remove_all_properties") && !strcmp(cmd->arg_types, ""))
     {
         int res = jack_remove_all_properties(jii->client);
