@@ -420,7 +420,7 @@ DEFINE_RT_FUNC(void *, cbox_rt, rt, cbox_rt_swap_pointers_and_update_count)
 void cbox_rt_array_insert(struct cbox_rt *rt, void ***ptr, uint32_t *pcount, int index, void *new_value)
 {
     assert(index >= -1);
-    assert((uint32_t)index <= *pcount);
+    assert(index == -1 || (uint32_t)index <= *pcount);
     assert(*pcount < (1U << 31));
     void **new_array = stm_array_clone_insert(*ptr, *pcount, index, new_value);
     free(cbox_rt_swap_pointers_and_update_count(rt, (void **)ptr, new_array, pcount, *pcount + 1));            
