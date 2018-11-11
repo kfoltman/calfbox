@@ -454,7 +454,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     // and 3 (N) frames at the start of the loop, and play it; in rare cases this will need to be
     // repeated twice if output write pointer is close to CBOX_BLOCK_SIZE or playback rate is very low,
     // but that's OK.
-    if (l->eff_waveform && l->eff_waveform->preloaded_frames == l->eff_waveform->info.frames)
+    if (l->eff_waveform && l->eff_waveform->preloaded_frames == (size_t)l->eff_waveform->info.frames)
     {
         int shift = l->eff_waveform->info.channels == 2 ? 1 : 0;
         uint32_t halfscratch = MAX_INTERPOLATION_ORDER << shift;

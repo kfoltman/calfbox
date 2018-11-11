@@ -832,7 +832,7 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", name);
             return FALSE;
         }
-        const jack_uuid_t *uuid = jack_port_uuid(port);
+        jack_uuid_t uuid = jack_port_uuid(port);
         if (!uuid)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "JACK Uuid for port '%s' not found", name);
@@ -861,7 +861,7 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", name);
             return FALSE;
         }
-        const jack_uuid_t *uuid = jack_port_uuid(port);
+        jack_uuid_t uuid = jack_port_uuid(port);
         if (!uuid)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "JACK Uuid for port '%s' not found", name);
