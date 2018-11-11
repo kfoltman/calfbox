@@ -102,8 +102,8 @@ void compressor_process_block(struct cbox_module *module, cbox_sample_t **inputs
         
         int falling = sig < m->tracker.y1 && sig < m->tracker.x1;
         int rising_fast = sig > 4 * m->tracker.y1 && sig > 4 * m->tracker.x1;
-        sig = cbox_onepolef_process_sample(&m->tracker, falling ? &m->release_lp : (rising_fast * m->tracker.y1 ? &m->fast_attack_lp : &m->attack_lp), sig);
-        sig = cbox_onepolef_process_sample(&m->tracker2, falling ? &m->release_lp : (rising_fast * m->tracker2.y1 ? &m->fast_attack_lp : &m->attack_lp), sig);
+        sig = cbox_onepolef_process_sample(&m->tracker, falling ? &m->release_lp : (rising_fast && m->tracker.y1 ? &m->fast_attack_lp : &m->attack_lp), sig);
+        sig = cbox_onepolef_process_sample(&m->tracker2, falling ? &m->release_lp : (rising_fast && m->tracker2.y1 ? &m->fast_attack_lp : &m->attack_lp), sig);
         float gain = 1.0;
         if (sig > threshold)
             gain = threshold * powf(sig / threshold, invratio) / sig;
