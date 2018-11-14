@@ -529,7 +529,14 @@ class JackIO:
 
     @staticmethod
     def get_property(port, key):
+        """port is the portname as string System:out_1"""
         result = get_thing("/io/get_property", "/value", [(str, str)], port, key)
+        return result
+
+    @staticmethod
+    def get_properties(port):
+        """port is the portname as string System:out_1"""
+        result = get_thing("/io/get_properties", "/properties", [(str, str, str)], port)
         return result
 
     @staticmethod

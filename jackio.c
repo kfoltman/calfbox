@@ -651,6 +651,28 @@ void cbox_jackio_destroy_midi_out(struct cbox_io_impl *ioi, struct cbox_midi_out
 #define jack_port_rename_fn(client, handle, name) jack_port_set_name(handle, name)
 #endif
 
+
+static gboolean cbox_jack_io_get_jack_uuid_from_name(struct cbox_jack_io_impl *jii, const char* name, jack_uuid_t* uuid, GError **error)
+{
+    jack_port_t *port = NULL;
+    port = jack_port_by_name(jii->client, name);
+    if (!port)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", name);
+        return FALSE;
+    }
+    assert(uuid);
+    jack_uuid_t temp_uuid = jack_port_uuid(port);
+    if (!temp_uuid)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "JACK uuid for port '%s' not found", name);
+        return FALSE;
+    }
+    *uuid = temp_uuid;
+    return TRUE;
+}
+
+
 static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)ct->user_data;
@@ -825,24 +847,13 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         const char *value = CBOX_ARG_S(cmd, 2);
         const char *type = CBOX_ARG_S(cmd, 3);
 
-        jack_port_t *port = NULL;
-        port = jack_port_by_name(jii->client, name);
-        if (!port)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", name);
+        jack_uuid_t subject;
+        if (!cbox_jack_io_get_jack_uuid_from_name(jii, name, &subject, error)) //error message set inside
             return FALSE;
-        }
-        jack_uuid_t uuid = jack_port_uuid(port);
-        if (!uuid)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "JACK Uuid for port '%s' not found", name);
-            return FALSE;
-        }
 
-        int res = jack_set_property(jii->client, uuid, key, value, type);
-        if (res) // 0 on success
+        if (jack_set_property(jii->client, subject, key, value, type)) // 0 on success
         {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Set properties was not successful");
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Set property key:'%s' value: '%s' to port '%s' was not successful", key, value, name);
             return FALSE;
         }
         return TRUE;
@@ -854,43 +865,64 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         const char *name = CBOX_ARG_S(cmd, 0);
         const char *key = CBOX_ARG_S(cmd, 1);
 
-        jack_port_t *port = NULL;
-        port = jack_port_by_name(jii->client, name);
-        if (!port)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", name);
+        jack_uuid_t subject;
+        if (!cbox_jack_io_get_jack_uuid_from_name(jii, name, &subject, error)) //error message set inside
             return FALSE;
-        }
-        jack_uuid_t uuid = jack_port_uuid(port);
-        if (!uuid)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "JACK Uuid for port '%s' not found", name);
-            return FALSE;
-        }
 
         char* value = NULL;
         char* type = NULL;
 
-        int res = jack_get_property(uuid, key, &value, &type);
-        if (res) // 0 on success, -1 if the subject has no key property.
+        if (jack_get_property(subject, key, &value, &type)) // 0 on success, -1 if the subject has no key property.
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' does not have key '%s'", name, key);
             return FALSE;
         }
 
-        if (!cbox_execute_on(fb, NULL, "/value", "ss", error, value, type)) //send return values to Python.
-            return FALSE;
+        char* returntype; //We need to call jack_free on type in any case so it can't be our own data.
+        if (type == NULL)
+             returntype = "";
+        else
+            returntype = type;
+
+        if (!cbox_execute_on(fb, NULL, "/value", "ss", error, value, returntype)) //send return values to Python.
+           return FALSE;
 
         jack_free(value);
         jack_free(type);
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/get_properties") && !strcmp(cmd->arg_types, "s"))
+    //parameters: "client:port"
+    {
+        const char *name = CBOX_ARG_S(cmd, 0);
 
+        jack_uuid_t subject;
+        if (!cbox_jack_io_get_jack_uuid_from_name(jii, name, &subject, error))  //error message set inside
+            return FALSE;
 
+        jack_description_t desc;
+        if (!jack_get_properties(subject, &desc)) // 0 on success, -1 if no subject with any properties exists.
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' with uuid '%li' does not have any properties", name, subject);
+            return FALSE;
+        }
+
+        char* returntype;
+        for (uint32_t i = 0; i<desc.property_cnt ; i++)
+        {
+            if (desc.properties[i].type == NULL)
+                 returntype = "";
+            else
+                returntype = desc.properties[i].type;
+            if (!cbox_execute_on(fb, NULL, "/properties", "sss", error, desc.properties[i].key, desc.properties[i].data, returntype))
+                return FALSE;
+        }
+        jack_free_description(&desc, 0); //if non-zero, then desc will also be passed to free()
+        return TRUE;
+    }
     else if (!strcmp(cmd->command, "/remove_all_properties") && !strcmp(cmd->arg_types, ""))
     {
-        int res = jack_remove_all_properties(jii->client);
-        if (res) // 0 on success, -1 otherwise
+        if (jack_remove_all_properties(jii->client)) // 0 on success, -1 otherwise
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Remove all JACK properties was not successful");
             return FALSE;
