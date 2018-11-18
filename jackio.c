@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <jack/types.h>
 #include <jack/midiport.h>
 #include <jack/transport.h>
+#include <jack/uuid.h>
 #include <jack/metadata.h>
 
 struct cbox_jack_io_impl
@@ -907,7 +908,7 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             return FALSE;
         }
 
-        char* returntype;
+        const char *returntype;
         for (uint32_t i = 0; i<desc.property_cnt ; i++)
         {
             if (desc.properties[i].type == NULL)
@@ -917,9 +918,45 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             if (!cbox_execute_on(fb, NULL, "/properties", "sss", error, desc.properties[i].key, desc.properties[i].data, returntype))
                 return FALSE;
         }
-        jack_free_description(&desc, 0); //if non-zero, then desc will also be passed to free()
+        jack_free_description(&desc, 0); //if non-zero desc will also be passed to free()
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/get_all_properties") && !strcmp(cmd->arg_types, ""))
+    {
+        jack_description_t *descs;
+        int counter;
+        counter = jack_get_all_properties(&descs);
+        const char *returntype;
+        for (int j = 0; j < counter; j++)
+        {
+            jack_description_t *one_desc = &descs[j];
+            for (uint32_t i = 0; i < one_desc->property_cnt ; i++)
+            {
+                if (one_desc->properties[i].type == NULL)
+                    returntype = "";
+                else
+                    returntype = one_desc->properties[i].type;
+
+                /*
+                index = jack_uuid_to_index(one_desc->subject)
+                portid = jack_port_by_id(jii->client, index);
+                portname = jack_port_name(port);
+                */
+                if (!cbox_execute_on(fb, NULL, "/all_properties", "ssss",
+                        error,
+                        jack_port_name(jack_port_by_id(jii->client, jack_uuid_to_index(one_desc->subject))),
+                        one_desc->properties[i].key,
+                        one_desc->properties[i].data,
+                        returntype))
+                    return FALSE;
+            }
+            jack_free_description(one_desc, 0); //if non-zero one_desc will also be passed to free()
+        }
+        jack_free(descs);
+        return TRUE;
+    }
+
+
     else if (!strcmp(cmd->command, "/remove_all_properties") && !strcmp(cmd->arg_types, ""))
     {
         if (jack_remove_all_properties(jii->client)) // 0 on success, -1 otherwise
@@ -929,6 +966,8 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         }
         return TRUE;
     }
+
+
     else
     {
         gboolean result = cbox_io_process_cmd(io, fb, cmd, error, &handled);

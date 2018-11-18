@@ -515,6 +515,25 @@ class JackIO:
     #Metadata
 
     @staticmethod
+    def get_property(port, key):
+        """port is the portname as string System:out_1
+        returns tuple (value, mime/type)"""
+        result = get_thing("/io/get_property", "/value", [(str, str)], port, key)
+        return result
+
+    @staticmethod
+    def get_properties(port):
+        """returns a list of tuples (key, value, mime/type)"""
+        result = get_thing("/io/get_properties", "/properties", [(str, str, str)], port)
+        return result
+
+    @staticmethod
+    def get_all_properties():
+        """returns a list of tuples (portname, key, value, mime/type)"""
+        result = get_thing("/io/get_all_properties", "/all_properties", [(str, str, str, str)])
+        return result
+
+    @staticmethod
     def set_property(port, key, value, jackPropertyType=""):
         """empty jackPropertyType leads to UTF-8 string
         for convenience we see if value is a python int and send the right jack_property_t::type
@@ -526,18 +545,6 @@ class JackIO:
         elif not type(value) is str:
             return TypeError("value {} must be int or str but was {}".format(value, type(value)))
         do_cmd("/io/set_property", None, [port, key, value, jackPropertyType])
-
-    @staticmethod
-    def get_property(port, key):
-        """port is the portname as string System:out_1"""
-        result = get_thing("/io/get_property", "/value", [(str, str)], port, key)
-        return result
-
-    @staticmethod
-    def get_properties(port):
-        """port is the portname as string System:out_1"""
-        result = get_thing("/io/get_properties", "/properties", [(str, str, str)], port)
-        return result
 
     @staticmethod
     def remove_all_properties():
