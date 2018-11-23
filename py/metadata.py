@@ -59,3 +59,34 @@ class Metadata:
     def remove_all_properties():
         """Remove all metadata from jack server"""
         do_cmd("/io/remove_all_properties", None, [])
+
+
+    #Higher Level Functions
+
+    @staticmethod
+    def set_port_order(port, index):
+       """
+       port is the portname as string System:out_1
+
+       https://github.com/drobilla/jackey
+
+       Order for a port.
+       This is used to specify the best order to show ports in user interfaces.
+       The value MUST be an integer.  There are no other requirements, so there may
+       be gaps in the orders for several ports.  Applications should compare the
+       orders of ports to determine their relative order, but must not assign any
+       other relevance to order values.
+
+       #define JACKEY_ORDER "http://jackaudio.org/metadata/order"
+       """
+       Metadata.set_property(port, "http://jackaudio.org/metadata/order", index) #automatically converted to int-mime
+
+    def set_all_port_order(pDict):
+        """
+        pDict portname as string : index as integer
+        """
+        if not (len(pDict.values()) == len(set(pDict.values()))):
+            raise ValueError("All indices for ordering must be unique")
+
+        for port, index in pDict.items():
+            Metadata.set_port_order(port, index)
