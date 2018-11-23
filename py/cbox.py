@@ -547,6 +547,16 @@ class JackIO:
         do_cmd("/io/set_property", None, [port, key, value, jackPropertyType])
 
     @staticmethod
+    def remove_property(port, key):
+        """port is the portname as string System:out_1"""
+        do_cmd("/io/remove_property", None, [port, key])
+
+    @staticmethod
+    def remove_properties(port):
+        """port is the portname as string System:out_1"""
+        do_cmd("/io/remove_properties", None, [port])
+
+    @staticmethod
     def remove_all_properties():
         """Remove all metadata from jack server"""
         do_cmd("/io/remove_all_properties", None, [])

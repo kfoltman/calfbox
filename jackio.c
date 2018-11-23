@@ -653,7 +653,7 @@ void cbox_jackio_destroy_midi_out(struct cbox_io_impl *ioi, struct cbox_midi_out
 #endif
 
 
-static gboolean cbox_jack_io_get_jack_uuid_from_name(struct cbox_jack_io_impl *jii, const char* name, jack_uuid_t* uuid, GError **error)
+static gboolean cbox_jack_io_get_jack_uuid_from_name(struct cbox_jack_io_impl *jii, const char *name, jack_uuid_t *uuid, GError **error)
 {
     jack_port_t *port = NULL;
     port = jack_port_by_name(jii->client, name);
@@ -672,7 +672,6 @@ static gboolean cbox_jack_io_get_jack_uuid_from_name(struct cbox_jack_io_impl *j
     *uuid = temp_uuid;
     return TRUE;
 }
-
 
 static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
@@ -957,6 +956,40 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
     }
 
 
+    else if (!strcmp(cmd->command, "/remove_property") && !strcmp(cmd->arg_types, "ss"))
+    {
+        const char *name = CBOX_ARG_S(cmd, 0);
+        const char *key = CBOX_ARG_S(cmd, 1);
+
+        jack_uuid_t subject;
+        if (!cbox_jack_io_get_jack_uuid_from_name(jii, name, &subject, error)) //error message set inside
+            return FALSE;
+
+        if (jack_remove_property(jii->client, subject, key)) // 0 on success, -1 otherwise
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Could not remove port '%s' key '%s'", name, key);
+            return FALSE;
+        }
+        return TRUE;
+    }
+
+    else if (!strcmp(cmd->command, "/remove_properties") && !strcmp(cmd->arg_types, "s"))
+    {
+        const char *name = CBOX_ARG_S(cmd, 0);
+
+        jack_uuid_t subject;
+        if (!cbox_jack_io_get_jack_uuid_from_name(jii, name, &subject, error)) //error message set inside
+            return FALSE;
+
+        if (jack_remove_properties(jii->client, subject) == -1) // number of removed properties returned, -1 on error
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Could not remove properties of port '%s'", name);
+            return FALSE;
+        }
+        return TRUE;
+    }
+
+
     else if (!strcmp(cmd->command, "/remove_all_properties") && !strcmp(cmd->arg_types, ""))
     {
         if (jack_remove_all_properties(jii->client)) // 0 on success, -1 otherwise
@@ -966,7 +999,6 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         }
         return TRUE;
     }
-
 
     else
     {
