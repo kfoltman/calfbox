@@ -81,6 +81,7 @@ class Metadata:
        """
        Metadata.set_property(port, "http://jackaudio.org/metadata/order", index) #automatically converted to int-mime
 
+    @staticmethod
     def set_all_port_order(pDict):
         """
         pDict portname as string : index as integer
