@@ -1,7 +1,7 @@
 #!/bin/bash
-set -e
 make clean
 rm build -rf
+set -e
 sh autogen.sh
 ./configure
 #make
