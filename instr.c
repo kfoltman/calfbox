@@ -191,7 +191,7 @@ void cbox_instrument_destroyfunc(struct cbox_objhdr *objhdr)
 {
     struct cbox_instrument *instrument = CBOX_H2O(objhdr);
     assert(instrument->refcount == 0);
-    for (uint32_t i = 0; i < (uint32_t)instrument->module->outputs; i ++)
+    for (uint32_t i = 0; i < (uint32_t)instrument->module->outputs >> 1; i ++)
     {
         cbox_instrument_output_uninit(&instrument->outputs[i]);
     }

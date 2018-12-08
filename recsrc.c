@@ -79,6 +79,7 @@ void cbox_recording_source_push(struct cbox_recording_source *src, const float *
 void cbox_recording_source_uninit(struct cbox_recording_source *src)
 {
     STM_ARRAY_FREE_OBJS(src->handlers, src->handler_count);
+    src->handlers = NULL;
     src->handler_count = 0;
 }
 
