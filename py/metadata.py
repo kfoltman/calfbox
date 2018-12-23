@@ -66,7 +66,7 @@ class Metadata:
     @staticmethod
     def set_port_order(port, index):
        """
-       port is the portname as string System:out_1
+       port is the portname as string including a client name System:out_1
 
        https://github.com/drobilla/jackey
 
@@ -91,3 +91,9 @@ class Metadata:
 
         for port, index in pDict.items():
             Metadata.set_port_order(port, index)
+            
+    @staticmethod
+    def set_pretty_name(port, name):
+        """port is the portname as string including a client name System:out_1
+        Name however is just the port name, without a client."""
+        Metadata.set_property(port, "http://jackaudio.org/metadata/pretty-name", name)
