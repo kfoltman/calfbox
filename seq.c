@@ -573,11 +573,15 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
             }
         }
         if (old_trk && trk->generation == old_trk->generation) {
+            old_trk->state_copied = TRUE;
             cbox_track_playback_ref(old_trk);
             spb->tracks[pos++] = old_trk;
         }
-        else
+        else {
+            if (old_trk)
+                old_trk->state_copied = FALSE;
             spb->tracks[pos++] = cbox_track_playback_new_from_track(trk, spb->master, spb, old_trk);
+        }
         if (!trk->external_output_set)
             cbox_midi_merger_connect(&spb->track_merger, &spb->tracks[pos - 1]->output_buffer, NULL, NULL);
     }

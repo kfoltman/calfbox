@@ -2,7 +2,7 @@ from _cbox import *
 from io import BytesIO
 import struct
 import traceback
-from . import metadata #local file metadata.py
+import metadata #local file metadata.py
 type_wrapper_debug = False
 
 ###############################################################################
