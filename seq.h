@@ -41,7 +41,7 @@ struct cbox_midi_playback_active_notes
 extern void cbox_midi_playback_active_notes_init(struct cbox_midi_playback_active_notes *notes);
 extern void cbox_midi_playback_active_notes_copy(struct cbox_midi_playback_active_notes *dest, const struct cbox_midi_playback_active_notes *src);
 extern void cbox_midi_playback_active_notes_clear(struct cbox_midi_playback_active_notes *notes);
-extern int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf);
+extern int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf, struct cbox_midi_playback_active_notes *leftover_notes);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 

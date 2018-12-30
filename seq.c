@@ -471,7 +471,7 @@ void cbox_midi_playback_active_notes_copy(struct cbox_midi_playback_active_notes
     memcpy(dest->notes, src->notes, sizeof(dest->notes));
 }
 
-int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf)
+int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_notes *notes, struct cbox_midi_buffer *buf, struct cbox_midi_playback_active_notes *leftover_notes)
 {
     if (!notes->channels_active)
         return 0;
@@ -496,6 +496,8 @@ int cbox_midi_playback_active_notes_release(struct cbox_midi_playback_active_not
                 cbox_midi_buffer_write_inline(buf, cbox_midi_buffer_get_last_event_time(buf), 0x80 + c, n, 0);
                 group &= ~(1 << i);
                 notes->notes[c][g] = group;
+                if (leftover_notes)
+                    leftover_notes->notes[c][g] &= ~(1 << i);
                 note_offs++;
             }
         }
@@ -730,7 +732,7 @@ int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, stru
         if (trk->state_copied)
             continue;
         struct cbox_midi_buffer *output = trk->external_merger ? &trk->output_buffer : buf;
-        if (cbox_midi_playback_active_notes_release(&trk->active_notes, output) < 0)
+        if (cbox_midi_playback_active_notes_release(&trk->active_notes, output, NULL) < 0)
             return 0;
     }
     // Release notes from removed/modified clips
@@ -747,7 +749,7 @@ int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, stru
             struct cbox_midi_playback_active_notes stuck_notes;
             cbox_midi_playback_active_notes_copy(&stuck_notes, &new_trk->active_notes);
             cbox_track_confirm_stuck_notes(new_trk, &stuck_notes, new_pos);
-            if (cbox_midi_playback_active_notes_release(&stuck_notes, output) < 0)
+            if (cbox_midi_playback_active_notes_release(&stuck_notes, output, &new_trk->active_notes) < 0)
                 return 0;
         }
     }

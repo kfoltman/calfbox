@@ -39,7 +39,7 @@ void cbox_adhoc_pattern_render(struct cbox_adhoc_pattern *ap, uint32_t offset, u
 {
     if (ap->completed)
     {
-        cbox_midi_playback_active_notes_release(&ap->active_notes, &ap->output_buffer);
+        cbox_midi_playback_active_notes_release(&ap->active_notes, &ap->output_buffer, NULL);
         return;
     }
     if (ap->playback.pos >= ap->playback.pattern->event_count)
