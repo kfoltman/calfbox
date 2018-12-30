@@ -29,11 +29,11 @@ static inline void accumulate_event(struct cbox_midi_playback_active_notes *note
     if (event->size != 3)
         return;
     // this ignores poly aftertouch - which, I supposed, is OK for now
-    if (event->data_inline[0] < 0x80 || event->data_inline[0] > 0x9F)
+    if (event->data_inline[0] < 0x90 || event->data_inline[0] > 0x9F)
         return;
-    int ch = event->data_inline[0] & 0x0F;
-    if (event->data_inline[0] >= 0x90 && event->data_inline[2] > 0)
+    if (event->data_inline[2] > 0)
     {
+        int ch = event->data_inline[0] & 0x0F;
         int note = event->data_inline[1] & 0x7F;
         if (!(notes->channels_active & (1 << ch)))
         {
@@ -42,6 +42,36 @@ static inline void accumulate_event(struct cbox_midi_playback_active_notes *note
             notes->channels_active |= 1 << ch;
         }
         notes->notes[ch][note >> 5] |= 1 << (note & 0x1F);
+    }
+}
+
+// this releases a note on note off (accumulate_event is 'sticky')
+static inline void accumulate_event2(struct cbox_midi_playback_active_notes *notes, const struct cbox_midi_event *event)
+{
+    if (event->size != 3)
+        return;
+    // this ignores poly aftertouch - which, I supposed, is OK for now
+    if (event->data_inline[0] < 0x80 || event->data_inline[0] > 0x9F)
+        return;
+    int ch = event->data_inline[0] & 0x0F;
+    int note = event->data_inline[1] & 0x7F;
+    uint32_t mask = 1 << (note & 0x1F);
+    if (event->data_inline[0] >= 0x90 && event->data_inline[2] > 0)
+    {
+        if (!(notes->channels_active & (1 << ch)))
+        {
+            for (int i = 0; i < 4; i++)
+                notes->notes[ch][i] = 0;
+            notes->channels_active |= 1 << ch;
+        }
+        notes->notes[ch][note >> 5] |= mask;
+    } else {
+        if (notes->notes[ch][note >> 5] & mask) {
+            notes->notes[ch][note >> 5] &= ~mask;
+            if (!notes->notes[ch][0] && !notes->notes[ch][1] && !notes->notes[ch][2] && !notes->notes[ch][3]) {
+                notes->channels_active &= ~(1 << ch);
+            }
+        }
     }
 }
 
@@ -417,7 +447,7 @@ void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct c
             
             cbox_midi_buffer_copy_event(buf, src, offset + time);
             if (pb->active_notes)
-                accumulate_event(pb->active_notes, src);
+                accumulate_event2(pb->active_notes, src);
         }
         pb->pos++;
     }
