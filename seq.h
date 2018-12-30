@@ -172,6 +172,7 @@ struct cbox_song_playback
 };
 
 extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_engine *engine, struct cbox_song_playback *old_state);
+extern void cbox_song_playback_prepare_render(struct cbox_song_playback *spb);
 extern void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, uint32_t nsamples);
 extern int cbox_song_playback_active_notes_release(struct cbox_song_playback *old_spb, struct cbox_song_playback *new_spb, uint32_t new_pos, struct cbox_midi_buffer *buf);
 extern void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int skip_this_pos);

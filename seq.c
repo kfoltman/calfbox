@@ -639,6 +639,14 @@ int cbox_song_playback_get_next_tempo_change(struct cbox_song_playback *spb)
     return spb->tempo_map_items[spb->tempo_map_pos + 1].time_samples;
 }
 
+void cbox_song_playback_prepare_render(struct cbox_song_playback *spb)
+{
+    for(uint32_t i = 0; i < spb->track_count; i++)
+    {
+        cbox_midi_buffer_clear(&spb->tracks[i]->output_buffer);
+    }
+}
+
 void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, uint32_t nsamples)
 {
     cbox_midi_buffer_clear(output);
@@ -648,10 +656,6 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
         if (spb->master->new_tempo != spb->master->tempo)
             cbox_song_playback_set_tempo(spb, spb->master->new_tempo);
         spb->master->new_tempo = 0;
-    }
-    for(uint32_t i = 0; i < spb->track_count; i++)
-    {
-        cbox_midi_buffer_clear(&spb->tracks[i]->output_buffer);
     }
     if (spb->master->state == CMTS_STOPPING)
     {
