@@ -112,6 +112,58 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     return pb;
 }
     
+void cbox_track_confirm_stuck_notes(struct cbox_track_playback *pb, struct cbox_midi_playback_active_notes *stuck_notes, uint32_t new_pos_ppqn)
+{
+    // Check if no notes are stuck
+    if (!stuck_notes->channels_active)
+        return;
+    uint32_t pos = 0;
+    while(pos < pb->items_count && pb->items[pos].time + pb->items[pos].length < new_pos_ppqn)
+        pos++;
+    if (pos >= pb->items_count) // past the end of the track - all notes are stuck
+        return;
+    const struct cbox_track_playback_item *tpi = &pb->items[pos];
+    uint32_t rel_time_ppqn = new_pos_ppqn - tpi->time;
+    if (rel_time_ppqn < tpi->length)
+    {
+        // inside the clip
+        rel_time_ppqn += tpi->offset;
+        
+        for (unsigned c = 0; c < 16; c++)
+        {
+            if (!(stuck_notes->channels_active & (1 << c)))
+                continue;
+            
+            gboolean any_left = FALSE;
+            for (unsigned g = 0; g < 4; g++)
+            {
+                uint32_t group = stuck_notes->notes[c][g];
+                if (!group)
+                    continue;
+                for (unsigned i = 0; i < 32; i++)
+                {
+                    if (!(group & (1 << i)))
+                        continue;
+                    uint8_t n = i + g * 32;
+                    if (cbox_midi_pattern_playback_is_note_active_at(tpi->pattern, rel_time_ppqn, c, n))
+                    {
+                        // That note is not stuck
+                        group &= ~(1 << i);
+                    } else {
+                        // It is stuck, so keep the channel as containing stuck notes
+                        any_left = TRUE;
+                    }
+                }
+                stuck_notes->notes[c][g] = group;
+            }
+            if (!any_left) {
+                stuck_notes->channels_active &= ~(1 << c);
+            }
+        }
+        return;
+    }
+}
+
 void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, uint32_t time_ppqn, uint32_t min_time_ppqn)
 {
     pb->pos = 0;
@@ -224,6 +276,28 @@ void cbox_track_playback_destroy(struct cbox_track_playback *pb)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
+static gint note_compare_fn(const void *p1, const void *p2, void *user_data)
+{
+    const struct cbox_midi_event *e1 = p1, *e2 = p2;
+    int cn1 = ((e1->data_inline[0] & 0x0F) << 8) | e1->data_inline[1];
+    int cn2 = ((e2->data_inline[0] & 0x0F) << 8) | e2->data_inline[1];
+    if (cn1 < cn2)
+        return -1;
+    if (cn2 < cn1)
+        return +1;
+    if (e1->time < e2->time)
+        return -1;
+    if (e1->time > e2->time)
+        return +1;
+    if (p1 < p2)
+        return -1;
+    if (p1 > p2)
+        return +1;
+    return 0;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct cbox_midi_pattern_playback *cbox_midi_pattern_playback_new(struct cbox_midi_pattern *pattern)
 {
     struct cbox_midi_pattern_playback *mppb = calloc(1, sizeof(struct cbox_midi_pattern_playback));
@@ -231,6 +305,17 @@ struct cbox_midi_pattern_playback *cbox_midi_pattern_playback_new(struct cbox_mi
     memcpy(mppb->events, pattern->events, sizeof(struct cbox_midi_event) * pattern->event_count);
     mppb->event_count = pattern->event_count;
     mppb->ref_count = 1;
+    cbox_midi_playback_active_notes_init(&mppb->note_bitmask);
+    mppb->note_lookup = g_sequence_new(NULL);
+    for (uint32_t i = 0; i < mppb->event_count; ++i) {
+        struct cbox_midi_event *event = &mppb->events[i];
+        if (event->size == 3 && (event->data_inline[0] & 0xE0) == 0x80) {
+            g_sequence_insert_sorted(mppb->note_lookup, event, note_compare_fn, NULL);
+            if (event->data_inline[0] >= 0x90)
+                accumulate_event(&mppb->note_bitmask, event);
+        }
+    }
+
     return mppb;
 }
 
@@ -247,8 +332,38 @@ void cbox_midi_pattern_playback_ref(struct cbox_midi_pattern_playback *mppb)
 
 void cbox_midi_pattern_playback_destroy(struct cbox_midi_pattern_playback *mppb)
 {
+    g_sequence_free(mppb->note_lookup);
     free(mppb->events);
     free(mppb);
+}
+
+gboolean cbox_midi_pattern_playback_is_note_active_at(struct cbox_midi_pattern_playback *mppb, uint32_t time_ppqn, uint32_t channel, uint32_t note)
+{
+    struct cbox_midi_event event;
+    event.time = time_ppqn;
+    event.size = 3;
+    event.data_inline[0] = 0x90 | channel;
+    event.data_inline[1] = note;
+    event.data_inline[2] = 127;
+    // printf("checking stuck note ch %d note %d at %d\n", channel, note, time_ppqn);
+    GSequenceIter *i = g_sequence_search(mppb->note_lookup, &event, note_compare_fn, NULL);
+    if (g_sequence_iter_is_begin(i)) // before first note
+    {
+        // printf("before first note\n");
+        return FALSE;
+    }
+    i = g_sequence_iter_prev(i);
+    // A preceding note with the same channel and note number
+    struct cbox_midi_event *pevent = g_sequence_get(i);
+    // If it's an event for a different note, channel or not a note on event, then the note hasn't been active at the time
+    // XXXKF what about notes that start before clip offset?
+    if (pevent->size != 3 || pevent->data_inline[0] != event.data_inline[0] || pevent->data_inline[1] != event.data_inline[1] || !pevent->data_inline[2]) {
+        // printf("pevent wrong %d %d %d %d\n", pevent->time, pevent->data_inline[0], pevent->data_inline[1], pevent->data_inline[2]);
+        return FALSE;
+    }
+    
+    // printf("confirmed note ch %d note %d\n", channel, note);
+    return TRUE;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -540,7 +655,7 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
     }
     if (spb->master->state == CMTS_STOPPING)
     {
-        if (cbox_song_playback_active_notes_release(spb, output) > 0)
+        if (cbox_song_playback_active_notes_release(spb, NULL, 0, output) > 0)
             spb->master->state = CMTS_STOP;
     }
     else
@@ -602,8 +717,9 @@ void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_
     }
 }
 
-int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf)
+int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_song_playback *new_spb, uint32_t new_pos, struct cbox_midi_buffer *buf)
 {
+    // Release notes from deleted tracks
     for(uint32_t i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *trk = spb->tracks[i];
@@ -612,6 +728,24 @@ int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, stru
         struct cbox_midi_buffer *output = trk->external_merger ? &trk->output_buffer : buf;
         if (cbox_midi_playback_active_notes_release(&trk->active_notes, output) < 0)
             return 0;
+    }
+    // Release notes from removed/modified clips
+    if (new_spb) {
+        for(uint32_t i = 0; i < new_spb->track_count; i++)
+        {
+            struct cbox_track_playback *new_trk = new_spb->tracks[i];
+            if (!new_trk->active_notes.channels_active)
+                continue;
+            // struct cbox_track_playback *old_trk = new_trk->old_state;
+            // if (!old_trk)
+            //     continue;
+            struct cbox_midi_buffer *output = new_trk->external_merger ? &new_trk->output_buffer : buf;
+            struct cbox_midi_playback_active_notes stuck_notes;
+            cbox_midi_playback_active_notes_copy(&stuck_notes, &new_trk->active_notes);
+            cbox_track_confirm_stuck_notes(new_trk, &stuck_notes, new_pos);
+            if (cbox_midi_playback_active_notes_release(&stuck_notes, output) < 0)
+                return 0;
+        }
     }
     return 1;
 }

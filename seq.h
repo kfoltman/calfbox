@@ -50,12 +50,15 @@ struct cbox_midi_pattern_playback
     struct cbox_midi_event *events;
     uint32_t event_count;
     int ref_count;
+    GSequence *note_lookup;
+    struct cbox_midi_playback_active_notes note_bitmask;
 };
 
 extern struct cbox_midi_pattern_playback *cbox_midi_pattern_playback_new(struct cbox_midi_pattern *pattern);
 extern void cbox_midi_pattern_playback_ref(struct cbox_midi_pattern_playback *mppb);
 extern void cbox_midi_pattern_playback_unref(struct cbox_midi_pattern_playback *mppb);
 extern void cbox_midi_pattern_playback_destroy(struct cbox_midi_pattern_playback *mppb);
+extern gboolean cbox_midi_pattern_playback_is_note_active_at(struct cbox_midi_pattern_playback *mppb, uint32_t time_ppqn, uint32_t channel, uint32_t note);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -114,6 +117,7 @@ extern void cbox_track_playback_render(struct cbox_track_playback *pb, uint32_t 
 extern void cbox_track_playback_seek_ppqn(struct cbox_track_playback *pb, uint32_t time_ppqn, uint32_t min_time_ppqn);
 extern void cbox_track_playback_seek_samples(struct cbox_track_playback *pb, uint32_t time_samples);
 extern void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, int is_ppqn, int skip_this_pos);
+extern void cbox_track_confirm_stuck_notes(struct cbox_track_playback *pb, struct cbox_midi_playback_active_notes *stuck_notes, uint32_t new_pos);
 extern void cbox_track_playback_destroy(struct cbox_track_playback *pb);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,7 +173,7 @@ struct cbox_song_playback
 
 extern struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct cbox_master *master, struct cbox_engine *engine, struct cbox_song_playback *old_state);
 extern void cbox_song_playback_render(struct cbox_song_playback *spb, struct cbox_midi_buffer *output, uint32_t nsamples);
-extern int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, struct cbox_midi_buffer *buf);
+extern int cbox_song_playback_active_notes_release(struct cbox_song_playback *old_spb, struct cbox_song_playback *new_spb, uint32_t new_pos, struct cbox_midi_buffer *buf);
 extern void cbox_song_playback_seek_ppqn(struct cbox_song_playback *spb, int time_ppqn, int skip_this_pos);
 extern void cbox_song_playback_seek_samples(struct cbox_song_playback *spb, uint32_t time_samples);
 extern int cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, uint32_t time_ppqn);

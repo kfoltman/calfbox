@@ -230,7 +230,7 @@ void cbox_engine_remove_scene(struct cbox_engine *engine, struct cbox_scene *sce
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-#define cbox_engine_set_song_playback_args(ARG) ARG(struct cbox_song_playback *, old_song) ARG(struct cbox_song_playback *, new_song) ARG(int, new_time_ppqn)
+#define cbox_engine_set_song_playback_args(ARG) ARG(struct cbox_song_playback *, old_song) ARG(struct cbox_song_playback *, new_song) ARG(uint32_t, new_time_ppqn)
 
 DEFINE_ASYNC_RT_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
 {
@@ -242,7 +242,7 @@ DEFINE_ASYNC_RT_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
         if (new_song)
             cbox_song_playback_apply_old_state(new_song);
 
-        if (cbox_song_playback_active_notes_release(engine->spb, &engine->midibuf_aux) < 0)
+        if (cbox_song_playback_active_notes_release(engine->spb, new_song, new_time_ppqn == (uint32_t)-1 ? old_song->song_pos_ppqn : new_time_ppqn, &engine->midibuf_aux) < 0)
         {
             RT_CALL_AGAIN_LATER();
             return;
@@ -252,7 +252,7 @@ DEFINE_ASYNC_RT_FUNC(cbox_engine, engine, cbox_engine_set_song_playback)
     engine->master->spb = new_song;
     if (new_song)
     {
-        if (new_time_ppqn == -1)
+        if (new_time_ppqn == (uint32_t)-1)
         {
             int old_time_ppqn = old_song ? old_song->song_pos_ppqn : 0;
             cbox_song_playback_seek_samples(engine->master->spb, old_song ? old_song->song_pos_samples : 0);
