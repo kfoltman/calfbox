@@ -763,7 +763,7 @@ int cbox_song_playback_active_notes_release(struct cbox_song_playback *spb, stru
     for(uint32_t i = 0; i < spb->track_count; i++)
     {
         struct cbox_track_playback *trk = spb->tracks[i];
-        if (trk->state_copied)
+        if (new_spb && trk->state_copied)
             continue;
         struct cbox_midi_buffer *output = trk->external_merger ? &trk->output_buffer : buf;
         if (cbox_midi_playback_active_notes_release(&trk->active_notes, output, NULL) < 0)
