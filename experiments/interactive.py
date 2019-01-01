@@ -44,6 +44,7 @@ pblob += cbox.Pattern.serialize_event(0, 0x90, 60, 100) # note on
 pblob += cbox.Pattern.serialize_event(383, 0x80, 60, 100) # note off
 pattern = cbox.Document.get_song().pattern_from_blob(pblob, 384)
 calfboxTrack.add_clip(0, 0, 384, pattern)  #pos, offset, length(and not end-position, but is the same for the complete track), pattern
+cbox.Document.get_song().set_loop(384, 384) #set playback length for the entire score. Why is the first value not zero? That would create an actual loop from the start to end. We want the song to play only once. The cbox way of doing that is to set the loop range to zero at the end of the track. Zero length is stop.
 
 print()
 
