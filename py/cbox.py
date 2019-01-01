@@ -2,7 +2,7 @@ from _cbox import *
 from io import BytesIO
 import struct
 import traceback
-import metadata #local file metadata.py
+import calfbox.metadata as metadata #local file metadata.py
 type_wrapper_debug = False
 
 ###############################################################################
