@@ -375,7 +375,7 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
             return FALSE;
         return cbox_uuid_report(&midiout->uuid, fb, error);
     }
-    else if (io->impl->destroymidioutfunc && !strcmp(cmd->command, "/delete_midi_input") && !strcmp(cmd->arg_types, "s"))
+    else if (io->impl->destroymidiinfunc && !strcmp(cmd->command, "/delete_midi_input") && !strcmp(cmd->arg_types, "s"))
     {
         *cmd_handled = TRUE;
         const char *uuidstr = CBOX_ARG_S(cmd, 0);
