@@ -133,6 +133,29 @@ struct cbox_midi_input *cbox_io_get_midi_input(struct cbox_io *io, const char *n
     return NULL;
 }
 
+struct cbox_audio_output *cbox_io_get_audio_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid)
+{
+    if (uuid)
+    {
+        for (GSList *p = io->audio_outputs; p; p = g_slist_next(p))
+        {
+            struct cbox_audio_output *audioout = p->data;
+            if (!audioout->removing && cbox_uuid_equal(&audioout->uuid, uuid))
+                return audioout;
+        }
+    }
+    if (name)
+    {
+        for (GSList *p = io->audio_outputs; p; p = g_slist_next(p))
+        {
+            struct cbox_audio_output *audioout = p->data;
+            if (!audioout->removing && !strcmp(audioout->name, name))
+                return audioout;
+        }
+    }
+    return NULL;
+}
+
 struct cbox_midi_output *cbox_io_create_midi_output(struct cbox_io *io, const char *name, GError **error)
 {
     struct cbox_midi_output *midiout = cbox_io_get_midi_output(io, name, NULL);
@@ -258,6 +281,46 @@ void cbox_io_destroy_all_midi_ports(struct cbox_io *io)
         old_i = g_slist_remove(old_i, midiin);
     }
     g_slist_free(old_i);
+}
+
+struct cbox_audio_output *cbox_io_create_audio_output(struct cbox_io *io, const char *name, GError **error)
+{
+    struct cbox_audio_output *audioout = cbox_io_get_audio_output(io, name, NULL);
+    if (audioout)
+        return audioout;
+
+    audioout = io->impl->createaudiooutfunc(io->impl, name, error);
+    if (!audioout)
+        return NULL;
+
+    io->audio_outputs = g_slist_prepend(io->audio_outputs, audioout);
+
+    // Notify client code to connect to new outputs if needed
+    if (io->cb->on_audio_outputs_changed)
+        io->cb->on_audio_outputs_changed(io->cb->user_data);
+    return audioout;
+}
+
+void cbox_io_destroy_audio_output(struct cbox_io *io, struct cbox_audio_output *audioout)
+{
+    audioout->removing = TRUE;
+
+    // This is not a very efficient way to do it. However, in this case,
+    // the list will rarely contain more than 10 elements, so simplicity
+    // and correctness may be more important.
+    GSList *copy = g_slist_copy(io->audio_outputs);
+    copy = g_slist_remove(copy, audioout);
+
+    GSList *old = io->audio_outputs;
+    io->audio_outputs = copy;
+
+    // Notify client code to disconnect the output and to make sure the RT code
+    // is not using the old list anymore
+    if (io->cb->on_audio_outputs_changed)
+        io->cb->on_audio_outputs_changed(io->cb->user_data);
+
+    g_slist_free(old);
+    io->impl->destroyaudiooutfunc(io->impl, audioout);
 }
 
 gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error, gboolean *cmd_handled)
@@ -405,6 +468,31 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
             return FALSE;
         }
         cbox_io_destroy_midi_output(io, midiout);
+        return TRUE;
+    }
+    else if (io->impl->createaudiooutfunc && !strcmp(cmd->command, "/create_audio_output") && !strcmp(cmd->arg_types, "s"))
+    {
+        *cmd_handled = TRUE;
+        struct cbox_audio_output *audioout;
+        audioout = cbox_io_create_audio_output(io, CBOX_ARG_S(cmd, 0), error);
+        if (!audioout)
+            return FALSE;
+        return cbox_uuid_report(&audioout->uuid, fb, error);
+    }
+    else if (io->impl->destroyaudiooutfunc && !strcmp(cmd->command, "/delete_audio_output") && !strcmp(cmd->arg_types, "s"))
+    {
+        *cmd_handled = TRUE;
+        const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        struct cbox_uuid uuid;
+        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+            return FALSE;
+        struct cbox_audio_output *audioout = cbox_io_get_audio_output(io, NULL, &uuid);
+        if (!audioout)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+            return FALSE;
+        }
+        cbox_io_destroy_audio_output(io, audioout);
         return TRUE;
     }
     return FALSE;

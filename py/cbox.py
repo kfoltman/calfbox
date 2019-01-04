@@ -499,6 +499,21 @@ class JackIO:
         do_cmd("/io/get_new_events", (lambda cmd, fb, args: seq.append((cmd, fb, args))), [input_uuid])
         return seq
     @staticmethod
+    def create_audio_output(name, autoconnect_spec = None):
+        uuid = GetUUID("/io/create_audio_output", name).uuid
+        if autoconnect_spec is not None and autoconnect_spec != '':
+            JackIO.autoconnect(uuid, autoconnect_spec)
+        return uuid
+    @staticmethod
+    def delete_audio_output(uuid):
+        do_cmd("/io/delete_audio_output", None, [uuid])
+    @staticmethod
+    def rename_audio_output(uuid, new_name):
+        do_cmd("/io/rename_audio_port", None, [uuid, new_name])
+    @staticmethod
+    def disconnect_audio_output(uuid):
+        do_cmd("/io/disconnect_audio_output", None, [uuid])
+    @staticmethod
     def port_connect(pfrom, pto):
         do_cmd("/io/port_connect", None, [pfrom, pto])
     @staticmethod

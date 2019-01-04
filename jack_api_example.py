@@ -38,6 +38,7 @@ print ("JACK period: %d frames" % (status.buffer_size))
 uuid_bad = cbox.JackIO.create_midi_output('bad')
 uuid_bad2 = cbox.JackIO.create_midi_input('bad2')
 cbox.JackIO.autoconnect_midi_output(uuid_bad, '%s:bad2' % client_name)
+print (cbox.JackIO.get_connected_ports('%s:bad' % client_name))
 try:
     cbox.JackIO.disconnect_midi_input(uuid_bad)
     assert False
@@ -139,6 +140,14 @@ cbox.JackIO.external_tempo(False)
 assert cbox.JackIO.status().external_tempo == False
 cbox.JackIO.external_tempo(True)
 assert cbox.JackIO.status().external_tempo == True
+
+uuid3 = cbox.JackIO.create_audio_output('noises')
+assert "cbox:noises" in cbox.JackIO.get_ports(".*:noises", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SOURCE)
+cbox.JackIO.rename_audio_output(uuid3, "silence")
+assert "cbox:noises" not in cbox.JackIO.get_ports(".*:noises", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SOURCE)
+assert "cbox:silence" in cbox.JackIO.get_ports(".*:silence", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SOURCE)
+cbox.JackIO.delete_audio_output(uuid3)
+assert "cbox:silence" not in cbox.JackIO.get_ports(".*:silence", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SOURCE)
 
 print("Ready!")
 

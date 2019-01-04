@@ -78,11 +78,22 @@ struct cbox_jack_midi_output
     struct cbox_jack_io_impl *jii;
 };
 
+struct cbox_jack_audio_output
+{
+    struct cbox_audio_output hdr;
+    gchar *autoconnect_spec;
+    jack_port_t *port;
+    struct cbox_jack_io_impl *jii;
+};
+
 static struct cbox_midi_input *cbox_jackio_create_midi_in(struct cbox_io_impl *impl, const char *name, GError **error);
 static struct cbox_midi_output *cbox_jackio_create_midi_out(struct cbox_io_impl *impl, const char *name, GError **error);
+static struct cbox_audio_output *cbox_jackio_create_audio_out(struct cbox_io_impl *impl, const char *name, GError **error);
 static void cbox_jackio_destroy_midi_in(struct cbox_io_impl *ioi, struct cbox_midi_input *midiin);
 static void cbox_jackio_destroy_midi_out(struct cbox_io_impl *ioi, struct cbox_midi_output *midiout);
+static void cbox_jackio_destroy_audio_out(struct cbox_io_impl *ioi, struct cbox_audio_output *audioout);
 static void cbox_jack_midi_output_set_autoconnect(struct cbox_jack_midi_output *jmo, const gchar *autoconnect_spec);
+static void cbox_jack_audio_output_set_autoconnect(struct cbox_jack_audio_output *jao, const gchar *autoconnect_spec);
 
 static const char *transport_state_names[] = {"Stopped", "Rolling", "Looping?", "Starting", "Unknown/invalid#4", "Unknown/invalid#5", "Unknown/invalid#6" };
 
@@ -109,6 +120,18 @@ void cbox_jack_midi_output_destroy(struct cbox_jack_midi_output *jmo)
     g_free(jmo->autoconnect_spec);
     assert(!jmo->hdr.merger.inputs);
     free(jmo);
+}
+
+void cbox_jack_audio_output_destroy(struct cbox_jack_audio_output *jao)
+{
+    if (jao->port)
+    {
+        jack_port_unregister(jao->jii->client, jao->port);
+        jao->port = NULL;
+    }
+    g_free(jao->hdr.name);
+    g_free(jao->autoconnect_spec);
+    free(jao);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -395,6 +418,16 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
             g_free(cbox_port);
         }
     }
+    for (GSList *p = io->audio_outputs; p; p = g_slist_next(p))
+    {
+        struct cbox_jack_audio_output *audioout = p->data;
+        if (audioout->autoconnect_spec)
+        {
+            gchar *cbox_port = g_strdup_printf("%s:%s", jii->client_name, audioout->hdr.name);
+            autoconnect_by_spec(jii->client, cbox_port, audioout->autoconnect_spec, 0, 1, portobj, fb);
+            g_free(cbox_port);
+        }
+    }
     gchar *cbox_port = g_strdup_printf("%s:midi", jii->client_name);
     autoconnect_by_var(jii->client, cbox_port, "midi", 1, 1, portobj, fb);
     g_free(cbox_port);
@@ -610,30 +643,51 @@ struct cbox_midi_output *cbox_jackio_create_midi_out(struct cbox_io_impl *impl, 
     return (struct cbox_midi_output *)output;
 }
 
-void cbox_jack_midi_input_set_autoconnect(struct cbox_jack_midi_input *jmi, const gchar *autoconnect_spec)
+struct cbox_audio_output *cbox_jackio_create_audio_out(struct cbox_io_impl *impl, const char *name, GError **error)
 {
-    if (jmi->autoconnect_spec)
-        g_free(jmi->autoconnect_spec);
-    jmi->autoconnect_spec = autoconnect_spec && *autoconnect_spec ? g_strdup(autoconnect_spec) : NULL;
-    if (jmi->autoconnect_spec)
+    struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
+    jack_port_t *port = jack_port_register(jii->client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    if (!port)
     {
-        gchar *cbox_port = g_strdup_printf("%s:%s", jmi->jii->client_name, jmi->hdr.name);
-        autoconnect_by_spec(jmi->jii->client, cbox_port, jmi->autoconnect_spec, 1, 1, NULL, NULL);
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create output audio port '%s'", name);
+        return FALSE;
+    }
+    struct cbox_jack_audio_output *output = calloc(1, sizeof(struct cbox_jack_audio_output));
+    output->hdr.name = g_strdup(name);
+    output->hdr.removing = FALSE;
+    output->port = port;
+    output->jii = jii;
+    cbox_uuid_generate(&output->hdr.uuid);
+
+    return (struct cbox_audio_output *)output;
+}
+
+void cbox_jack_port_set_autoconnect(gchar **spec_ptr, const gchar *autoconnect_spec, struct cbox_jack_io_impl *jii, const gchar *port_name, gboolean is_cbox_input, gboolean is_midi)
+{
+    if (*spec_ptr)
+        g_free(*spec_ptr);
+    *spec_ptr = autoconnect_spec && *autoconnect_spec ? g_strdup(autoconnect_spec) : NULL;
+    if (*spec_ptr)
+    {
+        gchar *cbox_port = g_strdup_printf("%s:%s", jii->client_name, port_name);
+        autoconnect_by_spec(jii->client, cbox_port, *spec_ptr, is_cbox_input, is_midi, NULL, NULL);
         g_free(cbox_port);
     }
 }
 
+void cbox_jack_midi_input_set_autoconnect(struct cbox_jack_midi_input *jmi, const gchar *autoconnect_spec)
+{
+    cbox_jack_port_set_autoconnect(&jmi->autoconnect_spec, autoconnect_spec, jmi->jii, jmi->hdr.name, TRUE, TRUE);
+}
+
 void cbox_jack_midi_output_set_autoconnect(struct cbox_jack_midi_output *jmo, const gchar *autoconnect_spec)
 {
-    if (jmo->autoconnect_spec)
-        g_free(jmo->autoconnect_spec);
-    jmo->autoconnect_spec = autoconnect_spec && *autoconnect_spec ? g_strdup(autoconnect_spec) : NULL;
-    if (jmo->autoconnect_spec)
-    {
-        gchar *cbox_port = g_strdup_printf("%s:%s", jmo->jii->client_name, jmo->hdr.name);
-        autoconnect_by_spec(jmo->jii->client, cbox_port, jmo->autoconnect_spec, 0, 1, NULL, NULL);
-        g_free(cbox_port);
-    }
+    cbox_jack_port_set_autoconnect(&jmo->autoconnect_spec, autoconnect_spec, jmo->jii, jmo->hdr.name, FALSE, TRUE);
+}
+
+void cbox_jack_audio_output_set_autoconnect(struct cbox_jack_audio_output *jao, const gchar *autoconnect_spec)
+{
+    cbox_jack_port_set_autoconnect(&jao->autoconnect_spec, autoconnect_spec, jao->jii, jao->hdr.name, FALSE, FALSE);
 }
 
 void cbox_jackio_destroy_midi_in(struct cbox_io_impl *ioi, struct cbox_midi_input *midiin)
@@ -644,6 +698,11 @@ void cbox_jackio_destroy_midi_in(struct cbox_io_impl *ioi, struct cbox_midi_inpu
 void cbox_jackio_destroy_midi_out(struct cbox_io_impl *ioi, struct cbox_midi_output *midiout)
 {
     cbox_jack_midi_output_destroy((struct cbox_jack_midi_output *)midiout);
+}
+
+void cbox_jackio_destroy_audio_out(struct cbox_io_impl *ioi, struct cbox_audio_output *audioout)
+{
+    cbox_jack_audio_output_destroy((struct cbox_jack_audio_output *)audioout);
 }
 
 #if JACK_HAS_RENAME
@@ -713,6 +772,28 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         *pname = g_strdup(new_name);
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/rename_audio_port") && !strcmp(cmd->arg_types, "ss"))
+    {
+        const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        const char *new_name = CBOX_ARG_S(cmd, 1);
+        struct cbox_uuid uuid;
+        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+            return FALSE;
+        struct cbox_audio_output *audioout = cbox_io_get_audio_output(io, NULL, &uuid);
+        if (!audioout)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+            return FALSE;
+        }
+        if (0 != jack_port_rename_fn(jii->client, ((struct cbox_jack_audio_output *)audioout)->port, new_name))
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot set port name to '%s'", new_name);
+            return FALSE;
+        }
+        g_free(audioout->name);
+        audioout->name = g_strdup(new_name);
+        return TRUE;
+    }
     else if (!strcmp(cmd->command, "/autoconnect") && !strcmp(cmd->arg_types, "ss"))
     {
         const char *uuidstr = CBOX_ARG_S(cmd, 0);
@@ -732,8 +813,29 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             cbox_jack_midi_input_set_autoconnect((struct cbox_jack_midi_input *)midiin, spec);
             return TRUE;
         }
+        struct cbox_audio_output *audioout = cbox_io_get_audio_output(io, NULL, &uuid);
+        if (audioout)
+        {
+            cbox_jack_audio_output_set_autoconnect((struct cbox_jack_audio_output *)audioout, spec);
+            return TRUE;
+        }
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
         return FALSE;
+    }
+    else if (!strcmp(cmd->command, "/disconnect_audio_output") && !strcmp(cmd->arg_types, "s"))
+    {
+        const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        struct cbox_uuid uuid;
+        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+            return FALSE;
+        struct cbox_audio_output *audioout = cbox_io_get_audio_output(io, NULL, &uuid);
+        if (!audioout)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+            return FALSE;
+        }
+        jack_port_disconnect(jii->client, ((struct cbox_jack_audio_output *)audioout)->port);
+        return TRUE;
     }
     else if (!strncmp(cmd->command, "/disconnect_midi_", 17) && !strcmp(cmd->arg_types, "s"))
     {
@@ -903,7 +1005,7 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         jack_description_t desc;
         if (!jack_get_properties(subject, &desc)) // 0 on success, -1 if no subject with any properties exists.
         {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' with uuid '%li' does not have any properties", name, subject);
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' with uuid '%lli' does not have any properties", name, (long long)subject);
             return FALSE;
         }
 
@@ -1110,6 +1212,8 @@ gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const pa
     jii->ioi.createmidioutfunc = cbox_jackio_create_midi_out;
     jii->ioi.destroymidioutfunc = cbox_jackio_destroy_midi_out;
     jii->ioi.updatemidiinroutingfunc = cbox_jackio_update_midi_in_routing;
+    jii->ioi.createaudiooutfunc = cbox_jackio_create_audio_out;
+    jii->ioi.destroyaudiooutfunc = cbox_jackio_destroy_audio_out;
     jii->ioi.controltransportfunc = cbox_jackio_control_transport;
     jii->ioi.getsynccompletedfunc = cbox_jackio_get_sync_completed;
     jii->ioi.destroyfunc = cbox_jackio_destroy;

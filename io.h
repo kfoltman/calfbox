@@ -56,6 +56,8 @@ struct cbox_io_impl
     struct cbox_midi_input *(*createmidiinfunc)(struct cbox_io_impl *ioi, const char *name, GError **error);
     void (*destroymidiinfunc)(struct cbox_io_impl *ioi, struct cbox_midi_input *midiout);
     void (*updatemidiinroutingfunc)(struct cbox_io_impl *ioi);
+    struct cbox_audio_output *(*createaudiooutfunc)(struct cbox_io_impl *ioi, const char *name, GError **error);
+    void (*destroyaudiooutfunc)(struct cbox_io_impl *ioi, struct cbox_audio_output *audioout);
     void (*controltransportfunc)(struct cbox_io_impl *ioi, gboolean roll, uint32_t pos); // (uint32_t)-1 if no change
     gboolean (*getsynccompletedfunc)(struct cbox_io_impl *ioi);
     void (*destroyfunc)(struct cbox_io_impl *ioi);
@@ -73,6 +75,7 @@ struct cbox_io
     struct cbox_io_callbacks *cb;
     GSList *midi_inputs;
     GSList *midi_outputs;
+    GSList *audio_outputs;
     uint32_t free_running_frame_counter;
 };
 
@@ -95,6 +98,7 @@ struct cbox_io_callbacks
     void (*on_reconnected)(void *user_data);
     void (*on_midi_inputs_changed)(void *user_data);
     void (*on_midi_outputs_changed)(void *user_data);
+    void (*on_audio_outputs_changed)(void *user_data);
     gboolean (*on_transport_sync)(void *user_data, enum cbox_transport_state state, uint32_t frame);
     gboolean (*on_tempo_sync)(void *user_data, double beats_per_minute);
 };
@@ -122,6 +126,15 @@ struct cbox_midi_output
     gboolean removing;
 };
 
+struct cbox_audio_output
+{
+    gchar *name;
+    struct cbox_uuid uuid;
+    // This is set if the output is in process of being removed and should not
+    // be used for output.
+    gboolean removing;
+};
+
 extern gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error);
 #if USE_JACK
 extern gboolean cbox_io_init_jack(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error);
@@ -137,8 +150,11 @@ extern gboolean cbox_io_cycle(struct cbox_io *io, struct cbox_command_target *fb
 extern void cbox_io_poll_ports(struct cbox_io *io, struct cbox_command_target *fb);
 extern struct cbox_midi_input *cbox_io_get_midi_input(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
 extern struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
+extern struct cbox_audio_output *cbox_io_get_audio_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
 extern struct cbox_midi_output *cbox_io_create_midi_output(struct cbox_io *io, const char *name, GError **error);
 extern void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *midiout);
+extern struct cbox_audio_output *cbox_io_create_audio_output(struct cbox_io *io, const char *name, GError **error);
+extern void cbox_io_destroy_audio_output(struct cbox_io *io, struct cbox_audio_output *midiout);
 extern struct cbox_midi_input *cbox_io_create_midi_input(struct cbox_io *io, const char *name, GError **error);
 extern void cbox_io_destroy_midi_input(struct cbox_io *io, struct cbox_midi_input *midiin);
 extern void cbox_io_destroy_all_midi_ports(struct cbox_io *io);
