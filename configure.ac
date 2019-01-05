@@ -25,6 +25,7 @@ PYTHON_ENABLED="yes"
 JACK_ENABLED="yes"
 FLUIDSYNTH_ENABLED="yes"
 LIBSMF_ENABLED="yes"
+LIBUSB_ENABLED="yes"
 SSE_ENABLED="no"
 NEON_ENABLED="no"
 
@@ -54,6 +55,12 @@ AC_HELP_STRING([--without-libsmf],[disable use of libsmf]),
   [if test "$withval" = "no"; then LIBSMF_ENABLED="no"; fi],[])
 AC_MSG_RESULT($LIBSMF_ENABLED)
 
+AC_MSG_CHECKING([whether to enable libusb])
+AC_ARG_WITH(libusb,
+AC_HELP_STRING([--without-libusb],[disable use of libusb]),
+  [if test "$withval" = "no"; then LIBUSB_ENABLED="no"; fi],[])
+AC_MSG_RESULT($LIBUSB_ENABLED)
+
 AC_MSG_CHECKING([whether to enable SSE (x86 family only)])
 AC_ARG_WITH(sse,
 AC_HELP_STRING([--with-sse],[enable use of SSE]),
@@ -70,7 +77,9 @@ AC_MSG_RESULT($NEON_ENABLED)
 AC_CHECK_HEADER(uuid/uuid.h, true, AC_MSG_ERROR([libuuid header (uuid/uuid.h) is required]))
 AC_CHECK_LIB(uuid, uuid_unparse, true, AC_MSG_ERROR([libuuid is required]))
 PKG_CHECK_MODULES(GLIB_DEPS, glib-2.0 >= 2.6, true, AC_MSG_ERROR([libglib-2.0 is required]))
-PKG_CHECK_MODULES(LIBUSB_DEPS, libusb-1.0 >= 1.0, true, AC_MSG_ERROR([libusb-1.0 is required]))
+if test "$LIBUSB_ENABLED" = "yes"; then
+    PKG_CHECK_MODULES(LIBUSB_DEPS, libusb-1.0 >= 1.0, true, AC_MSG_ERROR([libusb-1.0 is required]))
+fi
 PKG_CHECK_MODULES(LIBSNDFILE_DEPS, sndfile, true, AC_MSG_ERROR([libsndfile is required]))
 PKG_CHECK_MODULES(NCURSES_DEPS, ncurses, true, AC_MSG_ERROR([libncurses is required]))
 
@@ -98,6 +107,7 @@ AM_CONDITIONAL(USE_PYTHON, test "$PYTHON_ENABLED" = "yes")
 AM_CONDITIONAL(USE_JACK, test "$JACK_ENABLED" = "yes")
 AM_CONDITIONAL(USE_FLUIDSYNTH, test "$FLUIDSYNTH_ENABLED" = "yes")
 AM_CONDITIONAL(USE_LIBSMF, test "$LIBSMF_ENABLED" = "yes")
+AM_CONDITIONAL(USE_LIBUSB, test "$LIBUSB_ENABLED" = "yes")
 AM_CONDITIONAL(USE_SSE, test "$SSE_ENABLED" = "yes")
 AM_CONDITIONAL(USE_NEON, test "$NEON_ENABLED" = "yes")
 
@@ -116,6 +126,12 @@ if test "$FLUIDSYNTH_ENABLED" = "yes"; then
 fi
 if test "$LIBSMF_ENABLED" = "yes"; then
     AC_DEFINE(USE_LIBSMF, 1, [libsmf will be used])
+fi
+if test "$LIBUSB_ENABLED" = "yes"; then
+    AC_DEFINE(USE_LIBUSB, 1, [libusb will be used])
+fi
+if test "$LIBUSB_ENABLED" = "no" && test "$JACK_ENABLED" = "no"; then
+    AC_MSG_ERROR([Neither JACK nor libusb are enabled, at least one is required])
 fi
 if test "$SSE_ENABLED" = "yes"; then
     AC_DEFINE(USE_SSE, 1, [x86 Streaming SIMD Extensions will be used])

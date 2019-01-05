@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config.h"
+
+#if USE_LIBUSB
 #include "usbio_impl.h"
 #include <errno.h>
 
@@ -744,3 +747,5 @@ void usbio_forget_device(struct cbox_usb_io_impl *uii, struct cbox_usb_device_in
     libusb_close(devinfo->handle);
     free(devinfo);
 }
+
+#endif

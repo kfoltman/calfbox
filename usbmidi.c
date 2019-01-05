@@ -16,8 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "app.h"
 #include "config.h"
+#if USE_LIBUSB
+
+#include "app.h"
 #include "config-api.h"
 #include "errors.h"
 #include "hwcfg.h"
@@ -392,3 +394,4 @@ struct cbox_usb_midi_interface *usbio_open_midi_interface(struct cbox_usb_io_imp
     return umi;
 }
 
+#endif

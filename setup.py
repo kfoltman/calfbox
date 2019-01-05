@@ -8,12 +8,14 @@ import sys
 if sys.version_info[0] < 3:
     raise Exception("Python 3 required.")
 
-packages = ['glib-2.0', 'libusb-1.0', 'sndfile']
+packages = ['glib-2.0', 'sndfile']
 
 if '#define USE_FLUIDSYNTH 1' in open('config.h').read():
     packages.append('fluidsynth')
 if '#define USE_JACK 1' in open('config.h').read():
     packages.append('jack')
+if '#define USE_LIBUSB 1' in open('config.h').read():
+    packages.append('libusb-1.0')
 if '#define USE_LIBSMF 1' in open('config.h').read():
     packages.append('smf')
 

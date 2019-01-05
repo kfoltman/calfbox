@@ -39,11 +39,15 @@ const char *cbox_io_section = "io";
 gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error)
 {
 #if USE_JACK
+#if USE_LIBUSB
     if (cbox_config_get_int(cbox_io_section, "use_usb", 0))
         return cbox_io_init_usb(io, params, fb, error);
+#endif
     return cbox_io_init_jack(io, params, fb, error);
 #else
+#if USE_LIBUSB
     return cbox_io_init_usb(io, params, fb, error);
+#endif
 #endif
 }
 

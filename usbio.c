@@ -38,8 +38,11 @@ sync. I'm going to clean it up iteratively later.
 
 */
 
-#include "app.h"
 #include "config.h"
+
+#if USE_LIBUSB
+
+#include "app.h"
 #include "config-api.h"
 #include "errors.h"
 #include "hwcfg.h"
@@ -495,3 +498,4 @@ gboolean cbox_io_init_usb(struct cbox_io *io, struct cbox_open_params *const par
     
 }
 
+#endif

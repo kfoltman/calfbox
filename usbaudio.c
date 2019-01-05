@@ -16,6 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config.h"
+
+#if USE_LIBUSB
+
 #include <pthread.h>
 #include <time.h>
 #include "usbio_impl.h"
@@ -672,3 +676,4 @@ void usbio_stop_audio_playback(struct cbox_usb_io_impl *uii)
     free(uii->sync_transfers);
 }
 
+#endif
