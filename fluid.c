@@ -30,6 +30,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <fluidsynth.h>
 #include <fluidsynth/sfont.h>
+#include <fluidsynth/synth.h>
+#include <fluidsynth/types.h>
+
+#if FLUIDSYNTH_VERSION_MAJOR < 2
+
+typedef unsigned int cbox_fluidsynth_id_t;
+#define fluid_sfont_iteration_setup() fluid_preset_t sfont_iterator;
+#define fluid_sfont_iteration_start(sfont) (sfont)->iteration_start(sfont)
+#define fluid_sfont_iteration_next(sfont) (sfont)->iteration_next(sfont, &sfont_iterator) ? &sfont_iterator : NULL
+#define fluid_preset_get_num(preset) (preset)->get_num(preset)
+#define fluid_preset_get_banknum(preset) (preset)->get_banknum(preset)
+#define fluid_preset_get_name(preset) (preset)->get_name(preset)
+
+#else
+
+typedef int cbox_fluidsynth_id_t;
+#define fluid_sfont_iteration_setup()
+
+#endif
 
 #define CBOX_FLUIDSYNTH_ERROR cbox_fluidsynth_error_quark()
 
@@ -64,20 +83,21 @@ struct fluidsynth_module
 static gboolean select_patch_by_name(struct fluidsynth_module *m, int channel, const gchar *preset, GError **error)
 {
     fluid_sfont_t* sfont = fluid_synth_get_sfont(m->synth, 0);
-    fluid_preset_t tmp;
+    fluid_preset_t* tmp;
+    fluid_sfont_iteration_setup();
 
-    sfont->iteration_start(sfont);            
-    while(sfont->iteration_next(sfont, &tmp))
+    fluid_sfont_iteration_start(sfont);
+    while((tmp = fluid_sfont_iteration_next(sfont)) != NULL)
     {
         // trailing spaces are common in some SF2s
-        const char *pname = tmp.get_name(&tmp);
+        const char *pname = fluid_preset_get_name(tmp);
         int len = strlen(pname);
         while (len > 0 && pname[len - 1] == ' ')
             len--;
             
         if (!strncmp(pname, preset, len) && preset[len] == '\0')
         {
-            fluid_synth_program_select(m->synth, channel, m->sfid, tmp.get_banknum(&tmp), tmp.get_num(&tmp));
+            fluid_synth_program_select(m->synth, channel, m->sfid, fluid_preset_get_banknum(tmp), fluid_preset_get_num(tmp));
             return TRUE;
         }
     }
@@ -273,10 +293,10 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             return FALSE;
         for (int i = 0; i < 16; i++)
         {
-            unsigned int sfont_id, bank_num, preset_num;
+            cbox_fluidsynth_id_t sfont_id, bank_num, preset_num;
             fluid_synth_get_program(m->synth, i, &sfont_id, &bank_num, &preset_num);
             fluid_preset_t *preset = fluid_synth_get_channel_preset(m->synth, i);
-            if (!cbox_execute_on(fb, NULL, "/patch", "iis", error, 1 + i, preset_num + 128 * bank_num, preset ? preset->get_name(preset) : "(unknown)"))
+            if (!cbox_execute_on(fb, NULL, "/patch", "iis", error, 1 + i, preset_num + 128 * bank_num, preset ? fluid_preset_get_name(preset) : "(unknown)"))
                 return FALSE;
         }
         return CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
@@ -288,13 +308,14 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         if (m->sfid == -1)
             return TRUE;
         fluid_sfont_t* sfont = fluid_synth_get_sfont(m->synth, 0);
-        fluid_preset_t tmp;
+        fluid_preset_t *tmp;
 
-        sfont->iteration_start(sfont);            
-        while(sfont->iteration_next(sfont, &tmp))
+        fluid_sfont_iteration_setup();
+        fluid_sfont_iteration_start(sfont);
+        while((tmp = fluid_sfont_iteration_next(sfont)) != NULL)
         {
-            const char *pname = tmp.get_name(&tmp);
-            if (!cbox_execute_on(fb, NULL, "/patch", "is", error, (int)(tmp.get_num(&tmp) + 128 * tmp.get_banknum(&tmp)), pname))
+            const char *pname = fluid_preset_get_name(tmp);
+            if (!cbox_execute_on(fb, NULL, "/patch", "is", error, (int)(fluid_preset_get_num(tmp) + 128 * fluid_preset_get_banknum(tmp)), pname))
                 return FALSE;
         }
         return TRUE;
