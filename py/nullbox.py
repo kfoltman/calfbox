@@ -24,6 +24,9 @@ class NullCalfbox(str): #iterable
     def __call__(self, *args):
         return __class__()
 
+    def __getitem__(self, key):
+        return __class__()
+
     def serialize_event(self, *args):
         return b''
 
