@@ -610,15 +610,6 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
         }
     }
     
-    // XXXKF implement full cleanup, not only the front of the queue
-    if(scene->adhoc_patterns && scene->adhoc_patterns->completed)
-    {
-        struct cbox_adhoc_pattern *top = scene->adhoc_patterns;
-        cbox_midi_buffer_clear(&top->output_buffer);
-        scene->adhoc_patterns = top->next;
-    }
-
-
     cbox_midi_buffer_clear(&scene->midibuf_total);
     cbox_midi_merger_render(&scene->scene_input_merger);
 
@@ -1069,11 +1060,11 @@ static void free_adhoc_pattern_list(struct cbox_scene *scene, struct cbox_adhoc_
 {
     while(ap)
     {
-        struct cbox_adhoc_pattern *tmp = ap;
-        ap = ap->next;
-        tmp->next = NULL;
+        struct cbox_adhoc_pattern *next = ap->next;
+        ap->next = NULL;
         cbox_midi_merger_disconnect(&scene->scene_input_merger, &ap->output_buffer, scene->rt);
-        cbox_adhoc_pattern_destroy(tmp);
+        cbox_adhoc_pattern_destroy(ap);
+        ap = next;
     }
 }
 
