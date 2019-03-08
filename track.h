@@ -54,6 +54,7 @@ struct cbox_track
 extern struct cbox_track *cbox_track_new(struct cbox_document *document);
 extern struct cbox_track_item *cbox_track_add_item(struct cbox_track *track, uint32_t time, struct cbox_midi_pattern *pattern, uint32_t offset, uint32_t length);
 extern void cbox_track_update_playback(struct cbox_track *track, struct cbox_master *master);
+extern void cbox_track_clear_clips(struct cbox_track *track);
 extern void cbox_track_set_dirty(struct cbox_track *track);
 extern void cbox_track_item_set_dirty(struct cbox_track_item *track_item);
 

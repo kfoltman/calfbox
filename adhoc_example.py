@@ -34,12 +34,14 @@ pattern_len = 10 * 24 * 2
 pattern = song.pattern_from_blob(pblob, pattern_len)
 
 retrig = 10
-while True:
+i = 0
+while i < 50:
+    i += 1
     retrig -= 1
     if retrig <= 0:
         print ("Triggering adhoc pattern with ID 1")
-        Document.get_scene().play_pattern(pattern, 240, 1)
-        retrig = 10
+        Document.get_scene().play_pattern(pattern, 240, 0)
+        retrig = 5
     # Query JACK ports, new USB devices etc.
     cbox.call_on_idle()
     time.sleep(0.1)

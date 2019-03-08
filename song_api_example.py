@@ -23,6 +23,7 @@ song.clear()
 
 # Add the first track
 trk = song.add_track()
+trk.clear_clips()
 
 # Create a binary blob that contains the MIDI events
 pblob = bytes()

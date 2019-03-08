@@ -92,6 +92,14 @@ struct cbox_track_item *cbox_track_add_item(struct cbox_track *track, uint32_t t
     return item;
 }
 
+void cbox_track_clear_clips(struct cbox_track *track)
+{
+    while(track->items) {
+        cbox_object_destroy(track->items->data);
+    }
+    cbox_track_set_dirty(track);
+}
+
 void cbox_track_set_dirty(struct cbox_track *track)
 {
     ++track->generation;
@@ -132,6 +140,11 @@ gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return cbox_execute_on(fb, NULL, "/name", "s", error, track->name) &&
             (track->external_output_set ? cbox_uuid_report_as(&track->external_output, "/external_output", fb, error) : TRUE) &&
             CBOX_OBJECT_DEFAULT_STATUS(track, fb, error);
+    }
+    else if (!strcmp(cmd->command, "/clear_clips") && !strcmp(cmd->arg_types, ""))
+    {
+        cbox_track_clear_clips(track);
+        return TRUE;
     }
     else if (!strcmp(cmd->command, "/add_clip") && !strcmp(cmd->arg_types, "iiis"))
     {
