@@ -17,7 +17,9 @@ class NullCalfbox(str): #iterable
     def __init__(self, *args):
         self.client_name = ""
         self.pos_ppqn = 0
-
+        self.ignore_program_changes = False
+        self.patch = {i:(0, "nullbox") for i in range(1,17)} #catches status().patch
+        
     def __getattr__(self, *args):
         return __class__()
 
@@ -29,6 +31,17 @@ class NullCalfbox(str): #iterable
 
     def serialize_event(self, *args):
         return b''
+
+    def get_patches(self, *args):
+        """sf2 compatibility"""
+        return {
+            0 : "nullbox",
+            }
+                
+    def set_ignore_program_changes(self, state):
+        self.ignore_program_changes = state
+
+    
 
 import sys
 import calfbox.nullbox
