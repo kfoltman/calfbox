@@ -14,22 +14,22 @@ class NullCalfbox(str): #iterable
     will use the nullbox module.
     """
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         self.client_name = ""
         self.pos_ppqn = 0
         self.ignore_program_changes = False
         self.patch = {i:(0, "nullbox") for i in range(1,17)} #catches status().patch
         
-    def __getattr__(self, *args):
+    def __getattr__(self, *args, **kwargs):
         return __class__()
 
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         return __class__()
 
     def __getitem__(self, key):
         return __class__()
 
-    def serialize_event(self, *args):
+    def serialize_event(self, *args, **kwargs):
         return b''
 
     def get_patches(self, *args):
