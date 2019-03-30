@@ -1121,12 +1121,13 @@ static void cbox_jackio_control_transport(struct cbox_io_impl *impl, gboolean ro
         g_message("JACK transport: control(op=%s, pos=%d)\n", roll ? "roll" : "stop", (int)pos);
 
     jack_transport_state_t state = jack_transport_query(jii->client, NULL);
+    if (roll && pos != (uint32_t)-1)
+        jack_transport_locate(jii->client, pos);
     if (roll && state == JackTransportStopped)
         jack_transport_start(jii->client);
     if (!roll && state != JackTransportStopped)
         jack_transport_stop(jii->client);
-
-    if (pos != (uint32_t)-1)
+    if (!roll && pos != (uint32_t)-1)
         jack_transport_locate(jii->client, pos);
 }
 

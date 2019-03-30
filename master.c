@@ -175,9 +175,10 @@ DEFINE_RT_VOID_FUNC(cbox_master, master, cbox_master_play)
     struct cbox_rt *rt = master->engine->rt;
     if (rt && rt->io && rt->io->impl->controltransportfunc)
     {
-        rt->io->impl->controltransportfunc(rt->io->impl, TRUE, master->spb ? master->spb->song_pos_samples : (uint32_t)-1);
+        rt->io->impl->controltransportfunc(rt->io->impl, FALSE, master->spb ? master->spb->song_pos_samples : (uint32_t)-1);
         if (!rt->io->impl->getsynccompletedfunc(rt->io->impl))
             RT_CALL_AGAIN_LATER();
+        rt->io->impl->controltransportfunc(rt->io->impl, TRUE, master->spb ? master->spb->song_pos_samples : (uint32_t)-1);
         return;
     }
     // wait for the notes to be released
