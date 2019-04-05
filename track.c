@@ -50,6 +50,7 @@ struct cbox_track *cbox_track_new(struct cbox_document *document)
     p->owner = NULL;
     p->external_output_set = FALSE;
     p->generation = 0;
+    p->mute = FALSE;
 
     cbox_command_target_init(&p->cmd_target, cbox_track_process_cmd, p);
     CBOX_OBJECT_REGISTER(p);
@@ -137,7 +138,8 @@ gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             it = g_list_next(it);
         }
 
-        return cbox_execute_on(fb, NULL, "/name", "s", error, track->name) &&
+        return cbox_execute_on(fb, NULL, "/mute", "i", error, track->mute) &&
+            cbox_execute_on(fb, NULL, "/name", "s", error, track->name) &&
             (track->external_output_set ? cbox_uuid_report_as(&track->external_output, "/external_output", fb, error) : TRUE) &&
             CBOX_OBJECT_DEFAULT_STATUS(track, fb, error);
     }
@@ -197,6 +199,14 @@ gboolean cbox_track_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             track->external_output_set = FALSE;
             cbox_track_set_dirty(track);
         }
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/mute") && !strcmp(cmd->arg_types, "i"))
+    {
+        if (CBOX_ARG_I(cmd, 0) == (int)track->mute) // no-op
+            return TRUE;
+        track->mute = CBOX_ARG_I(cmd, 0) != 0;
+        cbox_track_set_dirty(track);
         return TRUE;
     }
     else

@@ -77,7 +77,7 @@ struct cbox_midi_clip_playback
 };
 
 extern void cbox_midi_clip_playback_init(struct cbox_midi_clip_playback *pb, struct cbox_midi_playback_active_notes *active_notes, struct cbox_master *master);
-extern void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, uint32_t offset, uint32_t nsamples);
+extern void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, uint32_t offset, uint32_t nsamples, gboolean mute);
 extern void cbox_midi_clip_playback_seek_ppqn(struct cbox_midi_clip_playback *pb, uint32_t time_ppqn, uint32_t min_time_ppqn);
 extern void cbox_midi_clip_playback_seek_samples(struct cbox_midi_clip_playback *pb, uint32_t time_samples, uint32_t min_time_ppqn);
 extern void cbox_midi_clip_playback_set_pattern(struct cbox_midi_clip_playback *pb, struct cbox_midi_pattern_playback *pattern, int start_time_samples, int end_time_samples, int item_start_ppqn, int offset_ppqn);
@@ -110,6 +110,7 @@ struct cbox_track_playback
     struct cbox_song_playback *spb;
     struct cbox_track_playback *old_state;
     gboolean state_copied;
+    gboolean mute;
 };
 
 extern struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track *track, struct cbox_master *master, struct cbox_song_playback *spb, struct cbox_track_playback *old_state);

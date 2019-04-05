@@ -44,7 +44,7 @@ void cbox_adhoc_pattern_render(struct cbox_adhoc_pattern *ap, uint32_t offset, u
     }
     if (ap->playback.pos >= ap->playback.pattern->event_count)
         ap->completed = TRUE;
-    cbox_midi_clip_playback_render(&ap->playback, &ap->output_buffer, offset, nsamples);
+    cbox_midi_clip_playback_render(&ap->playback, &ap->output_buffer, offset, nsamples, FALSE);
 }
 
 void cbox_adhoc_pattern_destroy(struct cbox_adhoc_pattern *ap)

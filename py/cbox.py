@@ -703,6 +703,7 @@ class DocTrack(DocObj):
         clips = [ClipItem]
         name = SettableProperty(str)
         external_output = SettableProperty(str)
+        mute = SettableProperty(int)
     def add_clip(self, pos, offset, length, pattern):
         return self.cmd_makeobj("/add_clip", int(pos), int(offset), int(length), pattern.uuid)
     def clear_clips(self):

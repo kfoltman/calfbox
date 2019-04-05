@@ -88,6 +88,7 @@ struct cbox_track_playback *cbox_track_playback_new_from_track(struct cbox_track
     pb->external_merger = NULL;
     pb->spb = spb;
     pb->state_copied = FALSE;
+    pb->mute = track->mute;
     
     GList *it = track->items;
     struct cbox_track_playback_item *p = pb->items;
@@ -257,6 +258,9 @@ void cbox_track_playback_start_item(struct cbox_track_playback *pb, int time, in
 void cbox_track_playback_render(struct cbox_track_playback *pb, uint32_t offset, uint32_t nsamples)
 {
     struct cbox_song_playback *spb = pb->master->spb;
+    if (pb->mute) {
+        cbox_midi_playback_active_notes_release(&pb->active_notes, &pb->output_buffer, NULL);
+    }
     uint32_t rpos = 0;
     while(rpos < nsamples && pb->pos < pb->items_count)
     {
@@ -277,12 +281,12 @@ void cbox_track_playback_render(struct cbox_track_playback *pb, uint32_t offset,
         if (render_end_samples > cur_segment_end_samples)
         {
             rend = cur_segment_end_samples - spb->song_pos_samples;
-            cbox_midi_clip_playback_render(&pb->playback, &pb->output_buffer, offset, rend - rpos);
+            cbox_midi_clip_playback_render(&pb->playback, &pb->output_buffer, offset, rend - rpos, pb->mute);
             pb->pos++;
             cbox_track_playback_start_item(pb, cur_segment_end_samples, FALSE, FALSE);
         }
         else
-            cbox_midi_clip_playback_render(&pb->playback, &pb->output_buffer, offset, rend - rpos);
+            cbox_midi_clip_playback_render(&pb->playback, &pb->output_buffer, offset, rend - rpos, pb->mute);
         offset += rend - rpos;
         rpos = rend;
     }
@@ -423,7 +427,7 @@ void cbox_midi_clip_playback_set_pattern(struct cbox_midi_clip_playback *pb, str
     pb->min_time_ppqn = offset_ppqn;
 }
 
-void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, uint32_t offset, uint32_t nsamples)
+void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct cbox_midi_buffer *buf, uint32_t offset, uint32_t nsamples, gboolean mute)
 {
     uint32_t end_time_samples = pb->end_time_samples;
     uint32_t cur_time_samples = pb->start_time_samples + pb->rel_time_samples;
@@ -445,9 +449,11 @@ void cbox_midi_clip_playback_render(struct cbox_midi_clip_playback *pb, struct c
             if (event_time_samples >= cur_time_samples) // convert negative relative time to 0 time
                 time = event_time_samples - cur_time_samples;
             
-            cbox_midi_buffer_copy_event(buf, src, offset + time);
-            if (pb->active_notes)
-                accumulate_event2(pb->active_notes, src);
+            if (!mute) {
+                cbox_midi_buffer_copy_event(buf, src, offset + time);
+                if (pb->active_notes)
+                    accumulate_event2(pb->active_notes, src);
+            }
         }
         pb->pos++;
     }

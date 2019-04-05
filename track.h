@@ -49,6 +49,7 @@ struct cbox_track
     struct cbox_song *owner;
     struct cbox_track_playback *pb;
     uint32_t generation;
+    gboolean mute;
 };
 
 extern struct cbox_track *cbox_track_new(struct cbox_document *document);
