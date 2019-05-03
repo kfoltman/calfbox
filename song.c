@@ -59,8 +59,12 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
         for(GList *p = song->master_track_items; p; p = g_list_next(p))
         {
             struct cbox_master_track_item *mti = p->data;
-            if (!cbox_execute_on(fb, NULL, "/mti", "ifii", error, pos, mti->tempo, mti->timesig_nom, mti->timesig_denom))
-                return FALSE;
+            // Omit dummy item at 0 position.
+            if (pos || (mti->timesig_nom && mti->timesig_denom) || mti->tempo)
+            {
+                if (!cbox_execute_on(fb, NULL, "/mti", "ifii", error, pos, mti->tempo, mti->timesig_nom, mti->timesig_denom))
+                    return FALSE;
+            }
             pos += mti->duration_ppqn;
         }
         return cbox_execute_on(fb, NULL, "/loop_start", "i", error, (int)song->loop_start_ppqn) &&
@@ -174,7 +178,15 @@ struct cbox_song *cbox_song_new(struct cbox_document *document)
 {
     struct cbox_song *p = calloc(1, sizeof(struct cbox_song));
     CBOX_OBJECT_HEADER_INIT(p, cbox_song, document);
-    p->master_track_items = NULL;
+    
+    // Create the first, dummy tempo map item
+    struct cbox_master_track_item *mti = calloc(1, sizeof(struct cbox_master_track_item));
+    mti->timesig_nom = 0;
+    mti->timesig_denom = 0;
+    mti->tempo = 0;
+    mti->duration_ppqn = 0;
+    
+    p->master_track_items = g_list_append(NULL, mti);
     p->tracks = NULL;
     p->patterns = NULL;
     p->lyrics_sheet = NULL;
@@ -213,10 +225,15 @@ void cbox_song_set_mti(struct cbox_song *song, uint32_t pos, double tempo, int t
             if (is_noop_here)
             {
                 uint32_t deleted_duration = mti->duration_ppqn;
-                song->master_track_items = g_list_remove(song->master_track_items, mti);
                 if (prev) {
+                    song->master_track_items = g_list_remove(song->master_track_items, mti);
                     mti = prev->data;
                     mti->duration_ppqn += deleted_duration;
+                } else {
+                    // Instead of deleting the first item, make it a dummy one.
+                    mti->tempo = 0;
+                    mti->timesig_nom = 0;
+                    mti->timesig_denom = 0;
                 }
                 return;
             }
