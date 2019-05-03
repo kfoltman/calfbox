@@ -299,7 +299,7 @@ int cmd_pattern_simple(struct cbox_menu_item_command *item, void *context)
 
 int cmd_pattern_normal(struct cbox_menu_item_command *item, void *context)
 {
-    cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_new_metronome(app.engine->master->song, app.engine->master->timesig_nom, app.engine->master->ppqn_factor));
+    cbox_song_use_looped_pattern(app.engine->master->song, cbox_midi_pattern_new_metronome(app.engine->master->song, app.engine->master->timesig_num, app.engine->master->ppqn_factor));
     restart_song();
     return 0;
 }

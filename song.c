@@ -60,9 +60,9 @@ gboolean cbox_song_process_cmd(struct cbox_command_target *ct, struct cbox_comma
         {
             struct cbox_master_track_item *mti = p->data;
             // Omit dummy item at 0 position.
-            if (pos || (mti->timesig_nom && mti->timesig_denom) || mti->tempo)
+            if (pos || (mti->timesig_num && mti->timesig_denom) || mti->tempo)
             {
-                if (!cbox_execute_on(fb, NULL, "/mti", "ifii", error, pos, mti->tempo, mti->timesig_nom, mti->timesig_denom))
+                if (!cbox_execute_on(fb, NULL, "/mti", "ifii", error, pos, mti->tempo, mti->timesig_num, mti->timesig_denom))
                     return FALSE;
             }
             pos += mti->duration_ppqn;
@@ -181,7 +181,7 @@ struct cbox_song *cbox_song_new(struct cbox_document *document)
     
     // Create the first, dummy tempo map item
     struct cbox_master_track_item *mti = calloc(1, sizeof(struct cbox_master_track_item));
-    mti->timesig_nom = 0;
+    mti->timesig_num = 0;
     mti->timesig_denom = 0;
     mti->tempo = 0;
     mti->duration_ppqn = 0;
@@ -199,27 +199,27 @@ struct cbox_song *cbox_song_new(struct cbox_document *document)
     return p;
 }
 
-void cbox_song_set_mti(struct cbox_song *song, uint32_t pos, double tempo, int timesig_nom, int timesig_denom)
+void cbox_song_set_mti(struct cbox_song *song, uint32_t pos, double tempo, int timesig_num, int timesig_denom)
 {
     uint32_t tstart = 0, tend = 0;
     GList *prev = NULL;
     // A full no-op
-    if (tempo < 0 && timesig_nom < 0)
+    if (tempo < 0 && timesig_num < 0)
         return;
-    gboolean is_noop = tempo == 0 && timesig_nom == 0;
+    gboolean is_noop = tempo == 0 && timesig_num == 0;
     
     struct cbox_master_track_item *mti = NULL;
     for(GList *p = song->master_track_items; p; p = g_list_next(p))
     {
         mti = p->data;
         tend = tstart + mti->duration_ppqn;
-        // printf("range %d-%d %f %d\n", tstart, tend, mti->tempo, mti->timesig_nom);
+        // printf("range %d-%d %f %d\n", tstart, tend, mti->tempo, mti->timesig_num);
         if (pos == tstart)
         {
             double new_tempo = tempo >= 0 ? tempo : mti->tempo;
-            int new_timesig_nom = timesig_nom >= 0 ? timesig_nom : mti->timesig_nom;
+            int new_timesig_num = timesig_num >= 0 ? timesig_num : mti->timesig_num;
             // Is this operation going to become a no-op after the change?
-            gboolean is_noop_here = new_tempo <= 0 && new_timesig_nom <= 0;
+            gboolean is_noop_here = new_tempo <= 0 && new_timesig_num <= 0;
             // If the new item is a no-op and not the first item, delete it
             // and extend the previous item by deleted item's duration
             if (is_noop_here)
@@ -232,7 +232,7 @@ void cbox_song_set_mti(struct cbox_song *song, uint32_t pos, double tempo, int t
                 } else {
                     // Instead of deleting the first item, make it a dummy one.
                     mti->tempo = 0;
-                    mti->timesig_nom = 0;
+                    mti->timesig_num = 0;
                     mti->timesig_denom = 0;
                 }
                 return;
@@ -241,7 +241,7 @@ void cbox_song_set_mti(struct cbox_song *song, uint32_t pos, double tempo, int t
         }
         if (pos >= tstart && pos < tend)
         {
-            if (is_noop || (tempo <= 0 && timesig_nom <= 0))
+            if (is_noop || (tempo <= 0 && timesig_num <= 0))
                 return;
             // Split old item's duration
             mti->duration_ppqn = pos - tstart;
@@ -284,10 +284,10 @@ set_values:
     // No effect if -1
     if (tempo >= 0)
         mti->tempo = tempo;
-    if ((timesig_nom > 0 && timesig_denom > 0) ||
-        (timesig_nom == 0 && timesig_denom == 0))
+    if ((timesig_num > 0 && timesig_denom > 0) ||
+        (timesig_num == 0 && timesig_denom == 0))
     {
-        mti->timesig_nom = timesig_nom;
+        mti->timesig_num = timesig_num;
         mti->timesig_denom = timesig_denom;
     }
 }

@@ -32,7 +32,7 @@ struct cbox_master_track_item
     // May be zero (= no change)
     double tempo;
     // Either both are zero (= no change) or both are non-zero
-    int timesig_nom, timesig_denom;
+    int timesig_num, timesig_denom;
 };
 
 struct cbox_master_track
@@ -56,7 +56,7 @@ extern void cbox_song_add_track(struct cbox_song *song, struct cbox_track *track
 extern void cbox_song_remove_track(struct cbox_song *song, struct cbox_track *track);
 extern void cbox_song_clear(struct cbox_song *song);
 extern void cbox_song_use_looped_pattern(struct cbox_song *song, struct cbox_midi_pattern *pattern);
-extern void cbox_song_set_mti(struct cbox_song *song, uint32_t pos, double tempo, int timesig_nom, int timesig_denom);
+extern void cbox_song_set_mti(struct cbox_song *song, uint32_t pos, double tempo, int timesig_num, int timesig_denom);
 extern void cbox_song_destroy(struct cbox_song *song);
 
 #endif

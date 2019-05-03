@@ -128,7 +128,7 @@ struct cbox_tempo_map_item
     uint32_t time_ppqn;
     uint32_t time_samples;
     double tempo;
-    int timesig_nom, timesig_denom;
+    int timesig_num, timesig_denom;
     // should also have a bar/beat position to make things easier
 };
 

@@ -36,7 +36,7 @@ static gboolean master_process_cmd(struct cbox_command_target *ct, struct cbox_c
         if (!m->spb)
             return TRUE;
         return cbox_execute_on(fb, NULL, "/tempo", "f", error, m->tempo) &&
-            cbox_execute_on(fb, NULL, "/timesig", "ii", error, m->timesig_nom, m->timesig_denom) &&
+            cbox_execute_on(fb, NULL, "/timesig", "ii", error, m->timesig_num, m->timesig_denom) &&
             cbox_execute_on(fb, NULL, "/playing", "i", error, (int)m->state) &&
             cbox_execute_on(fb, NULL, "/pos", "i", error, m->spb->song_pos_samples) &&
             cbox_execute_on(fb, NULL, "/pos_ppqn", "i", error, m->spb->song_pos_ppqn) &&
@@ -132,7 +132,7 @@ static void cbox_master_init(struct cbox_master *master, struct cbox_engine *eng
     master->srate = engine->io_env.srate;
     master->tempo = 120.0;
     master->new_tempo = 120.0;
-    master->timesig_nom = 4;
+    master->timesig_num = 4;
     master->timesig_denom = 4;
     master->state = CMTS_STOP;
     master->engine = engine;
@@ -164,7 +164,7 @@ void cbox_master_set_tempo(struct cbox_master *master, float tempo)
 
 void cbox_master_set_timesig(struct cbox_master *master, int beats, int unit)
 {
-    master->timesig_nom = beats;
+    master->timesig_num = beats;
     master->timesig_denom = unit;
 }
 

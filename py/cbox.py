@@ -723,13 +723,23 @@ class PatternItem:
         self.pattern = Document.map_uuid(pattern)
 
 class MtiItem:
-    def __init__(self, pos, tempo, timesig_nom, timesig_denom):
+    def __init__(self, pos, tempo, timesig_num, timesig_denom):
         self.pos = pos
         self.tempo = tempo
-        self.timesig_nom = timesig_nom
+        # Original misspelling
+        self.timesig_num = timesig_num
         self.timesig_denom = timesig_denom
+    def __getattr__(self, name):
+        if name == 'timesig_nom':
+            return self.timesig_num
+        raise AttributeError(name)
+    def __setattr__(self, name, value):
+        if name == 'timesig_nom':
+            self.timesig_num = value
+        else:
+            self.__dict__[name] = value
     def __eq__(self, o):
-        return self.pos == o.pos and self.tempo == o.tempo and self.timesig_nom == o.timesig_nom and self.timesig_denom == o.timesig_denom
+        return self.pos == o.pos and self.tempo == o.tempo and self.timesig_num == o.timesig_num and self.timesig_denom == o.timesig_denom
 
 class DocSongStatus:
     tracks = None
@@ -746,8 +756,10 @@ class DocSong(DocObj):
         return self.cmd("/clear", None)
     def set_loop(self, ls, le):
         return self.cmd("/set_loop", None, int(ls), int(le))
-    def set_mti(self, pos, tempo = None, timesig_nom = None, timesig_denom = None):
-        self.cmd("/set_mti", None, int(pos), float(tempo) if tempo is not None else -1.0, int(timesig_nom) if timesig_nom is not None else -1, int(timesig_denom) if timesig_denom else -1)
+    def set_mti(self, pos, tempo = None, timesig_num = None, timesig_denom = None, timesig_nom = None):
+        if timesig_nom is not None:
+            timesig_num = timesig_nom
+        self.cmd("/set_mti", None, int(pos), float(tempo) if tempo is not None else -1.0, int(timesig_num) if timesig_num is not None else -1, int(timesig_denom) if timesig_denom else -1)
     def add_track(self):
         return self.cmd_makeobj("/add_track")
     def load_drum_pattern(self, name):

@@ -598,22 +598,22 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
     int pos_ppqn = 0;
     int pos_samples = 0;
     double tempo = master->tempo;
-    int timesig_nom = master->timesig_nom;
+    int timesig_num = master->timesig_num;
     int timesig_denom = master->timesig_denom;
     for (GList *p = song->master_track_items; p != NULL; p = g_list_next(p))
     {
         struct cbox_master_track_item *mti = p->data;
         if (mti->tempo > 0)
             tempo = mti->tempo;
-        if (mti->timesig_nom > 0)
-            timesig_nom = mti->timesig_nom;
+        if (mti->timesig_num > 0)
+            timesig_num = mti->timesig_num;
         if (mti->timesig_denom > 0)
             timesig_denom = mti->timesig_denom;
         struct cbox_tempo_map_item *tmi = &spb->tempo_map_items[pos];
         tmi->time_ppqn = pos_ppqn;
         tmi->time_samples = pos_samples;
         tmi->tempo = tempo;
-        tmi->timesig_nom = timesig_nom;
+        tmi->timesig_num = timesig_num;
         tmi->timesig_denom = timesig_denom;
         
         pos_ppqn += mti->duration_ppqn;

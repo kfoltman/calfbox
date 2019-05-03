@@ -40,7 +40,7 @@ struct cbox_master
 {
     int srate;
     float tempo, new_tempo;
-    int timesig_nom;
+    int timesig_num;
     int timesig_denom; // must be 4 for now
     uint64_t ppqn_factor;
     enum cbox_master_transport_state state;
