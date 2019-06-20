@@ -795,7 +795,7 @@ try_now:
     }
     else if (!strncmp(key, "amp_velcurve_", 13))
     {
-        // if not known yet, set to 0, it can always be overriden via velcurve_quadratic setting
+        // if not known yet, set to 0, it can always be overridden via velcurve_quadratic setting
         if (l->data.velcurve_quadratic == -1)
             l->data.velcurve_quadratic = 0;
         int point = atoi(key + 13);

@@ -73,8 +73,8 @@ static void my_fft_main(complex float output[STD_WAVEFORM_FRAMES])
         
         for (int j = 0; j < STD_WAVEFORM_FRAMES / 2; j++)
         {
-            int jj1 = (j & mask) + ((j & ~mask) << 1); // insert 0 at ith bit to get the left arm of the butterfly
-            int jj2 = jj1 + disp;                      // insert 1 at ith bit to get the right arm
+            int jj1 = (j & mask) + ((j & ~mask) << 1); // insert 0 at i'th bit to get the left arm of the butterfly
+            int jj2 = jj1 + disp;                      // insert 1 at i'th bit to get the right arm
             assert((jj1 + disp) == (jj1 | disp));
 
             // e^iw

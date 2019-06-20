@@ -36,7 +36,7 @@ class Metadata:
     def set_property(port, key, value, jackPropertyType=""):
         """empty jackPropertyType leads to UTF-8 string
         for convenience we see if value is a python int and send the right jack_property_t::type
-        jackio.c checks if the port exists, eventhough metadata allows keys for non-existent uuids.
+        jackio.c checks if the port exists, even though metadata allows keys for non-existent uuids.
         """
         if type(value) is int:
             jackPropertyType = "http://www.w3.org/2001/XMLSchema#int"

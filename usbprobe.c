@@ -203,7 +203,7 @@ static const char *get_terminal_type_name(int type)
         case 0x604: return "Legacy audio";
         case 0x605: return "S/PDIF";
         case 0x606: return "1394 D/A Stream";
-        case 0x607: return "1394 D/V Stream Sountrack";
+        case 0x607: return "1394 D/V Stream Soundtrack";
         case 0x700: return "Embedded undefined";
         case 0x701: return "Level calibration noise source";
         case 0x702: return "Equalization noise";

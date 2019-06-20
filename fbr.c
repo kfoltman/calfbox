@@ -88,8 +88,8 @@ static int do_fft(struct feedback_reducer_module *m)
         
         for (int j = 0; j < ANALYSIS_BUFFER_SIZE / 2; j++)
         {
-            int jj1 = (j & mask) + ((j & ~mask) << 1); // insert 0 at ith bit to get the left arm of the butterfly
-            int jj2 = jj1 + disp;                      // insert 1 at ith bit to get the right arm
+            int jj1 = (j & mask) + ((j & ~mask) << 1); // insert 0 at i'th bit to get the left arm of the butterfly
+            int jj2 = jj1 + disp;                      // insert 1 at i'th bit to get the right arm
 
             // e^iw
             complex float eiw1 = euler_table[(jj1 << invi) & (ANALYSIS_BUFFER_SIZE - 1)];
