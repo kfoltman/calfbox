@@ -450,6 +450,12 @@ class JackIO:
             '*midi_input', 'sample_rate', 'output_resolution',
             '*usb_midi_input', '*usb_midi_output', '?external_tempo'], [])
     @staticmethod
+    def jack_transport_position():
+        # Some of these only make sense for JACK
+        return GetThings("/io/jack_transport_position", ['state', 'unique_lo',
+        'unique_hi', 'usecs_lo', 'usecs_hi', 'frame_rate', 'frame', 'bar',
+        'beat', 'tick', 'bar_start_tick', 'bbt_frame_offset'], [])
+    @staticmethod
     def create_midi_input(name, autoconnect_spec = None):
         uuid = GetUUID("/io/create_midi_input", name).uuid
         if autoconnect_spec is not None and autoconnect_spec != '':

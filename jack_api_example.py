@@ -101,6 +101,7 @@ cbox.JackIO.rename_midi_input(uuid_in, 'extra_port')
 
 uuid2 = cbox.JackIO.create_midi_output('violins')
 
+print (cbox.JackIO.jack_transport_position())
 status = cbox.JackIO.status()
 print ("Before deleting, MIDI outputs: %s" % status.midi_output)
 

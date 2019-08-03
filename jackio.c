@@ -746,6 +746,32 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             cbox_execute_on(fb, NULL, "/external_tempo", "i", error, jii->external_tempo) &&
             cbox_io_process_cmd(io, fb, cmd, error, &handled);
     }
+    else if (!strcmp(cmd->command, "/jack_transport_position") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        jack_position_t pos;
+        memset(&pos, 0, sizeof(pos));
+        jack_transport_state_t state = jack_transport_query(jii->client, &pos);
+        if (!(cbox_execute_on(fb, NULL, "/state", "i", error, (int)state) &&
+              cbox_execute_on(fb, NULL, "/unique_lo", "i", error, (int)pos.unique_1) &&
+              cbox_execute_on(fb, NULL, "/unique_hi", "i", error, (int)(pos.unique_1 >> 32)) &&
+              cbox_execute_on(fb, NULL, "/usecs_lo", "i", error, (int)pos.usecs) &&
+              cbox_execute_on(fb, NULL, "/usecs_hi", "i", error, (int)(pos.usecs >> 32)) &&
+              cbox_execute_on(fb, NULL, "/frame_rate", "i", error, (int)(pos.frame_rate)) &&
+              cbox_execute_on(fb, NULL, "/frame", "i", error, (int)(pos.frame))))
+            return FALSE;
+        if ((pos.valid & JackPositionBBT) && !(
+            cbox_execute_on(fb, NULL, "/bar", "i", error, (int)pos.bar) &&
+            cbox_execute_on(fb, NULL, "/beat", "i", error, (int)pos.beat) &&
+            cbox_execute_on(fb, NULL, "/tick", "i", error, (int)pos.tick) &&
+            cbox_execute_on(fb, NULL, "/bar_start_tick", "f", error, (int)pos.bar_start_tick)))
+            return FALSE;
+        if ((pos.valid & JackBBTFrameOffset) && !(
+            cbox_execute_on(fb, NULL, "/bbt_frame_offset", "i", error, (int)pos.bbt_offset)))
+            return FALSE;
+        return TRUE;
+    }
     else if (!strcmp(cmd->command, "/rename_midi_port") && !strcmp(cmd->arg_types, "ss"))
     {
         const char *uuidstr = CBOX_ARG_S(cmd, 0);
