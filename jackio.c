@@ -765,11 +765,20 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             cbox_execute_on(fb, NULL, "/bar", "i", error, (int)pos.bar) &&
             cbox_execute_on(fb, NULL, "/beat", "i", error, (int)pos.beat) &&
             cbox_execute_on(fb, NULL, "/tick", "i", error, (int)pos.tick) &&
-            cbox_execute_on(fb, NULL, "/bar_start_tick", "f", error, (int)pos.bar_start_tick)))
+            cbox_execute_on(fb, NULL, "/bar_start_tick", "f", error, (int)pos.bar_start_tick) &&
+            cbox_execute_on(fb, NULL, "/beats_per_bar", "f", error, (double)pos.beats_per_bar) &&
+            cbox_execute_on(fb, NULL, "/beat_type", "f", error, (double)pos.beat_type) &&
+            cbox_execute_on(fb, NULL, "/ticks_per_beat", "f", error, (double)pos.ticks_per_beat) &&
+            cbox_execute_on(fb, NULL, "/beats_per_minute", "f", error, (double)pos.beats_per_minute)))
             return FALSE;
         if ((pos.valid & JackBBTFrameOffset) && !(
             cbox_execute_on(fb, NULL, "/bbt_frame_offset", "i", error, (int)pos.bbt_offset)))
             return FALSE;
+        return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/jack_transport_locate") && !strcmp(cmd->arg_types, "i"))
+    {
+        jack_transport_locate(jii->client, (uint32_t)CBOX_ARG_I(cmd, 0));
         return TRUE;
     }
     else if (!strcmp(cmd->command, "/rename_midi_port") && !strcmp(cmd->arg_types, "ss"))
