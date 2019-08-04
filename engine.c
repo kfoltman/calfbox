@@ -321,6 +321,12 @@ void cbox_engine_update_input_connections(struct cbox_engine *engine)
         cbox_scene_update_connected_inputs(engine->scenes[i]);
 }
 
+void cbox_engine_update_output_connections(struct cbox_engine *engine)
+{
+    for (uint32_t i = 0; i < engine->scene_count; i++)
+        cbox_scene_update_connected_outputs(engine->scenes[i]);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////
 
 void cbox_engine_send_events_to(struct cbox_engine *engine, struct cbox_midi_merger *merger, struct cbox_midi_buffer *buffer)

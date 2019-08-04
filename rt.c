@@ -141,7 +141,10 @@ static void cbox_rt_on_midi_outputs_changed(void *user_data)
 {
     struct cbox_rt *rt = user_data;
     if (rt->engine)
+    {
         cbox_engine_update_song_playback(rt->engine);
+        cbox_engine_update_output_connections(rt->engine);
+    }
 }
 
 static void cbox_rt_on_midi_inputs_changed(void *user_data)

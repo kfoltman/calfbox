@@ -849,6 +849,7 @@ class DocLayer(DocObj):
         ignore_scene_transpose = SettableProperty(bool)
         ignore_program_changes = SettableProperty(bool)
         transpose = SettableProperty(int)
+        external_output = SettableProperty(str)
     def get_instrument(self):
         return self.status().instrument
 Document.classmap['cbox_layer'] = DocLayer
@@ -1003,6 +1004,11 @@ class DocScene(DocObj):
             return self.cmd_makeobj("/add_new_instrument_layer", 0, name, engine)
         else:
             return self.cmd_makeobj("/add_new_instrument_layer", int(1 + pos), name, engine)
+    def add_new_midi_layer(self, ext_output_uuid, pos = None):
+        if pos is None:
+            return self.cmd_makeobj("/add_midi_layer", 0, ext_output_uuid)
+        else:
+            return self.cmd_makeobj("/add_midi_layer", int(1 + pos), ext_output_uuid)
     def send_midi_event(self, *data):
         self.cmd('/send_event', None, *data)
     def play_pattern(self, pattern, tempo, id = 0):

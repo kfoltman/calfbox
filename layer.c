@@ -39,17 +39,15 @@ gboolean cbox_layer_load(struct cbox_layer *layer, const char *name, GError **er
     }
     
     cv = cbox_config_get_string(section, "instrument");
-    if (!cv)
+    if (cv)
     {
-        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Instrument not specified for layer %s", name);
-        goto error;
-    }
-    instr = cbox_scene_get_instrument_by_name(layer->scene, cv, TRUE, error);
-    if (!instr)
-    {
-        cbox_force_error(error);
-        g_prefix_error(error, "Cannot get instrument %s for layer %s: ", cv, name);
-        goto error;
+        instr = cbox_scene_get_instrument_by_name(layer->scene, cv, TRUE, error);
+        if (!instr)
+        {
+            cbox_force_error(error);
+            g_prefix_error(error, "Cannot get instrument %s for layer %s: ", cv, name);
+            goto error;
+        }
     }
 
     layer->enabled = cbox_config_get_int(section, "enabled", TRUE);
@@ -73,6 +71,7 @@ gboolean cbox_layer_load(struct cbox_layer *layer, const char *name, GError **er
     layer->consume = cbox_config_get_int(section, "consume", FALSE);
     layer->ignore_scene_transpose = cbox_config_get_int(section, "ignore_scene_transpose", FALSE);
     layer->ignore_program_changes = cbox_config_get_int(section, "ignore_program_changes", FALSE);
+    layer->external_output_set = FALSE;
     g_free(section);
     
     cbox_layer_set_instrument(layer, instr);    
@@ -96,7 +95,8 @@ void cbox_layer_set_instrument(struct cbox_layer *layer, struct cbox_instrument 
         layer->instrument = NULL;
     }
     layer->instrument = instrument;
-    layer->instrument->refcount++;
+    if (layer->instrument)
+        layer->instrument->refcount++;
 }
 
 static gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
@@ -123,8 +123,12 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
             return FALSE;
 
         if (!(cbox_execute_on(fb, NULL, "/enable", "i", error, (int)layer->enabled) && 
-            cbox_execute_on(fb, NULL, "/instrument_name", "s", error, layer->instrument->module->instance_name) && 
-            cbox_execute_on(fb, NULL, "/instrument_uuid", "o", error, layer->instrument) && 
+            (layer->instrument
+              ? cbox_execute_on(fb, NULL, "/instrument_name", "s", error, layer->instrument->module->instance_name) &&
+                cbox_execute_on(fb, NULL, "/instrument_uuid", "o", error, layer->instrument)
+              : (layer->external_output_set
+               ? cbox_uuid_report_as(&layer->external_output, "/external_output", fb, error)
+               : TRUE)) &&
             cbox_execute_on(fb, NULL, "/consume", "i", error, (int)layer->consume) && 
             cbox_execute_on(fb, NULL, "/ignore_scene_transpose", "i", error, (int)layer->ignore_scene_transpose) && 
             cbox_execute_on(fb, NULL, "/ignore_program_changes", "i", error, (int)layer->ignore_program_changes) && 
@@ -194,6 +198,20 @@ gboolean cbox_layer_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         layer->out_channel = CBOX_ARG_I(cmd, 0) - 1;
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/external_output") && !strcmp(cmd->arg_types, "s"))
+    {
+        if (*CBOX_ARG_S(cmd, 0))
+        {
+            if (cbox_uuid_fromstring(&layer->external_output, CBOX_ARG_S(cmd, 0), error)) {
+                layer->external_output_set = TRUE;
+            }
+        }
+        else {
+            layer->external_output_set = FALSE;
+        }
+        cbox_scene_update_connected_outputs(layer->scene);
+        return TRUE;
+    }
     else // otherwise, treat just like an command on normal (non-aux) output
         return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
@@ -222,6 +240,7 @@ struct cbox_layer *cbox_layer_new(struct cbox_scene *scene)
     l->ignore_scene_transpose = FALSE;
     l->ignore_program_changes = FALSE;
     l->scene = scene;
+    l->external_output_set = FALSE;
     CBOX_OBJECT_REGISTER(l);
     return l;
 }

@@ -51,6 +51,7 @@ struct cbox_engine
 extern struct cbox_engine *cbox_engine_new(struct cbox_document *doc, struct cbox_rt *rt);
 extern void cbox_engine_update_song_playback(struct cbox_engine *engine);
 extern void cbox_engine_update_input_connections(struct cbox_engine *engine);
+extern void cbox_engine_update_output_connections(struct cbox_engine *engine);
 extern void cbox_engine_add_scene(struct cbox_engine *engine, struct cbox_scene *scene);
 void cbox_engine_remove_scene(struct cbox_engine *engine, struct cbox_scene *scene);
 extern struct cbox_song *cbox_engine_set_song(struct cbox_engine *engine, struct cbox_song *song, int new_pos);

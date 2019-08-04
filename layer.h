@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_LAYER_H
 
 #include "dom.h"
+#include "midi.h"
 #include <glib.h>
 #include <stdint.h>
 
@@ -46,6 +47,10 @@ struct cbox_layer
     gboolean consume;
     gboolean ignore_scene_transpose;
     gboolean ignore_program_changes;
+    gboolean external_output_set;
+    struct cbox_uuid external_output;
+    struct cbox_midi_buffer output_buffer;
+    struct cbox_midi_merger *external_merger;
 };
 
 extern struct cbox_layer *cbox_layer_new(struct cbox_scene *scene);

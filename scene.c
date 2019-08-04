@@ -65,6 +65,18 @@ static gboolean cbox_scene_addlayercmd(struct cbox_scene *s, struct cbox_command
             layer = cbox_layer_new_with_instrument(s, CBOX_ARG_S(cmd, 1), error);
             break;
         }
+    case 4:
+        layer = cbox_layer_new(s);
+        if (cbox_uuid_fromstring(&layer->external_output, CBOX_ARG_S(cmd, 1), error))
+        {
+            layer->external_output_set = TRUE;
+        }
+        else
+        {
+            CBOX_DELETE(layer);
+            return FALSE;
+        }
+        break;
     default:
         assert(0);
         break;
@@ -118,6 +130,10 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     else if (!strcmp(cmd->command, "/add_new_instrument_layer") && !strcmp(cmd->arg_types, "iss"))
     {
         return cbox_scene_addlayercmd(s, fb, cmd, 3, error);
+    }
+    else if (!strcmp(cmd->command, "/add_midi_layer") && !strcmp(cmd->arg_types, "is"))
+    {
+        return cbox_scene_addlayercmd(s, fb, cmd, 4, error);
     }
     else if (!strcmp(cmd->command, "/delete_layer") && !strcmp(cmd->arg_types, "i"))
     {
@@ -365,28 +381,32 @@ gboolean cbox_scene_insert_layer(struct cbox_scene *scene, struct cbox_layer *la
     
     struct cbox_instrument *instrument = layer->instrument;
     
-    for (i = 0; i < instrument->aux_output_count; i++)
-    {
-        assert(!instrument->aux_outputs[i]);
-        if (instrument->aux_output_names[i])
+    if (instrument) {
+        for (i = 0; i < instrument->aux_output_count; i++)
         {
-            instrument->aux_outputs[i] = cbox_scene_get_aux_bus(scene, instrument->aux_output_names[i], TRUE, error);
-            if (!instrument->aux_outputs[i])
-                return FALSE;
-            cbox_aux_bus_ref(instrument->aux_outputs[i]);
+            assert(!instrument->aux_outputs[i]);
+            if (instrument->aux_output_names[i])
+            {
+                instrument->aux_outputs[i] = cbox_scene_get_aux_bus(scene, instrument->aux_output_names[i], TRUE, error);
+                if (!instrument->aux_outputs[i])
+                    return FALSE;
+                cbox_aux_bus_ref(instrument->aux_outputs[i]);
+            }
+        }
+        for (i = 0; i < scene->layer_count; i++)
+        {
+            if (scene->layers[i]->instrument == layer->instrument)
+                break;
+        }
+        if (i == scene->layer_count)
+        {
+            layer->instrument->scene = scene;
+            cbox_rt_array_insert(scene->rt, (void ***)&scene->instruments, &scene->instrument_count, -1, layer->instrument);
         }
     }
-    for (i = 0; i < scene->layer_count; i++)
-    {
-        if (scene->layers[i]->instrument == layer->instrument)
-            break;
-    }
-    if (i == scene->layer_count)
-    {
-        layer->instrument->scene = scene;
-        cbox_rt_array_insert(scene->rt, (void ***)&scene->instruments, &scene->instrument_count, -1, layer->instrument);
-    }
     cbox_rt_array_insert(scene->rt, (void ***)&scene->layers, &scene->layer_count, pos, layer);
+    if (layer->external_output_set && scene->rt)
+        cbox_scene_update_connected_outputs(scene);
     
     return TRUE;
 }
@@ -400,7 +420,10 @@ struct cbox_layer *cbox_scene_remove_layer(struct cbox_scene *scene, int pos)
 {
     struct cbox_layer *removed = scene->layers[pos];
     cbox_rt_array_remove(scene->rt, (void ***)&scene->layers, &scene->layer_count, pos);
-    cbox_instrument_unref_aux_buses(removed->instrument);
+    if (removed->instrument)
+        cbox_instrument_unref_aux_buses(removed->instrument);
+    if (removed->external_output_set)
+        cbox_scene_update_connected_outputs(scene);
     
     return removed;
 }
@@ -499,6 +522,12 @@ static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbo
 
     for (i = 0; i < scene->instrument_count; i++)
         cbox_midi_buffer_clear(&scene->instruments[i]->module->midi_input);
+    for (uint32_t l = 0; l < scene->layer_count; l++)
+    {
+        struct cbox_layer *lp = scene->layers[l];
+        if (lp->external_output_set)
+            cbox_midi_buffer_clear(&lp->output_buffer);
+    }
 
     if (!source)
         return 0;
@@ -516,6 +545,8 @@ static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbo
         {
             struct cbox_layer *lp = scene->layers[l];
             if (!lp->enabled)
+                continue;
+            if (!lp->external_output_set && !lp->instrument)
                 continue;
             uint8_t data[4] = {0, 0, 0, 0};
             memcpy(data, event->data_inline, event->size);
@@ -561,7 +592,8 @@ static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbo
                 else if (cmd == 12 && lp->ignore_program_changes)
                     continue;
             }
-            if (!cbox_midi_buffer_write_event(&lp->instrument->module->midi_input, event->time, data, event->size))
+            struct cbox_midi_buffer *output = lp->instrument ? &lp->instrument->module->midi_input : &lp->output_buffer;
+            if (!cbox_midi_buffer_write_event(output, event->time, data, event->size))
                 return -i;
             if (lp->consume)
                 break;
@@ -569,6 +601,24 @@ static int write_events_to_instrument_ports(struct cbox_scene *scene, struct cbo
     }
     
     return event_count;
+}
+
+void cbox_scene_update_connected_outputs(struct cbox_scene *scene)
+{
+    for (uint32_t l = 0; l < scene->layer_count; l++)
+    {
+        struct cbox_layer *lp = scene->layers[l];
+        struct cbox_midi_merger *merger = NULL;
+        if (lp->external_output_set)
+            merger = cbox_rt_get_midi_output(scene->engine->rt, &lp->external_output);
+        if (merger != lp->external_merger)
+        {
+            if (lp->external_merger)
+                cbox_midi_merger_disconnect(lp->external_merger, &lp->output_buffer, scene->engine->rt);
+            if (merger)
+                cbox_midi_merger_connect(merger, &lp->output_buffer, scene->engine->rt, &lp->external_merger);
+        }
+    }
 }
 
 void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output_buffers[], uint32_t output_channels)
