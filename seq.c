@@ -600,6 +600,7 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
     double tempo = master->tempo;
     int timesig_num = master->timesig_num;
     int timesig_denom = master->timesig_denom;
+    struct cbox_bbt cur_bbt = {0, 0, 0, 0};
     for (GList *p = song->master_track_items; p != NULL; p = g_list_next(p))
     {
         struct cbox_master_track_item *mti = p->data;
@@ -615,9 +616,11 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
         tmi->tempo = tempo;
         tmi->timesig_num = timesig_num;
         tmi->timesig_denom = timesig_denom;
-        
+        memcpy(&tmi->bbt, &cur_bbt, sizeof(cur_bbt));
+
+        cbox_bbt_add(&cur_bbt, mti->duration_ppqn, master->ppqn_factor, timesig_num, timesig_denom);
         pos_ppqn += mti->duration_ppqn;
-        pos_samples += spb->master->srate * 60.0 * mti->duration_ppqn / (tempo * master->ppqn_factor);
+        pos_samples += master->srate * 60.0 * mti->duration_ppqn / (tempo * master->ppqn_factor);
         pos++;
     }
     return spb;

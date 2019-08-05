@@ -52,16 +52,40 @@ struct cbox_master
 
 struct cbox_bbt
 {
-    int bar;
-    int beat;
-    int tick;
+    uint32_t bar;
+    uint32_t beat;
+    uint32_t tick;
+    uint32_t offset_samples;
 };
+
+struct cbox_master_track_item;
+
+static inline void cbox_bbt_add(struct cbox_bbt *accum, uint32_t ticks, uint32_t ppqn_factor, uint32_t timesig_num, uint32_t timesig_denom)
+{
+    uint32_t ticks_per_beat = ppqn_factor * 4 / timesig_denom;
+    uint32_t beats_per_bar = timesig_num;
+
+    accum->tick += ticks % ticks_per_beat;
+    if (accum->tick >= ticks_per_beat)
+    {
+        accum->tick -= ticks_per_beat;
+        accum->beat++;
+    }
+    uint32_t inc_beats = ticks / ticks_per_beat;
+    accum->beat += inc_beats % beats_per_bar;
+    if (accum->beat >= beats_per_bar)
+    {
+        accum->beat -= beats_per_bar;
+        accum->bar++;
+    }
+    accum->bar += inc_beats / beats_per_bar;
+}
 
 extern struct cbox_master *cbox_master_new(struct cbox_engine *engine);
 extern void cbox_master_set_sample_rate(struct cbox_master *master, int srate);
 extern void cbox_master_set_tempo(struct cbox_master *master, float tempo);
 extern void cbox_master_set_timesig(struct cbox_master *master, int beats, int unit);
-//extern void cbox_master_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt, int time_samples);
+extern void cbox_master_ppqn_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt, int time_ppqn, struct cbox_master_track_item *mti);
 //extern uint32_t cbox_master_song_pos_from_bbt(struct cbox_master *master, const struct cbox_bbt *bbt);
 extern void cbox_master_play(struct cbox_master *master);
 extern void cbox_master_stop(struct cbox_master *master);

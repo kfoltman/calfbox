@@ -23,6 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "module.h"
 #include "rt.h"
 #include "stm.h"
+#include "seq.h"
+#include "song.h"
 #include <assert.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -154,6 +156,30 @@ static void cbox_rt_on_midi_inputs_changed(void *user_data)
         cbox_engine_update_input_connections(rt->engine);
 }
 
+static void cbox_rt_get_transport_data(void *user_data, gboolean explicit_pos, uint32_t time_samples, struct cbox_transport_position *tp)
+{
+    struct cbox_rt *rt = user_data;
+    if (rt->engine)
+    {
+        struct cbox_master *master = rt->engine->master;
+        uint32_t time_ppqn;
+        if (explicit_pos)
+            time_ppqn = cbox_master_samples_to_ppqn(master, time_samples);
+        else
+            time_ppqn = master->spb ? master->spb->song_pos_ppqn : 0;
+        struct cbox_bbt bbt;
+        struct cbox_master_track_item mti;
+        cbox_master_ppqn_to_bbt(master, &bbt, time_ppqn, &mti);
+        tp->bar = bbt.bar;
+        tp->beat = bbt.beat;
+        tp->tick = bbt.tick;
+        tp->ticks_per_beat = master->ppqn_factor * 4 / mti.timesig_denom;
+        tp->timesig_num = mti.timesig_num;
+        tp->timesig_denom = mti.timesig_denom;
+        tp->tempo = mti.tempo;
+    }
+}
+
 void cbox_rt_on_update_io_env(struct cbox_rt *rt)
 {
     if (rt->engine)
@@ -232,6 +258,7 @@ void cbox_rt_start(struct cbox_rt *rt, struct cbox_command_target *fb)
         rt->cbs->on_midi_outputs_changed = cbox_rt_on_midi_outputs_changed;
         rt->cbs->on_transport_sync = cbox_rt_on_transport_sync;
         rt->cbs->on_tempo_sync = cbox_rt_on_tempo_sync;
+        rt->cbs->get_transport_data = cbox_rt_get_transport_data;
 
         assert(!rt->started);
         cbox_io_start(rt->io, rt->cbs, fb);

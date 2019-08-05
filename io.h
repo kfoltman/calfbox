@@ -87,6 +87,19 @@ enum cbox_transport_state
     ts_rolling,
 };
 
+struct cbox_transport_position
+{
+    uint32_t bar;
+    uint32_t beat;
+    uint32_t tick;
+    uint32_t offset;
+    double tempo;
+    double ticks_per_beat;
+    double bar_start_tick;
+    uint32_t timesig_num;
+    uint32_t timesig_denom;
+};
+
 struct cbox_io_callbacks
 {
     void *user_data;
@@ -100,6 +113,7 @@ struct cbox_io_callbacks
     void (*on_midi_outputs_changed)(void *user_data);
     void (*on_audio_outputs_changed)(void *user_data);
     gboolean (*on_transport_sync)(void *user_data, enum cbox_transport_state state, uint32_t frame);
+    void (*get_transport_data)(void *user_data, gboolean explicit_pos, uint32_t time_samples, struct cbox_transport_position *tp);
     gboolean (*on_tempo_sync)(void *user_data, double beats_per_minute);
 };
 

@@ -341,6 +341,42 @@ uint32_t cbox_master_samples_to_ppqn(struct cbox_master *master, uint32_t time_s
     return offset + (uint32_t)(tempo * master->ppqn_factor * time_samples / (master->srate * 60.0));
 }
 
+void cbox_master_ppqn_to_bbt(const struct cbox_master *master, struct cbox_bbt *bbt, int time_ppqn, struct cbox_master_track_item *mti)
+{
+    bbt->bar = 0;
+    bbt->beat = 0;
+    bbt->tick = 0;
+    bbt->offset_samples = 0;
+
+    if (!master->spb)
+        return;
+
+    uint32_t rel_ppqn = time_ppqn;
+    int idx = cbox_song_playback_tmi_from_ppqn(master->spb, time_ppqn);
+    if (idx != -1 && idx < master->spb->tempo_map_item_count)
+    {
+        struct cbox_tempo_map_item *tmi = &master->spb->tempo_map_items[idx];
+        rel_ppqn = time_ppqn - tmi->time_ppqn;
+        cbox_bbt_add(bbt, rel_ppqn, master->ppqn_factor, tmi->timesig_num, tmi->timesig_denom);
+        if (mti)
+        {
+            mti->tempo = tmi->tempo;
+            mti->timesig_num = tmi->timesig_num;
+            mti->timesig_denom = tmi->timesig_denom;
+        }
+    }
+    else
+    {
+        cbox_bbt_add(bbt, rel_ppqn, master->ppqn_factor, master->timesig_num, master->timesig_denom);
+        if (mti)
+        {
+            mti->tempo = master->tempo;
+            mti->timesig_num = master->timesig_num;
+            mti->timesig_denom = master->timesig_denom;
+        }
+    }
+}
+
 void cbox_master_destroy(struct cbox_master *master)
 {
     if (master->spb)

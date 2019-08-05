@@ -458,6 +458,28 @@ static void client_shutdown_cb(jack_status_t code, const char *reason, void *arg
         (io->cb->on_disconnected)(io->cb->user_data);
 }
 
+static void timebase_cb(jack_transport_state_t state, jack_nframes_t nframes,
+                       jack_position_t *pos, int new_pos, void *arg)
+{
+    struct cbox_jack_io_impl *jii = arg;
+    struct cbox_io *io = jii->ioi.pio;
+
+    if (io->cb->get_transport_data) {
+        struct cbox_transport_position tpos;
+
+        io->cb->get_transport_data(io->cb->user_data, new_pos, pos->frame, &tpos);
+        pos->valid = JackPositionBBT;
+        pos->bar = tpos.bar;
+        pos->beat = tpos.beat;
+        pos->tick = tpos.tick;
+        pos->bar_start_tick = tpos.bar_start_tick;
+        pos->ticks_per_beat = tpos.ticks_per_beat;
+        pos->beats_per_minute = tpos.tempo;
+        pos->beats_per_bar = tpos.timesig_num;
+        pos->beat_type = tpos.timesig_denom;
+    }
+}
+
 static int sync_cb(jack_transport_state_t state, jack_position_t *pos, void *arg)
 {
     struct cbox_jack_io_impl *jii = arg;
@@ -492,6 +514,8 @@ gboolean cbox_jackio_start(struct cbox_io_impl *impl, struct cbox_command_target
 
     if (io->cb->on_transport_sync)
         jack_set_sync_callback(jii->client, sync_cb, jii);
+    if (io->cb->get_transport_data)
+        jack_set_timebase_callback(jii->client, 1, timebase_cb, jii);
     jack_set_process_callback(jii->client, process_cb, jii);
     jack_set_port_registration_callback(jii->client, port_connect_cb, jii);
     jack_on_info_shutdown(jii->client, client_shutdown_cb, jii);
@@ -519,6 +543,7 @@ gboolean cbox_jackio_stop(struct cbox_io_impl *impl, GError **error)
     int result = jack_deactivate(jii->client);
     if (result)
         g_warning("jack_deactivate has failed, result = %d", result);
+    jack_release_timebase(jii->client);
     jack_set_process_callback(jii->client, NULL, 0);
     return TRUE;
 }
