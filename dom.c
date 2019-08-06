@@ -81,6 +81,11 @@ static struct cbox_class_per_document *get_cpd_for_class(struct cbox_document *d
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+void cbox_uuid_clear(struct cbox_uuid *uuid)
+{
+    uuid_clear(uuid->uuid);
+}
+
 guint cbox_uuid_hash(gconstpointer v)
 {
     char buf[40];

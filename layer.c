@@ -240,7 +240,9 @@ struct cbox_layer *cbox_layer_new(struct cbox_scene *scene)
     l->ignore_scene_transpose = FALSE;
     l->ignore_program_changes = FALSE;
     l->scene = scene;
+    cbox_uuid_clear(&l->external_output);
     l->external_output_set = FALSE;
+    l->external_merger = NULL;
     CBOX_OBJECT_REGISTER(l);
     return l;
 }

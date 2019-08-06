@@ -34,6 +34,7 @@ struct cbox_uuid
     uuid_t uuid;
 };
 
+extern void cbox_uuid_clear(struct cbox_uuid *uuid);
 extern guint cbox_uuid_hash(gconstpointer v);
 extern void cbox_uuid_copy(struct cbox_uuid *vto, const struct cbox_uuid *vfrom);
 extern gboolean cbox_uuid_equal(gconstpointer v1, gconstpointer v2);
