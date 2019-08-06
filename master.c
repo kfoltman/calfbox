@@ -164,8 +164,10 @@ void cbox_master_set_tempo(struct cbox_master *master, float tempo)
 
 void cbox_master_set_timesig(struct cbox_master *master, int beats, int unit)
 {
-    master->timesig_num = beats;
-    master->timesig_denom = unit;
+    if (beats > 0)
+        master->timesig_num = beats;
+    if (unit > 0)
+        master->timesig_denom = unit;
 }
 
 #define cbox_master_play_args(ARG)
@@ -348,11 +350,10 @@ void cbox_master_ppqn_to_bbt(const struct cbox_master *master, struct cbox_bbt *
     bbt->tick = 0;
     bbt->offset_samples = 0;
 
-    if (!master->spb)
-        return;
-
     uint32_t rel_ppqn = time_ppqn;
-    int idx = cbox_song_playback_tmi_from_ppqn(master->spb, time_ppqn);
+    int idx = -1;
+    if (master->spb)
+        idx = cbox_song_playback_tmi_from_ppqn(master->spb, time_ppqn);
     if (idx != -1 && idx < master->spb->tempo_map_item_count)
     {
         struct cbox_tempo_map_item *tmi = &master->spb->tempo_map_items[idx];
