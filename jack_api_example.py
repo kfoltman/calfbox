@@ -137,6 +137,14 @@ track.add_clip(0, 0, pattern.status().loop_end, pattern)
 song.set_loop(0, pattern.status().loop_end)
 song.update_playback()
 cbox.Transport.play()
+cbox.JackIO.transport_mode(True, False)
+while not cbox.JackIO.jack_transport_position().is_master:
+    print ("Waiting to become the master")
+    time.sleep(0.01)
+cbox.JackIO.transport_mode(False)
+while cbox.JackIO.jack_transport_position().is_master:
+    print ("Waiting to stop being the master")
+    time.sleep(0.01)
 cbox.JackIO.external_tempo(False)
 assert cbox.JackIO.status().external_tempo == False
 cbox.JackIO.external_tempo(True)

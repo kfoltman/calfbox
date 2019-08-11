@@ -455,10 +455,16 @@ class JackIO:
         return GetThings("/io/jack_transport_position", ['state', 'unique_lo',
         'unique_hi', 'usecs_lo', 'usecs_hi', 'frame_rate', 'frame', 'bar',
         'beat', 'tick', 'bar_start_tick', 'bbt_frame_offset', 'beats_per_bar',
-        'beat_type', 'ticks_per_beat', 'beats_per_minute'], [])
+        'beat_type', 'ticks_per_beat', 'beats_per_minute', 'is_master'], [])
     @staticmethod
     def jack_transport_locate(pos):
         do_cmd("/io/jack_transport_locate", None, [pos])
+    @staticmethod
+    def transport_mode(master = True, conditional = False):
+        if master:
+            do_cmd("/io/transport_mode", None, [1 if conditional else 2])
+        else:
+            do_cmd("/io/transport_mode", None, [0])
     @staticmethod
     def create_midi_input(name, autoconnect_spec = None):
         uuid = GetUUID("/io/create_midi_input", name).uuid

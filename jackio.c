@@ -56,6 +56,7 @@ struct cbox_jack_io_impl
     jack_transport_state_t last_transport_state;
     gboolean debug_transport;
     gboolean external_tempo;
+    uint32_t master_detect_bits;
 
     jack_ringbuffer_t *rb_autoconnect;
 };
@@ -258,6 +259,7 @@ static int process_cb(jack_nframes_t nframes, void *arg)
         }
     }
     io->free_running_frame_counter += nframes;
+    jii->master_detect_bits <<= 1;
     return 0;
 }
 
@@ -464,6 +466,7 @@ static void timebase_cb(jack_transport_state_t state, jack_nframes_t nframes,
     struct cbox_jack_io_impl *jii = arg;
     struct cbox_io *io = jii->ioi.pio;
 
+    jii->master_detect_bits |= 1;
     if (io->cb->get_transport_data) {
         struct cbox_transport_position tpos;
 
@@ -507,6 +510,41 @@ static int sync_cb(jack_transport_state_t state, jack_position_t *pos, void *arg
     return result;
 }
 
+gboolean cbox_jackio_set_master_mode(struct cbox_jack_io_impl *jii, int mode, GError **error)
+{
+    if (jii->ioi.pio->cb->get_transport_data)
+    {
+        if (mode) {
+            switch(jack_set_timebase_callback(jii->client, mode == 1, timebase_cb, jii))
+            {
+            case 0:
+                return TRUE;
+            case EBUSY:
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Timebase master already set");
+                return FALSE;
+            default:
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Timebase master could not be set");
+                return FALSE;
+
+            }
+        } else {
+            switch(jack_release_timebase(jii->client))
+            {
+            case 0:
+                return TRUE;
+            case EINVAL:
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Not a current timebase master");
+                return FALSE;
+            default:
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Timebase master could not be unset");
+                return FALSE;
+            }
+        }
+    }
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Transport not supported by engine");
+    return FALSE;
+}
+
 gboolean cbox_jackio_start(struct cbox_io_impl *impl, struct cbox_command_target *fb, GError **error)
 {
     struct cbox_jack_io_impl *jii = (struct cbox_jack_io_impl *)impl;
@@ -514,8 +552,6 @@ gboolean cbox_jackio_start(struct cbox_io_impl *impl, struct cbox_command_target
 
     if (io->cb->on_transport_sync)
         jack_set_sync_callback(jii->client, sync_cb, jii);
-    if (io->cb->get_transport_data)
-        jack_set_timebase_callback(jii->client, 1, timebase_cb, jii);
     jack_set_process_callback(jii->client, process_cb, jii);
     jack_set_port_registration_callback(jii->client, port_connect_cb, jii);
     jack_on_info_shutdown(jii->client, client_shutdown_cb, jii);
@@ -779,6 +815,7 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         memset(&pos, 0, sizeof(pos));
         jack_transport_state_t state = jack_transport_query(jii->client, &pos);
         if (!(cbox_execute_on(fb, NULL, "/state", "i", error, (int)state) &&
+              cbox_execute_on(fb, NULL, "/is_master", "i", error, jii->master_detect_bits & 2 ? 1 : 0) &&
               cbox_execute_on(fb, NULL, "/unique_lo", "i", error, (int)pos.unique_1) &&
               cbox_execute_on(fb, NULL, "/unique_hi", "i", error, (int)(pos.unique_1 >> 32)) &&
               cbox_execute_on(fb, NULL, "/usecs_lo", "i", error, (int)pos.usecs) &&
@@ -800,6 +837,10 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
             cbox_execute_on(fb, NULL, "/bbt_frame_offset", "i", error, (int)pos.bbt_offset)))
             return FALSE;
         return TRUE;
+    }
+    else if (!strcmp(cmd->command, "/transport_mode") && !strcmp(cmd->arg_types, "i"))
+    {
+        return cbox_jackio_set_master_mode(jii, CBOX_ARG_I(cmd, 0), error);
     }
     else if (!strcmp(cmd->command, "/jack_transport_locate") && !strcmp(cmd->arg_types, "i"))
     {
