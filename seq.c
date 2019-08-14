@@ -604,6 +604,11 @@ struct cbox_song_playback *cbox_song_playback_new(struct cbox_song *song, struct
     for (GList *p = song->master_track_items; p != NULL; p = g_list_next(p))
     {
         struct cbox_master_track_item *mti = p->data;
+        if (mti->tempo == 0 && mti->timesig_num == 0 && 
+            mti->timesig_denom == 0 && p == song->master_track_items) {
+            spb->tempo_map_item_count--;
+            continue;
+        }
         if (mti->tempo > 0)
             tempo = mti->tempo;
         if (mti->timesig_num > 0)
