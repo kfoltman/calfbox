@@ -174,6 +174,7 @@ static void cbox_rt_get_transport_data(void *user_data, gboolean explicit_pos, u
         tp->beat = bbt.beat;
         tp->tick = bbt.tick;
         tp->ticks_per_beat = master->ppqn_factor * 4 / mti.timesig_denom;
+        tp->bar_start_tick = 0;
         tp->timesig_num = mti.timesig_num;
         tp->timesig_denom = mti.timesig_denom;
         tp->tempo = mti.tempo;
