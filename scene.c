@@ -614,9 +614,9 @@ void cbox_scene_update_connected_outputs(struct cbox_scene *scene)
         if (merger != lp->external_merger)
         {
             if (lp->external_merger)
-                cbox_midi_merger_disconnect(lp->external_merger, &lp->output_buffer, scene->engine->rt);
+                cbox_midi_merger_disconnect(lp->external_merger, &lp->output_buffer, scene->rt);
             if (merger)
-                cbox_midi_merger_connect(merger, &lp->output_buffer, scene->engine->rt, &lp->external_merger);
+                cbox_midi_merger_connect(merger, &lp->output_buffer, scene->rt, &lp->external_merger);
         }
     }
 }
