@@ -111,6 +111,9 @@ static void cbox_layer_destroyfunc(struct cbox_objhdr *objhdr)
         
         cbox_instrument_destroy_if_unused(layer->instrument);
     }
+    if (layer->external_merger) {
+        cbox_midi_merger_disconnect(layer->external_merger, &layer->output_buffer, layer->scene->rt);
+    }
     free(layer);
 }
 
