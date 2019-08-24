@@ -755,7 +755,7 @@ class MtiItem:
         else:
             self.__dict__[name] = value
     def __eq__(self, o):
-        return self.pos == o.pos and self.tempo == o.tempo and self.timesig_num == o.timesig_num and self.timesig_denom == o.timesig_denom    
+        return self.pos == o.pos and self.tempo == o.tempo and self.timesig_num == o.timesig_num and self.timesig_denom == o.timesig_denom
     def __repr__(self):
         return ("pos: {}, bpm: {}, timesig: {}/{}".format(self.pos, self.tempo, self.timesig_num, self.timesig_denom))
 
@@ -778,6 +778,9 @@ class DocSong(DocObj):
         if timesig_nom is not None:
             timesig_num = timesig_nom
         self.cmd("/set_mti", None, int(pos), float(tempo) if tempo is not None else -1.0, int(timesig_num) if timesig_num is not None else -1, int(timesig_denom) if timesig_denom else -1)
+    def delete_mti(self, pos):
+        """Deleting works only if we set everything to exactly 0. Not None, not -1"""
+        self.set_mti(pos, tempo = 0, timesig_num = 0, timesig_denom = 0, timesig_nom = 0)
     def add_track(self):
         return self.cmd_makeobj("/add_track")
     def load_drum_pattern(self, name):
