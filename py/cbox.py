@@ -755,7 +755,9 @@ class MtiItem:
         else:
             self.__dict__[name] = value
     def __eq__(self, o):
-        return self.pos == o.pos and self.tempo == o.tempo and self.timesig_num == o.timesig_num and self.timesig_denom == o.timesig_denom
+        return self.pos == o.pos and self.tempo == o.tempo and self.timesig_num == o.timesig_num and self.timesig_denom == o.timesig_denom    
+    def __repr__(self):
+        return ("pos: {}, bpm: {}, timesig: {}/{}".format(self.pos, self.tempo, self.timesig_num, self.timesig_denom))
 
 class DocSongStatus:
     tracks = None
