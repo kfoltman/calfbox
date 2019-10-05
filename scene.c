@@ -1008,6 +1008,9 @@ static void destroy_rec_sources(struct cbox_recording_source *s, int count)
 
 struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_engine *engine)
 {
+    if (!engine->io_env.buffer_size)
+        return NULL;
+
     struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
     if (!s)
         return NULL;

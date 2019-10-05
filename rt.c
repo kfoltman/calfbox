@@ -105,6 +105,8 @@ struct cbox_rt *cbox_rt_new(struct cbox_document *doc)
     rt->disconnected = FALSE;
     rt->io_env.srate = 0;
     rt->io_env.buffer_size = 0;
+    rt->io_env.input_count = 0;
+    rt->io_env.output_count = 0;
     
     cbox_command_target_init(&rt->cmd_target, cbox_rt_process_cmd, rt);
     CBOX_OBJECT_REGISTER(rt);
