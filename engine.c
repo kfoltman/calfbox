@@ -390,6 +390,13 @@ gboolean cbox_engine_on_transport_sync(struct cbox_engine *engine, enum cbox_tra
     }
     if (state == ts_rolling)
     {
+        // When starting with JACK transport rolling, there is no
+        // ts_starting message in first place (because there can't be without
+        // interfering with other applications). Seek immediately.
+        if (engine->spb && engine->spb->song_pos_samples != frame)
+        {
+            cbox_song_playback_seek_samples(engine->spb, frame);
+        }
         engine->master->state = CMTS_ROLLING;
         return TRUE;
     }
