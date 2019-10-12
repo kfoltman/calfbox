@@ -19,14 +19,16 @@ class NullCalfbox(str): #iterable
         self.pos_ppqn = 0
         self.ignore_program_changes = False
         self.patch = {i:(0, "nullbox") for i in range(1,17)} #catches status().patch
-        
-    def __getattr__(self, *args, **kwargs):
+        self.frame_rate = 48000
+        self.frame = 0
+
+    def __getattr__(self, *args, **kwargs):        
         return __class__()
 
     def __call__(self, *args, **kwargs):
         return __class__()
 
-    def __getitem__(self, key):
+    def __getitem__(self, key):        
         return __class__()
 
     def serialize_event(self, *args, **kwargs):
