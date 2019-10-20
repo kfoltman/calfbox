@@ -331,7 +331,7 @@ static void autoconnect_by_spec(jack_client_t *client, const char *port, const c
                 if (names[i])
                     autoconnect_port(client, port, names[i], is_cbox_input, only_connect_port, fb);
                 else
-                    g_message("Connect: unmatched port index %d", (int)portidx);
+                    g_message("Connect: unmatched port index %d for autoconnecting %s", (int)portidx, port);
 
                 jack_free(names);
             }
@@ -413,7 +413,7 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
         if (midiout->autoconnect_spec)
         {
             gchar *cbox_port = g_strdup_printf("%s:%s", jii->client_name, midiout->hdr.name);
-            autoconnect_by_spec(jii->client, cbox_port, midiout->autoconnect_spec, 0, 1, portobj, fb);
+            autoconnect_by_spec(jii->client, cbox_port, midiout->autoconnect_spec, FALSE, TRUE, portobj, fb);
             g_free(cbox_port);
         }
     }
@@ -423,7 +423,7 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
         if (midiin->autoconnect_spec)
         {
             gchar *cbox_port = g_strdup_printf("%s:%s", jii->client_name, midiin->hdr.name);
-            autoconnect_by_spec(jii->client, cbox_port, midiin->autoconnect_spec, 1, 1, portobj, fb);
+            autoconnect_by_spec(jii->client, cbox_port, midiin->autoconnect_spec, TRUE, TRUE, portobj, fb);
             g_free(cbox_port);
         }
     }
@@ -433,7 +433,7 @@ static void port_autoconnect(struct cbox_jack_io_impl *jii, jack_port_t *portobj
         if (audioout->autoconnect_spec)
         {
             gchar *cbox_port = g_strdup_printf("%s:%s", jii->client_name, audioout->hdr.name);
-            autoconnect_by_spec(jii->client, cbox_port, audioout->autoconnect_spec, 0, 1, portobj, fb);
+            autoconnect_by_spec(jii->client, cbox_port, audioout->autoconnect_spec, FALSE, FALSE, portobj, fb);
             g_free(cbox_port);
         }
     }

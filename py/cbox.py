@@ -478,12 +478,14 @@ class JackIO:
             JackIO.autoconnect(uuid, autoconnect_spec)
         return uuid
     @staticmethod
-    def autoconnect_midi_output(uuid, autoconnect_spec = None):
+    def autoconnect(uuid, autoconnect_spec = None):
         if autoconnect_spec is not None:
             do_cmd("/io/autoconnect", None, [uuid, autoconnect_spec])
         else:
             do_cmd("/io/autoconnect", None, [uuid, ''])
-    autoconnect_midi_input = autoconnect_midi_output
+    autoconnect_midi_input = autoconnect
+    autoconnect_midi_output = autoconnect
+    autoconnect_audio_output = autoconnect
     @staticmethod
     def rename_midi_output(uuid, new_name):
         do_cmd("/io/rename_midi_port", None, [uuid, new_name])
@@ -809,6 +811,19 @@ class UnknownModule(NonDocObj):
     class Status:
         pass
 
+class DocRecorder(DocObj):
+    class Status:
+        filename = str
+Document.classmap['cbox_recorder'] = DocRecorder
+
+class RecSource(NonDocObj):
+    class Status:
+        handler = [DocRecorder]
+    def attach(self, recorder):
+        self.cmd('/attach', None, recorder.uuid)
+    def detach(self, recorder):
+        self.cmd('/detach', None, recorder.uuid)
+
 class EffectSlot(NonDocObj):
     class Status:
         insert_preset = SettableProperty(str)
@@ -823,6 +838,10 @@ class InstrumentOutput(EffectSlot):
         gain_linear = float
         gain = float
         output = SettableProperty(int)
+    def init_object(self):
+        EffectSlot.init_object(self)
+        self.rec_dry = RecSource(self.make_path('/rec_dry'))
+        self.rec_wet = RecSource(self.make_path('/rec_wet'))
 
 class DocInstrument(DocObj):
     class Status:
@@ -1054,11 +1073,6 @@ class DocEngine(DocObj):
         return self.get_thing("/render_stereo", '/data', bytes, samples)
 Document.classmap['cbox_engine'] = DocEngine
 
-class DocRecorder(DocObj):
-    class Status:
-        filename = str
-Document.classmap['cbox_recorder'] = DocRecorder
-
 class SamplerProgram(DocObj):
     class Status:
         name = str
@@ -1106,11 +1120,4 @@ class SamplerLayer(DocObj):
     def new_region(self):
         return self.cmd_makeobj("/new_region")
 Document.classmap['sampler_layer'] = SamplerLayer
-
-class DocRecorder(DocObj):
-    class Status:
-        pass
-    def __init__(self, uuid):
-        DocObj.__init__(self, uuid)
-Document.classmap['cbox_recorder'] = DocRecorder
 
