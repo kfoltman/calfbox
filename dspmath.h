@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_BLOCK_SIZE 16
 
 #include <complex.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
 #include <memory.h>
@@ -142,6 +143,95 @@ static inline void butterfly(complex float *dst1, complex float *dst2, complex f
 {
     *dst1 = src1 + eiw1 * src2;
     *dst2 = src1 + eiw2 * src2;
+}
+
+struct cbox_gain
+{
+    float db_gain;
+    float lin_gain;
+    float old_lin_gain;
+    float pos;
+    float delta;
+};
+
+static inline void cbox_gain_init(struct cbox_gain *gain)
+{
+    gain->db_gain = 0;
+    gain->lin_gain = 1;
+    gain->old_lin_gain = 1;
+    gain->pos = 1;
+    gain->delta = 1 / (44100 * 0.1); // XXXKF ballpark
+}
+
+static inline void cbox_gain_set_db(struct cbox_gain *gain, float db)
+{
+    if (gain->db_gain == db)
+        return;
+    gain->db_gain = db;
+    gain->old_lin_gain = gain->old_lin_gain + (gain->lin_gain - gain->old_lin_gain) * gain->pos;
+    gain->lin_gain = dB2gain(db);
+    gain->pos = 0;
+}
+
+#define CBOX_GAIN_APPLY_LOOP(gain, nsamples, code) \
+{ \
+    double pos = (gain)->pos; \
+    double span = (gain)->lin_gain - (gain)->old_lin_gain; \
+    double start = (gain)->old_lin_gain; \
+    double step = (gain)->delta; \
+    if (pos >= 1) { \
+        double tgain = gain->lin_gain; \
+        for (uint32_t i = 0; i < (nsamples); ++i) { \
+            code(i, tgain) \
+        } \
+    } else { \
+        if (pos + (nsamples) * step < 1.0) { \
+            for (uint32_t i = 0; i < (nsamples); ++i) { \
+                double tgain = start + (pos + i * step) * span; \
+                code(i, tgain) \
+            } \
+            gain->pos += (nsamples) * step; \
+        } \
+        else { \
+            for (uint32_t i = 0; i < (nsamples); ++i) { \
+                code(i, (start + pos * span)) \
+                pos = (pos + step < 1.0 ? pos + step : 1.0); \
+            } \
+            gain->pos = 1.0; \
+        } \
+    } \
+}
+
+#define CBOX_GAIN_ADD_MONO(i, gain) \
+    dest1[i] += src1[i] * gain;
+
+static inline void cbox_gain_add_mono(struct cbox_gain *gain, float *dest1, const float *src1, uint32_t nsamples)
+{
+    CBOX_GAIN_APPLY_LOOP(gain, nsamples, CBOX_GAIN_ADD_MONO);
+}
+
+#define CBOX_GAIN_ADD_STEREO(i, gain) \
+    dest1[i] += src1[i] * gain, dest2[i] += src2[i] * gain;
+
+static inline void cbox_gain_add_stereo(struct cbox_gain *gain, float *dest1, const float *src1, float *dest2, const float *src2, uint32_t nsamples)
+{
+    CBOX_GAIN_APPLY_LOOP(gain, nsamples, CBOX_GAIN_ADD_STEREO);
+}
+
+#define CBOX_GAIN_COPY_MONO(i, gain) \
+    dest1[i] = src1[i] * gain;
+
+static inline void cbox_gain_copy_mono(struct cbox_gain *gain, float *dest1, const float *src1, uint32_t nsamples)
+{
+    CBOX_GAIN_APPLY_LOOP(gain, nsamples, CBOX_GAIN_COPY_MONO);
+}
+
+#define CBOX_GAIN_COPY_STEREO(i, gain) \
+    dest1[i] = src1[i] * gain, dest2[i] = src2[i] * gain;
+
+static inline void cbox_gain_copy_stereo(struct cbox_gain *gain, float *dest1, const float *src1, float *dest2, const float *src2, uint32_t nsamples)
+{
+    CBOX_GAIN_APPLY_LOOP(gain, nsamples, CBOX_GAIN_COPY_STEREO);
 }
 
 #endif

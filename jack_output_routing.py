@@ -38,8 +38,8 @@ instrument.get_output_slot(0).rec_dry.attach(router_dry)
 instrument.get_output_slot(0).rec_wet.attach(router_wet)
 assert router_dry.uuid == instrument.get_output_slot(0).rec_dry.status().handler[0].uuid
 assert router_wet.uuid == instrument.get_output_slot(0).rec_wet.status().handler[0].uuid
-#cmd("/output/1/rec_dry/attach", None, router_dry.uuid)
-#instrument.cmd("/output/1/rec_wet/attach", None, router_wet.uuid)
+router_wet.set_gain(-3.0)
+assert router_wet.status().gain == -3
 
 print("Ready!")
 

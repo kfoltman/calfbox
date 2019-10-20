@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #if USE_JACK
 #include <jack/jack.h>
 #endif
+#include "dspmath.h"
 #include "dom.h"
 #include "ioenv.h"
 #include "master.h"
@@ -156,6 +157,7 @@ struct cbox_audio_output_router
 {
     struct cbox_recorder recorder;
     struct cbox_audio_output *left, *right;
+    struct cbox_gain gain;
 };
 
 extern gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error);

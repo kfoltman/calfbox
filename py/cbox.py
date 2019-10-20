@@ -814,6 +814,7 @@ class UnknownModule(NonDocObj):
 class DocRecorder(DocObj):
     class Status:
         filename = str
+        gain = SettableProperty(float)
 Document.classmap['cbox_recorder'] = DocRecorder
 
 class RecSource(NonDocObj):

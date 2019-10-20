@@ -292,10 +292,7 @@ static void cbox_audio_output_router_record_block(struct cbox_recorder *handler,
     struct cbox_audio_output_router *router = handler->user_data;
     if (router->left->removing || router->right->removing)
         return;
-    for (uint32_t i = 0; i < numsamples; ++i) {
-        router->left->buffer[offset + i] += buffers[0][i];
-        router->right->buffer[offset + i] += buffers[1][i];
-    }
+    cbox_gain_add_stereo(&router->gain, &router->left->buffer[offset], buffers[0], &router->right->buffer[offset], buffers[1], numsamples);
 }
 
 static void cbox_audio_output_router_destroy(struct cbox_recorder *handler)
@@ -305,11 +302,31 @@ static void cbox_audio_output_router_destroy(struct cbox_recorder *handler)
     router->right->users--;
 }
 
+static gboolean cbox_audio_output_router_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
+{
+    struct cbox_audio_output_router *router = ct->user_data;
+    if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+
+        if (!cbox_execute_on(fb, NULL, "/gain", "f", error, router->gain.db_gain))
+            return FALSE;
+        return CBOX_OBJECT_DEFAULT_STATUS(&router->recorder, fb, error);
+    }
+    if (!strcmp(cmd->command, "/gain") && !strcmp(cmd->arg_types, "f"))
+    {
+        cbox_gain_set_db(&router->gain, CBOX_ARG_F(cmd, 0));
+        return TRUE;
+    }
+    return cbox_object_default_process_cmd(ct, fb, cmd, error);
+}
+
 struct cbox_audio_output_router *cbox_io_create_audio_output_router(struct cbox_io *io, struct cbox_engine *engine, struct cbox_audio_output *left, struct cbox_audio_output *right)
 {
     struct cbox_audio_output_router *router = calloc(1, sizeof(struct cbox_audio_output_router));
     CBOX_OBJECT_HEADER_INIT(&router->recorder, cbox_recorder, CBOX_GET_DOCUMENT(engine));
-    cbox_command_target_init(&router->recorder.cmd_target, cbox_object_default_process_cmd, &router->recorder);
+    cbox_command_target_init(&router->recorder.cmd_target, cbox_audio_output_router_process_cmd, &router->recorder);
     router->recorder.user_data = router;
     router->recorder.attach = NULL;
     router->recorder.record_block = cbox_audio_output_router_record_block;
@@ -317,6 +334,8 @@ struct cbox_audio_output_router *cbox_io_create_audio_output_router(struct cbox_
     router->recorder.destroy = cbox_audio_output_router_destroy;
     router->left = left;
     router->right = right;
+    cbox_gain_init(&router->gain);
+    cbox_gain_set_db(&router->gain, 12.0);
     left->users++;
     right->users++;
     CBOX_OBJECT_REGISTER(&router->recorder);
