@@ -42,7 +42,7 @@ gboolean cbox_meter_attach(struct cbox_recorder *handler, struct cbox_recording_
     return TRUE;
 }
 
-void cbox_meter_record_block(struct cbox_recorder *handler, const float **buffers, uint32_t numsamples)
+void cbox_meter_record_block(struct cbox_recorder *handler, const float **buffers, uint32_t offset, uint32_t numsamples)
 {
     struct cbox_meter *m = handler->user_data;
     for (int c = 0; c < m->channels; c++)

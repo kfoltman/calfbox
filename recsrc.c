@@ -23,6 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "scene.h"
 #include "stm.h"
 
+static void cbox_recorder_destroyfunc(struct cbox_objhdr *objhdr)
+{
+    struct cbox_recorder *rec = CBOX_H2O(objhdr);
+    if (rec->destroy)
+        rec->destroy(rec);
+    free(rec);
+}
+
 CBOX_CLASS_DEFINITION_ROOT(cbox_recorder)
 
 static gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error);
@@ -39,7 +47,7 @@ void cbox_recording_source_init(struct cbox_recording_source *src, struct cbox_s
 
 gboolean cbox_recording_source_attach(struct cbox_recording_source *src, struct cbox_recorder *rec, GError **error)
 {
-    if (!rec->attach(rec, src, error))
+    if (rec->attach && !rec->attach(rec, src, error))
         return FALSE;
     cbox_rt_array_insert(app.rt, (void ***)&src->handlers, &src->handler_count, 0, rec);
     return TRUE;
@@ -67,13 +75,13 @@ int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_
     // XXXKF: when converting to async API, the array_remove must be done synchronously or
     // detach needs to be called in the cleanup part of the remove command, otherwise detach
     // may be called on 'live' recorder, which may cause unpredictable results.
-    return rec->detach(rec, error);
+    return rec->detach ? rec->detach(rec, error) : 1;
 }
 
-void cbox_recording_source_push(struct cbox_recording_source *src, const float **buffers, uint32_t numsamples)
+void cbox_recording_source_push(struct cbox_recording_source *src, const float **buffers, uint32_t offset, uint32_t numsamples)
 {
     for (uint32_t i = 0; i < src->handler_count; i++)
-        src->handlers[i]->record_block(src->handlers[i], buffers, numsamples);
+        src->handlers[i]->record_block(src->handlers[i], buffers, offset, numsamples);
 }
 
 void cbox_recording_source_uninit(struct cbox_recording_source *src)
@@ -120,8 +128,3 @@ gboolean cbox_recording_source_process_cmd(struct cbox_command_target *ct, struc
         return cbox_set_command_error(error, cmd);
 }
 
-void cbox_recorder_destroyfunc(struct cbox_objhdr *objhdr)
-{
-    struct cbox_recorder *recorder = CBOX_H2O(objhdr);
-    recorder->destroy(recorder);
-}

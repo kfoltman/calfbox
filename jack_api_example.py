@@ -118,7 +118,9 @@ inputs = cbox.JackIO.get_ports(".*", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS
 outputs = cbox.JackIO.get_ports(".*", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SINK | cbox.JackIO.PORT_IS_PHYSICAL)
 cbox.JackIO.port_connect(inputs[0], outputs[0])
 cbox.JackIO.port_connect(inputs[1], outputs[1])
-assert "cbox:in_3" in cbox.JackIO.get_connected_ports(inputs[0])
+#assert "cbox:in_3" in cbox.JackIO.get_connected_ports(inputs[0])
+cbox.JackIO.port_disconnect(inputs[0], outputs[0])
+cbox.JackIO.port_disconnect(inputs[1], outputs[1])
 
 scene = Document.get_scene()
 scene.clear()
@@ -153,6 +155,14 @@ assert cbox.JackIO.status().external_tempo == True
 uuid3 = cbox.JackIO.create_audio_output('noises')
 assert "cbox:noises" in cbox.JackIO.get_ports(".*:noises", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SOURCE)
 cbox.JackIO.rename_audio_output(uuid3, "silence")
+router = cbox.JackIO.create_audio_output_router(uuid3, uuid3)
+assert type(router) is cbox.DocRecorder
+try:
+    cbox.JackIO.delete_audio_output(uuid3)
+    assert False
+except Exception as e:
+    assert 'is in use' in str(e)
+router.delete()
 assert "cbox:noises" not in cbox.JackIO.get_ports(".*:noises", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SOURCE)
 assert "cbox:silence" in cbox.JackIO.get_ports(".*:silence", cbox.JackIO.AUDIO_TYPE, cbox.JackIO.PORT_IS_SOURCE)
 cbox.JackIO.delete_audio_output(uuid3)

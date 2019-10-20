@@ -287,6 +287,42 @@ void cbox_io_destroy_all_midi_ports(struct cbox_io *io)
     g_slist_free(old_i);
 }
 
+static void cbox_audio_output_router_record_block(struct cbox_recorder *handler, const float **buffers, uint32_t offset, uint32_t numsamples)
+{
+    struct cbox_audio_output_router *router = handler->user_data;
+    if (router->left->removing || router->right->removing)
+        return;
+    for (uint32_t i = 0; i < numsamples; ++i) {
+        router->left->buffer[offset + i] += buffers[0][i];
+        router->right->buffer[offset + i] += buffers[1][i];
+    }
+}
+
+static void cbox_audio_output_router_destroy(struct cbox_recorder *handler)
+{
+    struct cbox_audio_output_router *router = handler->user_data;
+    router->left->users--;
+    router->right->users--;
+}
+
+struct cbox_audio_output_router *cbox_io_create_audio_output_router(struct cbox_io *io, struct cbox_engine *engine, struct cbox_audio_output *left, struct cbox_audio_output *right)
+{
+    struct cbox_audio_output_router *router = calloc(1, sizeof(struct cbox_audio_output_router));
+    CBOX_OBJECT_HEADER_INIT(&router->recorder, cbox_recorder, CBOX_GET_DOCUMENT(engine));
+    cbox_command_target_init(&router->recorder.cmd_target, cbox_object_default_process_cmd, &router->recorder);
+    router->recorder.user_data = router;
+    router->recorder.attach = NULL;
+    router->recorder.record_block = cbox_audio_output_router_record_block;
+    router->recorder.detach = NULL;
+    router->recorder.destroy = cbox_audio_output_router_destroy;
+    router->left = left;
+    router->right = right;
+    left->users++;
+    right->users++;
+    CBOX_OBJECT_REGISTER(&router->recorder);
+    return router;
+}
+
 struct cbox_audio_output *cbox_io_create_audio_output(struct cbox_io *io, const char *name, GError **error)
 {
     struct cbox_audio_output *audioout = cbox_io_get_audio_output(io, name, NULL);
@@ -305,8 +341,27 @@ struct cbox_audio_output *cbox_io_create_audio_output(struct cbox_io *io, const 
     return audioout;
 }
 
-void cbox_io_destroy_audio_output(struct cbox_io *io, struct cbox_audio_output *audioout)
+struct cbox_audio_output *cbox_io_get_audio_output_by_uuid_string(struct cbox_io *io, const char *uuidstr, GError **error)
 {
+    struct cbox_uuid uuid;
+    if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
+        return NULL;
+    struct cbox_audio_output *audioout = cbox_io_get_audio_output(io, NULL, &uuid);
+    if (!audioout)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
+        return NULL;
+    }
+    return audioout;
+}
+
+gboolean cbox_io_destroy_audio_output(struct cbox_io *io, struct cbox_audio_output *audioout, GError **error)
+{
+    if (audioout->users)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' is in use", audioout->name);
+        return FALSE;
+    }
     audioout->removing = TRUE;
 
     // This is not a very efficient way to do it. However, in this case,
@@ -325,6 +380,7 @@ void cbox_io_destroy_audio_output(struct cbox_io *io, struct cbox_audio_output *
 
     g_slist_free(old);
     io->impl->destroyaudiooutfunc(io->impl, audioout);
+    return TRUE;
 }
 
 gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error, gboolean *cmd_handled)
@@ -487,17 +543,24 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
     {
         *cmd_handled = TRUE;
         const char *uuidstr = CBOX_ARG_S(cmd, 0);
-        struct cbox_uuid uuid;
-        if (!cbox_uuid_fromstring(&uuid, uuidstr, error))
-            return FALSE;
-        struct cbox_audio_output *audioout = cbox_io_get_audio_output(io, NULL, &uuid);
+        struct cbox_audio_output *audioout = cbox_io_get_audio_output_by_uuid_string(io, uuidstr, error);
         if (!audioout)
-        {
-            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Port '%s' not found", uuidstr);
             return FALSE;
-        }
-        cbox_io_destroy_audio_output(io, audioout);
-        return TRUE;
+        return cbox_io_destroy_audio_output(io, audioout, error);
+    }
+    else if (io->impl->createmidioutfunc && !strcmp(cmd->command, "/create_audio_output_router") && !strcmp(cmd->arg_types, "ss"))
+    {
+        *cmd_handled = TRUE;
+        const char *uuidstr = CBOX_ARG_S(cmd, 0);
+        struct cbox_audio_output *left = cbox_io_get_audio_output_by_uuid_string(io, uuidstr, error);
+        if (!left)
+            return FALSE;
+        struct cbox_audio_output *right = cbox_io_get_audio_output_by_uuid_string(io, uuidstr, error);
+        if (!right)
+            return FALSE;
+        // XXXKF hack alert
+        struct cbox_audio_output_router *router = cbox_io_create_audio_output_router(io, app.engine, left, right);
+        return cbox_uuid_report(&router->recorder._obj_hdr.instance_uuid, fb, error);
     }
     return FALSE;
 }

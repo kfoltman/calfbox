@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "ioenv.h"
 #include "master.h"
 #include "mididest.h"
+#include "recsrc.h"
 
 struct cbox_io;
 struct cbox_io_callbacks;
@@ -147,6 +148,14 @@ struct cbox_audio_output
     // This is set if the output is in process of being removed and should not
     // be used for output.
     gboolean removing;
+    float *buffer;
+    uint32_t users;
+};
+
+struct cbox_audio_output_router
+{
+    struct cbox_recorder recorder;
+    struct cbox_audio_output *left, *right;
 };
 
 extern gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error);
@@ -165,10 +174,11 @@ extern void cbox_io_poll_ports(struct cbox_io *io, struct cbox_command_target *f
 extern struct cbox_midi_input *cbox_io_get_midi_input(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
 extern struct cbox_midi_output *cbox_io_get_midi_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
 extern struct cbox_audio_output *cbox_io_get_audio_output(struct cbox_io *io, const char *name, const struct cbox_uuid *uuid);
+extern struct cbox_audio_output *cbox_io_get_audio_output_by_uuid_string(struct cbox_io *io, const char *uuidstr, GError **error);
 extern struct cbox_midi_output *cbox_io_create_midi_output(struct cbox_io *io, const char *name, GError **error);
 extern void cbox_io_destroy_midi_output(struct cbox_io *io, struct cbox_midi_output *midiout);
 extern struct cbox_audio_output *cbox_io_create_audio_output(struct cbox_io *io, const char *name, GError **error);
-extern void cbox_io_destroy_audio_output(struct cbox_io *io, struct cbox_audio_output *midiout);
+extern gboolean cbox_io_destroy_audio_output(struct cbox_io *io, struct cbox_audio_output *audioout, GError **error);
 extern struct cbox_midi_input *cbox_io_create_midi_input(struct cbox_io *io, const char *name, GError **error);
 extern void cbox_io_destroy_midi_input(struct cbox_io *io, struct cbox_midi_input *midiin);
 extern void cbox_io_destroy_all_midi_ports(struct cbox_io *io);

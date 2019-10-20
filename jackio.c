@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "meter.h"
 #include "midi.h"
 #include "mididest.h"
-#include "recsrc.h"
 
 #include <errno.h>
 #include <stdbool.h>
@@ -222,6 +221,14 @@ static int process_cb(jack_nframes_t nframes, void *arg)
         }
         else
             cbox_midi_buffer_clear(&input->hdr.buffer);
+    }
+    for (GSList *p = io->audio_outputs; p; p = p->next)
+    {
+        struct cbox_jack_audio_output *output = p->data;
+        float *buffer = jack_port_get_buffer(output->port, nframes);
+        output->hdr.buffer = buffer;
+        for (uint32_t j = 0; j < nframes; j ++)
+            buffer[j] = 0.f;
     }
     cb->process(cb->user_data, io, nframes);
     for (uint32_t i = 0; i < io->io_env.input_count; i++)
@@ -716,6 +723,7 @@ struct cbox_audio_output *cbox_jackio_create_audio_out(struct cbox_io_impl *impl
     struct cbox_jack_audio_output *output = calloc(1, sizeof(struct cbox_jack_audio_output));
     output->hdr.name = g_strdup(name);
     output->hdr.removing = FALSE;
+    output->hdr.users = 0;
     output->port = port;
     output->jii = jii;
     cbox_uuid_generate(&output->hdr.uuid);

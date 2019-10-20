@@ -631,14 +631,14 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
         for (i = 0; i < io->io_env.input_count; i++)
         {
             if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_mono_inputs[i]))
-                cbox_recording_source_push(&scene->rec_mono_inputs[i], (const float **)&io->input_buffers[i], nframes);
+                cbox_recording_source_push(&scene->rec_mono_inputs[i], (const float **)&io->input_buffers[i], 0, nframes);
         }
         for (i = 0; i < io->io_env.input_count / 2; i++)
         {
             if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_stereo_inputs[i]))
             {
                 const float *buf[2] = { io->input_buffers[i * 2], io->input_buffers[i * 2 + 1] };
-                cbox_recording_source_push(&scene->rec_stereo_inputs[i], buf, nframes);
+                cbox_recording_source_push(&scene->rec_stereo_inputs[i], buf, 0, nframes);
             }
         }
     }
@@ -716,11 +716,11 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
                 struct cbox_module *insert = oobj->insert;
                 float gain = oobj->gain;
                 if (IS_RECORDING_SOURCE_CONNECTED(oobj->rec_dry))
-                    cbox_recording_source_push(&oobj->rec_dry, (const float **)(outputs + 2 * o), CBOX_BLOCK_SIZE);
+                    cbox_recording_source_push(&oobj->rec_dry, (const float **)(outputs + 2 * o), i, CBOX_BLOCK_SIZE);
                 if (insert && !insert->bypass)
                     (*insert->process_block)(insert, outputs + 2 * o, outputs + 2 * o);
                 if (IS_RECORDING_SOURCE_CONNECTED(oobj->rec_wet))
-                    cbox_recording_source_push(&oobj->rec_wet, (const float **)(outputs + 2 * o), CBOX_BLOCK_SIZE);
+                    cbox_recording_source_push(&oobj->rec_wet, (const float **)(outputs + 2 * o), i, CBOX_BLOCK_SIZE);
                 float *leftbuf, *rightbuf;
                 if (o < module->aux_offset / 2)
                 {
@@ -803,14 +803,14 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
     for (i = 0; i < output_count; i++)
     {
         if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_mono_outputs[i]))
-            cbox_recording_source_push(&scene->rec_mono_outputs[i], (const float **)&output_buffers[i], nframes);
+            cbox_recording_source_push(&scene->rec_mono_outputs[i], (const float **)&output_buffers[i], 0, nframes);
     }
     for (i = 0; i < output_count / 2; i++)
     {
         if (IS_RECORDING_SOURCE_CONNECTED(scene->rec_stereo_outputs[i]))
         {
             const float *buf[2] = { output_buffers[i * 2], output_buffers[i * 2 + 1] };
-            cbox_recording_source_push(&scene->rec_stereo_outputs[i], buf, nframes);
+            cbox_recording_source_push(&scene->rec_stereo_outputs[i], buf, 0, nframes);
         }
     }
 }

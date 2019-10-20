@@ -134,7 +134,7 @@ static gboolean stream_recorder_attach(struct cbox_recorder *handler, struct cbo
     return TRUE;
 }
 
-void stream_recorder_record_block(struct cbox_recorder *handler, const float **buffers, uint32_t numsamples)
+void stream_recorder_record_block(struct cbox_recorder *handler, const float **buffers, uint32_t offset, uint32_t numsamples)
 {
     struct stream_recorder *self = handler->user_data;
 

@@ -521,6 +521,9 @@ class JackIO:
             JackIO.autoconnect(uuid, autoconnect_spec)
         return uuid
     @staticmethod
+    def create_audio_output_router(uuid_left, uuid_right):
+        return get_thing("/io/create_audio_output_router", "/uuid", DocRecorder, uuid_left, uuid_right)
+    @staticmethod
     def delete_audio_output(uuid):
         do_cmd("/io/delete_audio_output", None, [uuid])
     @staticmethod
@@ -1103,4 +1106,11 @@ class SamplerLayer(DocObj):
     def new_region(self):
         return self.cmd_makeobj("/new_region")
 Document.classmap['sampler_layer'] = SamplerLayer
+
+class DocRecorder(DocObj):
+    class Status:
+        pass
+    def __init__(self, uuid):
+        DocObj.__init__(self, uuid)
+Document.classmap['cbox_recorder'] = DocRecorder
 

@@ -30,12 +30,12 @@ CBOX_EXTERN_CLASS(cbox_recorder)
 
 struct cbox_recorder
 {
-    CBOX_OBJECT_HEADER()    
+    CBOX_OBJECT_HEADER()
     void *user_data;
     struct cbox_command_target cmd_target;
     
     gboolean (*attach)(struct cbox_recorder *handler, struct cbox_recording_source *src, GError **error);
-    void (*record_block)(struct cbox_recorder *handler, const float **buffers, uint32_t numsamples);
+    void (*record_block)(struct cbox_recorder *handler, const float **buffers, uint32_t offset, uint32_t numsamples);
     gboolean (*detach)(struct cbox_recorder *handler, GError **error);
     void (*destroy)(struct cbox_recorder *handler);
 };
@@ -56,7 +56,7 @@ struct cbox_recording_source
 extern void cbox_recording_source_init(struct cbox_recording_source *src, struct cbox_scene *scene, uint32_t max_numsamples, int channels);
 extern gboolean cbox_recording_source_attach(struct cbox_recording_source *src, struct cbox_recorder *rec, GError **error);
 extern int cbox_recording_source_detach(struct cbox_recording_source *src, struct cbox_recorder *rec, GError **error);
-extern void cbox_recording_source_push(struct cbox_recording_source *src, const float **buffers, uint32_t numsamples);
+extern void cbox_recording_source_push(struct cbox_recording_source *src, const float **buffers, uint32_t offset, uint32_t numsamples);
 extern void cbox_recording_source_uninit(struct cbox_recording_source *src);
 
 extern struct cbox_recorder *cbox_recorder_new_stream(struct cbox_engine *engine, struct cbox_rt *rt, const char *filename);
