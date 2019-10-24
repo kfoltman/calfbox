@@ -1,5 +1,8 @@
 import sys
 sys.argv  = []
+import gi
+gi.require_version('Gdk', '3.0')
+gi.require_version('Gtk', '3.0')
 from gi.repository import GObject, Gdk, Gtk
 import math
 
@@ -15,7 +18,7 @@ import drumkit_editor
 class SceneDialog(SelectObjectDialog):
     title = "Select a scene"
     def __init__(self, parent):
-        SelectObjectDialog.__init__(self, parent)
+        SelectObjectDialog.__init__(self, parent=parent)
     def update_model(self, model):
         for s in cbox.Config.sections("scene:"):
             title = s["title"]
@@ -30,7 +33,7 @@ class SceneDialog(SelectObjectDialog):
 class NewLayerDialog(SelectObjectDialog):
     title = "Create a layer"
     def __init__(self, parent):
-        SelectObjectDialog.__init__(self, parent)
+        SelectObjectDialog.__init__(self, parent=parent)
     def update_model(self, model):
         for engine_name, wclass in instr_gui.instrument_window_map.items():
             model.append((engine_name, "Engine", engine_name, ""))
@@ -38,7 +41,7 @@ class NewLayerDialog(SelectObjectDialog):
 class LoadLayerDialog(SelectObjectDialog):
     title = "Load a layer"
     def __init__(self, parent):
-        SelectObjectDialog.__init__(self, parent)
+        SelectObjectDialog.__init__(self, parent=parent)
     def update_model(self, model):
         for s in cbox.Config.sections("instrument:"):
             title = s["title"]
@@ -94,7 +97,7 @@ class SceneLayersModel(Gtk.ListStore):
 
 class SceneLayersView(Gtk.TreeView):
     def __init__(self, model):
-        Gtk.TreeView.__init__(self, model)
+        Gtk.TreeView.__init__(self, model=model)
         self.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, [("text/plain", 0, 1)], Gdk.DragAction.MOVE)
         self.enable_model_drag_dest([("text/plain", Gtk.TargetFlags.SAME_APP | Gtk.TargetFlags.SAME_WIDGET, 1)], Gdk.DragAction.MOVE)
         self.connect('drag_data_get', self.drag_data_get)
@@ -133,7 +136,7 @@ class SceneAuxBusesModel(Gtk.ListStore):
 
 class SceneAuxBusesView(Gtk.TreeView):
     def __init__(self, model):
-        Gtk.TreeView.__init__(self, model)
+        Gtk.TreeView.__init__(self, model=model)
         self.insert_column_with_attributes(0, "Name", Gtk.CellRendererText(), text=0)
         self.insert_column_with_attributes(1, "Engine", Gtk.CellRendererText(), text=1)
     def get_current_row(self):
@@ -145,7 +148,7 @@ class SceneAuxBusesView(Gtk.TreeView):
 class StatusBar(Gtk.Statusbar):
     def __init__(self):
         Gtk.Statusbar.__init__(self)
-        self.sample_rate_label = Gtk.Label("")
+        self.sample_rate_label = Gtk.Label(label="")
         self.pack_start(self.sample_rate_label, False, False, 2)
         self.status = self.get_context_id("Status")
         self.sample_rate = self.get_context_id("Sample rate")
@@ -158,7 +161,7 @@ class StatusBar(Gtk.Statusbar):
 
 class MainWindow(Gtk.Window):
     def __init__(self):
-        Gtk.Window.__init__(self, Gtk.WindowType.TOPLEVEL)
+        Gtk.Window.__init__(self, type = Gtk.WindowType.TOPLEVEL)
         self.vbox = Gtk.VBox(spacing = 5)
         self.add(self.vbox)
         self.create()
@@ -197,7 +200,7 @@ class MainWindow(Gtk.Window):
         scene = cbox.Document.get_scene()
         self.nb = Gtk.Notebook()
         self.vbox.add(self.nb)
-        self.nb.append_page(self.create_master(scene), Gtk.Label("Master"))
+        self.nb.append_page(self.create_master(scene), Gtk.Label(label="Master"))
         self.status_bar = StatusBar()
         self.vbox.pack_start(self.status_bar, False, False, 0)
         self.create_instrument_pages(scene.status(), rt_status)
@@ -207,55 +210,55 @@ class MainWindow(Gtk.Window):
         self.master_info = left_label("")
         self.timesig_info = left_label("")
         
-        t = Gtk.Table(3, 8)
-        t.set_col_spacings(5)
-        t.set_row_spacings(5)
+        t = Gtk.Grid()
+        t.set_column_spacing(5)
+        t.set_row_spacing(5)
         
-        t.attach(bold_label("Scene"), 0, 1, 0, 1, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(bold_label("Scene"), 0, 0, 1, 1)
         self.scene_label = left_label(scene_status.name)
-        t.attach(self.scene_label, 1, 3, 0, 1, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(self.scene_label, 1, 0, 2, 1)
 
         self.title_label = left_label(scene_status.title)
-        t.attach(bold_label("Title"), 0, 1, 1, 2, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
-        t.attach(self.title_label, 1, 3, 1, 2, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(bold_label("Title"), 0, 1, 1, 1)
+        t.attach(self.title_label, 1, 1, 2, 1)
         
-        t.attach(bold_label("Play pos"), 0, 1, 2, 3, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
-        t.attach(self.master_info, 1, 3, 2, 3, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(bold_label("Play pos"), 0, 2, 1, 1)
+        t.attach(self.master_info, 1, 2, 2, 1)
         
-        t.attach(bold_label("Time sig"), 0, 1, 3, 4, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
-        t.attach(self.timesig_info, 1, 2, 3, 4, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(bold_label("Time sig"), 0, 3, 1, 1)
+        t.attach(self.timesig_info, 1, 3, 2, 1)
         hb = Gtk.HButtonBox()
-        b = Gtk.Button("Play")
+        b = Gtk.Button(label="Play")
         b.connect('clicked', lambda w: cbox.Transport.play())
         hb.pack_start(b, False, False, 5)
-        b = Gtk.Button("Stop")
+        b = Gtk.Button(label="Stop")
         b.connect('clicked', lambda w: cbox.Transport.stop())
         hb.pack_start(b, False, False, 5)
-        b = Gtk.Button("Rewind")
+        b = Gtk.Button(label="Rewind")
         b.connect('clicked', lambda w: cbox.Transport.seek_ppqn(0))
         hb.pack_start(b, False, False, 5)
-        b = Gtk.Button("Panic")
+        b = Gtk.Button(label="Panic")
         b.connect('clicked', lambda w: cbox.Transport.panic())
         hb.pack_start(b, False, False, 5)
-        t.attach(hb, 2, 3, 3, 4, Gtk.AttachOptions.EXPAND, Gtk.AttachOptions.SHRINK)
+        t.attach(hb, 2, 3, 1, 1)
         
-        t.attach(bold_label("Tempo"), 0, 1, 4, 5, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
-        self.tempo_adj = Gtk.Adjustment(40, 40, 300, 1, 5, 0)
+        t.attach(bold_label("Tempo"), 0, 4, 1, 1)
+        self.tempo_adj = Gtk.Adjustment(value=40, lower=40, upper=300, step_increment=1, page_increment=5, page_size=0)
         self.tempo_adj.connect('value_changed', adjustment_changed_float, cbox.VarPath("/master/set_tempo"))
-        t.attach(standard_hslider(self.tempo_adj), 1, 3, 4, 5, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(standard_hslider(self.tempo_adj), 1, 4, 2, 1)
 
-        t.attach(bold_label("Transpose"), 0, 1, 5, 6, Gtk.AttachOptions.SHRINK | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
-        self.transpose_adj = Gtk.Adjustment(scene_status.transpose, -24, 24, 1, 5, 0)
+        t.attach(bold_label("Transpose"), 0, 5, 1, 1)
+        self.transpose_adj = Gtk.Adjustment(value=scene_status.transpose, lower=-24, upper=24, step_increment=1, page_increment=5, page_size=0)
         self.transpose_adj.connect('value_changed', adjustment_changed_int, cbox.VarPath('/scene/transpose'))
-        t.attach(standard_align(Gtk.SpinButton(adjustment = self.transpose_adj), 0, 0, 0, 0), 1, 3, 5, 6, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(standard_align(Gtk.SpinButton(adjustment = self.transpose_adj), 0, 0, 0, 0), 1, 5, 2, 1)
         
         self.layers_model = SceneLayersModel()
         self.layers_view = SceneLayersView(self.layers_model)
-        t.attach(standard_vscroll_window(-1, 160, self.layers_view), 0, 3, 7, 8, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(standard_vscroll_window(-1, 160, self.layers_view), 0, 7, 3, 1)
         
         self.auxes_model = SceneAuxBusesModel()
         self.auxes_view = SceneAuxBusesView(self.auxes_model)
-        t.attach(standard_vscroll_window(-1, 120, self.auxes_view), 0, 3, 8, 9, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(standard_vscroll_window(-1, 120, self.auxes_view), 0, 8, 3, 1)
 
         me = cbox.Document.get_engine().master_effect
         me_status = me.status()
@@ -267,8 +270,8 @@ class MainWindow(Gtk.Window):
         hb.pack_start(self.master_chooser.fx_edit, False, False, 5)
         hb.pack_start(self.master_chooser.fx_bypass, False, False, 5)
         
-        t.attach(bold_label("Master effect"), 0, 1, 6, 7, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
-        t.attach(standard_align(hb, 0, 0, 0, 0), 1, 3, 6, 7, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
+        t.attach(bold_label("Master effect"), 0, 6, 1, 1)
+        t.attach(standard_align(hb, 0, 0, 0, 0), 1, 6, 3, 1)
         
         self.layers_model.refresh(scene_status)
         self.auxes_model.refresh(scene_status)
@@ -473,10 +476,9 @@ class MainWindow(Gtk.Window):
             #markup += '<b>Instrument %d:</b> engine %s, name %s\n' % (i, attribs.engine, attribs.name)
             b = Gtk.VBox(spacing = 5)
             b.set_border_width(5)
-            b.pack_start(Gtk.Label("Engine: %s" % iengine), False, False, 5)
+            b.pack_start(Gtk.Label(label="Engine: %s" % iengine), False, False, 5)
             b.pack_start(Gtk.HSeparator(), False, False, 5)
-            t = Gtk.Table(1 + idata.outputs, 7)
-            t.set_col_spacings(5)
+            t = Gtk.Table(n_rows=1 + idata.outputs, n_columns=7)
             t.attach(bold_label("Instr. output", 0.5), 0, 1, 0, 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
             t.attach(bold_label("Send to", 0.5), 1, 2, 0, 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
             t.attach(bold_label("Gain [dB]", 0.5), 2, 3, 0, 1, 0, Gtk.AttachOptions.SHRINK)
@@ -498,7 +500,7 @@ class MainWindow(Gtk.Window):
                 preset = odata.insert_preset
                 bypass = odata.bypass
                 
-                t.attach(Gtk.Label(output_name), 0, 1, y, y + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
+                t.attach(Gtk.Label(label=output_name), 0, 1, y, y + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
                 
                 if not is_aux:
                     cb = standard_combo(outputs_ls, odata.output - 1)
@@ -508,7 +510,7 @@ class MainWindow(Gtk.Window):
                     cb.connect('changed', combo_value_changed_use_column, cbox.VarPath(opath + '/bus'), 1)
                 t.attach(cb, 1, 2, y, y + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
                                     
-                adj = Gtk.Adjustment(odata.gain, -96, 24, 1, 6, 0)
+                adj = Gtk.Adjustment(value=odata.gain, lower=-96, upper=24, step_increment=1, page_increment=6, page_size=0)
                 adj.connect('value_changed', adjustment_changed_float, cbox.VarPath(opath + '/gain'))
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
                 
@@ -522,7 +524,7 @@ class MainWindow(Gtk.Window):
             if iengine in instr_gui.instrument_window_map:
                 b.pack_start(Gtk.HSeparator(), False, False, 5)
                 b.pack_start(instr_gui.instrument_window_map[iengine](iname, iobj), True, True, 5)
-            self.nb.append_page(b, Gtk.Label(iname))
+            self.nb.append_page(b, Gtk.Label(label=iname))
         self.update()
         
     def delete_instrument_pages(self):
