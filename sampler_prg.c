@@ -361,7 +361,10 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         {
             sampler_layer_update(l);
             if (!l->data.eff_waveform)
+            {
                 g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
+                CBOX_DELETE((struct sampler_layer *)l);
+            }
             else
                 sampler_program_add_layer(prg, l);
         }
