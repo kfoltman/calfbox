@@ -983,11 +983,16 @@ class TonewheelOrganEngine(NonDocObj):
         percussion_enable = SettableProperty(bool)
         percussion_3rd = SettableProperty(bool)
 
+class JackInputEngine(NonDocObj):
+    class Status:
+        inputs = (int, int)
+
 engine_classes = {
     'sampler' : SamplerEngine,
     'fluidsynth' : FluidsynthEngine,
     'stream_player' : StreamPlayerEngine,
     'tonewheel_organ' : TonewheelOrganEngine,
+    'jack_input' : JackInputEngine,
 }
 
 class DocAuxBus(DocObj):

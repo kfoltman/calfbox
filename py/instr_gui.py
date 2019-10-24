@@ -338,7 +338,42 @@ class TonewheelOrganWindow(Gtk.VBox):
             combo.handler_block(combo.update_handler)
             combo.set_active(ls_index(combo.get_model(), getattr(attribs, flag), 0))
             combo.handler_unblock(combo.update_handler)
-        
+
+class JackInputWindow(Gtk.VBox):
+    def __init__(self, instrument, iobj):
+        Gtk.VBox.__init__(self)
+        print (iobj.status())
+        self.engine = iobj.engine
+        self.path = self.engine.path
+        table = Gtk.Table(2, 2)
+        table.props.row_spacing = 10
+        no_inputs = cbox.JackIO.status().audio_inputs
+        model = Gtk.ListStore(GObject.TYPE_INT, GObject.TYPE_STRING)
+        model.append((0, "Unconnected"))
+        for i in range(no_inputs):
+            model.append((1 + i, "Input#%s" % (1 + i)))
+        self.combos = []
+        for i, name in ((0, "Left"), (1, "Right")):
+            table.attach(Gtk.Label(name), 0, 1, i, i + 1)
+            combo = standard_combo(model, column = 1)
+            table.attach(combo, 1, 2, i, i + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
+            combo.update_handler = combo.connect('changed', self.update_inputs)
+            self.combos.append(combo)
+        self.pack_start(table, False, False, 5)
+        self.refresh()
+
+    def update_inputs(self, w):
+        def to_base1(value):
+            return -1 if value <= 0 else value
+        left = to_base1(self.combos[0].get_active())
+        right = to_base1(self.combos[1].get_active())
+        self.engine.cmd("/inputs", None, left, right)
+
+    def refresh(self):
+        inputs = self.engine.status().inputs
+        self.combos[0].set_active(max(0, inputs[0]))
+        self.combos[1].set_active(max(0, inputs[1]))
+
 instrument_window_map = {
     'stream_player' : StreamWindow,
     'fluidsynth' : FluidsynthWindow,
@@ -346,3 +381,5 @@ instrument_window_map = {
     'tonewheel_organ' : TonewheelOrganWindow
 }
 
+if int(cbox.Config.get("io", "use_usb") or "0") == 0 and cbox.JackIO.status().audio_inputs > 0:
+    instrument_window_map['jack_input'] = JackInputWindow
