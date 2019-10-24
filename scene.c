@@ -623,7 +623,7 @@ void cbox_scene_update_connected_outputs(struct cbox_scene *scene)
 
 void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output_buffers[], uint32_t output_channels)
 {
-    uint32_t i, j, n;
+    uint32_t i, n;
 
     if (scene->rt && scene->rt->io)
     {
@@ -714,7 +714,7 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
             {
                 struct cbox_instrument_output *oobj = &instr->outputs[o];
                 struct cbox_module *insert = oobj->insert;
-                float gain = oobj->gain;
+                struct cbox_gain *gain_obj = &oobj->gain_obj;
                 if (IS_RECORDING_SOURCE_CONNECTED(oobj->rec_dry))
                     cbox_recording_source_push(&oobj->rec_dry, (const float **)(outputs + 2 * o), i, CBOX_BLOCK_SIZE);
                 if (insert && !insert->bypass)
@@ -744,24 +744,14 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
                 }
                 if (leftbuf && rightbuf)
                 {
-                    for (j = 0; j < CBOX_BLOCK_SIZE; j++)
-                    {
-                        leftbuf[i + j] += gain * channels[2 * o][j];
-                        rightbuf[i + j] += gain * channels[2 * o + 1][j];
-                    }
+                    cbox_gain_add_stereo(gain_obj, &leftbuf[i], channels[2 * o], &rightbuf[i], channels[2 * o + 1], CBOX_BLOCK_SIZE);
                 }
                 else
                 {
                     if (leftbuf)
-                    {
-                        for (j = 0; j < CBOX_BLOCK_SIZE; j++)
-                            leftbuf[i + j] += gain * channels[2 * o][j];
-                    }
+                        cbox_gain_add_mono(gain_obj, &leftbuf[i], channels[2 * o], CBOX_BLOCK_SIZE);
                     if (rightbuf)
-                    {
-                        for (j = 0; j < CBOX_BLOCK_SIZE; j++)
-                            rightbuf[i + j] += gain * channels[2 * o + 1][j];
-                    }
+                        cbox_gain_add_mono(gain_obj, &rightbuf[i], channels[2 * o + 1], CBOX_BLOCK_SIZE);
                 }
             }
         }
@@ -947,7 +937,7 @@ struct cbox_instrument *cbox_scene_get_instrument_by_name(struct cbox_scene *sce
         oobj->output_bus = cbox_config_get_int(instr_section, key, 1) - 1;
         g_free(key);
         key = i == 0 ? g_strdup("gain") : g_strdup_printf("gain%d", 1 + i);
-        oobj->gain = cbox_config_get_gain_db(instr_section, key, 0);
+        cbox_gain_set_db(&oobj->gain_obj, cbox_config_get_float(instr_section, key, 0));
         g_free(key);
         
         key = i == 0 ? g_strdup("insert") : g_strdup_printf("insert%d", 1 + i);

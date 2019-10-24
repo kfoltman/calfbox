@@ -32,15 +32,17 @@ static gboolean cbox_instrument_output_process_cmd(struct cbox_instrument *instr
 {
     if (!strcmp(subcmd, "/status") && !strcmp(cmd->arg_types, ""))
     {
-        if (!(cbox_execute_on(fb, NULL, "/gain_linear", "f", error, output->gain) &&
-            cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
+        if (!(cbox_execute_on(fb, NULL, "/gain_linear", "f", error, output->gain_obj.lin_gain) &&
+            cbox_execute_on(fb, NULL, "/gain", "f", error, output->gain_obj.db_gain) &&
             cbox_execute_on(fb, NULL, "/output", "i", error, output->output_bus + 1)))
             return FALSE;
         return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, CBOX_GET_DOCUMENT(instr->scene), instr->scene->rt, instr->scene->engine, error);
     }
     if (!strcmp(subcmd, "/gain") && !strcmp(cmd->arg_types, "f"))
     {
-        output->gain = dB2gain_simple(CBOX_ARG_F(cmd, 0));
+        // XXXKF this needs proper handling of concurrency/race conditions, might
+        // be built into the gain class in future.
+        cbox_gain_set_db(&output->gain_obj, CBOX_ARG_F(cmd, 0));
         return TRUE;
     }
     if (!strcmp(subcmd, "/output") && !strcmp(cmd->arg_types, "i"))
@@ -68,8 +70,8 @@ static gboolean cbox_instrument_aux_process_cmd(struct cbox_instrument *instr, s
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        if (!(cbox_execute_on(fb, NULL, "/gain_linear", "f", error, output->gain) &&
-            cbox_execute_on(fb, NULL, "/gain", "f", error, gain2dB_simple(output->gain)) &&
+        if (!(cbox_execute_on(fb, NULL, "/gain_linear", "f", error, output->gain_obj.lin_gain) &&
+            cbox_execute_on(fb, NULL, "/gain", "f", error, output->gain_obj.db_gain) &&
             cbox_execute_on(fb, NULL, "/bus", "s", error, instr->aux_output_names[id] ? instr->aux_output_names[id] : "")))
             return FALSE;
         return cbox_module_slot_process_cmd(&output->insert, fb, cmd, subcmd, CBOX_GET_DOCUMENT(instr->scene), instr->scene->rt, instr->scene->engine, error);
@@ -233,7 +235,7 @@ void cbox_instrument_output_init(struct cbox_instrument_output *output, struct c
     cbox_recording_source_init(&output->rec_wet, scene, max_numsamples, 2);
     output->insert = NULL;
     output->output_bus = 0;
-    output->gain = 1.0;
+    cbox_gain_init(&output->gain_obj);
 }
 
 

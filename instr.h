@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_INSTR_H
 #define CBOX_INSTR_H
 
+#include "dspmath.h"
 #include "recsrc.h"
 
 CBOX_EXTERN_CLASS(cbox_instrument)
@@ -32,7 +33,7 @@ struct cbox_instrument_output
 {
     struct cbox_module *insert;
     int output_bus;
-    float gain;
+    struct cbox_gain gain_obj;
     struct cbox_recording_source rec_dry, rec_wet;
 };
 
