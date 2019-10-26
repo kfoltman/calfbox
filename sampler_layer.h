@@ -186,6 +186,7 @@ struct sampler_lfo_params
     float freq;
     float delay;
     float fade;
+    int wave;
 };
 
 struct sampler_eq_params
@@ -295,6 +296,7 @@ typedef int midi_note_t;
     MACRO(freq, 0, 0, ## __VA_ARGS__) \
     MACRO(delay, 1, 0, ## __VA_ARGS__) \
     MACRO(fade, 2, 0, ## __VA_ARGS__) \
+    MACRO(wave, 3, 1, ## __VA_ARGS__) \
     
 #define EQ_FIELDS(MACRO, ...) \
     MACRO(freq, 0, 0, ## __VA_ARGS__) \

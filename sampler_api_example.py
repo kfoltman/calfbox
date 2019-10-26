@@ -31,6 +31,11 @@ g1.set_param("amp_veltrack", "0")
 g1.set_param("volume", "-12")
 g1.set_param("fileg_depthcc14", "-5400")
 
+#g1.set_param("cutoff", "1000")
+#g1.set_param("fillfo_freq", "4")
+#g1.set_param("fillfo_depth", "2400")
+#g1.set_param("fillfo_wave", "12")
+
 r1 = g1.new_region()
 r1.set_param("sample", "*saw")
 r1.set_param("transpose", "0")

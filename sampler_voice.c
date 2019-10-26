@@ -42,12 +42,14 @@ static void lfo_update_freq(struct sampler_lfo *lfo, struct sampler_lfo_params *
     lfo->delta = (uint32_t)(lfop->freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE * srate_inv);
     lfo->delay = (uint32_t)(lfop->delay * srate);
     lfo->fade = (uint32_t)(lfop->fade * srate);
+    lfo->wave = (int32_t)(lfop->wave);
 }
 
 static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, int srate, double srate_inv)
 {
     lfo->phase = 0;
     lfo->age = 0;
+    lfo->random_value = 0; // safe, less CPU intensive value
     lfo_update_freq(lfo, lfop, srate, srate_inv);
 }
 
@@ -60,11 +62,49 @@ static inline float lfo_run(struct sampler_lfo *lfo)
     }
 
     const int FRAC_BITS = 32 - 11;
-    lfo->phase += lfo->delta;
-    uint32_t iphase = lfo->phase >> FRAC_BITS;
-    float frac = (lfo->phase & ((1 << FRAC_BITS) - 1)) * (1.0 / (1 << FRAC_BITS));
 
-    float v = sampler_sine_wave[iphase] + (sampler_sine_wave[iphase + 1] - sampler_sine_wave[iphase]) * frac;
+    float v = 0;
+    switch(lfo->wave) {
+        case 0: // triangle
+        {
+            uint32_t ph = lfo->phase + 0x40000000;
+            uint32_t tri = (ph & 0x7FFFFFFF) ^ (((ph >> 31) - 1) & 0x7FFFFFFF);
+            v = -1.0 + tri * (2.0 / (1U << 31));
+            break;
+        }
+        case 1: // sine (default)
+        default:
+        {
+            uint32_t iphase = lfo->phase >> FRAC_BITS;
+            float frac = (lfo->phase & ((1 << FRAC_BITS) - 1)) * (1.0 / (1 << FRAC_BITS));
+            v = sampler_sine_wave[iphase] + (sampler_sine_wave[iphase + 1] - sampler_sine_wave[iphase]) * frac;
+            break;
+        }
+        case 2:
+            v = lfo->phase < 0xC0000000 ? 1 : -1;
+            break;
+        case 3:
+            v = lfo->phase < 0x80000000 ? 1 : -1;
+            break;
+        case 4:
+            v = lfo->phase < 0x40000000 ? 1 : -1;
+            break;
+        case 5:
+            v = lfo->phase < 0x20000000 ? 1 : -1;
+            break;
+        case 6:
+            v = -1 + lfo->phase * (1.0 / (1U << 31));
+            break;
+        case 7:
+            v = 1 - lfo->phase * (1.0 / (1U << 31));
+            break;
+        case 12:
+            if ((lfo->phase & 0x80000000) != ((lfo->phase + lfo->delta) & 0x80000000))
+                lfo->random_value = -1 + 2 * rand() / (1.0 * RAND_MAX);
+            v = lfo->random_value;
+            break;
+    }
+    lfo->phase += lfo->delta;
     if (lfo->fade && lfo->age < lfo->delay + lfo->fade)
     {
         v *= (lfo->age - lfo->delay) * 1.0 / lfo->fade;
