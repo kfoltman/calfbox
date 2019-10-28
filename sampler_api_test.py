@@ -22,7 +22,7 @@ def verify_region(region, has, has_not, full = False):
             values.add(key)
             values_dict[key] = value
     if 'genericmod' in rtext:
-        print (rtext)
+        print (rtext, "Expected:", has)
         assert False
     for i in has:
         if i not in values:
@@ -88,8 +88,12 @@ params_to_test = [
     'loop_start', 'loop_end',
     'ampeg_attack',
     'amplfo_depth', 'fillfo_depth',
-    'fileg_depthcc5',
-    'amplfo_depthcc5',
+    'fileg_depthcc5', 'fillfo_depthcc8','amplfo_depthcc5',
+    'amplfo_freqcc5', 'fillfo_freqcc10', 'pitchlfo_freqcc5',
+    'cutoff_chanaft', 'resonance_chanaft',
+    'cutoff_polyaft', 'resonance_polyaft',
+    'amplfo_depthpolyaft', 'fillfo_depthpolyaft', 'pitchlfo_depthpolyaft', 
+    'amplfo_freqpolyaft', 'fillfo_freqpolyaft', 'pitchlfo_freqpolyaft',
     ]
 for i in range(len(params_to_test)):
     param = params_to_test[0]

@@ -704,6 +704,16 @@ static double atof_C(const char *value)
     return g_ascii_strtod(value, NULL);
 }
 
+#define PROC_SET_MODULATION(name, source, dest) \
+    if (!strcmp(key, name)) { \
+        sampler_layer_set_modulation(layer, src, smsrc_##source, dest, fvalue, 0); \
+        return TRUE; \
+    }
+#define PROC_SET_AMOUNT(name, source, dest) \
+    if (!strcmp(key, name)) { \
+        sampler_layer_set_modulation(layer, smsrc_##source, smsrc_none, dest, fvalue, 0); \
+        return TRUE; \
+    }
 #define PROC_SET_MODULATION_DEPTH_CC(name, source, dest) \
     if (!strncmp(key, name, sizeof(name) - 1)) \
     { \
@@ -724,9 +734,19 @@ static double atof_C(const char *value)
             return FALSE; \
     }
 
-#define PROC_UNSET_MODULATION(name, source) \
+#define PROC_UNSET_MODULATION(name, source, dest) \
     if (!strcmp(key, name)) { \
         sampler_layer_unset_modulation(layer, src, smsrc_##source, dest); \
+        return TRUE; \
+    }
+#define PROC_UNSET_AMOUNT(name, source, dest) \
+    if (!strcmp(key, name)) { \
+        sampler_layer_unset_modulation(layer, smsrc_##source, smsrc_none, dest); \
+        return TRUE; \
+    }
+#define PROC_UNSET_MODULATION_TO(name, source, dest) \
+    if (!strcmp(key, name)) { \
+        sampler_layer_unset_modulation(layer, smsrc_##source, smsrc_none, dest); \
         return TRUE; \
     }
 #define PROC_UNSET_MODULATION_DEPTH_CC(name, src2, dest) \
@@ -792,7 +812,7 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
 {
     static const enum sampler_modsrc srcs[] = { smsrc_amplfo, smsrc_fillfo, smsrc_pitchlfo };
     static const enum sampler_moddest dests[] = { smdest_gain, smdest_cutoff, smdest_pitch };
-    static const enum sampler_moddest dests2[] = { smdest_amplfo_freq, smdest_fillfo_freq, smdest_pitchlfo_freq };
+    static const enum sampler_moddest dests_freq[] = { smdest_amplfo_freq, smdest_fillfo_freq, smdest_pitchlfo_freq };
     enum sampler_modsrc src = srcs[lfo_type];
     enum sampler_moddest dest = dests[lfo_type];
 
@@ -806,12 +826,12 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     LFO_FIELDS(PROC_SET_LFO_FIELD)
     if (!strcmp(key, "depth"))
         sampler_layer_set_modulation(layer, src, smsrc_none, dest, fvalue, 0);
-    else if (!strcmp(key, "depthchanaft"))
-        sampler_layer_set_modulation(layer, src, smsrc_chanaft, dest, fvalue, 0);
-    else if (!strcmp(key, "depthpolyaft"))
-        sampler_layer_set_modulation(layer, src, smsrc_polyaft, dest, fvalue, 0);
+    else PROC_SET_MODULATION("depthchanaft", chanaft, dest)
+    else PROC_SET_MODULATION("depthpolyaft", polyaft, dest)
+    else PROC_SET_AMOUNT("freqchanaft", chanaft, dests_freq[lfo_type])
+    else PROC_SET_AMOUNT("freqpolyaft", polyaft, dests_freq[lfo_type])
     else PROC_SET_MODULATION_DEPTH_CC("depthcc", src, dest)
-    else PROC_SET_AMOUNT_CC("freqcc", dests2[lfo_type])
+    else PROC_SET_AMOUNT_CC("freqcc", dests_freq[lfo_type])
     else 
         return FALSE;
     return TRUE;
@@ -912,11 +932,7 @@ try_now:
     // XXXKF: to make things worse, some attributes have names different from
     // C field names, or have multiple names, or don't map 1:1 to internal model
     
-    if (!strcmp(key, "lolev"))
-        l->data.lovel = atoi(value), l->data.has_lovel = 1;
-    else if (!strcmp(key, "hilev"))
-        l->data.hivel = atoi(value), l->data.has_hivel = 1;
-    else if (!strcmp(key, "benddown"))
+    if (!strcmp(key, "benddown"))
         l->data.bend_down = atoi(value), l->data.has_bend_down = 1;
     else if (!strcmp(key, "bendup"))
         l->data.bend_up = atoi(value), l->data.has_bend_up = 1;
@@ -926,6 +942,12 @@ try_now:
         l->data.loop_end = atoi(value), l->data.has_loop_end = 1;
     else if (!strcmp(key, "cutoff_chanaft"))
         sampler_layer_set_modulation(l, smsrc_chanaft, smsrc_none, smdest_cutoff, atof_C(value), 0);
+    else if (!strcmp(key, "resonance_chanaft"))
+        sampler_layer_set_modulation(l, smsrc_chanaft, smsrc_none, smdest_resonance, atof_C(value), 0);
+    else if (!strcmp(key, "cutoff_polyaft"))
+        sampler_layer_set_modulation(l, smsrc_polyaft, smsrc_none, smdest_cutoff, atof_C(value), 0);
+    else if (!strcmp(key, "resonance_polyaft"))
+        sampler_layer_set_modulation(l, smsrc_polyaft, smsrc_none, smdest_resonance, atof_C(value), 0);
     else PROC_ADD_NIF_FOR_KEY("amp_random", sampler_nif_addrandom, 0)
     else PROC_ADD_NIF_FOR_KEY("fil_random", sampler_nif_addrandom, 1)
     else PROC_ADD_NIF_FOR_KEY("pitch_random", sampler_nif_addrandom, 2)
@@ -934,6 +956,7 @@ try_now:
     else PROC_ADD_NIF_FOR_KEY_CC("delay_cc", sampler_nif_cc2delay)
     else PROC_ADD_NIF_FOR_KEY_CC("reloffset_cc", sampler_nif_cc2reloffset)
     else PROC_SET_AMOUNT_CC("cutoff_cc", smdest_cutoff)
+    else PROC_SET_AMOUNT_CC("resonance_cc", smdest_resonance)
     else PROC_SET_AMOUNT_CC("pitch_cc", smdest_pitch)
     else PROC_SET_AMOUNT_CC("tonectl_cc", smdest_tonectl)
     else PROC_SET_AMOUNT_CC("gain_cc", smdest_gain)
@@ -1028,6 +1051,16 @@ try_now:
         sampler_layer_set_modulation(l, atoi(tokens[1]), atoi(tokens[2]), atoi(tokens[3]), atof(value), atoi(tokens[4]));
         g_strfreev(tokens);
     }
+    else if (!strcmp(key, "lolev"))
+    {
+        key = "lovel";
+        goto try_now;
+    }
+    else if (!strcmp(key, "hilev"))
+    {
+        key = "hivel";
+        goto try_now;
+    }
     else
         goto unknown_key;
     
@@ -1065,7 +1098,7 @@ static gboolean unset_envelope_param(struct sampler_layer *layer, struct cbox_da
     else PROC_UNSET_ENV_NIF(decay)
     else PROC_UNSET_ENV_NIF(sustain)
     else PROC_UNSET_ENV_NIF(release)
-    else PROC_UNSET_MODULATION("vel2depth", vel)
+    else PROC_UNSET_MODULATION("vel2depth", vel, dest)
     else PROC_UNSET_MODULATION_DEPTH_CC("depthcc", src, dest)
     else
         return FALSE;
@@ -1079,7 +1112,7 @@ static gboolean unset_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
 {
     static const enum sampler_modsrc srcs[] = { smsrc_amplfo, smsrc_fillfo, smsrc_pitchlfo };
     static const enum sampler_moddest dests[] = { smdest_gain, smdest_cutoff, smdest_pitch };
-    static const enum sampler_moddest dests2[] = { smdest_amplfo_freq, smdest_fillfo_freq, smdest_pitchlfo_freq };
+    static const enum sampler_moddest dests_freq[] = { smdest_amplfo_freq, smdest_fillfo_freq, smdest_pitchlfo_freq };
     enum sampler_modsrc src = srcs[lfo_type];
     enum sampler_moddest dest = dests[lfo_type];
 
@@ -1091,11 +1124,13 @@ static gboolean unset_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
         }
 
     LFO_FIELDS(PROC_UNSET_LFO_FIELD)
-    PROC_UNSET_MODULATION("depth", none)
-    else PROC_UNSET_MODULATION("depthchanaft", chanaft)
-    else PROC_UNSET_MODULATION("depthpolyaft", polyaft)
+    PROC_UNSET_MODULATION("depth", none, dest)
+    else PROC_UNSET_MODULATION("depthchanaft", chanaft, dest)
+    else PROC_UNSET_MODULATION("depthpolyaft", polyaft, dest)
+    else PROC_UNSET_AMOUNT("freqchanaft", chanaft, dests_freq[lfo_type])
+    else PROC_UNSET_AMOUNT("freqpolyaft", polyaft, dests_freq[lfo_type])
     else PROC_UNSET_MODULATION_DEPTH_CC("depthcc", src, dest)
-    else PROC_UNSET_AMOUNT_CC("freqcc", src, dests2[lfo_type])
+    else PROC_UNSET_AMOUNT_CC("freqcc", src, dests_freq[lfo_type])
     else
         return FALSE;
     return TRUE;
@@ -1171,6 +1206,10 @@ gboolean sampler_layer_unapply_param(struct sampler_layer *layer, const char *ke
 {
     struct sampler_layer *l = layer;
     SAMPLER_FIXED_FIELDS(PROC_UNAPPLY_PARAM)
+    else PROC_UNSET_MODULATION_TO("cutoff_chanaft", chanaft, smdest_cutoff)
+    else PROC_UNSET_MODULATION_TO("resonance_chanaft", chanaft, smdest_resonance)
+    else PROC_UNSET_MODULATION_TO("cutoff_polyaft", polyaft, smdest_cutoff)
+    else PROC_UNSET_MODULATION_TO("resonance_polyaft", polyaft, smdest_resonance)
     else PROC_UNSET_NIF_FOR_KEY("amp_random", sampler_nif_addrandom, 0)
     else PROC_UNSET_NIF_FOR_KEY("fil_random", sampler_nif_addrandom, 1)
     else PROC_UNSET_NIF_FOR_KEY("pitch_random", sampler_nif_addrandom, 2)
@@ -1244,7 +1283,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     
     static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
     static const char *modsrc_names[] = { "chanaft", "vel", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
-    static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl" };
+    static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pitchlfo_freq", "fillfo_freq", "amplfo_freq" };
     for(GSList *nif = l->nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;
@@ -1277,9 +1316,14 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
 
         if (md->src2 == smsrc_none)
         {
+            gboolean is_lfofreq = md->dest >= smdest_pitchlfo_freq && md->dest <= smdest_amplfo_freq;
             if (md->src < 120)
             {
-                g_string_append_printf(outstr, " %s_cc%d=%s", moddest_names[md->dest], md->src, floatbuf);
+                // Inconsistency: cutoff_cc5 but amplfo_freqcc5
+                if (is_lfofreq)
+                    g_string_append_printf(outstr, " %scc%d=%s", moddest_names[md->dest], md->src, floatbuf);
+                else
+                    g_string_append_printf(outstr, " %s_cc%d=%s", moddest_names[md->dest], md->src, floatbuf);
                 continue;
             }
             if (md->src < 120 + sizeof(modsrc_names) / sizeof(modsrc_names[0]))
@@ -1290,6 +1334,8 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                     (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
                     (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
                     g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - 120], floatbuf);
+                else if (is_lfofreq)
+                    g_string_append_printf(outstr, " %s%s=%s", moddest_names[md->dest], modsrc_names[md->src - 120], floatbuf);
                 else
                     g_string_append_printf(outstr, " %s_%s=%s", moddest_names[md->dest], modsrc_names[md->src - 120], floatbuf);
                 continue;
