@@ -536,24 +536,31 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     
     float moddests[smdestcount];
-    moddests[smdest_gain] = 0;
     moddests[smdest_pitch] = pitch;
     moddests[smdest_cutoff] = v->cutoff_shift;
+    // These are always set
+    uint32_t modmask = (1 << smdest_pitch) | (1 << smdest_cutoff);
+#if 0
+    // Those are lazy-initialized using modmask.
+    moddests[smdest_gain] = 0;
     moddests[smdest_resonance] = 0;
     moddests[smdest_tonectl] = 0;
     moddests[smdest_pitchlfo_freq] = 0;
     moddests[smdest_fillfo_freq] = 0;
     moddests[smdest_amplfo_freq] = 0;
+#endif
     GSList *mod = l->modulations;
     if (__builtin_expect(l->trigger == stm_release, 0))
-        moddests[smdest_gain] -= v->age * l->rt_decay * m->module.srate_inv;
+    {
+        moddests[smdest_gain] = -v->age * l->rt_decay * m->module.srate_inv;
+        modmask |= (1 << smdest_gain);
+    }
     
     if (c->pitchwheel)
         moddests[smdest_pitch] += c->pitchwheel * (c->pitchwheel > 0 ? l->bend_up : l->bend_down) >> 13;
     
     static const int modoffset[4] = {0, -1, -1, 1 };
     static const int modscale[4] = {1, 1, 2, -2 };
-    uint32_t modmask = 0;
     while(mod)
     {
         struct sampler_modulation *sm = mod->data;
@@ -574,8 +581,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             value2 = modoffset[(sm->flags & 12) >> 2] + value2 * modscale[(sm->flags & 12) >> 2];
             value *= value2;
         }
-        moddests[sm->dest] += value * sm->amount;
-        modmask |= (1 << sm->dest);
+        if (!(modmask & (1 << sm->dest))) // first value
+        {
+            moddests[sm->dest] = value * sm->amount;
+            modmask |= (1 << sm->dest);
+        }
+        else
+            moddests[sm->dest] += value * sm->amount;
         
         mod = g_slist_next(mod);
     }
@@ -697,7 +709,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->gen.virtdelta = freq64;
     }
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * c->channel_volume_cc * sampler_channel_addcc(c, 11) / (maxv * maxv);
-    if (moddests[smdest_gain] != 0.f)
+    if ((modmask & (1 << smdest_gain)) && moddests[smdest_gain] != 0.f)
         gain *= dB2gain(moddests[smdest_gain]);
     // http://drealm.info/sfz/plj-sfz.xhtml#amp "The overall gain must remain in the range -144 to 6 decibels."
     if (gain > 2.f)
@@ -719,7 +731,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (logcutoff > 12798)
             logcutoff = 12798;
         //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
-        float resonance = l->resonance_linearized * dB2gain((is4p ? 0.5 : 1) * moddests[smdest_resonance]);
+        float resonance = l->resonance_linearized;
+        if (modmask & (1 << smdest_resonance))
+            resonance *= dB2gain((is4p ? 0.5 : 1) * moddests[smdest_resonance]);
         if (resonance < 0.7f)
             resonance = 0.7f;
         if (resonance > 32.f)
@@ -760,7 +774,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     if (__builtin_expect(l->tonectl_freq != 0, 0))
     {
-        float ctl = l->tonectl + moddests[smdest_tonectl];
+        float ctl = l->tonectl + (modmask & (1 << smdest_tonectl) ? moddests[smdest_tonectl] : 0);
         if (fabs(ctl) > 0.0001f)
             cbox_onepolef_set_highshelf_setgain(&v->onepole_coeffs, dB2gain(ctl));
         else
