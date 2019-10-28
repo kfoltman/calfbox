@@ -199,8 +199,8 @@ static inline void cbox_dahdsr_init(struct cbox_dahdsr *dahdsr, float top_value)
 
 static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, const struct cbox_dahdsr *dahdsr, int sr, float top_value, gboolean is_release_exp)
 {
-    env->start_value = 0;
-    env->stages[0].end_value = 0;
+    env->start_value = dahdsr->start;
+    env->stages[0].end_value = dahdsr->start;
     env->stages[0].time = dahdsr->delay * sr;
     env->stages[0].next_if_pressed = 1;
     env->stages[0].next_if_released = 5;

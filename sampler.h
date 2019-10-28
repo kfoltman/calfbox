@@ -67,7 +67,7 @@ struct sampler_channel
 
 struct sampler_lfo
 {
-    uint32_t phase, delta;
+    uint32_t phase, delta, xdelta;
     uint32_t age, delay, fade;
     int32_t wave;
     float random_value;

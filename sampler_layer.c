@@ -34,6 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <locale.h>
 
+void sampler_layer_data_dump_modulations(struct sampler_layer_data *l)
+{
+    GSList *p = l->modulations;
+    while(p)
+    {
+        struct sampler_modulation *sm = p->data;
+        if (sm->has_value)
+            printf("%d x %d -> %d : %f\n", sm->src, sm->src2, sm->dest, sm->amount);
+        p = g_slist_next(p);
+    }
+}
+
 static void sampler_layer_data_set_modulation(struct sampler_layer_data *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags, gboolean propagating_defaults)
 {
     GSList *p = l->modulations;
@@ -62,14 +74,74 @@ static void sampler_layer_data_set_modulation(struct sampler_layer_data *l, enum
     l->modulations = g_slist_prepend(l->modulations, sm);
 }
 
-void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags)
+static void sampler_layer_data_unset_modulation(struct sampler_layer_data *l, struct sampler_layer_data *parent_data, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest)
 {
-    sampler_layer_data_set_modulation(&l->data, src, smsrc_none, dest, amount, flags, FALSE);
+    GSList *p = l->modulations;
+    while(p)
+    {
+        struct sampler_modulation *sm = p->data;
+        // Ignore propagated values
+        if (sm->src == src && sm->src2 == src2 && sm->dest == dest && sm->has_value)
+        {
+            if (parent_data) {
+                // Try to copy over from parent
+                GSList *q = parent_data->modulations;
+                while(q)
+                {
+                    struct sampler_modulation *psm = q->data;
+                    if (psm->src == src && psm->src2 == src2 && psm->dest == dest && psm->has_value)
+                    {
+                        memcpy(sm, psm, sizeof(*sm));
+                        sm->has_value = FALSE;
+                        return;
+                    }
+                    q = g_slist_next(q);
+                }
+            }
+            // No parent value, just delete
+            l->modulations = g_slist_delete_link(l->modulations, p);
+            return;
+        }
+        p = g_slist_next(p);
+    }
+#if 0
+    printf("modulation not found\n");
+    printf("Looking for: %d x %d -> %d\n", src, src2, dest);
+    sampler_layer_data_dump_modulations(l);
+#endif
 }
 
 void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags)
 {
     sampler_layer_data_set_modulation(&l->data, src, src2, dest, amount, flags, FALSE);
+}
+
+void sampler_layer_unset_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest)
+{
+    sampler_layer_data_unset_modulation(&l->data, l->parent_group ? &l->parent_group->data : NULL, src, src2, dest);
+
+    if (l->child_layers) {
+        // Also remove propagated copies from child layers, if any
+        GHashTableIter iter;
+        g_hash_table_iter_init(&iter, l->child_layers);
+        gpointer key, value;
+        while(g_hash_table_iter_next(&iter, &key, &value))
+        {
+            struct sampler_layer *child = value;
+            GSList *p = child->data.modulations;
+            while(p)
+            {
+                struct sampler_modulation *sm = p->data;
+                // Ignore propagated values
+                if (sm->src == src && sm->src2 == src2 && sm->dest == dest && !sm->has_value)
+                {
+                    child->data.modulations = g_slist_delete_link(child->data.modulations, p);
+                    break;
+                }
+                p = g_slist_next(p);
+            }
+        }
+    }
 }
 
 void sampler_layer_data_add_nif(struct sampler_layer_data *l, SamplerNoteInitFunc notefunc, int variant, float param, gboolean propagating_defaults)
@@ -97,9 +169,66 @@ void sampler_layer_data_add_nif(struct sampler_layer_data *l, SamplerNoteInitFun
     l->nifs = g_slist_prepend(l->nifs, nif);
 }
 
+void sampler_layer_data_remove_nif(struct sampler_layer_data *l, struct sampler_layer_data *parent_data, SamplerNoteInitFunc notefunc, int variant)
+{
+    GSList *p = l->nifs;
+    while(p)
+    {
+        struct sampler_noteinitfunc *nif = p->data;
+        if (nif->notefunc == notefunc && nif->variant == variant && nif->has_value)
+        {
+            if (parent_data) {
+                // Try to copy over from parent
+                GSList *q = parent_data->nifs;
+                while(q)
+                {
+                    struct sampler_noteinitfunc *pnif = q->data;
+                    if (pnif->notefunc == notefunc && pnif->variant == variant && pnif->has_value)
+                    {
+                        memcpy(nif, pnif, sizeof(*pnif));
+                        nif->has_value = FALSE;
+                        return;
+                    }
+                    q = g_slist_next(q);
+                }
+            }
+            l->nifs = g_slist_delete_link(l->nifs, p);
+            return;
+        }
+        p = g_slist_next(p);
+    }
+}
+
 void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param)
 {
     sampler_layer_data_add_nif(&l->data, notefunc, variant, param, FALSE);
+}
+
+void sampler_layer_remove_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant)
+{
+    sampler_layer_data_remove_nif(&l->data, l->parent_group ? &l->parent_group->data : NULL, notefunc, variant);
+
+    if (l->child_layers) {
+        // Also remove propagated copies from child layers, if any
+        GHashTableIter iter;
+        g_hash_table_iter_init(&iter, l->child_layers);
+        gpointer key, value;
+        while(g_hash_table_iter_next(&iter, &key, &value))
+        {
+            struct sampler_layer *child = value;
+            GSList *p = child->data.nifs;
+            while(p)
+            {
+                struct sampler_noteinitfunc *nif = p->data;
+                if (nif->notefunc == notefunc && nif->variant == variant && !nif->has_value)
+                {
+                    child->data.nifs = g_slist_delete_link(child->data.nifs, p);
+                    break;
+                }
+                p = g_slist_next(p);
+            }
+        }
+    }
 }
 
 static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
@@ -121,7 +250,7 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         gchar *res = sampler_layer_to_string(layer, !strcmp(cmd->command, "/as_string_full"));
-        gboolean result = cbox_execute_on(fb, NULL, "/value", "s", error, res);
+        gboolean result = cbox_execute_on(fb, NULL, "/value", "s", error, res[0] == ' ' ? res + 1 : res);
         g_free(res);
         return result;
     }
@@ -130,6 +259,17 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         const char *key = CBOX_ARG_S(cmd, 0);
         const char *value = CBOX_ARG_S(cmd, 1);
         if (sampler_layer_apply_param(layer, key, value, error))
+        {
+            sampler_layer_update(layer);
+            sampler_program_update_layers(layer->parent_program);
+            return TRUE;
+        }
+        return FALSE;
+    }
+    if (!strcmp(cmd->command, "/unset_param") && !strcmp(cmd->arg_types, "s"))
+    {
+        const char *key = CBOX_ARG_S(cmd, 0);
+        if (sampler_layer_unapply_param(layer, key, error))
         {
             sampler_layer_update(layer);
             sampler_program_update_layers(layer->parent_program);
@@ -247,8 +387,8 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     l->last_key = -1;
     if (!parent_group)
     {
-        sampler_layer_set_modulation1(l, 74, smdest_cutoff, 9600, 2);
-        sampler_layer_set_modulation1(l, 71, smdest_resonance, 12, 2);
+        sampler_layer_set_modulation(l, 74, smsrc_none, smdest_cutoff, 9600, 2);
+        sampler_layer_set_modulation(l, 71, smsrc_none, smdest_resonance, 12, 2);
         sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
     }
     l->runtime = NULL;
@@ -376,7 +516,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
 
     sampler_layer_data_getdefaults(l, parent);
     
-    // Handle change of sample in the prent group without override on region level
+    // Handle change of sample in the parent group without override on region level
     if (parent && (l->sample_changed || parent->sample_changed))
     {
         struct cbox_waveform *oldwf = l->eff_waveform;
@@ -564,6 +704,54 @@ static double atof_C(const char *value)
     return g_ascii_strtod(value, NULL);
 }
 
+#define PROC_SET_MODULATION_DEPTH_CC(name, source, dest) \
+    if (!strncmp(key, name, sizeof(name) - 1)) \
+    { \
+        int cc = atoi(key + sizeof(name) - 1); \
+        if (cc > 0 && cc < 120) \
+            sampler_layer_set_modulation(layer, source, cc, dest, fvalue, 0); \
+        else \
+            return FALSE; \
+    }
+
+#define PROC_SET_AMOUNT_CC(name, dest) \
+    if (!strncmp(key, name, sizeof(name) - 1)) \
+    { \
+        int cc = atoi(key + sizeof(name) - 1); \
+        if (cc > 0 && cc < 120) \
+            sampler_layer_set_modulation(layer, cc, smsrc_none, dest, fvalue, 0); \
+        else \
+            return FALSE; \
+    }
+
+#define PROC_UNSET_MODULATION(name, source) \
+    if (!strcmp(key, name)) { \
+        sampler_layer_unset_modulation(layer, src, smsrc_##source, dest); \
+        return TRUE; \
+    }
+#define PROC_UNSET_MODULATION_DEPTH_CC(name, src2, dest) \
+    if (!strncmp(key, name, sizeof(name) - 1)) \
+    { \
+        int cc = atoi(key + sizeof(name) - 1); \
+        if (cc > 0 && cc < 120) {\
+            sampler_layer_unset_modulation(layer, src2, cc, dest); \
+            return TRUE; \
+        } \
+        else \
+            goto unknown_key; \
+    }
+#define PROC_UNSET_AMOUNT_CC(name, src2, dest) \
+    if (!strncmp(key, name, sizeof(name) - 1)) \
+    { \
+        int cc = atoi(key + sizeof(name) - 1); \
+        if (cc > 0 && cc < 120) {\
+            sampler_layer_unset_modulation(layer, cc, smsrc_none, dest); \
+            return TRUE; \
+        } \
+        else \
+            goto unknown_key; \
+    }
+
 static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_dahdsr *env, struct sampler_dahdsr_has_fields *has_fields, int env_type, const char *key, const char *value)
 {
     static const enum sampler_modsrc srcs[] = { smsrc_ampenv, smsrc_filenv, smsrc_pitchenv };
@@ -579,30 +767,22 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_da
             return TRUE; \
         }
     DAHDSR_FIELDS(PROC_SET_ENV_FIELD)
+
+#define PROC_SET_ENV_NIF(name) \
+    if (!strcmp(key, "vel2" #name)) \
+        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + snif_env_ ## name, fvalue);
+
     if (!strcmp(key, "depth"))
-        sampler_layer_set_modulation1(layer, src, dest, atof_C(value), 0);
-    else if (!strcmp(key, "vel2delay"))
-        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 0, fvalue);
-    else if (!strcmp(key, "vel2attack"))
-        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 1, fvalue);
-    else if (!strcmp(key, "vel2hold"))
-        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 2, fvalue);
-    else if (!strcmp(key, "vel2decay"))
-        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 3, fvalue);
-    else if (!strcmp(key, "vel2sustain"))
-        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 4, fvalue);
-    else if (!strcmp(key, "vel2release"))
-        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + 5, fvalue);
+        sampler_layer_set_modulation(layer, src, smsrc_none, dest, fvalue, 0);
+    else PROC_SET_ENV_NIF(delay)
+    else PROC_SET_ENV_NIF(attack)
+    else PROC_SET_ENV_NIF(hold)
+    else PROC_SET_ENV_NIF(decay)
+    else PROC_SET_ENV_NIF(sustain)
+    else PROC_SET_ENV_NIF(release)
     else if (!strcmp(key, "vel2depth"))
-        sampler_layer_set_modulation(layer, src, smsrc_vel, dest, atof_C(value), 0);
-    else if (!strncmp(key, "depthcc", 7))
-    {
-        int cc = atoi(key + 7);
-        if (cc > 0 && cc < 120)
-            sampler_layer_set_modulation(layer, src, cc, dest, fvalue, 0);
-        else
-            return FALSE;
-    }
+        sampler_layer_set_modulation(layer, src, smsrc_vel, dest, fvalue, 0);
+    else PROC_SET_MODULATION_DEPTH_CC("depthcc", src, dest)
     else
         return FALSE;
     return TRUE;
@@ -612,6 +792,7 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
 {
     static const enum sampler_modsrc srcs[] = { smsrc_amplfo, smsrc_fillfo, smsrc_pitchlfo };
     static const enum sampler_moddest dests[] = { smdest_gain, smdest_cutoff, smdest_pitch };
+    static const enum sampler_moddest dests2[] = { smdest_amplfo_freq, smdest_fillfo_freq, smdest_pitchlfo_freq };
     enum sampler_modsrc src = srcs[lfo_type];
     enum sampler_moddest dest = dests[lfo_type];
 
@@ -624,19 +805,13 @@ static gboolean parse_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     float fvalue = atof_C(value);
     LFO_FIELDS(PROC_SET_LFO_FIELD)
     if (!strcmp(key, "depth"))
-        sampler_layer_set_modulation1(layer, src, dest, fvalue, 0);
+        sampler_layer_set_modulation(layer, src, smsrc_none, dest, fvalue, 0);
     else if (!strcmp(key, "depthchanaft"))
         sampler_layer_set_modulation(layer, src, smsrc_chanaft, dest, fvalue, 0);
     else if (!strcmp(key, "depthpolyaft"))
         sampler_layer_set_modulation(layer, src, smsrc_polyaft, dest, fvalue, 0);
-    else if (!strncmp(key, "depthcc", 7))
-    {
-        int cc = atoi(key + 7);
-        if (cc > 0 && cc < 120)
-            sampler_layer_set_modulation(layer, src, cc, dest, fvalue, 0);
-        else
-            return FALSE;
-    }
+    else PROC_SET_MODULATION_DEPTH_CC("depthcc", src, dest)
+    else PROC_SET_AMOUNT_CC("freqcc", dests2[lfo_type])
     else 
         return FALSE;
     return TRUE;
@@ -701,6 +876,20 @@ static gboolean parse_eq_param(struct sampler_layer *layer, struct sampler_eq_pa
         return parse_eq_param(l, &l->data.name, &l->data.has_##name, index, key + sizeof(#parname), value);
 #define PROC_APPLY_PARAM_ccrange(name)  /* handled separately in apply_param */
 
+#define PROC_ADD_NIF_FOR_KEY(name, type, variant) \
+    if (!strcmp(key, name)) \
+        sampler_layer_add_nif(l, type, variant, atof_C(value));
+
+#define PROC_ADD_NIF_FOR_KEY_CC(name, type) \
+    if (!strncmp(key, name, sizeof(name) - 1)) \
+    { \
+        int ccno = atoi(key + sizeof(name) - 1); \
+        if (ccno > 0 && ccno < 120) \
+            sampler_layer_add_nif(l, type, ccno, atof_C(value)); \
+        else \
+            goto unknown_key; \
+    }
+
 static void sampler_layer_apply_unknown(struct sampler_layer *l, const char *key, const char *value)
 {
     if (!l->unknown_keys)
@@ -711,6 +900,8 @@ static void sampler_layer_apply_unknown(struct sampler_layer *l, const char *key
 
 gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error)
 {
+    struct sampler_layer *layer = l;
+    float fvalue = atof_C(value); // just in case
 try_now:
     // XXXKF: this is seriously stupid code, this should use a hash table for
     // fixed strings, or something else that doesn't explode O(N**2) with
@@ -734,65 +925,18 @@ try_now:
     else if (!strcmp(key, "loopend"))
         l->data.loop_end = atoi(value), l->data.has_loop_end = 1;
     else if (!strcmp(key, "cutoff_chanaft"))
-        sampler_layer_set_modulation1(l, smsrc_chanaft, smdest_cutoff, atof_C(value), 0);
-    else if (!strcmp(key, "amp_random"))
-        sampler_layer_add_nif(l, sampler_nif_addrandom, 0, atof_C(value));
-    else if (!strcmp(key, "fil_random"))
-        sampler_layer_add_nif(l, sampler_nif_addrandom, 1, atof_C(value));
-    else if (!strcmp(key, "pitch_random"))
-        sampler_layer_add_nif(l, sampler_nif_addrandom, 2, atof_C(value));
-    else if (!strcmp(key, "pitch_veltrack"))
-        sampler_layer_add_nif(l, sampler_nif_vel2pitch, 0, atof_C(value));
-    else if (!strcmp(key, "reloffset_veltrack"))
-        sampler_layer_add_nif(l, sampler_nif_vel2reloffset, 0, atof_C(value));
-    else if (!strncmp(key, "delay_cc", 8))
-    {
-        int ccno = atoi(key + 8);
-        if (ccno > 0 && ccno < 120)
-            sampler_layer_add_nif(l, sampler_nif_cc2delay, ccno, atof_C(value));
-        else
-            goto unknown_key;
-    }
-    else if (!strncmp(key, "reloffset_cc", 12))
-    {
-        int ccno = atoi(key + 12);
-        if (ccno > 0 && ccno < 120)
-            sampler_layer_add_nif(l, sampler_nif_cc2reloffset, ccno, atof_C(value));
-        else
-            goto unknown_key;
-    }
-    else if (!strncmp(key, "cutoff_cc", 9))
-    {
-        int ccno = atoi(key + 9);
-        if (ccno > 0 && ccno < 120)
-            sampler_layer_set_modulation1(l, ccno, smdest_cutoff, atof_C(value), 0);
-        else
-            goto unknown_key;
-    }
-    else if (!strncmp(key, "pitch_cc", 8))
-    {
-        int ccno = atoi(key + 8);
-        if (ccno > 0 && ccno < 120)
-            sampler_layer_set_modulation1(l, ccno, smdest_pitch, atof_C(value), 0);
-        else
-            goto unknown_key;
-    }
-    else if (!strncmp(key, "tonectl_cc", 10))
-    {
-        int ccno = atoi(key + 10);
-        if (ccno > 0 && ccno < 120)
-            sampler_layer_set_modulation1(l, ccno, smdest_tonectl, atof_C(value), 0);
-        else
-            goto unknown_key;
-    }
-    else if (!strncmp(key, "gain_cc", 7))
-    {
-        int ccno = atoi(key + 7);
-        if (ccno > 0 && ccno < 120)
-            sampler_layer_set_modulation1(l, ccno, smdest_gain, atof_C(value), 0);
-        else
-            goto unknown_key;
-    }
+        sampler_layer_set_modulation(l, smsrc_chanaft, smsrc_none, smdest_cutoff, atof_C(value), 0);
+    else PROC_ADD_NIF_FOR_KEY("amp_random", sampler_nif_addrandom, 0)
+    else PROC_ADD_NIF_FOR_KEY("fil_random", sampler_nif_addrandom, 1)
+    else PROC_ADD_NIF_FOR_KEY("pitch_random", sampler_nif_addrandom, 2)
+    else PROC_ADD_NIF_FOR_KEY("pitch_veltrack", sampler_nif_vel2pitch, 0)
+    else PROC_ADD_NIF_FOR_KEY("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
+    else PROC_ADD_NIF_FOR_KEY_CC("delay_cc", sampler_nif_cc2delay)
+    else PROC_ADD_NIF_FOR_KEY_CC("reloffset_cc", sampler_nif_cc2reloffset)
+    else PROC_SET_AMOUNT_CC("cutoff_cc", smdest_cutoff)
+    else PROC_SET_AMOUNT_CC("pitch_cc", smdest_pitch)
+    else PROC_SET_AMOUNT_CC("tonectl_cc", smdest_tonectl)
+    else PROC_SET_AMOUNT_CC("gain_cc", smdest_gain)
     else if (!strncmp(key, "amp_velcurve_", 13))
     {
         // if not known yet, set to 0, it can always be overridden via velcurve_quadratic setting
@@ -894,6 +1038,155 @@ unknown_key:
     return TRUE;
 }
 
+static gboolean unset_envelope_param(struct sampler_layer *layer, struct cbox_dahdsr *env, struct cbox_dahdsr *parent_env, struct sampler_dahdsr_has_fields *has_fields, int env_type, const char *key, GError **error)
+{
+    static const enum sampler_modsrc srcs[] = { smsrc_ampenv, smsrc_filenv, smsrc_pitchenv };
+    static const enum sampler_moddest dests[] = { smdest_gain, smdest_cutoff, smdest_pitch };
+    enum sampler_modsrc src = srcs[env_type];
+    enum sampler_moddest dest = dests[env_type];
+
+#define PROC_UNSET_ENV_FIELD(name, index, def_value) \
+        if (!strcmp(key, #name)) {\
+            env->name = parent_env ? parent_env->name : def_value; \
+            has_fields->name = FALSE; \
+            return TRUE; \
+        }
+    DAHDSR_FIELDS(PROC_UNSET_ENV_FIELD)
+
+#define PROC_UNSET_ENV_NIF(name) \
+    if (!strcmp(key, "vel2" #name)) \
+        sampler_layer_remove_nif(layer, sampler_nif_vel2env, (env_type << 4) + snif_env_ ## name);
+
+    if (!strcmp(key, "depth"))
+        sampler_layer_unset_modulation(layer, src, smsrc_none, dest);
+    else PROC_UNSET_ENV_NIF(delay)
+    else PROC_UNSET_ENV_NIF(attack)
+    else PROC_UNSET_ENV_NIF(hold)
+    else PROC_UNSET_ENV_NIF(decay)
+    else PROC_UNSET_ENV_NIF(sustain)
+    else PROC_UNSET_ENV_NIF(release)
+    else PROC_UNSET_MODULATION("vel2depth", vel)
+    else PROC_UNSET_MODULATION_DEPTH_CC("depthcc", src, dest)
+    else
+        return FALSE;
+    return TRUE;
+unknown_key:
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown envelope parameter: '%s'", key);
+    return FALSE;
+}
+
+static gboolean unset_lfo_param(struct sampler_layer *layer, struct sampler_lfo_params *params, struct sampler_lfo_params *parent_params, struct sampler_lfo_has_fields *has_fields, int lfo_type, const char *key, GError **error)
+{
+    static const enum sampler_modsrc srcs[] = { smsrc_amplfo, smsrc_fillfo, smsrc_pitchlfo };
+    static const enum sampler_moddest dests[] = { smdest_gain, smdest_cutoff, smdest_pitch };
+    static const enum sampler_moddest dests2[] = { smdest_amplfo_freq, smdest_fillfo_freq, smdest_pitchlfo_freq };
+    enum sampler_modsrc src = srcs[lfo_type];
+    enum sampler_moddest dest = dests[lfo_type];
+
+#define PROC_UNSET_LFO_FIELD(name, index, def_value) \
+        if (!strcmp(key, #name)) {\
+            params->name = parent_params ? parent_params->name : def_value; \
+            has_fields->name = FALSE; \
+            return TRUE; \
+        }
+
+    LFO_FIELDS(PROC_UNSET_LFO_FIELD)
+    PROC_UNSET_MODULATION("depth", none)
+    else PROC_UNSET_MODULATION("depthchanaft", chanaft)
+    else PROC_UNSET_MODULATION("depthpolyaft", polyaft)
+    else PROC_UNSET_MODULATION_DEPTH_CC("depthcc", src, dest)
+    else PROC_UNSET_AMOUNT_CC("freqcc", src, dests2[lfo_type])
+    else
+        return FALSE;
+    return TRUE;
+unknown_key:
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown LFO parameter: '%s'", key);
+    return FALSE;
+}
+
+static gboolean unset_eq_param(struct sampler_layer *layer, struct sampler_eq_params *params, struct sampler_eq_params *parent_params, struct sampler_eq_has_fields *has_fields, int eq_index, const char *key)
+{
+#define PROC_UNSET_EQ_FIELD(name, index, def_value) \
+        if (!strcmp(key, #name)) {\
+            params->name = parent_params ? parent_params->name : def_value; \
+            has_fields->name = 0; \
+            return TRUE; \
+        }
+    EQ_FIELDS(PROC_UNSET_EQ_FIELD)
+    return FALSE;
+}
+
+#define PROC_UNSET_NIF_FOR_KEY(name, type, variant) \
+    if (!strcmp(key, name)) { \
+        sampler_layer_remove_nif(l, type, variant); \
+        return TRUE; \
+    }
+
+#define PROC_UNSET_NIF_FOR_KEY_CC(name, type) \
+    if (!strncmp(key, name, sizeof(name) - 1)) \
+    { \
+        int ccno = atoi(key + sizeof(name) - 1); \
+        if (ccno > 0 && ccno < 120) {\
+            sampler_layer_remove_nif(l, type, ccno); \
+            return TRUE; \
+        } \
+        else \
+            goto unknown_key; \
+    }
+
+#define PROC_UNAPPLY_PARAM(type, name, def_value) \
+    if (!strcmp(key, #name)) { \
+        l->data.has_##name = 0; \
+        l->data.name = l->parent_group ? l->parent_group->data.name : def_value;\
+        return TRUE; \
+    }
+#define PROC_UNAPPLY_PARAM_string(name) \
+    PROC_UNAPPLY_PARAM(__error__, name, NULL)
+#define PROC_UNAPPLY_PARAM_dBamp(type, name, def_value) \
+    PROC_UNAPPLY_PARAM(type, name, def_value)
+#define PROC_UNAPPLY_PARAM_enum(enumtype, name, def_value) \
+    PROC_UNAPPLY_PARAM(type, name, def_value)
+
+// LFO and envelope need special handling now
+#define PROC_UNAPPLY_PARAM_dahdsr(name, parname, index) \
+    if (!strncmp(key, #parname "_", sizeof(#parname))) \
+        return unset_envelope_param(l, &l->data.name, l->parent_group ? &l->parent_group->data.name : NULL, &l->data.has_##name, index, key + sizeof(#parname), error);
+#define PROC_UNAPPLY_PARAM_lfo(name, parname, index) \
+    if (!strncmp(key, #parname "_", sizeof(#parname))) \
+        return unset_lfo_param(l, &l->data.name, l->parent_group ? &l->parent_group->data.name : NULL, &l->data.has_##name, index, key + sizeof(#parname), error);
+#define PROC_UNAPPLY_PARAM_eq(name, parname, index) \
+    if (!strncmp(key, #parname "_", sizeof(#parname))) \
+        return unset_eq_param(l, &l->data.name, l->parent_group ? &l->parent_group->data.name : NULL, &l->data.has_##name, index, key + sizeof(#parname));
+#define PROC_UNAPPLY_PARAM_ccrange(name)  /* handled separately in apply_param */ \
+    if (!strncmp(key, #name "_locc", sizeof(#name) + 4)) {\
+        l->data.has_##name##locc = FALSE; \
+        return TRUE; \
+    }\
+    if (!strncmp(key, #name "_hicc", sizeof(#name) + 4)) { \
+        l->data.has_##name##hicc = FALSE; \
+        return TRUE; \
+    }
+
+gboolean sampler_layer_unapply_param(struct sampler_layer *layer, const char *key, GError **error)
+{
+    struct sampler_layer *l = layer;
+    SAMPLER_FIXED_FIELDS(PROC_UNAPPLY_PARAM)
+    else PROC_UNSET_NIF_FOR_KEY("amp_random", sampler_nif_addrandom, 0)
+    else PROC_UNSET_NIF_FOR_KEY("fil_random", sampler_nif_addrandom, 1)
+    else PROC_UNSET_NIF_FOR_KEY("pitch_random", sampler_nif_addrandom, 2)
+    else PROC_UNSET_NIF_FOR_KEY("pitch_veltrack", sampler_nif_vel2pitch, 0)
+    else PROC_UNSET_NIF_FOR_KEY("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
+    else PROC_UNSET_NIF_FOR_KEY_CC("delay_cc", sampler_nif_cc2delay)
+    else PROC_UNSET_NIF_FOR_KEY_CC("reloffset_cc", sampler_nif_cc2reloffset)
+    else PROC_UNSET_AMOUNT_CC("cutoff_cc", smsrc_none, smdest_cutoff)
+    else PROC_UNSET_AMOUNT_CC("pitch_cc", smsrc_none, smdest_pitch)
+    else PROC_UNSET_AMOUNT_CC("tonectl_cc", smsrc_none, smdest_tonectl)
+    else PROC_UNSET_AMOUNT_CC("gain_cc", smsrc_none, smdest_gain)
+unknown_key:
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown parameter: '%s'", key);
+    return FALSE;
+}
+
 #define TYPE_PRINTF_uint32_t(name, def_value) \
     if (show_inherited || l->has_##name) \
         g_string_append_printf(outstr, " %s=%u", #name, (unsigned)(l->name));
@@ -993,6 +1286,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             {
                 if ((md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
                     (md->src == smsrc_pitchenv && md->dest == smdest_pitch) ||
+                    (md->src == smsrc_amplfo && md->dest == smdest_gain) ||
                     (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
                     (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
                     g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - 120], floatbuf);
@@ -1009,17 +1303,19 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             {
             case smsrc_chanaft:
             case smsrc_polyaft:
-                g_string_append_printf(outstr, " %slfo_depth%s=%s", moddest_names[md->dest], modsrc_names[md->src2 - 120], floatbuf);
+                g_string_append_printf(outstr, " %s_depth%s=%s", modsrc_names[md->src - 120], modsrc_names[md->src2 - 120], floatbuf);
+                continue;
+            case smsrc_none:
+                g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - 120], floatbuf);
                 continue;
             default:
                 if (md->src2 < 120)
                 {
-                    g_string_append_printf(outstr, " %slfo_depthcc%d=%s", moddest_names[md->dest], md->src2, floatbuf);
+                    g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - 120], md->src2, floatbuf);
                     continue;
                 }
                 break;
             }
-            break;
         }
         if ((md->src == smsrc_ampenv && md->dest == smdest_gain) ||
             (md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
@@ -1028,6 +1324,11 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             if (md->src2 == smsrc_vel)
             {
                 g_string_append_printf(outstr, " %seg_vel2depth=%s", moddest_names[md->dest], floatbuf);
+                continue;
+            }
+            if (md->src2 == smsrc_none)
+            {
+                g_string_append_printf(outstr, " %seg_depth=%s", moddest_names[md->dest], floatbuf);
                 continue;
             }
             if (md->src2 < 120)

@@ -156,6 +156,9 @@ enum sampler_moddest
     smdest_cutoff,
     smdest_resonance,
     smdest_tonectl,
+    smdest_pitchlfo_freq,
+    smdest_fillfo_freq,
+    smdest_amplfo_freq,
     
     smdestcount
 };
@@ -179,6 +182,16 @@ struct sampler_noteinitfunc
     unsigned int has_value:1;
     float param;
     // XXXKF no destructor for now - might not be necessary
+};
+
+enum sampler_noteinitfunc_envelope_variant
+{
+    snif_env_delay = 0,
+    snif_env_attack = 1,
+    snif_env_hold = 2,
+    snif_env_decay = 3,
+    snif_env_sustain = 4,
+    snif_env_release = 5,
 };
 
 struct sampler_lfo_params
@@ -427,6 +440,7 @@ extern void sampler_layer_load_overrides(struct sampler_layer *l, const char *cf
 extern void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_layer_data *parent, struct sampler_program *p);
 extern void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m);
 extern gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, const char *value, GError **error);
+extern gboolean sampler_layer_unapply_param(struct sampler_layer *l, const char *key, GError **error);
 extern gchar *sampler_layer_to_string(struct sampler_layer *l, gboolean show_inherited);
 extern void sampler_layer_dump(struct sampler_layer *l, FILE *f);
 extern void sampler_layer_update(struct sampler_layer *l);

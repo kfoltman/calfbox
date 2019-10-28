@@ -48,6 +48,7 @@ static void lfo_update_freq(struct sampler_lfo *lfo, struct sampler_lfo_params *
 static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, int srate, double srate_inv)
 {
     lfo->phase = 0;
+    lfo->xdelta = 0;
     lfo->age = 0;
     lfo->random_value = 0; // safe, less CPU intensive value
     lfo_update_freq(lfo, lfop, srate, srate_inv);
@@ -60,6 +61,7 @@ static inline float lfo_run(struct sampler_lfo *lfo)
         lfo->age += CBOX_BLOCK_SIZE;
         return 0.f;
     }
+    uint32_t delta = lfo->delta + lfo->xdelta;
 
     const int FRAC_BITS = 32 - 11;
 
@@ -99,12 +101,12 @@ static inline float lfo_run(struct sampler_lfo *lfo)
             v = 1 - lfo->phase * (1.0 / (1U << 31));
             break;
         case 12:
-            if ((lfo->phase & 0x80000000) != ((lfo->phase + lfo->delta) & 0x80000000))
+            if ((lfo->phase & 0x80000000) != ((lfo->phase + delta) & 0x80000000))
                 lfo->random_value = -1 + 2 * rand() / (1.0 * RAND_MAX);
             v = lfo->random_value;
             break;
     }
-    lfo->phase += lfo->delta;
+    lfo->phase += delta;
     if (lfo->fade && lfo->age < lfo->delay + lfo->fade)
     {
         v *= (lfo->age - lfo->delay) * 1.0 / lfo->fade;
@@ -450,6 +452,14 @@ void sampler_voice_update_params_from_layer(struct sampler_voice *v)
     cbox_envelope_update_shape(&v->pitch_env, &l->pitch_env_shape);
 }
 
+static inline void lfo_update_xdelta(struct sampler_module *m, struct sampler_lfo *lfo, uint32_t modmask, uint32_t dest, const float *moddests)
+{
+    if (!(modmask & (1 << dest)))
+        lfo->xdelta = 0;
+    else
+        lfo->xdelta = (uint32_t)(moddests[dest] * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE * m->module.srate_inv);
+}
+
 void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs)
 {
     struct sampler_layer_data *l = v->layer;
@@ -531,6 +541,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     moddests[smdest_cutoff] = v->cutoff_shift;
     moddests[smdest_resonance] = 0;
     moddests[smdest_tonectl] = 0;
+    moddests[smdest_pitchlfo_freq] = 0;
+    moddests[smdest_fillfo_freq] = 0;
+    moddests[smdest_amplfo_freq] = 0;
     GSList *mod = l->modulations;
     if (__builtin_expect(l->trigger == stm_release, 0))
         moddests[smdest_gain] -= v->age * l->rt_decay * m->module.srate_inv;
@@ -540,6 +553,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     
     static const int modoffset[4] = {0, -1, -1, 1 };
     static const int modscale[4] = {1, 1, 2, -2 };
+    uint32_t modmask = 0;
     while(mod)
     {
         struct sampler_modulation *sm = mod->data;
@@ -561,9 +575,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             value *= value2;
         }
         moddests[sm->dest] += value * sm->amount;
+        modmask |= (1 << sm->dest);
         
         mod = g_slist_next(mod);
     }
+    lfo_update_xdelta(m, &v->pitch_lfo, modmask, smdest_pitchlfo_freq, moddests);
+    lfo_update_xdelta(m, &v->filter_lfo, modmask, smdest_fillfo_freq, moddests);
+    lfo_update_xdelta(m, &v->amp_lfo, modmask, smdest_amplfo_freq, moddests);
     
     double maxv = 127 << 7;
     double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;
