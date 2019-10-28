@@ -744,11 +744,6 @@ static double atof_C(const char *value)
         sampler_layer_unset_modulation(layer, smsrc_##source, smsrc_none, dest); \
         return TRUE; \
     }
-#define PROC_UNSET_MODULATION_TO(name, source, dest) \
-    if (!strcmp(key, name)) { \
-        sampler_layer_unset_modulation(layer, smsrc_##source, smsrc_none, dest); \
-        return TRUE; \
-    }
 #define PROC_UNSET_MODULATION_DEPTH_CC(name, src2, dest) \
     if (!strncmp(key, name, sizeof(name) - 1)) \
     { \
@@ -910,6 +905,23 @@ static gboolean parse_eq_param(struct sampler_layer *layer, struct sampler_eq_pa
             goto unknown_key; \
     }
 
+#define PARAM_ALIAS_LIST(macro) \
+    macro(hilev, hivel) \
+    macro(lolev, lovel) \
+    macro(loopstart, loop_start) \
+    macro(loopend, loop_end) \
+    macro(loopmode, loop_mode) \
+    macro(bendup, bend_up) \
+    macro(benddown, bend_down) \
+    macro(offby, off_by) \
+
+#define REMATCH_ALIAS(old,new) \
+    else if (!strcmp(key, #old)) \
+    { \
+        key = #new; \
+        goto try_now; \
+    }
+
 static void sampler_layer_apply_unknown(struct sampler_layer *l, const char *key, const char *value)
 {
     if (!l->unknown_keys)
@@ -932,22 +944,10 @@ try_now:
     // XXXKF: to make things worse, some attributes have names different from
     // C field names, or have multiple names, or don't map 1:1 to internal model
     
-    if (!strcmp(key, "benddown"))
-        l->data.bend_down = atoi(value), l->data.has_bend_down = 1;
-    else if (!strcmp(key, "bendup"))
-        l->data.bend_up = atoi(value), l->data.has_bend_up = 1;
-    else if (!strcmp(key, "loopstart"))
-        l->data.loop_start = atoi(value), l->data.has_loop_start = 1;
-    else if (!strcmp(key, "loopend"))
-        l->data.loop_end = atoi(value), l->data.has_loop_end = 1;
-    else if (!strcmp(key, "cutoff_chanaft"))
-        sampler_layer_set_modulation(l, smsrc_chanaft, smsrc_none, smdest_cutoff, atof_C(value), 0);
-    else if (!strcmp(key, "resonance_chanaft"))
-        sampler_layer_set_modulation(l, smsrc_chanaft, smsrc_none, smdest_resonance, atof_C(value), 0);
-    else if (!strcmp(key, "cutoff_polyaft"))
-        sampler_layer_set_modulation(l, smsrc_polyaft, smsrc_none, smdest_cutoff, atof_C(value), 0);
-    else if (!strcmp(key, "resonance_polyaft"))
-        sampler_layer_set_modulation(l, smsrc_polyaft, smsrc_none, smdest_resonance, atof_C(value), 0);
+    else PROC_SET_AMOUNT("cutoff_chanaft", chanaft, smdest_cutoff)
+    else PROC_SET_AMOUNT("resonance_chanaft", chanaft, smdest_resonance)
+    else PROC_SET_AMOUNT("cutoff_polyaft", polyaft, smdest_cutoff)
+    else PROC_SET_AMOUNT("resonance_polyaft", polyaft, smdest_resonance)
     else PROC_ADD_NIF_FOR_KEY("amp_random", sampler_nif_addrandom, 0)
     else PROC_ADD_NIF_FOR_KEY("fil_random", sampler_nif_addrandom, 1)
     else PROC_ADD_NIF_FOR_KEY("pitch_random", sampler_nif_addrandom, 2)
@@ -1035,32 +1035,13 @@ try_now:
         else
             return FALSE;
     }
-    else if (!strcmp(key, "loopmode"))
-    {
-        key = "loop_mode";
-        goto try_now; // yes, goto, why not?
-    }
-    else if (!strcmp(key, "offby"))
-    {
-        key = "off_by";
-        goto try_now;
-    }
     else if (!strncmp(key, "genericmod_", 11))
     {
         char **tokens = g_strsplit(key, "_", 5);
         sampler_layer_set_modulation(l, atoi(tokens[1]), atoi(tokens[2]), atoi(tokens[3]), atof(value), atoi(tokens[4]));
         g_strfreev(tokens);
     }
-    else if (!strcmp(key, "lolev"))
-    {
-        key = "lovel";
-        goto try_now;
-    }
-    else if (!strcmp(key, "hilev"))
-    {
-        key = "hivel";
-        goto try_now;
-    }
+    PARAM_ALIAS_LIST(REMATCH_ALIAS)
     else
         goto unknown_key;
     
@@ -1205,11 +1186,12 @@ static gboolean unset_eq_param(struct sampler_layer *layer, struct sampler_eq_pa
 gboolean sampler_layer_unapply_param(struct sampler_layer *layer, const char *key, GError **error)
 {
     struct sampler_layer *l = layer;
+try_now:
     SAMPLER_FIXED_FIELDS(PROC_UNAPPLY_PARAM)
-    else PROC_UNSET_MODULATION_TO("cutoff_chanaft", chanaft, smdest_cutoff)
-    else PROC_UNSET_MODULATION_TO("resonance_chanaft", chanaft, smdest_resonance)
-    else PROC_UNSET_MODULATION_TO("cutoff_polyaft", polyaft, smdest_cutoff)
-    else PROC_UNSET_MODULATION_TO("resonance_polyaft", polyaft, smdest_resonance)
+    else PROC_UNSET_AMOUNT("cutoff_chanaft", chanaft, smdest_cutoff)
+    else PROC_UNSET_AMOUNT("resonance_chanaft", chanaft, smdest_resonance)
+    else PROC_UNSET_AMOUNT("cutoff_polyaft", polyaft, smdest_cutoff)
+    else PROC_UNSET_AMOUNT("resonance_polyaft", polyaft, smdest_resonance)
     else PROC_UNSET_NIF_FOR_KEY("amp_random", sampler_nif_addrandom, 0)
     else PROC_UNSET_NIF_FOR_KEY("fil_random", sampler_nif_addrandom, 1)
     else PROC_UNSET_NIF_FOR_KEY("pitch_random", sampler_nif_addrandom, 2)
@@ -1221,6 +1203,7 @@ gboolean sampler_layer_unapply_param(struct sampler_layer *layer, const char *ke
     else PROC_UNSET_AMOUNT_CC("pitch_cc", smsrc_none, smdest_pitch)
     else PROC_UNSET_AMOUNT_CC("tonectl_cc", smsrc_none, smdest_tonectl)
     else PROC_UNSET_AMOUNT_CC("gain_cc", smsrc_none, smdest_gain)
+    PARAM_ALIAS_LIST(REMATCH_ALIAS)
 unknown_key:
     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown parameter: '%s'", key);
     return FALSE;

@@ -114,5 +114,33 @@ for i in range(len(params_to_test)):
     
     params_to_test = params_to_test[1:] + params_to_test[0:1]
 
-print(r2.as_string())
-#print(r2.as_string_full())
+old_names = [
+    ("hilev", "hivel"),
+    ("lolev", "lovel"),
+    ("loopstart", "loop_start"),
+    ("loopend", "loop_end"),
+    ("loopmode", "loop_mode", "one_shot", "loop_continuous"),
+    ("bendup", "bend_up"),
+    ("benddown", "bend_down"),
+    ("offby", "off_by"),
+]
+
+for t in old_names:
+    if len(t) == 2:
+        old, new = t
+        v1, v2 = "10", "20"
+    else:
+        old, new, v1, v2 = t
+    print ("Trying %s" % old)
+    r1.set_param(old, v1)
+    verify_region(r1, ["%s=%s" % (new, v1)], [old])
+    r1.set_param(old, v2)
+    verify_region(r1, ["%s=%s" % (new, v2)], [old])
+    r1.unset_param(old)
+    verify_region(r1, [], [old, new])
+    r1.set_param(new, v1)
+    verify_region(r1, ["%s=%s" % (new, v1)], [old])
+    r1.set_param(new, v2)
+    verify_region(r1, ["%s=%s" % (new, v2)], [old])
+    r1.unset_param(new)
+    verify_region(r1, [], [old, new])
