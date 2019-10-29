@@ -258,6 +258,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
                 loop_end = l->loop_end;
             }
             // Those are initial values only, they will be adjusted in process function
+            assert(!v->current_pipe);
             v->current_pipe = cbox_prefetch_stack_pop(m->pipe_stack, l->eff_waveform, loop_start, loop_end, l->count);
             if (!v->current_pipe)
             {

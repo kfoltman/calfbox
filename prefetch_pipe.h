@@ -41,8 +41,10 @@ enum cbox_prefetch_pipe_state
 
 struct cbox_prefetch_pipe
 {
-    enum cbox_prefetch_pipe_state state;
-    int next_free_pipe;
+    union {
+        volatile enum cbox_prefetch_pipe_state state;
+        uint64_t atomic1;
+    };
     struct cbox_waveform *waveform;
     struct cbox_tarfile_sndstream sndstream;
     int16_t *data;
@@ -74,6 +76,7 @@ static inline uint32_t cbox_prefetch_pipe_get_remaining(struct cbox_prefetch_pip
 struct cbox_prefetch_stack
 {
     struct cbox_prefetch_pipe *pipes;
+    int *next_free_pipe;
     int pipe_count;
     pthread_t thr_prefetch;
     int last_free_pipe;

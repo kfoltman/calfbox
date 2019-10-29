@@ -196,11 +196,12 @@ struct cbox_prefetch_stack *cbox_prefetch_stack_new(int npipes, uint32_t buffer_
 {
     struct cbox_prefetch_stack *stack = calloc(1, sizeof(struct cbox_prefetch_stack));
     stack->pipes = calloc(npipes, sizeof(struct cbox_prefetch_pipe));
+    stack->next_free_pipe = calloc(npipes, sizeof(int));
     
     for (int i = 0; i < npipes; i++)
     {
         cbox_prefetch_pipe_init(&stack->pipes[i], buffer_size);
-        stack->pipes[i].next_free_pipe = i - 1;
+        stack->next_free_pipe[i] = i - 1;
     }
     stack->pipe_count = npipes;
     stack->last_free_pipe = npipes - 1;
@@ -220,16 +221,22 @@ struct cbox_prefetch_pipe *cbox_prefetch_stack_pop(struct cbox_prefetch_stack *s
 {
     // The stack may include some pipes that are already returned but not yet 
     // fully prepared for opening a new file
-    int pos = stack->last_free_pipe;
-    while(pos != -1 && stack->pipes[pos].state != pps_free)
-        pos = stack->pipes[pos].next_free_pipe;
-    if (pos == -1)
-        return NULL;    
+    int *ppos = &stack->last_free_pipe;
+    while(*ppos != -1 && stack->pipes[*ppos].state != pps_free)
+        ppos = &stack->next_free_pipe[*ppos];
+    if (*ppos == -1) {
+        for (int i = 0; i < stack->pipe_count; ++i) {
+            printf("Pipe %d state %d next-free %d\n", i, stack->pipes[i].state, stack->next_free_pipe[i]);
+        }
+        printf("last_free_pipe %d\n", stack->last_free_pipe);
+        return NULL;
+    }
     
+    int pos = *ppos;
     struct cbox_prefetch_pipe *pipe = &stack->pipes[pos];
     
-    stack->last_free_pipe = pipe->next_free_pipe;
-    pipe->next_free_pipe = -1;
+    *ppos = stack->next_free_pipe[pos];
+    stack->next_free_pipe[pos] = -1;
     
     pipe->waveform = waveform;
     if (file_loop_start == (uint32_t)-1 && loop_count)
@@ -268,14 +275,15 @@ void cbox_prefetch_stack_push(struct cbox_prefetch_stack *stack, struct cbox_pre
         pipe->state = pps_closing;
         break;
     }
+
     __sync_synchronize();
 
-    assert(pipe->next_free_pipe == -1);
-    pipe->next_free_pipe = stack->last_free_pipe;
     int pos = pipe - stack->pipes;
+    assert(stack->next_free_pipe[pos] == -1);
+    stack->next_free_pipe[pos] = stack->last_free_pipe;
+    stack->last_free_pipe = pos;
     
     __sync_synchronize();
-    stack->last_free_pipe = pos;
 }
 
 int cbox_prefetch_stack_get_active_pipe_count(struct cbox_prefetch_stack *stack)
@@ -296,6 +304,7 @@ void cbox_prefetch_stack_destroy(struct cbox_prefetch_stack *stack)
     pthread_join(stack->thr_prefetch, &result);
     for (int i = 0; i < stack->pipe_count; i++)
         cbox_prefetch_pipe_close(&stack->pipes[i]);
+    free(stack->next_free_pipe);
     free(stack->pipes);
     free(stack);
 }
