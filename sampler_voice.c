@@ -207,6 +207,27 @@ static inline void mix_block_into(cbox_sample_t **outputs, int oofs, float *src_
 
 ////////////////////////////////////////////////////////////////////////////////
 
+static float sfz_crossfade(float param, float xfin_lo, float xfin_hi, float xfout_lo, float xfout_hi, enum sampler_xf_curve xfc)
+{
+    if (param >= xfin_hi && param <= xfout_lo)
+        return 1.f;
+    if (param < xfin_lo || param > xfout_hi)
+        return 0.f;
+    float for0 = (param < xfout_lo) ? xfin_lo : xfout_hi;
+    float for1 = (param < xfout_lo) ? xfin_hi : xfout_lo;
+    if (for0 == for1)
+        return 1.f;
+    if (xfc == stxc_gain)
+        return (param - for0) / (for1 - for0);
+    else
+    {
+        float v = (param - for0) / (for1 - for0);
+        return sqrtf(v);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void sampler_voice_activate(struct sampler_voice *v, enum sampler_player_type mode)
 {
     assert(v->gen.mode == spt_inactive);
@@ -282,6 +303,10 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     v->gen.loop_overlap_step = l->loop_overlap > 0 ? 1.0 / l->loop_overlap : 0;
     v->gain_fromvel = 1.0 + (l->eff_velcurve[vel] - 1.0) * l->amp_veltrack * 0.01;
     v->gain_shift = (note - l->amp_keycenter) * l->amp_keytrack;
+
+    v->gain_fromvel *= sfz_crossfade(note, l->xfin_lokey, l->xfin_hikey, l->xfout_lokey, l->xfout_hikey, l->xf_keycurve);
+    v->gain_fromvel *= sfz_crossfade(vel, l->xfin_lovel, l->xfin_hivel, l->xfout_lovel, l->xfout_hivel, l->xf_velcurve);
+
     v->note = note;
     v->vel = vel;
     v->pitch_shift = 0;

@@ -113,11 +113,22 @@ enum sampler_filter_type
     MACRO("hpf_4p_nores", sft_hp24nr)  \
     MACRO("lpf_4p_hybrid", sft_lp24hybrid)  \
 
+enum sampler_xf_curve
+{
+    stxc_power,
+    stxc_gain,
+};
+
+#define ENUM_VALUES_sampler_xf_curve(MACRO) \
+    MACRO("power", stxc_power) \
+    MACRO("gain", stxc_gain)
+
 #define ENUM_LIST(MACRO) \
     MACRO(sampler_loop_mode) \
     MACRO(sampler_off_mode) \
     MACRO(sampler_trigger) \
     MACRO(sampler_filter_type) \
+    MACRO(sampler_xf_curve) \
 
 #define MAKE_FROM_TO_STRING_EXTERN(enumtype) \
     extern const char *enumtype##_to_string(enum enumtype value); \
@@ -283,6 +294,16 @@ typedef int midi_note_t;
     MACRO(float, tonectl, 0) \
     MACRO(float, tonectl_freq, 0) \
     MACRO(float, reloffset, 0) \
+    MACRO(float, xfin_lokey, 0) \
+    MACRO(float, xfin_hikey, 0) \
+    MACRO(float, xfout_lokey, 127) \
+    MACRO(float, xfout_hikey, 127) \
+    MACRO##_enum(sampler_xf_curve, xf_keycurve, stxc_power) \
+    MACRO(float, xfin_lovel, 0) \
+    MACRO(float, xfin_hivel, 0) \
+    MACRO(float, xfout_lovel, 127) \
+    MACRO(float, xfout_hivel, 127) \
+    MACRO##_enum(sampler_xf_curve, xf_velcurve, stxc_power) \
     MACRO##_dahdsr(amp_env, ampeg, 0) \
     MACRO##_dahdsr(filter_env, fileg, 1) \
     MACRO##_dahdsr(pitch_env, pitcheg, 2) \
