@@ -584,7 +584,17 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     
     if (c->pitchwheel)
-        moddests[smdest_pitch] += c->pitchwheel * (c->pitchwheel > 0 ? l->bend_up : l->bend_down) >> 13;
+    {
+        int pw = c->pitchwheel * (c->pitchwheel > 0 ? l->bend_up : l->bend_down);
+        // approximate dividing by 8191
+        if (pw < 0)
+            pw >>= 13;
+        else
+            pw = (pw + 4096) >> 13;
+        if (l->bend_step > 1)
+            pw = (pw / l->bend_step) * l->bend_step;
+        moddests[smdest_pitch] += pw;
+    }
     
     static const int modoffset[4] = {0, -1, -1, 1 };
     static const int modscale[4] = {1, 1, 2, -2 };
