@@ -856,6 +856,22 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         samples = sampler_gen_sample_playback(&v->gen, leftright, (uint32_t)-1);
     }
 
+    if (l->position != 0 || l->width != 100) {
+        float crossmix = (100.0 - l->width) * 0.005f;
+        float amtleft = l->position > 0 ? 1 - 0.01 * l->position : 1;
+        float amtright = l->position < 0 ? 1 - 0.01 * -l->position : 1;
+        if (amtleft < 0)
+            amtleft = 0;
+        if (amtright < 0)
+            amtright = 0;
+        for (uint32_t i = 0; i < 2 * samples; i += 2) {
+            float left = leftright[i], right = leftright[i + 1];
+            float newleft = left + crossmix * (right - left);
+            float newright = right + crossmix * (left - right);
+            leftright[i] = newleft * amtleft;
+            leftright[i + 1] = newright * amtright;
+        }
+    }
     for (int i = 2 * samples; i < 2 * CBOX_BLOCK_SIZE; i++)
         leftright[i] = 0.f;
     if (l->cutoff != -1)

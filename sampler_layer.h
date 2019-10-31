@@ -253,6 +253,8 @@ typedef int midi_note_t;
     MACRO##_enum(sampler_trigger, trigger, stm_attack) \
     MACRO##_dBamp(float, volume, 0) \
     MACRO(float, pan, 0) \
+    MACRO(float, position, 0) \
+    MACRO(float, width, 100) \
     MACRO(float, tune, 0) \
     MACRO(int, transpose, 0) \
     MACRO(int, lochan, 1) \
