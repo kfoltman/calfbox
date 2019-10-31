@@ -258,7 +258,6 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
                 loop_end = l->loop_end;
             }
             // Those are initial values only, they will be adjusted in process function
-            assert(!v->current_pipe);
             v->current_pipe = cbox_prefetch_stack_pop(m->pipe_stack, l->eff_waveform, loop_start, loop_end, l->count);
             if (!v->current_pipe)
             {
@@ -282,7 +281,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     v->gen.loop_overlap = l->loop_overlap;
     v->gen.loop_overlap_step = l->loop_overlap > 0 ? 1.0 / l->loop_overlap : 0;
     v->gain_fromvel = 1.0 + (l->eff_velcurve[vel] - 1.0) * l->amp_veltrack * 0.01;
-    v->gain_shift = 0.0;
+    v->gain_shift = (note - l->amp_keycenter) * l->amp_keytrack;
     v->note = note;
     v->vel = vel;
     v->pitch_shift = 0;
@@ -349,6 +348,8 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
         p->notefunc(p, v);
         nif = nif->next;
     }
+    v->gain_fromvel *= dB2gain(v->gain_shift);
+
     v->offset = l->offset;
     if (v->reloffset != 0)
     {

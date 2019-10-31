@@ -26,12 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>
 
 // Don't bother fetching less than 4 (mono) or 8 KB (stereo)
-#define PIPE_MIN_PREFETCH_SIZE_FRAMES 2048
 
-void cbox_prefetch_pipe_init(struct cbox_prefetch_pipe *pipe, uint32_t buffer_size)
+void cbox_prefetch_pipe_init(struct cbox_prefetch_pipe *pipe, uint32_t buffer_size, uint32_t min_buffer_frames)
 {
     pipe->data = malloc(buffer_size);
     pipe->buffer_size = buffer_size;
+    pipe->min_buffer_frames = min_buffer_frames;
     pipe->sndfile = NULL;
     pipe->state = pps_free;
 }
@@ -88,8 +88,7 @@ void cbox_prefetch_pipe_fetch(struct cbox_prefetch_pipe *pipe)
         
         // How many frames to read to fill the full prefetch size
         int32_t readsize = pipe->buffer_loop_end - supply;
-        // 
-        if (readsize < PIPE_MIN_PREFETCH_SIZE_FRAMES)
+        if (readsize < (int32_t)pipe->min_buffer_frames)
             return;
         
         if (pipe->write_ptr == pipe->buffer_loop_end)
@@ -192,7 +191,7 @@ static void *prefetch_thread(void *user_data)
     return 0;
 }
 
-struct cbox_prefetch_stack *cbox_prefetch_stack_new(int npipes, uint32_t buffer_size)
+struct cbox_prefetch_stack *cbox_prefetch_stack_new(int npipes, uint32_t buffer_size, uint32_t min_buffer_frames)
 {
     struct cbox_prefetch_stack *stack = calloc(1, sizeof(struct cbox_prefetch_stack));
     stack->pipes = calloc(npipes, sizeof(struct cbox_prefetch_pipe));
@@ -200,7 +199,7 @@ struct cbox_prefetch_stack *cbox_prefetch_stack_new(int npipes, uint32_t buffer_
     
     for (int i = 0; i < npipes; i++)
     {
-        cbox_prefetch_pipe_init(&stack->pipes[i], buffer_size);
+        cbox_prefetch_pipe_init(&stack->pipes[i], buffer_size, min_buffer_frames);
         stack->next_free_pipe[i] = i - 1;
     }
     stack->pipe_count = npipes;

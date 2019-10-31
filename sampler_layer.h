@@ -245,6 +245,8 @@ typedef int midi_note_t;
     MACRO(int, pitch_keytrack, 100) \
     MACRO(midi_note_t, fil_keycenter, 60) \
     MACRO(int, fil_keytrack, 0) \
+    MACRO(midi_note_t, amp_keycenter, 60) \
+    MACRO(int, amp_keytrack, 0) \
     MACRO(int, fil_veltrack, 0) \
     MACRO(int, amp_veltrack, 100) \
     MACRO(int, lovel, 0) \
