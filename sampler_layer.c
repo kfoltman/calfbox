@@ -755,7 +755,7 @@ static double atof_C(const char *value)
         else \
             goto unknown_key; \
     }
-#define PROC_UNSET_AMOUNT_CC(name, src2, dest) \
+#define PROC_UNSET_AMOUNT_CC(name, dest) \
     if (!strncmp(key, name, sizeof(name) - 1)) \
     { \
         int cc = atoi(key + sizeof(name) - 1); \
@@ -840,9 +840,17 @@ static gboolean parse_eq_param(struct sampler_layer *layer, struct sampler_eq_pa
             has_fields->name = 1; \
             return TRUE; \
         }
+    static const enum sampler_moddest dests_freq[] = { smdest_eq1_freq, smdest_eq2_freq, smdest_eq3_freq };
+    static const enum sampler_moddest dests_bw[] = { smdest_eq1_bw, smdest_eq2_bw, smdest_eq3_bw };
+    static const enum sampler_moddest dests_gain[] = { smdest_eq1_gain, smdest_eq2_gain, smdest_eq3_gain };
     float fvalue = atof_C(value);
     EQ_FIELDS(PROC_SET_EQ_FIELD)
-    return FALSE;
+    else PROC_SET_AMOUNT_CC("freqcc", dests_freq[eq_index])
+    else PROC_SET_AMOUNT_CC("bwcc", dests_bw[eq_index])
+    else PROC_SET_AMOUNT_CC("gaincc", dests_gain[eq_index])
+    else
+        return FALSE;
+    return TRUE;
 }
 
 #define PARSE_PARAM_midi_note_t(field, strname, valuestr) \
@@ -1111,7 +1119,7 @@ static gboolean unset_lfo_param(struct sampler_layer *layer, struct sampler_lfo_
     else PROC_UNSET_AMOUNT("freqchanaft", chanaft, dests_freq[lfo_type])
     else PROC_UNSET_AMOUNT("freqpolyaft", polyaft, dests_freq[lfo_type])
     else PROC_UNSET_MODULATION_DEPTH_CC("depthcc", src, dest)
-    else PROC_UNSET_AMOUNT_CC("freqcc", src, dests_freq[lfo_type])
+    else PROC_UNSET_AMOUNT_CC("freqcc", dests_freq[lfo_type])
     else
         return FALSE;
     return TRUE;
@@ -1120,7 +1128,7 @@ unknown_key:
     return FALSE;
 }
 
-static gboolean unset_eq_param(struct sampler_layer *layer, struct sampler_eq_params *params, struct sampler_eq_params *parent_params, struct sampler_eq_has_fields *has_fields, int eq_index, const char *key)
+static gboolean unset_eq_param(struct sampler_layer *layer, struct sampler_eq_params *params, struct sampler_eq_params *parent_params, struct sampler_eq_has_fields *has_fields, int eq_index, const char *key, GError **error)
 {
 #define PROC_UNSET_EQ_FIELD(name, index, def_value) \
         if (!strcmp(key, #name)) {\
@@ -1128,7 +1136,18 @@ static gboolean unset_eq_param(struct sampler_layer *layer, struct sampler_eq_pa
             has_fields->name = 0; \
             return TRUE; \
         }
+    static const enum sampler_moddest dests_freq[] = { smdest_eq1_freq, smdest_eq2_freq, smdest_eq3_freq };
+    static const enum sampler_moddest dests_bw[] = { smdest_eq1_bw, smdest_eq2_bw, smdest_eq3_bw };
+    static const enum sampler_moddest dests_gain[] = { smdest_eq1_gain, smdest_eq2_gain, smdest_eq3_gain };
     EQ_FIELDS(PROC_UNSET_EQ_FIELD)
+    else PROC_UNSET_AMOUNT_CC("freqcc", dests_freq[eq_index])
+    else PROC_UNSET_AMOUNT_CC("bwcc", dests_bw[eq_index])
+    else PROC_UNSET_AMOUNT_CC("gaincc", dests_gain[eq_index])
+    else
+        return FALSE;
+    return TRUE;
+unknown_key:
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown EQ parameter: '%s'", key);
     return FALSE;
 }
 
@@ -1172,7 +1191,7 @@ static gboolean unset_eq_param(struct sampler_layer *layer, struct sampler_eq_pa
         return unset_lfo_param(l, &l->data.name, l->parent_group ? &l->parent_group->data.name : NULL, &l->data.has_##name, index, key + sizeof(#parname), error);
 #define PROC_UNAPPLY_PARAM_eq(name, parname, index) \
     if (!strncmp(key, #parname "_", sizeof(#parname))) \
-        return unset_eq_param(l, &l->data.name, l->parent_group ? &l->parent_group->data.name : NULL, &l->data.has_##name, index, key + sizeof(#parname));
+        return unset_eq_param(l, &l->data.name, l->parent_group ? &l->parent_group->data.name : NULL, &l->data.has_##name, index, key + sizeof(#parname), error);
 #define PROC_UNAPPLY_PARAM_ccrange(name)  /* handled separately in apply_param */ \
     if (!strncmp(key, #name "_locc", sizeof(#name) + 4)) {\
         l->data.has_##name##locc = FALSE; \
@@ -1199,10 +1218,10 @@ try_now:
     else PROC_UNSET_NIF_FOR_KEY("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
     else PROC_UNSET_NIF_FOR_KEY_CC("delay_cc", sampler_nif_cc2delay)
     else PROC_UNSET_NIF_FOR_KEY_CC("reloffset_cc", sampler_nif_cc2reloffset)
-    else PROC_UNSET_AMOUNT_CC("cutoff_cc", smsrc_none, smdest_cutoff)
-    else PROC_UNSET_AMOUNT_CC("pitch_cc", smsrc_none, smdest_pitch)
-    else PROC_UNSET_AMOUNT_CC("tonectl_cc", smsrc_none, smdest_tonectl)
-    else PROC_UNSET_AMOUNT_CC("gain_cc", smsrc_none, smdest_gain)
+    else PROC_UNSET_AMOUNT_CC("cutoff_cc", smdest_cutoff)
+    else PROC_UNSET_AMOUNT_CC("pitch_cc", smdest_pitch)
+    else PROC_UNSET_AMOUNT_CC("tonectl_cc", smdest_tonectl)
+    else PROC_UNSET_AMOUNT_CC("gain_cc", smdest_gain)
     PARAM_ALIAS_LIST(REMATCH_ALIAS)
 unknown_key:
     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown parameter: '%s'", key);
@@ -1266,7 +1285,11 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     
     static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
     static const char *modsrc_names[] = { "chanaft", "vel", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
-    static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pitchlfo_freq", "fillfo_freq", "amplfo_freq" };
+    static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pitchlfo_freq", "fillfo_freq", "amplfo_freq",
+        "eq1_freq", "eq1_bw", "eq1_gain",
+        "eq2_freq", "eq2_bw", "eq2_gain",
+        "eq3_freq", "eq3_bw", "eq3_gain",
+        };
     for(GSList *nif = l->nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;
@@ -1299,7 +1322,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
 
         if (md->src2 == smsrc_none)
         {
-            gboolean is_lfofreq = md->dest >= smdest_pitchlfo_freq && md->dest <= smdest_amplfo_freq;
+            gboolean is_lfofreq = md->dest >= smdest_pitchlfo_freq && md->dest <= smdest_eq3_gain;
             if (md->src < 120)
             {
                 // Inconsistency: cutoff_cc5 but amplfo_freqcc5

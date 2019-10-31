@@ -94,6 +94,7 @@ params_to_test = [
     'cutoff_polyaft', 'resonance_polyaft',
     'amplfo_depthpolyaft', 'fillfo_depthpolyaft', 'pitchlfo_depthpolyaft', 
     'amplfo_freqpolyaft', 'fillfo_freqpolyaft', 'pitchlfo_freqpolyaft',
+    'eq1_freqcc1', 'eq2_gaincc2', 'eq3_bwcc3',
     ]
 for i in range(len(params_to_test)):
     param = params_to_test[0]

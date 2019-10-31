@@ -170,8 +170,18 @@ enum sampler_moddest
     smdest_pitchlfo_freq,
     smdest_fillfo_freq,
     smdest_amplfo_freq,
-    
-    smdestcount
+
+    smdest_eq1_freq,
+    smdest_eq1_bw,
+    smdest_eq1_gain,
+    smdest_eq2_freq,
+    smdest_eq2_bw,
+    smdest_eq2_gain,
+    smdest_eq3_freq,
+    smdest_eq3_bw,
+    smdest_eq3_gain,
+
+    smdestcount,
 };
 
 struct sampler_modulation

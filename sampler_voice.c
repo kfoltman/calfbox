@@ -505,6 +505,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     // XXXKF I'm sacrificing sample accuracy for delays for now
     v->delay = 0;
     const float velscl = v->vel * (1.f / 127.f);
+
+    #define RECALC_EQ_MASK_EQ1 (7 << smdest_eq1_freq)
+    #define RECALC_EQ_MASK_EQ2 (7 << smdest_eq2_freq)
+    #define RECALC_EQ_MASK_EQ3 (7 << smdest_eq3_freq)
+    #define RECALC_EQ_MASK_ALL (RECALC_EQ_MASK_EQ1 | RECALC_EQ_MASK_EQ2 | RECALC_EQ_MASK_EQ3)
+    uint32_t recalc_eq_mask = 0;
+
     if (__builtin_expect(v->layer_changed, 0))
     {
         v->last_level = -1;
@@ -520,26 +527,15 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             {
                 sampler_voice_inactivate(v, TRUE);
                 return;
-            }        
+            }
         }
-    #define RECALC_EQ_IF(index) \
-        if (l->eq_bitmask & (1 << (index - 1))) \
-        { \
-            cbox_biquadf_set_peakeq_rbj_scaled(&v->eq_coeffs[index - 1], l->eq##index.effective_freq + velscl * l->eq##index.vel2freq, 1.0 / l->eq##index.bw, dB2gain(0.5 * (l->eq##index.gain + velscl * l->eq##index.vel2gain)), m->module.srate); \
-            if (!(v->last_eq_bitmask & (1 << (index - 1)))) \
-            { \
-                cbox_biquadf_reset(&v->eq_left[index-1]); \
-                cbox_biquadf_reset(&v->eq_right[index-1]); \
-            } \
-        }
-
-        RECALC_EQ_IF(1)
-        RECALC_EQ_IF(2)
-        RECALC_EQ_IF(3)
+        if (l->eq_bitmask & (1 << 0)) recalc_eq_mask |= RECALC_EQ_MASK_EQ1;
+        if (l->eq_bitmask & (1 << 1)) recalc_eq_mask |= RECALC_EQ_MASK_EQ2;
+        if (l->eq_bitmask & (1 << 2)) recalc_eq_mask |= RECALC_EQ_MASK_EQ3;
         v->last_eq_bitmask = l->eq_bitmask;
         v->layer_changed = FALSE;
     }
-    
+
     float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100 + v->pitch_shift;
     float modsrcs[smsrc_pernote_count];
     modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * velscl;
@@ -552,7 +548,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     modsrcs[smsrc_amplfo - smsrc_pernote_offset] = lfo_run(&v->amp_lfo);
     modsrcs[smsrc_fillfo - smsrc_pernote_offset] = lfo_run(&v->filter_lfo);
     modsrcs[smsrc_pitchlfo - smsrc_pernote_offset] = lfo_run(&v->pitch_lfo);
-    
+
     if (__builtin_expect(v->amp_env.cur_stage < 0, 0))
     {
         if (__builtin_expect(is_tail_finished(v), 0))
@@ -631,6 +627,26 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     lfo_update_xdelta(m, &v->pitch_lfo, modmask, smdest_pitchlfo_freq, moddests);
     lfo_update_xdelta(m, &v->filter_lfo, modmask, smdest_fillfo_freq, moddests);
     lfo_update_xdelta(m, &v->amp_lfo, modmask, smdest_amplfo_freq, moddests);
+    recalc_eq_mask |= modmask;
+
+    #define RECALC_EQ_IF(index) \
+        if (recalc_eq_mask & RECALC_EQ_MASK_EQ##index) \
+        { \
+            float dfreq = velscl * l->eq##index.vel2freq + ((modmask & (1 << smdest_eq##index##_freq)) ? moddests[smdest_eq##index##_freq] : 0);\
+            float fbw = (modmask & (1 << smdest_eq##index##_bw)) ? pow(0.5, moddests[smdest_eq##index##_bw]) : 1;\
+            float dgain = velscl * l->eq##index.vel2gain + ((modmask & (1 << smdest_eq##index##_gain)) ? moddests[smdest_eq##index##_gain] : 0);\
+            cbox_biquadf_set_peakeq_rbj_scaled(&v->eq_coeffs[index - 1], l->eq##index.effective_freq + dfreq, fbw / l->eq##index.bw, dB2gain(0.5 * (l->eq##index.gain + dgain)), m->module.srate); \
+            if (!(v->last_eq_bitmask & (1 << (index - 1)))) \
+            { \
+                cbox_biquadf_reset(&v->eq_left[index-1]); \
+                cbox_biquadf_reset(&v->eq_right[index-1]); \
+            } \
+        }
+    if (recalc_eq_mask) {
+        RECALC_EQ_IF(1)
+        RECALC_EQ_IF(2)
+        RECALC_EQ_IF(3)
+    }
     
     double maxv = 127 << 7;
     double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;
