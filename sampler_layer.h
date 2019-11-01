@@ -272,6 +272,7 @@ typedef int midi_note_t;
     MACRO(int, amp_keytrack, 0) \
     MACRO(int, fil_veltrack, 0) \
     MACRO(int, amp_veltrack, 100) \
+    MACRO(int, pitch_veltrack, 0) \
     MACRO(int, lovel, 0) \
     MACRO(int, hivel, 127) \
     MACRO(int, velcurve_quadratic, -1) \
