@@ -1,5 +1,6 @@
 from ctypes import *
 import numbers
+import os
 
 def cbox_uuid_to_str(uuid_ptr):
     uuid_str = create_string_buffer(40)
@@ -91,9 +92,24 @@ class PyCmdTarget(CmdTarget):
     def process(self, cmd, args):
         print ("%s(%s)" % (cmd, repr(args)))
 
-cb = cdll.LoadLibrary("")
-if not hasattr(cb, 'cbox_embed_get_cmd_root'):
-    cb = cdll.LoadLibrary("./calfbox")
+def find_calfbox():
+    cb = cdll.LoadLibrary("")
+    if not hasattr(cb, 'cbox_embed_get_cmd_root'):
+        cb = None
+        fn = os.getenv("CALFBOX_BINARY", None)
+        if fn is not None:
+            cb = cdll.LoadLibrary(fn)
+        else:
+            for pdir in os.getenv('PATH').split(os.pathsep):
+                fn = os.path.join(pdir, 'calfbox')
+                if os.path.exists(fn):
+                    cb = cdll.LoadLibrary(fn)
+                    break
+        if not cb:
+            raise IOError("Calfbox executable not found in PATH")
+    return cb
+
+cb = find_calfbox()
 cb.cbox_embed_get_cmd_root.restype = CmdTargetPtr
 
 class CalfboxException(Exception):
