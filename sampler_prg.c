@@ -63,7 +63,7 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
             {
                 gboolean play = lr->current_seq_position == 1;
                 lr->current_seq_position++;
-                if (lr->current_seq_position >= l->seq_length)
+                if (lr->current_seq_position > l->seq_length)
                     lr->current_seq_position = 1;
                 if (play)
                     return next_layer;
