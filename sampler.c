@@ -142,6 +142,8 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 break;
             
             case 10:
+                c->cc[smsrc_lastpolyaft] = data[2];
+                c->poly_pressure[data[1]] = data[2];
                 // handle chokeable one shot layers
                 if (data[2] == 127)
                     sampler_channel_stop_note(c, data[1], data[2], TRUE);

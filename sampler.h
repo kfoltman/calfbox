@@ -60,6 +60,7 @@ struct sampler_channel
     struct sampler_voice *voices_running;
     int active_voices;
     uint8_t prev_note_velocity[128];
+    uint8_t poly_pressure[128];
     uint32_t prev_note_start_time[128];
     int channel_volume_cc, channel_pan_cc;
     int output_shift;

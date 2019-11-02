@@ -140,6 +140,7 @@ enum sampler_modsrc
 {
     smsrc_cc0 = 0,
     smsrc_chanaft = 120,
+    smsrc_lastpolyaft,
 
     // those are per-note, not per-channel
     smsrc_vel,
@@ -277,6 +278,10 @@ typedef int midi_note_t;
     MACRO(int, hivel, 127) \
     MACRO(int, lobend, -8192) \
     MACRO(int, hibend, 8192) \
+    MACRO(int, lochanaft, 0) \
+    MACRO(int, hichanaft, 127) \
+    MACRO(int, lopolyaft, 0) \
+    MACRO(int, hipolyaft, 127) \
     MACRO(int, velcurve_quadratic, -1) \
     MACRO##_enum(sampler_filter_type, fil_type, sft_lp12) \
     MACRO##_enum(sampler_off_mode, off_mode, som_unknown) \

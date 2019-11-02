@@ -540,7 +540,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float modsrcs[smsrc_pernote_count];
     modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * velscl;
     modsrcs[smsrc_pitch - smsrc_pernote_offset] = pitch * (1.f / 100.f);
-    modsrcs[smsrc_polyaft - smsrc_pernote_offset] = 0.f; // XXXKF not supported yet
+    modsrcs[smsrc_polyaft - smsrc_pernote_offset] = c->poly_pressure[v->note] * (1.f / 127.f);
     modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released) * 0.01f;
     modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released) * 0.01f;
     modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->amp_env, v->released) * 0.01f;
