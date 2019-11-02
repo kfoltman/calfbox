@@ -71,6 +71,8 @@ calfbox_SOURCES = \
     usbprobe.c \
     wavebank.c
 
+calfbox_LDFLAGS=-pie -Wl,-E
+
 calfbox_LDADD = $(JACK_DEPS_LIBS) $(GLIB_DEPS_LIBS) $(FLUIDSYNTH_DEPS_LIBS) $(PYTHON_DEPS_LIBS) $(LIBSMF_DEPS_LIBS) $(LIBSNDFILE_DEPS_LIBS) $(LIBUSB_DEPS_LIBS) $(NCURSES_DEPS_LIBS) -lpthread -luuid -lm -lrt
 
 if USE_SSE
@@ -134,4 +136,3 @@ noinst_HEADERS = \
     wavebank.h
 
 EXTRA_DIST = cboxrc-example
-

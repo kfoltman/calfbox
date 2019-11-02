@@ -1,4 +1,4 @@
-from _cbox import *
+from calfbox._cbox2 import *
 from io import BytesIO
 import struct
 import traceback

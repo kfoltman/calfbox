@@ -231,6 +231,12 @@ static gboolean app_process_cmd(struct cbox_command_target *ct, struct cbox_comm
         return TRUE;
     }
     else
+    if (!strcmp(obj, "print_b") && !strcmp(cmd->arg_types, "b"))
+    {
+        g_message("Print: %s", (char *)CBOX_ARG_B(cmd, 0)->data);
+        return TRUE;
+    }
+    else
     {
         g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown combination of target path and argument: '%s', '%s'", cmd->command, cmd->arg_types);
         return FALSE;

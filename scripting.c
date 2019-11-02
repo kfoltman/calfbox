@@ -18,8 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config.h"
 
-#if USE_PYTHON
-
 #include "app.h"
 #include "blob.h"
 #include "engine.h"
@@ -29,13 +27,130 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <glib.h>
 
+#include "config-api.h"
+#include "tarfile.h"
+#include "wavebank.h"
+#include "scene.h"
+
+static gboolean audio_running = FALSE;
+static gboolean engine_initialised = FALSE;
+
+gboolean cbox_embed_init_engine(const char *config_file, GError **error)
+{
+    if (engine_initialised)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Engine already initialized");
+        return FALSE;
+    }
+
+    cbox_dom_init();
+    app.tarpool = cbox_tarpool_new();
+    app.document = cbox_document_new();
+    app.rt = cbox_rt_new(app.document);
+    app.engine = cbox_engine_new(app.document, app.rt);
+    app.rt->engine = app.engine;
+    cbox_config_init(config_file);
+    cbox_wavebank_init();
+    engine_initialised = 1;
+
+    return TRUE;
+}
+
+gboolean cbox_embed_shutdown_engine(GError **error)
+{
+    if (!engine_initialised)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Engine not initialized");
+        return FALSE;
+    }
+
+    CBOX_DELETE(app.engine);
+    CBOX_DELETE(app.rt);
+    cbox_tarpool_destroy(app.tarpool);
+    cbox_document_destroy(app.document);
+    cbox_wavebank_close();
+    cbox_config_close();
+    cbox_dom_close();
+    engine_initialised = FALSE;
+
+    return TRUE;
+}
+
+gboolean cbox_embed_start_audio(struct cbox_command_target *target, GError **error)
+{
+    if (!engine_initialised)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Engine not initialized");
+        return FALSE;
+    }
+    if (audio_running)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Audio already started");
+        return FALSE;
+    }
+
+    struct cbox_open_params params;
+
+    GError *error2 = NULL;
+    if (!cbox_io_init(&app.io, &params, target, &error2))
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot initialise sound I/O: %s", (error2 && error2->message ? error2->message : "Unknown error"));
+        g_error_free(error2);
+        return FALSE;
+    }
+
+    const char *effect_preset_name = cbox_config_get_string("master", "effect");
+
+    cbox_rt_set_io(app.rt, &app.io);
+    cbox_scene_new(app.document, app.engine);
+    cbox_rt_start(app.rt, target);
+    if (effect_preset_name && *effect_preset_name)
+    {
+        app.engine->effect = cbox_module_new_from_fx_preset(effect_preset_name, app.document, app.rt, app.engine, error);
+        if (!app.engine->effect)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot load master effect preset %s: %s", effect_preset_name, (error2 && error2->message ? error2->message : "Unknown error"));
+            g_error_free(error2);
+            return FALSE;
+        }
+    }
+    audio_running = TRUE;
+    return TRUE;
+}
+
+gboolean cbox_embed_stop_audio(GError **error)
+{
+    if (!engine_initialised)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Engine not initialised");
+        return FALSE;
+    }
+    if (!audio_running)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Audio not running");
+        return FALSE;
+    }
+
+    while(app.engine->scene_count > 0)
+        CBOX_DELETE(app.engine->scenes[0]);
+    cbox_rt_stop(app.rt);
+    cbox_io_close(&app.io);
+    audio_running = FALSE;
+    return TRUE;
+}
+
+struct cbox_command_target *cbox_embed_get_cmd_root()
+{
+    return &app.cmd_target;
+}
+
+#if USE_PYTHON
+
 // This is a workaround for what I consider a defect in pyconfig.h
 #undef _XOPEN_SOURCE
 #undef _POSIX_C_SOURCE
 
 #include <Python.h>
-
-static gboolean engine_initialised = FALSE;
 
 struct PyCboxCallback 
 {
@@ -310,26 +425,22 @@ static PyObject *cbox_python_do_cmd(PyObject *self, PyObject *args)
 #include "wavebank.h"
 #include "scene.h"
 
-static gboolean audio_running = FALSE;
+static PyObject *pyerror_from_gerror(PyObject *exception, GError *error)
+{
+    PyObject *pyerr = PyErr_Format(exception, "%s", error ? error->message : "Unknown error");
+    g_error_free(error);
+    return pyerr;
+}
 
 static PyObject *cbox_python_init_engine(PyObject *self, PyObject *args)
 {
     const char *config_file = NULL;
     if (!PyArg_ParseTuple(args, "|z:init_engine", &config_file))
         return NULL;
-    if (engine_initialised)
-        return PyErr_Format(PyExc_Exception, "Engine already initialised");
- 
-    cbox_dom_init();
-    app.tarpool = cbox_tarpool_new();
-    app.document = cbox_document_new();
-    app.rt = cbox_rt_new(app.document);
-    app.engine = cbox_engine_new(app.document, app.rt);
-    app.rt->engine = app.engine;
-    cbox_config_init(config_file);
-    cbox_wavebank_init();
-    engine_initialised = 1;
 
+    GError *error = NULL;
+    if (!cbox_embed_init_engine(config_file, &error))
+        return pyerror_from_gerror(PyExc_Exception, error);
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -338,18 +449,10 @@ static PyObject *cbox_python_shutdown_engine(PyObject *self, PyObject *args)
 {
     if (!PyArg_ParseTuple(args, ":shutdown_engine"))
         return NULL;
-    if (!engine_initialised)
-        return PyErr_Format(PyExc_Exception, "Engine not initialised");
     
-    CBOX_DELETE(app.engine);
-    CBOX_DELETE(app.rt);
-    cbox_tarpool_destroy(app.tarpool);
-    cbox_document_destroy(app.document);
-    cbox_wavebank_close();
-    cbox_config_close();
-    cbox_dom_close();
-    engine_initialised = FALSE;
-    
+    GError *error = NULL;
+    if (!cbox_embed_shutdown_engine(&error))
+        return pyerror_from_gerror(PyExc_Exception, error);
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -359,33 +462,15 @@ static PyObject *cbox_python_start_audio(PyObject *self, PyObject *args)
     PyObject *callback = NULL;
     if (!PyArg_ParseTuple(args, "|O:start_audio", &callback))
         return NULL;
-    if (!engine_initialised)
-        return PyErr_Format(PyExc_Exception, "Engine not initialised");
-    if (audio_running)
-        return PyErr_Format(PyExc_Exception, "Audio already started");
 
-    struct cbox_open_params params;
-    GError *error = NULL;
-    
     struct cbox_command_target target;
-    if (callback && callback != Py_None)
+    gboolean has_target = callback && callback != Py_None;
+    if (has_target)
         cbox_command_target_init(&target, bridge_to_python_callback, callback);
 
-    if (!cbox_io_init(&app.io, &params, (callback && callback != Py_None) ? &target : NULL, &error))
-        return PyErr_Format(PyExc_IOError, "Cannot initialise sound I/O: %s", (error && error->message) ? error->message : "Unknown error");
-
-    const char *effect_preset_name = cbox_config_get_string("master", "effect");
-    
-    cbox_rt_set_io(app.rt, &app.io);
-    cbox_scene_new(app.document, app.engine);
-    cbox_rt_start(app.rt, (callback && callback != Py_None) ? &target : NULL);
-    if (effect_preset_name && *effect_preset_name)
-    {
-        app.engine->effect = cbox_module_new_from_fx_preset(effect_preset_name, app.document, app.rt, app.engine, &error);
-        if (!app.engine->effect)
-            return PyErr_Format(PyExc_IOError, "Cannot load master effect preset %s: %s", effect_preset_name, (error && error->message) ? error->message : "Unknown error");
-    }
-    audio_running = TRUE;
+    GError *error = NULL;
+    if (!cbox_embed_start_audio(has_target ? &target : NULL, &error))
+        return pyerror_from_gerror(PyExc_Exception, error);
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -419,16 +504,10 @@ static PyObject *cbox_python_stop_audio(PyObject *self, PyObject *args)
 {
     if (!PyArg_ParseTuple(args, ":stop_audio"))
         return NULL;
-    if (!engine_initialised)
-        return PyErr_Format(PyExc_Exception, "Engine not initialised");
-    if (!audio_running)
-        return PyErr_Format(PyExc_Exception, "Audio not running");
 
-    while(app.engine->scene_count > 0)
-        CBOX_DELETE(app.engine->scenes[0]);
-    cbox_rt_stop(app.rt);
-    cbox_io_close(&app.io);
-    audio_running = FALSE;
+    GError *error = NULL;
+    if (!cbox_embed_stop_audio(&error))
+        return pyerror_from_gerror(PyExc_Exception, error);
     Py_INCREF(Py_None);
     return Py_None;
 }
