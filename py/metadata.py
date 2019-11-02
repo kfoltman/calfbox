@@ -8,7 +8,7 @@ This file implements the JackIO Python side of Jack Medata as described here:
 """
 
 #get_thing
-from _cbox import do_cmd
+from calfbox._cbox2 import do_cmd
 
 def get_thing(): pass #overwritten by cbox.py after import
 

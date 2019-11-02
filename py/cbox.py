@@ -1,9 +1,11 @@
 from calfbox._cbox2 import *
 from io import BytesIO
 import struct
+import sys
 import traceback
 import calfbox.metadata as metadata #local file metadata.py
 type_wrapper_debug = False
+is_python3 = not sys.version.startswith("2")
 
 ###############################################################################
 # Ugly internals. Please skip this section for your own sanity.
@@ -130,7 +132,7 @@ def new_get_things(obj, cmd, settermap, args):
 def _error_arg_mismatch(required, passed):
     raise ValueError("Types required: %s, values passed: %s" % (repr(required), repr(passed)))
 def _handle_object_wrapping(t):
-    if type(t) is CboxObjMetaclass:
+    if issubclass(t, DocObj):
         return lambda uuid: Document.map_uuid_and_check(uuid, t)
     return t
 def _make_args_to_type_lambda(t):
@@ -146,6 +148,7 @@ def _make_args_decoder(t):
         return _make_args_to_type_lambda(t)
 
 def get_thing(cmd, fieldcmd, datatype, *args):
+    pull = False
     if type(datatype) is list:
         assert (len(datatype) == 1)
         decoder = _make_args_decoder(datatype[0])
@@ -163,16 +166,19 @@ def get_thing(cmd, fieldcmd, datatype, *args):
     else:
         decoder = _make_args_decoder(datatype)
         def adder(data):
-            nonlocal value
-            value = decoder(data)
-        value = None
+            value[0] = decoder(data)
+        value = [None]
+        pull = True
     def callback(cmd2, fb, args2):
         if cmd2 == fieldcmd:
             adder(args2)
         else:
             print ("Unexpected command %s" % cmd2)
     do_cmd(cmd, callback, list(args))
-    return value
+    if pull:
+        return value[0]
+    else:
+        return value
 
 class SetterWithConversion:
     """A setter object class that sets a specific property to a typed value or a tuple of typed value."""
@@ -217,7 +223,7 @@ def _type_properties(base_type):
     return {prop: getattr(base_type, prop) for prop in dir(base_type) if not prop.startswith("__")}
 
 def _create_setter(prop, t):
-    if type(t) in [type, CboxObjMetaclass, tuple]:
+    if type(t) in [type, tuple] or issubclass(type(t), DocObj):
         if type_wrapper_debug:
             print ("%s is type %s" % (prop, repr(t)))
         return SetterWithConversion(prop, _make_args_decoder(t))
@@ -233,7 +239,7 @@ def _create_setter(prop, t):
             print ("%s is array of %s" % (prop, repr(t[0])))
         return ListAdderWithConversion(prop, _make_args_decoder(t[0]))
     else:
-        raise ValueError("Don't know what to do with %s property '%s' of type %s" % (name, prop, repr(t)))
+        raise ValueError("Don't know what to do with property '%s' of type %s" % (prop, repr(t)))
 
 def _create_unmarshaller(name, base_type, object_wrapper = False, property_grabber = _type_properties):
     all_decorators = {}
@@ -271,19 +277,7 @@ def _create_unmarshaller(name, base_type, object_wrapper = False, property_grabb
     else:
         return lambda cmd, *args: new_get_things(base_type(), cmd, settermap, list(args))
 
-class CboxObjMetaclass(type):
-    """Metaclass that creates Python wrapper classes for various C-side objects.
-    This class is responsible for automatically marshalling and type-checking/converting
-    fields of Status inner class on status() calls."""
-    def __new__(cls, name, bases, namespace, **kwds):
-        status_class = namespace['Status']
-        classfinaliser, cmdwrapper = _create_unmarshaller(name, status_class, True)
-        result = type.__new__(cls, name, bases, namespace, **kwds)
-        classfinaliser(result)
-        result.status = cmdwrapper('/status')
-        return result
-
-class NonDocObj(object, metaclass = CboxObjMetaclass):
+class NonDocObj(object):
     """Root class for all wrapper classes that wrap objects that don't have
     their own identity/UUID.
     This covers various singletons and inner objects (e.g. engine in instruments)."""
@@ -291,6 +285,19 @@ class NonDocObj(object, metaclass = CboxObjMetaclass):
         pass
     def __init__(self, path):
         self.path = path
+    def __new__(classObj, *args, **kwargs):
+        if is_python3:
+            result = object.__new__(classObj)
+            result.__init__(*args, **kwargs)
+        else:
+            result = object.__new__(classObj, *args, **kwargs)
+        name = classObj.__name__
+        if getattr(classObj, 'wrapped_class', None) != name:
+            classfinaliser, cmdwrapper = _create_unmarshaller(name, classObj.Status, object_wrapper = True)
+            classfinaliser(classObj)
+            classObj.status = cmdwrapper('/status')
+            classObj.wrapped_class = name
+        return result
 
     def cmd(self, cmd, fb = None, *args):
         do_cmd(self.path + cmd, fb, list(args))
@@ -559,7 +566,8 @@ def get_new_events():
     do_cmd("/on_idle", (lambda cmd, fb, args: seq.append((cmd, fb, args))), [])
     return seq
 
-def send_midi_event(*data, output = None):
+def send_midi_event(*data, **kwargs):
+    output = kwargs.get('output', None)
     do_cmd('/send_event_to', None, [output if output is not None else ''] + list(data))
 
 def send_sysex(data, output = None):
@@ -855,6 +863,8 @@ class DocInstrument(DocObj):
         engine = s.engine
         if engine in engine_classes:
             self.engine = engine_classes[engine]("/doc/uuid/" + self.uuid + "/engine")
+        else:
+            raise ValueError("Unknown engine %s" % engine)
         self.output_slots = []
         for i in range(s.outputs):
             io = InstrumentOutput(self.make_path('/output/%d' % (i + 1)))

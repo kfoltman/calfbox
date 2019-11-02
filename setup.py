@@ -5,13 +5,13 @@ import glob
 import os
 import sys
 
-if sys.version_info[0] < 3:
-    raise Exception("Python 3 required.")
-
 support_ext_module = False
 
 ext_modules = []
 if support_ext_module:
+    if sys.version_info[0] < 3:
+        raise Exception("Python 3 required.")
+
     packages = ['glib-2.0', 'sndfile']
 
     if '#define USE_FLUIDSYNTH 1' in open('config.h').read():
