@@ -428,8 +428,7 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
                     return FALSE;
             }
         }
-        return cbox_execute_on(fb, NULL, "/client_type", "s", error, "USB") &&
-            cbox_execute_on(fb, NULL, "/audio_inputs", "i", error, io->io_env.input_count) &&
+        return cbox_execute_on(fb, NULL, "/audio_inputs", "i", error, io->io_env.input_count) &&
             cbox_execute_on(fb, NULL, "/audio_outputs", "i", error, io->io_env.output_count) &&
             cbox_execute_on(fb, NULL, "/sample_rate", "i", error, io->io_env.srate) &&
             cbox_execute_on(fb, NULL, "/buffer_size", "i", error, io->io_env.buffer_size);

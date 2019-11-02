@@ -403,7 +403,8 @@ static gboolean cbox_usb_io_process_cmd(struct cbox_command_target *ct, struct c
                 return FALSE;
         }
         
-        return cbox_execute_on(fb, NULL, "/output_resolution", "i", error, 8 * uii->output_resolution) &&
+        return cbox_execute_on(fb, NULL, "/client_type", "s", error, "USB") &&
+            cbox_execute_on(fb, NULL, "/output_resolution", "i", error, 8 * uii->output_resolution) &&
             cbox_io_process_cmd(io, fb, cmd, error, &handled);
     }
     else
