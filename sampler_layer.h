@@ -275,6 +275,8 @@ typedef int midi_note_t;
     MACRO(int, pitch_veltrack, 0) \
     MACRO(int, lovel, 0) \
     MACRO(int, hivel, 127) \
+    MACRO(int, lobend, -8192) \
+    MACRO(int, hibend, 8192) \
     MACRO(int, velcurve_quadratic, -1) \
     MACRO##_enum(sampler_filter_type, fil_type, sft_lp12) \
     MACRO##_enum(sampler_off_mode, off_mode, som_unknown) \

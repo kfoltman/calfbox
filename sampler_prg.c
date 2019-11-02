@@ -46,7 +46,11 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
             if (note >= l->sw_lokey && note <= l->sw_hikey)
                 lr->last_key = note;
         }
-        if (note >= l->lokey && note <= l->hikey && vel >= l->lovel && vel <= l->hivel && ch >= l->lochan && ch <= l->hichan && random >= l->lorand && random < l->hirand && 
+        if (note >= l->lokey && note <= l->hikey && 
+            vel >= l->lovel && vel <= l->hivel && 
+            ch >= l->lochan && ch <= l->hichan && 
+            random >= l->lorand && random < l->hirand && 
+            c->pitchwheel >= l->lobend && c->pitchwheel < l->hibend &&
             (l->cc_number == -1 || (c->cc[l->cc_number] >= l->locc && c->cc[l->cc_number] <= l->hicc)))
         {
             if (!l->eff_use_keyswitch || 
