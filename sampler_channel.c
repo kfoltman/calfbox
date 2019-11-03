@@ -43,7 +43,7 @@ void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
     c->pitchwheel = 0;
     c->output_shift = 0;
     memset(c->cc, 0, sizeof(c->cc));
-    memset(c->poly_pressure, 0, sizeof(c->poly_pressure));
+    c->poly_pressure_mask = 0;
     
     // default to maximum and pan=centre if MIDI mixing disabled
     if (m->disable_mixer_controls)
@@ -141,8 +141,7 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
             c->cc[1] = 0;
             c->pitchwheel = 0;
             c->cc[smsrc_chanaft] = 0;
-            // XXXKF implement lazy clearing by groups of 4 or something
-            memset(c->poly_pressure, 0, sizeof(c->poly_pressure));
+            c->poly_pressure_mask = 0;
             return;
     }
     if (cc < 120)

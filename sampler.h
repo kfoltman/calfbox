@@ -64,6 +64,7 @@ struct sampler_channel
     uint32_t prev_note_start_time[128];
     int channel_volume_cc, channel_pan_cc;
     int output_shift;
+    uint32_t poly_pressure_mask;
 };
 
 struct sampler_lfo

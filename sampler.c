@@ -143,11 +143,17 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
             
             case 10:
                 c->cc[smsrc_lastpolyaft] = data[2];
+                // Lazy clearing
+                if (!(c->poly_pressure_mask & (1 << (data[1] >> 2))))
+                {
+                    // Clear the group of 4
+                    memset(c->poly_pressure + (data[1] & ~3), 0, 4);
+                    c->poly_pressure_mask |= 1 << (data[1] >> 2);
+                }
                 c->poly_pressure[data[1]] = data[2];
-                // handle chokeable one shot layers
-                if (data[2] == 127)
-                    sampler_channel_stop_note(c, data[1], data[2], TRUE);
-                // polyphonic pressure not handled
+                // XXXKF add a new opcode for cymbal chokes via poly pressure
+                // if (data[2] == 127)
+                //    sampler_channel_stop_note(c, data[1], data[2], TRUE);
                 break;
             
             case 11:
