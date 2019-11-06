@@ -4,6 +4,7 @@
 AC_PREREQ(2.63)
 AC_INIT([calfbox],[0.0.3],[wdev@foltman.com])
 AC_CONFIG_HEADER([config.h])
+LT_INIT([])
 LT_LANG([C])
 
 AM_INIT_AUTOMAKE(1.8)

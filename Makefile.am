@@ -1,8 +1,17 @@
 AM_CPPFLAGS = -I$(srcdir) -Wall -Wsign-compare -D_GNU_SOURCE
 
+AM_CFLAGS = $(JACK_DEPS_CFLAGS) $(GLIB_DEPS_CFLAGS) $(FLUIDSYNTH_DEPS_CFLAGS) $(PYTHON_DEPS_CFLAGS) $(LIBSMF_DEPS_CFLAGS) $(LIBSNDFILE_DEPS_CFLAGS) $(LIBUSB_DEPS_CFLAGS) $(ARCH_OPT_CFLAGS) $(NCURSES_DEPS_CFLAGS)
+
+lib_LTLIBRARIES = libcalfbox.la
+
 bin_PROGRAMS = calfbox
 
 calfbox_SOURCES = \
+    main.c
+
+calfbox_LDADD = libcalfbox.la $(JACK_DEPS_LIBS) $(GLIB_DEPS_LIBS) $(FLUIDSYNTH_DEPS_LIBS) $(PYTHON_DEPS_LIBS) $(LIBSMF_DEPS_LIBS) $(LIBSNDFILE_DEPS_LIBS) $(LIBUSB_DEPS_LIBS) $(NCURSES_DEPS_LIBS) -lpthread -luuid -lm -lrt
+
+libcalfbox_la_SOURCES = \
     app.c \
     appmenu.c \
     auxbus.c \
@@ -30,7 +39,6 @@ calfbox_SOURCES = \
     jackio.c \
     layer.c \
     limiter.c \
-    main.c \
     master.c \
     menu.c \
     menuitem.c \
@@ -71,9 +79,7 @@ calfbox_SOURCES = \
     usbprobe.c \
     wavebank.c
 
-calfbox_LDFLAGS=-pie -Wl,-E
-
-calfbox_LDADD = $(JACK_DEPS_LIBS) $(GLIB_DEPS_LIBS) $(FLUIDSYNTH_DEPS_LIBS) $(PYTHON_DEPS_LIBS) $(LIBSMF_DEPS_LIBS) $(LIBSNDFILE_DEPS_LIBS) $(LIBUSB_DEPS_LIBS) $(NCURSES_DEPS_LIBS) -lpthread -luuid -lm -lrt
+libcalfbox_la_LIBADD = $(JACK_DEPS_LIBS) $(GLIB_DEPS_LIBS) $(FLUIDSYNTH_DEPS_LIBS) $(PYTHON_DEPS_LIBS) $(LIBSMF_DEPS_LIBS) $(LIBSNDFILE_DEPS_LIBS) $(LIBUSB_DEPS_LIBS) $(NCURSES_DEPS_LIBS) -lpthread -luuid -lm -lrt
 
 if USE_SSE
 ARCH_OPT_CFLAGS=-msse -ffast-math
@@ -82,8 +88,6 @@ if USE_NEON
 ARCH_OPT_CFLAGS=-mfloat-abi=hard -mfpu=neon -ffast-math
 endif
 endif
-
-AM_CFLAGS = $(JACK_DEPS_CFLAGS) $(GLIB_DEPS_CFLAGS) $(FLUIDSYNTH_DEPS_CFLAGS) $(PYTHON_DEPS_CFLAGS) $(LIBSMF_DEPS_CFLAGS) $(LIBSNDFILE_DEPS_CFLAGS) $(LIBUSB_DEPS_CFLAGS) $(ARCH_OPT_CFLAGS) $(NCURSES_DEPS_CFLAGS)
 
 noinst_HEADERS = \
     app.h \

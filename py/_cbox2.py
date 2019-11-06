@@ -1,4 +1,5 @@
 from ctypes import *
+from ctypes.util import find_library
 import numbers
 import os
 
@@ -93,20 +94,8 @@ class PyCmdTarget(CmdTarget):
         print ("%s(%s)" % (cmd, repr(args)))
 
 def find_calfbox():
-    cb = cdll.LoadLibrary("")
-    if not hasattr(cb, 'cbox_embed_get_cmd_root'):
-        cb = None
-        fn = os.getenv("CALFBOX_BINARY", None)
-        if fn is not None:
-            cb = cdll.LoadLibrary(fn)
-        else:
-            for pdir in os.getenv('PATH').split(os.pathsep):
-                fn = os.path.join(pdir, 'calfbox')
-                if os.path.exists(fn):
-                    cb = cdll.LoadLibrary(fn)
-                    break
-        if not cb:
-            raise IOError("Calfbox executable not found in PATH")
+    cblib = find_library('calfbox')
+    cb = cdll.LoadLibrary(cblib)
     return cb
 
 cb = find_calfbox()
