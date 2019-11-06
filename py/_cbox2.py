@@ -115,7 +115,7 @@ class WrapCmdTarget(PyCmdTarget):
     def process(self, cmd, args):
         self.fb(cmd, None, args)
     
-def init_engine(config=""):
+def init_engine(config=None):
     gptr = GErrorPtr()
     if not cb.cbox_embed_init_engine(config, byref(gptr)):
         convert_exception(CalfboxException, gptr)
