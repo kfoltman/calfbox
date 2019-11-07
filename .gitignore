@@ -22,3 +22,5 @@ __pycache__/
 *.py[cod]
 *$py.class
 build/
+config.guess
+config.sub
