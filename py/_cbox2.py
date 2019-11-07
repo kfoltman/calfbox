@@ -75,7 +75,7 @@ class PyCmdTarget(CmdTarget):
                 elif argtype == 'f':
                     args[i] = cast(data[i], c_double_p).contents.value
                 elif argtype == 'u':
-                    args[i] = cbox_uuid_to_str(data[i])
+                    args[i] = cbox_uuid_to_str(cast(data[i], c_void_p))
                 elif argtype == 'b':
                     args[i] = cast(data[i], CboxBlobPtr).contents
                 elif argtype == 'o':
@@ -150,11 +150,11 @@ def do_cmd_on(target, cmd, fb, args):
             if t is float:
                 arg_types[i] = b'f'
                 arg_values[i] = addressof(arg_space) + 8 * i
-                cast(arg_values[i], c_double_p)[i] = c_double(a)
+                cast(arg_values[i], c_double_p).contents.value = a
             else:
                 arg_types[i] = b'i'
                 arg_values[i] = addressof(arg_space) + 8 * i
-                cast(arg_values[i], c_int32_p)[i] = c_int32(a)
+                cast(arg_values[i], c_int32_p).contents.value = a
         elif t == str:
             tmp.append(create_string_buffer(a.encode()))
             arg_types[i] = b's'
