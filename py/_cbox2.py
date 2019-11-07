@@ -121,9 +121,9 @@ def init_engine(config=None):
         convert_exception(CalfboxException, gptr)
 def start_audio(cmd_dumper=None):
     gptr = GErrorPtr()
-    target = WrapCmdTarget(cmd_dumper) if cmd_dumper is not None else None
+    target = byref(WrapCmdTarget(cmd_dumper)) if cmd_dumper is not None else None
     # XXXKF pass the callback
-    if not cb.cbox_embed_start_audio(byref(target), byref(gptr)):
+    if not cb.cbox_embed_start_audio(target, byref(gptr)):
         convert_exception(CalfboxException, gptr)
 def stop_audio():
     gptr = GErrorPtr()
