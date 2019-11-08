@@ -77,7 +77,7 @@ class PyCmdTarget(CmdTarget):
                 elif argtype == 'u':
                     args[i] = cbox_uuid_to_str(cast(data[i], c_void_p))
                 elif argtype == 'b':
-                    args[i] = cast(data[i], CboxBlobPtr).contents
+                    args[i] = cast(data[i], CboxBlobPtr).contents.bytes()
                 elif argtype == 'o':
                     args[i] = cbox_uuid_to_str(cast(data[i], POINTER(CboxObjHdr)).contents.cbox_uuid)
                 #elif argtype == 'N':
