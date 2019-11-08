@@ -2,6 +2,7 @@ from ctypes import *
 from ctypes.util import find_library
 import numbers
 import os
+import logging
 
 def cbox_uuid_to_str(uuid_ptr):
     uuid_str = create_string_buffer(40)
@@ -94,7 +95,12 @@ class PyCmdTarget(CmdTarget):
         print ("%s(%s)" % (cmd, repr(args)))
 
 def find_calfbox():
-    cblib = find_library('calfbox')
+    if "CALFBOXLIBABSPATH" in os.environ:
+        assert os.path.exists(os.environ["CALFBOXLIBABSPATH"])
+        cblib = os.environ["CALFBOXLIBABSPATH"]
+    else:
+        cblib = find_library('calfbox')
+    logging.info("Loading calfbox shared library: %s" % (cblib))
     cb = cdll.LoadLibrary(cblib)
     return cb
 
