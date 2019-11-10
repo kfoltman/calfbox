@@ -904,6 +904,8 @@ class SamplerEngine(NonDocObj):
         polyphony = int
         """Current number of voices playing."""
         active_voices = int
+        """Current number of delayed-startup voices waiting to be played."""
+        active_prevoices = int
         """Current number of disk streams."""
         active_pipes = int
         """GM volume (14-bit) per MIDI channel."""
@@ -914,6 +916,8 @@ class SamplerEngine(NonDocObj):
         output = {int:int}
         """Current number of voices playing per MIDI channel."""
         channel_voices = AltPropName('/channel_voices', {int:int})
+        """Current number of voices waiting to be played per MIDI channel."""
+        channel_prevoices = AltPropName('/channel_prevoices', {int:int})
         """MIDI channel -> (program number, program name)"""
         patches = {int:(int, str)}
 

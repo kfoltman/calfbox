@@ -40,6 +40,7 @@ void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
     c->module = m;
     c->voices_running = NULL;
     c->active_voices = 0;
+    c->active_prevoices = 0;
     c->pitchwheel = 0;
     c->output_shift = 0;
     memset(c->cc, 0, sizeof(c->cc));
@@ -197,6 +198,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
     struct sampler_program *prg = c->program;
     if (!prg || !prg->rll || prg->deleting)
         return;
+
     GSList *next_layer = sampler_program_get_next_layer(prg, c, !is_release_trigger ? prg->rll->layers : prg->rll->layers_release, note, vel, random, is_first);
     if (!next_layer)
     {
@@ -204,20 +206,51 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
             c->previous_note = note;
         return;
     }
+    struct sampler_layer_data *layers[MAX_SAMPLER_VOICES];
+    struct sampler_layer_data *delayed_layers[MAX_SAMPLER_PREVOICES];
+    int lcount = 0, dlcount = 0;
+    struct sampler_voice *free_voice = m->voices_free;
+    struct sampler_prevoice *free_prevoice = m->prevoices_free;
+    int fvcount = 0, fpcount = 0;
     
-    // this might perhaps be optimized by mapping the group identifiers to flat-array indexes
-    // but I'm not going to do that until someone gives me an SFZ worth doing that work ;)
-    int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
-    
-    FOREACH_VOICE(m->voices_free, v)
+    while(next_layer && lcount < MAX_SAMPLER_VOICES + MAX_SAMPLER_PREVOICES)
     {
-        struct sampler_layer *l = next_layer->data;
-        // Maybe someone forgot to call sampler_update_layer?
-        assert(l->runtime);
-        sampler_voice_start(v, c, l->runtime, note, vel, exgroups, &exgroupcount);
+        if (free_voice)
+        {
+            free_voice = free_voice->next;
+            fvcount++;
+        }
+        if (free_prevoice)
+        {
+            free_prevoice = free_prevoice->next;
+            fpcount++;
+        }
+        struct sampler_layer *layer = next_layer->data;
+        assert(layer->runtime);
+        if (layer->runtime->use_prevoice)
+            delayed_layers[dlcount++] = layer->runtime;
+        else
+            layers[lcount++] = layer->runtime;
         next_layer = sampler_program_get_next_layer(prg, c, g_slist_next(next_layer), note, vel, random, is_first);
-        if (!next_layer)
-            break;
+    }
+
+    int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
+    // If running out of polyphony, do not start the note if all the regions cannot be played
+    if (lcount <= fvcount && dlcount <= fpcount)
+    {
+        // this might perhaps be optimized by mapping the group identifiers to flat-array indexes
+        // but I'm not going to do that until someone gives me an SFZ worth doing that work ;)
+
+        for (int i = 0; i < lcount; ++i)
+        {
+            struct sampler_layer_data *l = layers[i];
+            sampler_voice_start(m->voices_free, c, l, note, vel, exgroups, &exgroupcount);
+        }
+        for (int i = 0; i < dlcount; ++i)
+        {
+            struct sampler_layer_data *l = delayed_layers[i];
+            sampler_prevoice_start(m->prevoices_free, c, l, note, vel);
+        }
     }
     if (!is_release_trigger)
         c->previous_note = note;
@@ -239,6 +272,11 @@ void sampler_channel_start_release_triggered_voices(struct sampler_channel *c, i
 void sampler_channel_stop_note(struct sampler_channel *c, int note, int vel, gboolean is_polyaft)
 {
     c->switchmask[note >> 5] &= ~(1 << (note & 31));
+    FOREACH_PREVOICE(c->module->prevoices_running, pv)
+    {
+        if (pv->note == note)
+            sampler_prevoice_unlink(&c->module->prevoices_running, pv);
+    }
     FOREACH_VOICE(c->voices_running, v)
     {
         if (v->note == note && v->layer->trigger != stm_release)
@@ -330,6 +368,14 @@ void sampler_channel_stop_all(struct sampler_channel *c)
 
 void sampler_channel_set_program_RT(struct sampler_channel *c, struct sampler_program *prg)
 {
+    FOREACH_PREVOICE(c->module->prevoices_running, pv)
+    {
+        if (pv->channel == c)
+        {
+            sampler_prevoice_unlink(&c->module->prevoices_running, pv);
+            sampler_prevoice_link(&c->module->prevoices_free, pv);            
+        }
+    }
     if (c->program)
         c->program->in_use--;    
     c->program = prg;
@@ -367,6 +413,7 @@ void sampler_channel_program_change(struct sampler_channel *c, int program)
         }
     }
     g_warning("Unknown program %d", program);
-    sampler_channel_set_program_RT(c, m->programs[0]);
+    if (m->program_count)
+        sampler_channel_set_program_RT(c, m->programs[0]);
 }
 

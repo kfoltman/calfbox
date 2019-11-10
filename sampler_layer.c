@@ -144,13 +144,13 @@ void sampler_layer_unset_modulation(struct sampler_layer *l, enum sampler_modsrc
     }
 }
 
-void sampler_layer_data_add_nif(struct sampler_layer_data *l, SamplerNoteInitFunc notefunc, int variant, float param, gboolean propagating_defaults)
+void sampler_layer_data_add_nif(struct sampler_layer_data *l, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant, float param, gboolean propagating_defaults)
 {
     GSList *p = l->nifs;
     while(p)
     {
         struct sampler_noteinitfunc *nif = p->data;
-        if (nif->notefunc == notefunc && nif->variant == variant)
+        if (nif->notefunc_voice == notefunc_voice && nif->notefunc_prevoice == notefunc_prevoice && nif->variant == variant)
         {
             // do not overwrite locally set value with defaults
             if (propagating_defaults && nif->has_value)
@@ -162,20 +162,21 @@ void sampler_layer_data_add_nif(struct sampler_layer_data *l, SamplerNoteInitFun
         p = g_slist_next(p);
     }
     struct sampler_noteinitfunc *nif = malloc(sizeof(struct sampler_noteinitfunc));
-    nif->notefunc = notefunc;
+    nif->notefunc_voice = notefunc_voice;
+    nif->notefunc_prevoice = notefunc_prevoice;
     nif->variant = variant;
     nif->param = param;
     nif->has_value = !propagating_defaults;
     l->nifs = g_slist_prepend(l->nifs, nif);
 }
 
-void sampler_layer_data_remove_nif(struct sampler_layer_data *l, struct sampler_layer_data *parent_data, SamplerNoteInitFunc notefunc, int variant)
+void sampler_layer_data_remove_nif(struct sampler_layer_data *l, struct sampler_layer_data *parent_data, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant)
 {
     GSList *p = l->nifs;
     while(p)
     {
         struct sampler_noteinitfunc *nif = p->data;
-        if (nif->notefunc == notefunc && nif->variant == variant && nif->has_value)
+        if (nif->notefunc_voice == notefunc_voice && nif->notefunc_prevoice == notefunc_prevoice && nif->variant == variant && nif->has_value)
         {
             if (parent_data) {
                 // Try to copy over from parent
@@ -183,7 +184,7 @@ void sampler_layer_data_remove_nif(struct sampler_layer_data *l, struct sampler_
                 while(q)
                 {
                     struct sampler_noteinitfunc *pnif = q->data;
-                    if (pnif->notefunc == notefunc && pnif->variant == variant && pnif->has_value)
+                    if (pnif->notefunc_voice == notefunc_voice && pnif->notefunc_prevoice == notefunc_prevoice && pnif->variant == variant && pnif->has_value)
                     {
                         memcpy(nif, pnif, sizeof(*pnif));
                         nif->has_value = FALSE;
@@ -199,14 +200,14 @@ void sampler_layer_data_remove_nif(struct sampler_layer_data *l, struct sampler_
     }
 }
 
-void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param)
+void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant, float param)
 {
-    sampler_layer_data_add_nif(&l->data, notefunc, variant, param, FALSE);
+    sampler_layer_data_add_nif(&l->data, notefunc_voice, notefunc_prevoice, variant, param, FALSE);
 }
 
-void sampler_layer_remove_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant)
+void sampler_layer_remove_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant)
 {
-    sampler_layer_data_remove_nif(&l->data, l->parent_group ? &l->parent_group->data : NULL, notefunc, variant);
+    sampler_layer_data_remove_nif(&l->data, l->parent_group ? &l->parent_group->data : NULL, notefunc_voice, notefunc_prevoice, variant);
 
     if (l->child_layers) {
         // Also remove propagated copies from child layers, if any
@@ -220,7 +221,7 @@ void sampler_layer_remove_nif(struct sampler_layer *l, SamplerNoteInitFunc notef
             while(p)
             {
                 struct sampler_noteinitfunc *nif = p->data;
-                if (nif->notefunc == notefunc && nif->variant == variant && !nif->has_value)
+                if (nif->notefunc_voice == notefunc_voice && nif->notefunc_prevoice == notefunc_prevoice && nif->variant == variant && !nif->has_value)
                 {
                     child->data.nifs = g_slist_delete_link(child->data.nifs, p);
                     break;
@@ -487,7 +488,7 @@ static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct 
         for(GSList *mod = parent->nifs; mod; mod = mod->next)
         {
             struct sampler_noteinitfunc *nif = mod->data;
-            sampler_layer_data_add_nif(l, nif->notefunc, nif->variant, nif->param, TRUE);
+            sampler_layer_data_add_nif(l, nif->notefunc_voice, nif->notefunc_prevoice, nif->variant, nif->param, TRUE);
         }
         // set modulations used by parent
         for(GSList *mod = parent->modulations; mod; mod = mod->next)
@@ -618,6 +619,16 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     l->eq_bitmask = ((l->eq1.gain != 0 || l->eq1.vel2gain != 0) ? 1 : 0)
         | ((l->eq2.gain != 0 || l->eq2.vel2gain != 0) ? 2 : 0)
         | ((l->eq3.gain != 0 || l->eq3.vel2gain != 0) ? 4 : 0);
+
+    l->use_prevoice = (l->delay || l->delay_random);
+    if (!l->use_prevoice)
+    {
+        GSList *nif = l->nifs;
+        while(nif && !((struct sampler_noteinitfunc *)(nif->data))->notefunc_prevoice)
+            nif = nif->next;
+        if (nif)
+            l->use_prevoice = TRUE;
+    }
 }
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)
@@ -785,7 +796,7 @@ static gboolean parse_envelope_param(struct sampler_layer *layer, struct cbox_da
 
 #define PROC_SET_ENV_NIF(name) \
     if (!strcmp(key, "vel2" #name)) \
-        sampler_layer_add_nif(layer, sampler_nif_vel2env, (env_type << 4) + snif_env_ ## name, fvalue);
+        sampler_layer_add_nif(layer, sampler_nif_vel2env, NULL, (env_type << 4) + snif_env_ ## name, fvalue);
 
     if (!strcmp(key, "depth"))
         sampler_layer_set_modulation(layer, src, smsrc_none, dest, fvalue, 0);
@@ -899,16 +910,26 @@ static gboolean parse_eq_param(struct sampler_layer *layer, struct sampler_eq_pa
         return parse_eq_param(l, &l->data.name, &l->data.has_##name, index, key + sizeof(#parname), value);
 #define PROC_APPLY_PARAM_ccrange(name)  /* handled separately in apply_param */
 
-#define PROC_ADD_NIF_FOR_KEY(name, type, variant) \
+#define PROC_ADD_VOICE_NIF_FOR_KEY(name, type, variant) \
     if (!strcmp(key, name)) \
-        sampler_layer_add_nif(l, type, variant, atof_C(value));
+        sampler_layer_add_nif(l, type, NULL, variant, atof_C(value));
 
-#define PROC_ADD_NIF_FOR_KEY_CC(name, type) \
+#define PROC_ADD_VOICE_NIF_FOR_KEY_CC(name, type) \
     if (!strncmp(key, name, sizeof(name) - 1)) \
     { \
         int ccno = atoi(key + sizeof(name) - 1); \
         if (ccno > 0 && ccno < 120) \
-            sampler_layer_add_nif(l, type, ccno, atof_C(value)); \
+            sampler_layer_add_nif(l, type, NULL, ccno, atof_C(value)); \
+        else \
+            goto unknown_key; \
+    }
+
+#define PROC_ADD_PREVOICE_NIF_FOR_KEY_CC(name, type) \
+    if (!strncmp(key, name, sizeof(name) - 1)) \
+    { \
+        int ccno = atoi(key + sizeof(name) - 1); \
+        if (ccno > 0 && ccno < 120) \
+            sampler_layer_add_nif(l, NULL, type, ccno, atof_C(value)); \
         else \
             goto unknown_key; \
     }
@@ -956,13 +977,13 @@ try_now:
     else PROC_SET_AMOUNT("resonance_chanaft", chanaft, smdest_resonance)
     else PROC_SET_AMOUNT("cutoff_polyaft", polyaft, smdest_cutoff)
     else PROC_SET_AMOUNT("resonance_polyaft", polyaft, smdest_resonance)
-    else PROC_ADD_NIF_FOR_KEY("amp_random", sampler_nif_addrandom, 0)
-    else PROC_ADD_NIF_FOR_KEY("fil_random", sampler_nif_addrandom, 1)
-    else PROC_ADD_NIF_FOR_KEY("pitch_random", sampler_nif_addrandom, 2)
-    else PROC_ADD_NIF_FOR_KEY("pitch_veltrack", sampler_nif_vel2pitch, 0)
-    else PROC_ADD_NIF_FOR_KEY("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
-    else PROC_ADD_NIF_FOR_KEY_CC("delay_cc", sampler_nif_cc2delay)
-    else PROC_ADD_NIF_FOR_KEY_CC("reloffset_cc", sampler_nif_cc2reloffset)
+    else PROC_ADD_VOICE_NIF_FOR_KEY("amp_random", sampler_nif_addrandom, 0)
+    else PROC_ADD_VOICE_NIF_FOR_KEY("fil_random", sampler_nif_addrandom, 1)
+    else PROC_ADD_VOICE_NIF_FOR_KEY("pitch_random", sampler_nif_addrandom, 2)
+    else PROC_ADD_VOICE_NIF_FOR_KEY("pitch_veltrack", sampler_nif_vel2pitch, 0)
+    else PROC_ADD_VOICE_NIF_FOR_KEY("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
+    else PROC_ADD_PREVOICE_NIF_FOR_KEY_CC("delay_cc", sampler_nif_cc2delay)
+    else PROC_ADD_VOICE_NIF_FOR_KEY_CC("reloffset_cc", sampler_nif_cc2reloffset)
     else PROC_SET_AMOUNT_CC("cutoff_cc", smdest_cutoff)
     else PROC_SET_AMOUNT_CC("resonance_cc", smdest_resonance)
     else PROC_SET_AMOUNT_CC("pitch_cc", smdest_pitch)
@@ -1077,7 +1098,7 @@ static gboolean unset_envelope_param(struct sampler_layer *layer, struct cbox_da
 
 #define PROC_UNSET_ENV_NIF(name) \
     if (!strcmp(key, "vel2" #name)) \
-        sampler_layer_remove_nif(layer, sampler_nif_vel2env, (env_type << 4) + snif_env_ ## name);
+        sampler_layer_remove_nif(layer, sampler_nif_vel2env, NULL, (env_type << 4) + snif_env_ ## name);
 
     if (!strcmp(key, "depth"))
         sampler_layer_unset_modulation(layer, src, smsrc_none, dest);
@@ -1151,18 +1172,30 @@ unknown_key:
     return FALSE;
 }
 
-#define PROC_UNSET_NIF_FOR_KEY(name, type, variant) \
+#define PROC_UNSET_VOICE_NIF_FOR_KEY(name, type, variant) \
     if (!strcmp(key, name)) { \
-        sampler_layer_remove_nif(l, type, variant); \
+        sampler_layer_remove_nif(l, type, NULL, variant); \
         return TRUE; \
     }
 
-#define PROC_UNSET_NIF_FOR_KEY_CC(name, type) \
+#define PROC_UNSET_VOICE_NIF_FOR_KEY_CC(name, type) \
     if (!strncmp(key, name, sizeof(name) - 1)) \
     { \
         int ccno = atoi(key + sizeof(name) - 1); \
         if (ccno > 0 && ccno < 120) {\
-            sampler_layer_remove_nif(l, type, ccno); \
+            sampler_layer_remove_nif(l, type, NULL, ccno); \
+            return TRUE; \
+        } \
+        else \
+            goto unknown_key; \
+    }
+
+#define PROC_UNSET_PREVOICE_NIF_FOR_KEY_CC(name, type) \
+    if (!strncmp(key, name, sizeof(name) - 1)) \
+    { \
+        int ccno = atoi(key + sizeof(name) - 1); \
+        if (ccno > 0 && ccno < 120) {\
+            sampler_layer_remove_nif(l, NULL, type, ccno); \
             return TRUE; \
         } \
         else \
@@ -1211,13 +1244,13 @@ try_now:
     else PROC_UNSET_AMOUNT("resonance_chanaft", chanaft, smdest_resonance)
     else PROC_UNSET_AMOUNT("cutoff_polyaft", polyaft, smdest_cutoff)
     else PROC_UNSET_AMOUNT("resonance_polyaft", polyaft, smdest_resonance)
-    else PROC_UNSET_NIF_FOR_KEY("amp_random", sampler_nif_addrandom, 0)
-    else PROC_UNSET_NIF_FOR_KEY("fil_random", sampler_nif_addrandom, 1)
-    else PROC_UNSET_NIF_FOR_KEY("pitch_random", sampler_nif_addrandom, 2)
-    else PROC_UNSET_NIF_FOR_KEY("pitch_veltrack", sampler_nif_vel2pitch, 0)
-    else PROC_UNSET_NIF_FOR_KEY("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
-    else PROC_UNSET_NIF_FOR_KEY_CC("delay_cc", sampler_nif_cc2delay)
-    else PROC_UNSET_NIF_FOR_KEY_CC("reloffset_cc", sampler_nif_cc2reloffset)
+    else PROC_UNSET_VOICE_NIF_FOR_KEY("amp_random", sampler_nif_addrandom, 0)
+    else PROC_UNSET_VOICE_NIF_FOR_KEY("fil_random", sampler_nif_addrandom, 1)
+    else PROC_UNSET_VOICE_NIF_FOR_KEY("pitch_random", sampler_nif_addrandom, 2)
+    else PROC_UNSET_VOICE_NIF_FOR_KEY("pitch_veltrack", sampler_nif_vel2pitch, 0)
+    else PROC_UNSET_VOICE_NIF_FOR_KEY("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
+    else PROC_UNSET_PREVOICE_NIF_FOR_KEY_CC("delay_cc", sampler_nif_cc2delay)
+    else PROC_UNSET_VOICE_NIF_FOR_KEY_CC("reloffset_cc", sampler_nif_cc2reloffset)
     else PROC_UNSET_AMOUNT_CC("cutoff_cc", smdest_cutoff)
     else PROC_UNSET_AMOUNT_CC("pitch_cc", smdest_pitch)
     else PROC_UNSET_AMOUNT_CC("tonectl_cc", smdest_tonectl)
@@ -1300,17 +1333,17 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         int v = nd->variant;
         g_ascii_dtostr(floatbuf, floatbufsize, nd->param);
         
-        if (nd->notefunc == sampler_nif_addrandom && v >= 0 && v <= 2)
+        if (nd->notefunc_voice == sampler_nif_addrandom && v >= 0 && v <= 2)
             g_string_append_printf(outstr, " %s_random=%s", addrandom_variants[nd->variant], floatbuf);
-        else if (nd->notefunc == sampler_nif_vel2pitch)
+        else if (nd->notefunc_voice == sampler_nif_vel2pitch)
             g_string_append_printf(outstr, " pitch_veltrack=%s", floatbuf);
-        else if (nd->notefunc == sampler_nif_vel2reloffset)
+        else if (nd->notefunc_voice == sampler_nif_vel2reloffset)
             g_string_append_printf(outstr, " reloffset_veltrack=%s", floatbuf);
-        else if (nd->notefunc == sampler_nif_cc2delay && v >= 0 && v < 120)
+        else if (nd->notefunc_prevoice == sampler_nif_cc2delay && v >= 0 && v < 120)
             g_string_append_printf(outstr, " delay_cc%d=%s", nd->variant, floatbuf);
-        else if (nd->notefunc == sampler_nif_cc2reloffset && v >= 0 && v < 120)
+        else if (nd->notefunc_voice == sampler_nif_cc2reloffset && v >= 0 && v < 120)
             g_string_append_printf(outstr, " reloffset_cc%d=%s", nd->variant, floatbuf);
-        else if (nd->notefunc == sampler_nif_vel2env && v >= 0 && (v & 15) < 6 && (v >> 4) < 3)
+        else if (nd->notefunc_voice == sampler_nif_vel2env && v >= 0 && (v & 15) < 6 && (v >> 4) < 3)
             g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], floatbuf);
     }
     for(GSList *mod = l->modulations; mod; mod = mod->next)
@@ -1525,6 +1558,16 @@ static int sampler_layer_update_cmd_execute(void *data)
                 v->layer_changed = TRUE;
                 sampler_voice_update_params_from_layer(v);
             }
+        }
+    }
+    FOREACH_PREVOICE(cmd->module->prevoices_running, pv)
+    {
+        if (pv->layer_data == cmd->layer->runtime)
+        {
+            pv->layer_data = cmd->new_data;
+            // XXXKF when need arises
+            // pv->layer_changed = TRUE;
+            // sampler_prevoice_update_params_from_layer(v);
         }
     }
     cmd->old_data = cmd->layer->runtime;
