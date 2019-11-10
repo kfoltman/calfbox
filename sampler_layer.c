@@ -1317,7 +1317,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
     
     static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
-    static const char *modsrc_names[] = { "chanaft", "vel", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
+    static const char *modsrc_names[] = { "chanaft", "lastpolyaft", "vel", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
     static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pitchlfo_freq", "fillfo_freq", "amplfo_freq",
         "eq1_freq", "eq1_bw", "eq1_gain",
         "eq2_freq", "eq2_bw", "eq2_gain",
