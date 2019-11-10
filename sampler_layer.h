@@ -507,4 +507,9 @@ static inline gboolean sampler_layer_data_is_4pole(struct sampler_layer_data *v)
     return v->fil_type == sft_lp24hybrid || v->fil_type == sft_lp24 || v->fil_type == sft_lp24nr || v->fil_type == sft_hp24 || v->fil_type == sft_hp24nr || v->fil_type == sft_bp12;
 }
 
+static inline gboolean sampler_layer_data_is_delayed(struct sampler_layer_data *l)
+{
+    return l->delay > 0;
+}
+
 #endif

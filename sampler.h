@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 
 #define MAX_SAMPLER_VOICES 128
+#define MAX_SAMPLER_PREVOICES 128
 #define SAMPLER_NO_LOOP ((uint32_t)-1)
 
 #define CBOX_SAMPLER_ERROR cbox_sampler_error_quark()
@@ -58,7 +59,7 @@ struct sampler_channel
     uint8_t cc[smsrc_perchan_count];
     struct sampler_program *program;
     struct sampler_voice *voices_running;
-    int active_voices;
+    int active_voices, active_prevoices;
     uint8_t prev_note_velocity[128];
     uint8_t poly_pressure[128];
     uint32_t prev_note_start_time[128];
@@ -102,6 +103,15 @@ struct sampler_gen
     int16_t *streaming_buffer;
     uint32_t consumed, consumed_credit, streaming_buffer_frames;
     gboolean prefetch_only_loop, in_streaming_buffer;
+};
+
+struct sampler_prevoice
+{
+    struct sampler_prevoice *prev, *next;
+    struct sampler_layer_data *layer_data;
+    struct sampler_channel *channel;
+    int note, vel;
+    int age;
 };
 
 struct sampler_voice
@@ -151,10 +161,12 @@ struct sampler_module
     struct cbox_module module;
 
     struct sampler_voice *voices_free, voices_all[MAX_SAMPLER_VOICES];
+    struct sampler_prevoice *prevoices_free, prevoices_all[MAX_SAMPLER_PREVOICES], *prevoices_running;
     struct sampler_channel channels[16];
     struct sampler_program **programs;
     uint32_t program_count;
     int active_voices, max_voices;
+    int active_prevoices;
     int serial_no;
     int output_pairs, aux_pairs;
     uint32_t current_time;
@@ -195,6 +207,11 @@ extern void sampler_voice_unlink(struct sampler_voice **pv, struct sampler_voice
 extern void sampler_voice_inactivate(struct sampler_voice *v, gboolean expect_active);
 extern void sampler_voice_update_params_from_layer(struct sampler_voice *v);
 
+extern void sampler_prevoice_start(struct sampler_prevoice *pv, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel);
+extern int sampler_prevoice_process(struct sampler_prevoice *pv, struct sampler_module *m);
+extern void sampler_prevoice_link(struct sampler_prevoice **pv, struct sampler_prevoice *v);
+extern void sampler_prevoice_unlink(struct sampler_prevoice **pv, struct sampler_prevoice *v);
+
 extern float sampler_sine_wave[2049];
 
 static inline int sampler_channel_addcc(struct sampler_channel *c, int cc_no)
@@ -204,6 +221,16 @@ static inline int sampler_channel_addcc(struct sampler_channel *c, int cc_no)
 
 #define FOREACH_VOICE(var, p) \
     for (struct sampler_voice *p = (var), *p##_next = NULL; p && (p##_next = p->next, TRUE); p = p##_next)
-
+#define FOREACH_PREVOICE(var, p) \
+    for (struct sampler_prevoice *p = (var), *p##_next = NULL; p && (p##_next = p->next, TRUE); p = p##_next)
+#define CANCEL_PREVOICE(var, p) \
+    {\
+        struct sampler_prevoice *_tmp = (p); \
+        if (_tmp->prev) \
+            _tmp->prev->next = _tmp->next; \
+        else \
+            var = _tmp->next; \
+        _tmp->prev = _tmp->next = NULL; \
+    }
 
 #endif

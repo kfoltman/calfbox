@@ -1527,6 +1527,16 @@ static int sampler_layer_update_cmd_execute(void *data)
             }
         }
     }
+    FOREACH_PREVOICE(cmd->module->prevoices_running, pv)
+    {
+        if (pv->layer_data == cmd->layer->runtime)
+        {
+            pv->layer_data = cmd->new_data;
+            // XXXKF when need arises
+            // pv->layer_changed = TRUE;
+            // sampler_prevoice_update_params_from_layer(v);
+        }
+    }
     cmd->old_data = cmd->layer->runtime;
     cmd->layer->runtime = cmd->new_data;
     return 10;

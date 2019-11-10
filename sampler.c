@@ -85,12 +85,35 @@ static inline float clip01(float v)
     return v;
 }
 
+void sampler_create_voice_from_prevoice(struct sampler_module *m, struct sampler_prevoice *pv)
+{
+    if (!m->voices_free)
+        return;
+    int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
+    sampler_voice_start(m->voices_free, pv->channel, pv->layer_data, pv->note, pv->vel, exgroups, &exgroupcount);
+    if (exgroupcount)
+        sampler_channel_release_groups(pv->channel, pv->note, exgroups, exgroupcount);
+}
+
 void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct sampler_module *m = (struct sampler_module *)module;
     
-    //float channels[2][CBOX_BLOCK_SIZE];
-    
+    int active_prevoices[16];
+    uint32_t active_prevoices_mask = 0;
+    FOREACH_PREVOICE(m->prevoices_running, pv)
+    {
+        uint32_t c = pv->channel - m->channels;
+        active_prevoices[c] = (active_prevoices_mask >> c) & 1 ? 1 + active_prevoices[c] : 1;
+        active_prevoices_mask |= 1 << c;
+        if (sampler_prevoice_process(pv, m))
+        {
+            sampler_prevoice_unlink(&m->prevoices_running, pv);
+            sampler_create_voice_from_prevoice(m, pv);
+            sampler_prevoice_link(&m->prevoices_free, pv);
+        }
+    }
+
     for (int c = 0; c < m->output_pairs + m->aux_pairs; c++)
     {
         int oo = 2 * c;
@@ -98,7 +121,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
             outputs[oo][i] = outputs[oo + 1][i] = 0.f;
     }
     
-    int vcount = 0, vrel = 0;
+    int vcount = 0, vrel = 0, pvcount = 0;
     for (int i = 0; i < 16; i++)
     {
         int cvcount = 0;
@@ -110,10 +133,14 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
                 vrel++;
             cvcount++;
         }
+        int cpvcount = (active_prevoices_mask >> i) & 1 ? active_prevoices[i] : 0;
         m->channels[i].active_voices = cvcount;
+        m->channels[i].active_prevoices = cpvcount;
         vcount += cvcount;
+        pvcount += cpvcount;
     }
     m->active_voices = vcount;
+    m->active_prevoices = pvcount;
     if (vcount - vrel > m->max_voices)
         sampler_steal_voice(m);
     m->serial_no++;
@@ -224,6 +251,14 @@ static int release_program_voices_execute(void *data)
     struct sampler_module *m = rpv->module;
     int finished = 1;
     
+    FOREACH_PREVOICE(m->prevoices_running, pv)
+    {
+        if (pv->channel->program == rpv->old_pgm)
+        {
+            sampler_prevoice_unlink(&m->prevoices_running, pv);
+            sampler_prevoice_link(&m->prevoices_free, pv);            
+        }
+    }
     for (int i = 0; i < 16; i++)
     {
         uint16_t mask = 1 << i;
@@ -379,6 +414,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
             if (!result)
                 return FALSE;
             if (!(cbox_execute_on(fb, NULL, "/channel_voices", "ii", error, i + 1, channel->active_voices) &&
+                cbox_execute_on(fb, NULL, "/channel_prevoices", "ii", error, i + 1, channel->active_prevoices) &&
                 cbox_execute_on(fb, NULL, "/output", "ii", error, i + 1, channel->output_shift) &&
                 cbox_execute_on(fb, NULL, "/volume", "ii", error, i + 1, sampler_channel_addcc(channel, 7)) &&
                 cbox_execute_on(fb, NULL, "/pan", "ii", error, i + 1, sampler_channel_addcc(channel, 10))))
@@ -386,6 +422,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
         }
         
         return cbox_execute_on(fb, NULL, "/active_voices", "i", error, m->active_voices) &&
+            cbox_execute_on(fb, NULL, "/active_prevoices", "i", error, m->active_prevoices) &&
             cbox_execute_on(fb, NULL, "/active_pipes", "i", error, cbox_prefetch_stack_get_active_pipe_count(m->pipe_stack)) &&
             cbox_execute_on(fb, NULL, "/polyphony", "i", error, m->max_voices) && 
             CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
@@ -623,6 +660,15 @@ MODULE_CREATE_FUNCTION(sampler)
         sampler_voice_link(&m->voices_free, v);
     }
     m->active_voices = 0;
+    m->active_prevoices = 0;
+
+    m->prevoices_free = NULL;
+    memset(m->prevoices_all, 0, sizeof(m->prevoices_all));
+    for (i = 0; i < MAX_SAMPLER_PREVOICES; i++)
+    {
+        struct sampler_prevoice *v = &m->prevoices_all[i];
+        sampler_prevoice_link(&m->prevoices_free, v);
+    }
     
     for (i = 0; i < 16; i++)
         sampler_channel_init(&m->channels[i], m);

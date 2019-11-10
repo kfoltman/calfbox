@@ -291,8 +291,9 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     
     v->output_pair_no = (l->output + c->output_shift) % m->output_pairs;
     v->serial_no = m->serial_no;
-    
-    float delay = l->delay;
+
+    // XXXKF convert to prevoice
+    float delay = 0;
     if (l->delay_random)
         delay += rand() * (1.0 / RAND_MAX) * l->delay_random;
     if (delay > 0)

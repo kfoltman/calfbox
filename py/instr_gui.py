@@ -266,9 +266,9 @@ class SamplerWindow(Gtk.VBox, WithPatchTable):
         
     def voices_update(self):
         status = self.engine.status()
-        self.voices_widget.set_text("%s voices, %s pipes" % (status.active_voices, status.active_pipes))
+        self.voices_widget.set_text("%s voices, %s waiting, %s pipes" % (status.active_voices, status.active_prevoices, status.active_pipes))
         for i in range(16):
-            self.polyphony_labels[i + 1].set_text("%d voices" % (status.channel_voices[i + 1],))
+            self.polyphony_labels[i + 1].set_text("%d voices, %d waiting" % (status.channel_voices[i + 1], status.channel_prevoices[i + 1]))
             
         return True
 
