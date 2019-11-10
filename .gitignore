@@ -10,7 +10,11 @@ install-sh
 ltmain.sh
 missing
 *.o
+*.lo
+.libs/
 .deps/
+libcalfbox.la
+libtool
 Makefile.in
 Makefile
 config.log
