@@ -63,6 +63,7 @@ void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
     c->cc[71] = 64;
     c->cc[74] = 64;
     c->previous_note = -1;
+    c->first_note_vel = 100;
     c->program = NULL;
     sampler_channel_set_program_RT(c, m->program_count ? m->programs[0] : NULL);
     memset(c->switchmask, 0, sizeof(c->switchmask));
@@ -244,16 +245,20 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
         for (int i = 0; i < lcount; ++i)
         {
             struct sampler_layer_data *l = layers[i];
-            sampler_voice_start(m->voices_free, c, l, note, vel, exgroups, &exgroupcount);
+            int velc = (!is_first && l->vel_mode == svm_previous) ? c->first_note_vel : vel;
+            sampler_voice_start(m->voices_free, c, l, note, velc, exgroups, &exgroupcount);
         }
         for (int i = 0; i < dlcount; ++i)
         {
             struct sampler_layer_data *l = delayed_layers[i];
-            sampler_prevoice_start(m->prevoices_free, c, l, note, vel);
+            int velc = (!is_first && l->vel_mode == svm_previous) ? c->first_note_vel : vel;
+            sampler_prevoice_start(m->prevoices_free, c, l, note, velc);
         }
     }
     if (!is_release_trigger)
         c->previous_note = note;
+    if (is_first)
+        c->first_note_vel = vel;
     sampler_channel_release_groups(c, note, exgroups, exgroupcount);
 }
 

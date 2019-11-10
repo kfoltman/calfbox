@@ -67,6 +67,17 @@ enum sampler_off_mode
     MACRO("normal", som_normal) \
     MACRO("fast", som_fast)  
 
+enum sampler_vel_mode
+{
+    svm_unknown,
+    svm_current,
+    svm_previous
+};
+
+#define ENUM_VALUES_sampler_vel_mode(MACRO) \
+    MACRO("current", svm_current) \
+    MACRO("previous", svm_previous)
+
 enum sampler_trigger
 {
     stm_attack,
@@ -127,6 +138,7 @@ enum sampler_xf_curve
 #define ENUM_LIST(MACRO) \
     MACRO(sampler_loop_mode) \
     MACRO(sampler_off_mode) \
+    MACRO(sampler_vel_mode) \
     MACRO(sampler_trigger) \
     MACRO(sampler_filter_type) \
     MACRO(sampler_xf_curve) \
@@ -288,6 +300,7 @@ typedef int midi_note_t;
     MACRO(int, velcurve_quadratic, -1) \
     MACRO##_enum(sampler_filter_type, fil_type, sft_lp12) \
     MACRO##_enum(sampler_off_mode, off_mode, som_unknown) \
+    MACRO##_enum(sampler_vel_mode, vel_mode, svm_current) \
     MACRO(float, cutoff, -1) \
     MACRO##_dBamp(float, resonance, 0) \
     MACRO(midi_note_t, sw_lokey, 0) \

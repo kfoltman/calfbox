@@ -56,7 +56,7 @@ struct sampler_channel
     uint32_t switchmask[4];
     uint32_t sustainmask[4];
     uint32_t sostenutomask[4];
-    int previous_note;
+    int previous_note, first_note_vel;
     uint8_t cc[smsrc_perchan_count];
     struct sampler_program *program;
     struct sampler_voice *voices_running;
