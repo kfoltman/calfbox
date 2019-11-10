@@ -9,4 +9,4 @@ tonectl_freq=3000 tonectl_cc84=24
 tune=-5 fil_veltrack=1200
 
 <region>
-tune=+5 transpose=+12
+tune=+5 transpose=+12 delay_cc1=0.5

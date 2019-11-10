@@ -292,14 +292,6 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     v->output_pair_no = (l->output + c->output_shift) % m->output_pairs;
     v->serial_no = m->serial_no;
 
-    // XXXKF convert to prevoice
-    float delay = 0;
-    if (l->delay_random)
-        delay += rand() * (1.0 / RAND_MAX) * l->delay_random;
-    if (delay > 0)
-        v->delay = (int)(delay * m->module.srate);
-    else
-        v->delay = 0;
     v->gen.loop_overlap = l->loop_overlap;
     v->gen.loop_overlap_step = l->loop_overlap > 0 ? 1.0 / l->loop_overlap : 0;
     v->gain_fromvel = 1.0 + (l->eff_velcurve[vel] - 1.0) * l->amp_veltrack * 0.01;
@@ -371,7 +363,8 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     while(nif)
     {
         struct sampler_noteinitfunc *p = nif->data;
-        p->notefunc(p, v);
+        if (p->notefunc_voice)
+            p->notefunc_voice(p, v);
         nif = nif->next;
     }
     v->gain_fromvel *= dB2gain(v->gain_shift);
@@ -448,22 +441,14 @@ void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft)
 {
     if ((v->loop_mode == slm_one_shot_chokeable) != is_polyaft)
         return;
-    if (v->delay >= v->age + CBOX_BLOCK_SIZE)
+    if (v->loop_mode != slm_one_shot && !v->layer->count)
     {
         v->released = 1;
-        sampler_voice_inactivate(v, TRUE);
-    }
-    else
-    {
-        if (v->loop_mode != slm_one_shot && !v->layer->count)
+        if (v->loop_mode == slm_loop_sustain && v->current_pipe)
         {
-            v->released = 1;
-            if (v->loop_mode == slm_loop_sustain && v->current_pipe)
-            {
-                // Break the loop
-                v->current_pipe->file_loop_end = v->gen.cur_sample_end;
-                v->current_pipe->file_loop_start = -1;
-            }
+            // Break the loop
+            v->current_pipe->file_loop_end = v->gen.cur_sample_end;
+            v->current_pipe->file_loop_start = -1;
         }
     }
 }
@@ -500,11 +485,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     struct sampler_channel *c = v->channel;
     v->age += CBOX_BLOCK_SIZE;
     
-    if (__builtin_expect(v->age < v->delay, 0))
-        return;
-
-    // XXXKF I'm sacrificing sample accuracy for delays for now
-    v->delay = 0;
     const float velscl = v->vel * (1.f / 127.f);
 
     #define RECALC_EQ_MASK_EQ1 (7 << smdest_eq1_freq)

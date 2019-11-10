@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct sampler_program;
 struct sampler_voice;
+struct sampler_prevoice;
 struct sampler_noteinitfunc;
 struct sampler_module;
 
@@ -196,10 +197,12 @@ struct sampler_modulation
 };
 
 typedef void (*SamplerNoteInitFunc)(struct sampler_noteinitfunc *nif, struct sampler_voice *voice);
+typedef void (*SamplerNoteInitFunc2)(struct sampler_noteinitfunc *nif, struct sampler_prevoice *prevoice);
 
 struct sampler_noteinitfunc
 {
-    SamplerNoteInitFunc notefunc;
+    SamplerNoteInitFunc notefunc_voice;
+    SamplerNoteInitFunc2 notefunc_prevoice;
     int variant:31;
     unsigned int has_value:1;
     float param;
@@ -455,6 +458,7 @@ struct sampler_layer_data
     float resonance_scaled;
     float logcutoff;
     uint32_t eq_bitmask;
+    gboolean use_prevoice;
 };
 
 struct sampler_layer
@@ -479,7 +483,7 @@ extern struct sampler_layer *sampler_layer_new_from_section(struct sampler_modul
 extern struct sampler_layer *sampler_layer_new_clone(struct sampler_layer *layer, struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group);
 extern void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags);
 extern void sampler_layer_set_modulation1(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_moddest dest, float amount, int flags);
-extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc, int variant, float param);
+extern void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant, float param);
 extern void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_section);
 extern void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_layer_data *parent, struct sampler_program *p);
 extern void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m);
@@ -496,7 +500,7 @@ extern void sampler_layer_data_destroy(struct sampler_layer_data *l);
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
-extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
 extern void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 
@@ -505,11 +509,6 @@ static inline gboolean sampler_layer_data_is_4pole(struct sampler_layer_data *v)
     if (v->cutoff == -1)
         return FALSE;
     return v->fil_type == sft_lp24hybrid || v->fil_type == sft_lp24 || v->fil_type == sft_lp24nr || v->fil_type == sft_hp24 || v->fil_type == sft_hp24nr || v->fil_type == sft_bp12;
-}
-
-static inline gboolean sampler_layer_data_is_delayed(struct sampler_layer_data *l)
-{
-    return l->delay > 0;
 }
 
 #endif

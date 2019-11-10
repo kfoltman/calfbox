@@ -227,7 +227,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
         }
         struct sampler_layer *layer = next_layer->data;
         assert(layer->runtime);
-        if (sampler_layer_data_is_delayed(layer->runtime))
+        if (layer->runtime->use_prevoice)
             delayed_layers[dlcount++] = layer->runtime;
         else
             layers[lcount++] = layer->runtime;

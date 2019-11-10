@@ -752,9 +752,9 @@ void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_
     v->reloffset += nif->param * v->vel * (1.0 / 127.0);
 }
 
-void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
+void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv)
 {
-    v->delay += nif->param * v->channel->cc[nif->variant] * (1.0 / 127.0) * v->channel->module->module.srate;
+    pv->delay_ccs += nif->param * pv->channel->cc[nif->variant] * (1.0 / 127.0);
 }
 
 void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)

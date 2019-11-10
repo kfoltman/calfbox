@@ -45,6 +45,7 @@ enum CboxSamplerError
 
 struct sampler_noteinitfunc;
 struct sampler_voice;
+struct sampler_prevoice;
 
 #define GET_RT_FROM_sampler_channel(channel) ((channel)->module->module.rt)
 
@@ -112,6 +113,7 @@ struct sampler_prevoice
     struct sampler_channel *channel;
     int note, vel;
     int age;
+    float delay_random, delay_ccs;
 };
 
 struct sampler_voice
@@ -127,7 +129,6 @@ struct sampler_voice
     int vel;
     int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;
     int off_by;
-    int delay;
     int age;
     float pitch_shift;
     float cutoff_shift;
