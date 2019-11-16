@@ -178,8 +178,8 @@ def do_cmd_on(target, cmd, fb, args):
     else:
         res = target.contents.process_cmd(target, None, ocmd, gptr)
     if not res:
-        if gptr.contents:
-            raise Exception(gptr.contents.message)
+        if gptr and gptr.contents:
+            raise Exception(gptr.contents.message.decode())
         else:
             raise Exception("Unknown error")
         
