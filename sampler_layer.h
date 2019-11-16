@@ -355,6 +355,9 @@ typedef int midi_note_t;
     MACRO(float, xfout_lovel, 127) \
     MACRO(float, xfout_hivel, 127) \
     MACRO##_enum(sampler_xf_curve, xf_velcurve, stxc_power) \
+    MACRO##_ccrange(xfin_cc, xfin_) \
+    MACRO##_ccrange(xfout_cc, xfout_) \
+    MACRO##_enum(sampler_xf_curve, xf_cccurve, stxc_power) \
     MACRO##_dahdsr(amp_env, ampeg, 0) \
     MACRO##_dahdsr(filter_env, fileg, 1) \
     MACRO##_dahdsr(pitch_env, pitcheg, 2) \
@@ -493,6 +496,7 @@ struct sampler_layer_data
     float resonance_scaled;
     float logcutoff;
     uint32_t eq_bitmask;
+    gboolean eff_use_xfcc;
     gboolean use_prevoice;
 };
 

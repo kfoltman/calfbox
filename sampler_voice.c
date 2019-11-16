@@ -226,6 +226,26 @@ static float sfz_crossfade(float param, float xfin_lo, float xfin_hi, float xfou
     }
 }
 
+// One-half version for CC-based crossfades
+static inline float sfz_crossfade2(float param, float xflo, float xfhi, float left, float right, enum sampler_xf_curve xfc)
+{
+    if (xflo > xfhi)
+        return sfz_crossfade2(param, xfhi, xflo, right, left, xfc);
+    if (param <= xflo)
+        return left;
+    if (param >= xfhi)
+        return right;
+    float res;
+    if (xflo == xfhi)
+        res = 0.5f * (left + right);
+    else
+        res = left + (right - left) * (param - xflo) / (xfhi - xflo);
+    if (xfc == stxc_gain)
+        return res;
+    else
+        return sqrtf(res);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void sampler_voice_activate(struct sampler_voice *v, enum sampler_player_type mode)
@@ -746,6 +766,11 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->gen.virtdelta = freq64;
     }
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * c->channel_volume_cc * sampler_channel_addcc(c, 11) / (maxv * maxv);
+    if (l->eff_use_xfcc) {
+        gain *=
+            ((l->xfin_cc.has_locc || l->xfin_cc.has_hicc) ? sfz_crossfade2(c->cc[l->xfin_cc.cc_number], l->xfin_cc.locc, l->xfin_cc.hicc, 0, 1, l->xf_cccurve) : 1.f) *
+            ((l->xfout_cc.has_locc || l->xfout_cc.has_hicc) ? sfz_crossfade2(c->cc[l->xfout_cc.cc_number], l->xfout_cc.locc, l->xfout_cc.hicc, 1, 0, l->xf_cccurve) : 1.f);
+    }
     if ((modmask & (1 << smdest_gain)) && moddests[smdest_gain] != 0.f)
         gain *= dB2gain(moddests[smdest_gain]);
     // http://drealm.info/sfz/plj-sfz.xhtml#amp "The overall gain must remain in the range -144 to 6 decibels."

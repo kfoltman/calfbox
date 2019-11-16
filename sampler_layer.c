@@ -1138,6 +1138,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         (l->lopolyaft == 0 && l->hipolyaft == 127) &&
         (!l->cc.has_locc && !l->cc.has_hicc) &&
         !l->eff_use_keyswitch;
+    l->eff_use_xfcc = ((l->xfin_cc.has_locc) || (l->xfin_cc.has_hicc) || (l->xfout_cc.has_locc) || (l->xfout_cc.has_hicc));
     l->eff_freq = (l->eff_waveform && l->eff_waveform->info.samplerate) ? l->eff_waveform->info.samplerate : 44100;
     l->eff_loop_mode = l->loop_mode;
     if (l->loop_mode == slm_unknown)
