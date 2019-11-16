@@ -24,7 +24,7 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
         struct sampler_layer *l = p->data;
-        if (!l->data.on_cc.has_locc && !l->data.on_cc.has_hicc &&
+        if (!l->data.on_cc.is_active &&
             l->data.lokey >= 0 && l->data.lokey <= 127 &&
             l->data.hikey >= 0 && l->data.hikey <= 127)
         {
@@ -52,7 +52,7 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
         struct sampler_layer *l = p->data;
-        if (l->data.on_cc.has_locc || l->data.on_cc.has_hicc)
+        if (l->data.on_cc.is_active)
         {
             int cc = l->data.on_cc.cc_number;
             rll->layers_oncc = g_slist_prepend(rll->layers_oncc, l);

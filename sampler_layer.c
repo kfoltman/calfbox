@@ -515,8 +515,8 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
                 return FALSE;
             }
             switch(e->extra_int) {
-                case 0: range->locc = number; break;
-                case 1: range->hicc = number; break;
+                case 0: range->locc = number; range->is_active = 1; break;
+                case 1: range->hicc = number; range->is_active = 1; break;
                 default: assert(0);
             }
             e->set_has_value(&l->data, 1);
@@ -625,8 +625,8 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             }
 
             switch(e->extra_int) {
-                case 0: range->locc = prange ? prange->locc : (uint8_t)e->def_value; break;
-                case 1: range->hicc = prange ? prange->hicc : (uint8_t)e->def_value; break;
+                case 0: range->locc = prange ? prange->locc : (uint8_t)e->def_value; range->is_active = range->has_hicc || (prange ? prange->is_active : 0); break;
+                case 1: range->hicc = prange ? prange->hicc : (uint8_t)e->def_value; range->is_active = range->has_locc || (prange ? prange->is_active : 0); break;
                 default: assert(0);
             }
             e->set_has_value(&l->data, 0);
@@ -874,7 +874,8 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     ld->name.hicc = 127; \
     ld->name.cc_number = 0; \
     ld->name.has_locc = 0; \
-    ld->name.has_hicc = 0;
+    ld->name.has_hicc = 0; \
+    ld->name.is_active = 0;
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_layer)
 
@@ -952,6 +953,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     dst->name.locc = src->name.locc; \
     dst->name.hicc = src->name.hicc; \
     dst->name.cc_number = src->name.cc_number; \
+    dst->name.is_active = src->name.is_active; \
     dst->name.has_locc = copy_hasattr ? src->name.has_locc : FALSE; \
     dst->name.has_hicc = copy_hasattr ? src->name.has_hicc : FALSE;
 
@@ -1015,8 +1017,10 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
         l->name.locc = parent ? parent->name.locc : 0; \
     if (!l->name.has_hicc) \
         l->name.hicc = parent ? parent->name.hicc : 127; \
-    if (!l->name.has_locc && !l->name.has_hicc) \
-        l->name.cc_number = parent ? parent->name.cc_number : -1;
+    if (!l->name.has_locc && !l->name.has_hicc) {\
+        l->name.is_active = parent ? parent->name.is_active : 0; \
+        l->name.cc_number = parent ? parent->name.cc_number : -1; \
+    }
 
 static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct sampler_layer_data *parent)
 {
@@ -1136,9 +1140,8 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         (l->lobend == -8192 && l->hibend == 8192) &&
         (l->lochanaft == 0 && l->hichanaft == 127) &&
         (l->lopolyaft == 0 && l->hipolyaft == 127) &&
-        (!l->cc.has_locc && !l->cc.has_hicc) &&
-        !l->eff_use_keyswitch;
-    l->eff_use_xfcc = ((l->xfin_cc.has_locc) || (l->xfin_cc.has_hicc) || (l->xfout_cc.has_locc) || (l->xfout_cc.has_hicc));
+        !l->cc.is_active && !l->eff_use_keyswitch;
+    l->eff_use_xfcc = l->xfin_cc.is_active || l->xfout_cc.is_active;
     l->eff_freq = (l->eff_waveform && l->eff_waveform->info.samplerate) ? l->eff_waveform->info.samplerate : 44100;
     l->eff_loop_mode = l->loop_mode;
     if (l->loop_mode == slm_unknown)
@@ -1270,7 +1273,7 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
         return res;
     sampler_layer_apply_unknown(l, key, value);
     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown SFZ property key: '%s'", key);
-    return TRUE;
+    return FALSE;
 }
 
 gboolean sampler_layer_unapply_param(struct sampler_layer *layer, const char *key, GError **error)

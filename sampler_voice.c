@@ -690,7 +690,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     
     // XXXKF or maybe check for on-cc being in the on-cc range instead?
-    gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || playing_sustain_loop) && !(v->layer->on_cc.has_locc || v->layer->on_cc.has_hicc);
+    gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || playing_sustain_loop) && !v->layer->on_cc.is_active;
     loop_start = play_loop ? v->layer->loop_start : (v->layer->count ? 0 : (uint32_t)-1);
     loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
 
@@ -768,8 +768,8 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * c->channel_volume_cc * sampler_channel_addcc(c, 11) / (maxv * maxv);
     if (l->eff_use_xfcc) {
         gain *=
-            ((l->xfin_cc.has_locc || l->xfin_cc.has_hicc) ? sfz_crossfade2(c->cc[l->xfin_cc.cc_number], l->xfin_cc.locc, l->xfin_cc.hicc, 0, 1, l->xf_cccurve) : 1.f) *
-            ((l->xfout_cc.has_locc || l->xfout_cc.has_hicc) ? sfz_crossfade2(c->cc[l->xfout_cc.cc_number], l->xfout_cc.locc, l->xfout_cc.hicc, 1, 0, l->xf_cccurve) : 1.f);
+            (l->xfin_cc.is_active ? sfz_crossfade2(c->cc[l->xfin_cc.cc_number], l->xfin_cc.locc, l->xfin_cc.hicc, 0, 1, l->xf_cccurve) : 1.f) *
+            (l->xfout_cc.is_active ? sfz_crossfade2(c->cc[l->xfout_cc.cc_number], l->xfout_cc.locc, l->xfout_cc.hicc, 1, 0, l->xf_cccurve) : 1.f);
     }
     if ((modmask & (1 << smdest_gain)) && moddests[smdest_gain] != 0.f)
         gain *= dB2gain(moddests[smdest_gain]);

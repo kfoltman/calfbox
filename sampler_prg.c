@@ -63,7 +63,7 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
             c->pitchwheel >= l->lobend && c->pitchwheel < l->hibend &&
             c->cc[smsrc_chanaft] >= l->lochanaft && c->cc[smsrc_chanaft] <= l->hichanaft &&
             c->cc[smsrc_lastpolyaft] >= l->lopolyaft && c->cc[smsrc_lastpolyaft] <= l->hipolyaft &&
-            ((!l->cc.has_locc && !l->cc.has_hicc) || (c->cc[l->cc.cc_number] >= l->cc.locc && c->cc[l->cc.cc_number] <= l->cc.hicc)))
+            (!l->cc.is_active || (c->cc[l->cc.cc_number] >= l->cc.locc && c->cc[l->cc.cc_number] <= l->cc.hicc)))
         {
             if (!l->eff_use_keyswitch || 
                 ((l->sw_last == -1 || l->sw_last == lr->last_key) &&

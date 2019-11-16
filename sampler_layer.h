@@ -431,6 +431,7 @@ struct sampler_cc_range
     uint8_t cc_number;
     uint8_t has_locc:1;
     uint8_t has_hicc:1;
+    uint8_t is_active:1;
 };
 
 #define PROC_FIELDS_TO_STRUCT(type, name, def_value) \
