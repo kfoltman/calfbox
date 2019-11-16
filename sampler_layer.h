@@ -533,8 +533,10 @@ extern void sampler_layer_data_close(struct sampler_layer_data *l);
 extern void sampler_layer_data_destroy(struct sampler_layer_data *l);
 
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+extern void sampler_nif_vel2offset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+extern void sampler_nif_cc2offset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 

@@ -359,6 +359,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     if (l->tonectl_freq != 0)
         cbox_onepolef_set_highshelf_tonectl(&v->onepole_coeffs, l->tonectl_freq * M_PI * m->module.srate_inv, 1.0);
     
+    v->offset = l->offset;
     GSList *nif = v->layer->voice_nifs;
     while(nif)
     {
@@ -369,9 +370,10 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     if (v->gain_shift)
         v->gain_fromvel *= dB2gain(v->gain_shift);
 
-    v->offset = l->offset;
-    if (v->reloffset != 0)
+    if (v->offset + v->reloffset != 0)
     {
+        // For streamed samples, allow only half the preload period worth of offset to avoid gaps
+        // (maybe we can allow up to preload period minus one buffer size here?)
         uint32_t maxend = v->current_pipe ? (l->eff_waveform->preloaded_frames >> 1) : l->eff_waveform->preloaded_frames;
         int32_t pos = v->offset + v->reloffset * maxend * 0.01;
         if (pos < 0)

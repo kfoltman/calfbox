@@ -356,10 +356,12 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_VOICE_NIF("fil_random", sampler_nif_addrandom, 1)
     FIELD_VOICE_NIF("pitch_random", sampler_nif_addrandom, 2)
     FIELD_VOICE_NIF("pitch_veltrack", sampler_nif_vel2pitch, 0)
+    FIELD_VOICE_NIF("offset_veltrack", sampler_nif_vel2offset, 0)
     FIELD_VOICE_NIF("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
     FIELD_PREVOICE_NIF("delay_random", sampler_nif_addrandomdelay, 0)
     FIELD_PREVOICE_CC_NIF("delay_cc#", sampler_nif_cc2delay)
     FIELD_VOICE_CC_NIF("reloffset_cc#", sampler_nif_cc2reloffset)
+    FIELD_VOICE_CC_NIF("offset_cc#", sampler_nif_cc2offset)
 
     FIELD_ALIAS("hilev", "hivel")
     FIELD_ALIAS("lolev", "lovel")
@@ -1364,6 +1366,10 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             g_string_append_printf(outstr, " reloffset_veltrack=%s", floatbuf);
         else if (nd->notefunc_voice == sampler_nif_cc2reloffset && v >= 0 && v < 120)
             g_string_append_printf(outstr, " reloffset_cc%d=%s", nd->variant, floatbuf);
+        else if (nd->notefunc_voice == sampler_nif_vel2offset)
+            g_string_append_printf(outstr, " offset_veltrack=%s", floatbuf);
+        else if (nd->notefunc_voice == sampler_nif_cc2offset && v >= 0 && v < 120)
+            g_string_append_printf(outstr, " offset_cc%d=%s", nd->variant, floatbuf);
         else if (nd->notefunc_voice == sampler_nif_vel2env && v >= snif_env_delay && (v & 15) <= snif_env_start && (v >> 4) < 3)
             g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], floatbuf);
         else

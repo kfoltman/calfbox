@@ -25,6 +25,16 @@ void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voic
     v->pitch_shift += nif->param * v->vel * (1.0 / 127.0);
 }
 
+void sampler_nif_vel2offset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
+{
+    v->offset += nif->param * v->vel * (1.0 / 127.0);
+}
+
+void sampler_nif_cc2offset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
+{
+    v->offset += nif->param * v->channel->cc[nif->variant] * (1.0 / 127.0);
+}
+
 void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
     v->reloffset += nif->param * v->vel * (1.0 / 127.0);
