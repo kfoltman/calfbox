@@ -88,9 +88,9 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
             // Only trigger on transition between 'out of range' and 'in range' values.
             // XXXKF I'm not sure if it's what is expected here, but don't have
             // the reference implementation handy.
-            if (layer->runtime->on_cc_number == cc && 
-                (val >= layer->runtime->on_locc && val <= layer->runtime->on_hicc) &&
-                !(old_value >= layer->runtime->on_locc && old_value <= layer->runtime->on_hicc))
+            if (layer->runtime->on_cc.cc_number == cc &&
+                (val >= layer->runtime->on_cc.locc && val <= layer->runtime->on_cc.hicc) &&
+                !(old_value >= layer->runtime->on_cc.locc && old_value <= layer->runtime->on_cc.hicc))
             {
                 struct sampler_voice *v = m->voices_free;
                 if (!v)

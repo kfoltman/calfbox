@@ -803,7 +803,7 @@ void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice 
         env->shape = &v->dyn_envs[env_type];
     }
     float param = nif->param * v->vel * (1.0 / 127.0);
-    if ((nif->variant & 15) == 4)
+    if ((nif->variant & 15) == snif_env_sustain || (nif->variant & 15) == snif_env_start)
         param *= 0.01;
     cbox_envelope_modify_dahdsr(env->shape, nif->variant & 15, param, v->channel->module->module.srate * (1.0 / CBOX_BLOCK_SIZE));
 }

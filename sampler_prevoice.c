@@ -21,12 +21,11 @@ void sampler_prevoice_start(struct sampler_prevoice *pv, struct sampler_channel 
         pv->delay_random = 0.f;
     pv->delay_ccs = 0.f;
 
-    GSList *nif = pv->layer_data->nifs;
+    GSList *nif = pv->layer_data->prevoice_nifs;
     while(nif)
     {
         struct sampler_noteinitfunc *p = nif->data;
-        if (p->notefunc_prevoice)
-            p->notefunc_prevoice(p, pv);
+        p->notefunc_prevoice(p, pv);
         nif = nif->next;
     }
     sampler_prevoice_unlink(&channel->module->prevoices_free, pv);

@@ -294,7 +294,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
 
     v->gen.loop_overlap = l->loop_overlap;
     v->gen.loop_overlap_step = l->loop_overlap > 0 ? 1.0 / l->loop_overlap : 0;
-    v->gain_fromvel = 1.0 + (l->eff_velcurve[vel] - 1.0) * l->amp_veltrack * 0.01;
+    v->gain_fromvel = l->eff_amp_velcurve[vel];
     v->gain_shift = (note - l->amp_keycenter) * l->amp_keytrack;
 
     v->gain_fromvel *= sfz_crossfade(note, l->xfin_lokey, l->xfin_hikey, l->xfout_lokey, l->xfout_hikey, l->xf_keycurve);
@@ -359,15 +359,15 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     if (l->tonectl_freq != 0)
         cbox_onepolef_set_highshelf_tonectl(&v->onepole_coeffs, l->tonectl_freq * M_PI * m->module.srate_inv, 1.0);
     
-    GSList *nif = v->layer->nifs;
+    GSList *nif = v->layer->voice_nifs;
     while(nif)
     {
         struct sampler_noteinitfunc *p = nif->data;
-        if (p->notefunc_voice)
-            p->notefunc_voice(p, v);
+        p->notefunc_voice(p, v);
         nif = nif->next;
     }
-    v->gain_fromvel *= dB2gain(v->gain_shift);
+    if (v->gain_shift)
+        v->gain_fromvel *= dB2gain(v->gain_shift);
 
     v->offset = l->offset;
     if (v->reloffset != 0)
@@ -667,7 +667,8 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         }
     }
     
-    gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || playing_sustain_loop) && v->layer->on_cc_number == -1;
+    // XXXKF or maybe check for on-cc being in the on-cc range instead?
+    gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || playing_sustain_loop) && v->layer->on_cc.cc_number == -1;
     loop_start = play_loop ? v->layer->loop_start : (v->layer->count ? 0 : (uint32_t)-1);
     loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
 

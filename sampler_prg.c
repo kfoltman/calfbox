@@ -53,7 +53,7 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
             c->pitchwheel >= l->lobend && c->pitchwheel < l->hibend &&
             c->cc[smsrc_chanaft] >= l->lochanaft && c->cc[smsrc_chanaft] <= l->hichanaft &&
             c->cc[smsrc_lastpolyaft] >= l->lopolyaft && c->cc[smsrc_lastpolyaft] <= l->hipolyaft &&
-            (l->cc_number == -1 || (c->cc[l->cc_number] >= l->locc && c->cc[l->cc_number] <= l->hicc)))
+            (l->cc.cc_number == -1 || (c->cc[l->cc.cc_number] >= l->cc.locc && c->cc[l->cc.cc_number] <= l->cc.hicc)))
         {
             if (!l->eff_use_keyswitch || 
                 ((l->sw_last == -1 || l->sw_last == lr->last_key) &&
@@ -520,7 +520,7 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
         struct sampler_layer *l = p->data;
-        int cc = l->data.on_cc_number;
+        int cc = l->data.on_cc.cc_number;
         if (cc != -1)
         {
             rll->layers_oncc = g_slist_prepend(rll->layers_oncc, l);

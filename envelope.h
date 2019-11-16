@@ -274,6 +274,10 @@ static inline void cbox_envelope_modify_dahdsr(struct cbox_envelope_shape *env, 
             env->stages[3].end_value = value;
             env->stages[4].end_value = value;
             break;
+        case 6: // start
+            env->stages[0].end_value = value;
+            env->start_value = value;
+            break;
     }
 }
 

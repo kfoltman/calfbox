@@ -53,6 +53,24 @@ g1.set_param("amp_veltrack", "0")
 g1.set_param("volume", "-12")
 g1.set_param("fileg_depthcc14", "-5400")
 
+def check_exception(param, value, substr):
+    try:
+        g1.set_param(param, value)
+        assert False, "Exception with substring %s expected when setting %s to %s, none caught" % (substr, param, value)
+    except Exception as e:
+        assert substr in str(e), "Exception with substring %s expected when setting %s to %s, caught another one: %s" % (substr, param, value, str(e))
+
+check_exception("cutoff", "bla", "correct numeric value")
+check_exception("key", "bla", "valid note name")
+check_exception("lochan", "bla", "correct integer value")
+check_exception("lochan", "10.5", "correct integer value")
+check_exception("offset", "bla", "correct unsigned integer value")
+check_exception("offset", "10.5", "correct unsigned integer value")
+check_exception("offset", "-1000", "correct unsigned integer value")
+g1.set_param("locc5", "100")
+check_exception("locc8", "110", "Conflicting controller")
+check_exception("hicc8", "110", "Conflicting controller")
+
 #g1.set_param("cutoff", "1000")
 #g1.set_param("fillfo_freq", "4")
 #g1.set_param("fillfo_depth", "2400")
@@ -79,15 +97,17 @@ r2.unset_param("sample")
 verify_region(r2, [], ["transpose", "sample"])
 
 params_to_test = [
-    'cutoff', 'pan', 'offset', 'tune',
+    'lokey', 'hikey', 'lovel', 'hivel', 'key',
+    'cutoff', 'pan', 'offset', 'tune', 'position', 'width',
     'amp_random', 'fil_random', 'pitch_random',
     'pitch_veltrack', 'reloffset_veltrack',
     'delay_cc5', 'delay_cc10', 'reloffset_cc5', 'reloffset_cc10',
-    'cutoff_cc1', 'pitch_cc1', 'tonectl_cc1', 'gain_cc1',
-    'cutoff_cc2', 'pitch_cc2', 'tonectl_cc2', 'gain_cc2',
+    'cutoff_cc1', "resonance_cc1", 'pitch_cc1', 'tonectl_cc1', 'gain_cc1',
+    'cutoff_cc2', "resonance_cc2", 'pitch_cc2', 'tonectl_cc2', 'gain_cc2',
     'loop_start', 'loop_end',
     'ampeg_attack',
     'amplfo_depth', 'fillfo_depth',
+    'fileg_vel2depth',
     'fileg_depthcc5', 'fillfo_depthcc8','amplfo_depthcc5',
     'amplfo_freqcc5', 'fillfo_freqcc10', 'pitchlfo_freqcc5',
     'cutoff_chanaft', 'resonance_chanaft',
@@ -95,23 +115,30 @@ params_to_test = [
     'amplfo_depthpolyaft', 'fillfo_depthpolyaft', 'pitchlfo_depthpolyaft', 
     'amplfo_freqpolyaft', 'fillfo_freqpolyaft', 'pitchlfo_freqpolyaft',
     'eq1_freqcc1', 'eq2_gaincc2', 'eq3_bwcc3',
+    'fileg_vel2start', 'fileg_vel2delay', 'fileg_vel2attack', 'fileg_vel2hold', 'fileg_vel2decay', 'fileg_vel2sustain', 'fileg_vel2release',
+    'amp_velcurve_5', 'amp_velcurve_127',
+    'locc5', 'hicc5',
+    'on_locc8', 'on_hicc8',
     ]
 for i in range(len(params_to_test)):
     param = params_to_test[0]
     print ("Trying %s" % param)
     rest = params_to_test[1:]
-    r2.set_param(param, "100")
-    verify_region(r2, ["%s=100" % param], rest)
-    g1.set_param(param, "80")
-    verify_region(g1, ["%s=80" % param], [])
-    verify_region(r2, ["%s=100" % param], rest)
-    verify_region(r2, ["%s=100" % param], [], full=True)
+    value1, value2 = "100", "80"
+    if 'key' in param:
+        value1, value2 = "e1", "g1"
+    r2.set_param(param, value1)
+    verify_region(r2, ["%s=%s" % (param, value1)], rest)
+    g1.set_param(param, value2)
+    verify_region(g1, ["%s=%s" % (param, value2)], [])
+    verify_region(r2, ["%s=%s" % (param, value1)], rest)
+    verify_region(r2, ["%s=%s" % (param, value1)], [], full=True)
     r2.unset_param(param)
     verify_region(r2, [], params_to_test)
     
-    verify_region(r2, ["%s=80" % param], [], full=True)
+    verify_region(r2, ["%s=%s" % (param, value2)], [], full=True)
     g1.unset_param(param)
-    verify_region(r2, [], ["%s=80" % param], full=True)
+    verify_region(r2, [], ["%s=%s" % (param, value2)], full=True)
     
     params_to_test = params_to_test[1:] + params_to_test[0:1]
 

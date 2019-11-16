@@ -24,6 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdint.h>
 
+// arbitrary value that doesn't collide with a useful range
+#define SAMPLER_CURVE_GAP -100000
+
 struct sampler_program;
 struct sampler_voice;
 struct sampler_prevoice;
@@ -172,6 +175,10 @@ enum sampler_modsrc
     smsrc_perchan_count = smsrc_vel,
     smsrc_pernote_offset = smsrc_vel,
     smsrc_pernote_count = smsrccount - smsrc_pernote_offset,
+
+    smsrc_ampeg = smsrc_ampenv,
+    smsrc_fileg = smsrc_filenv,
+    smsrc_pitcheg = smsrc_pitchenv,
 };
 
 enum sampler_moddest
@@ -196,6 +203,13 @@ enum sampler_moddest
     smdest_eq3_gain,
 
     smdestcount,
+
+    smdest_from_amplfo = smdest_gain,
+    smdest_from_fillfo = smdest_cutoff,
+    smdest_from_pitchlfo = smdest_pitch,
+    smdest_from_ampeg = smdest_gain,
+    smdest_from_fileg = smdest_cutoff,
+    smdest_from_pitcheg = smdest_pitch,
 };
 
 struct sampler_modulation
@@ -229,6 +243,7 @@ enum sampler_noteinitfunc_envelope_variant
     snif_env_decay = 3,
     snif_env_sustain = 4,
     snif_env_release = 5,
+    snif_env_start = 6,
 };
 
 struct sampler_lfo_params
@@ -297,7 +312,7 @@ typedef int midi_note_t;
     MACRO(int, hichanaft, 127) \
     MACRO(int, lopolyaft, 0) \
     MACRO(int, hipolyaft, 127) \
-    MACRO(int, velcurve_quadratic, -1) \
+    MACRO(int, velcurve_quadratic, 1) \
     MACRO##_enum(sampler_filter_type, fil_type, sft_lp12) \
     MACRO##_enum(sampler_off_mode, off_mode, som_unknown) \
     MACRO##_enum(sampler_vel_mode, vel_mode, svm_current) \
@@ -350,8 +365,9 @@ typedef int midi_note_t;
     MACRO##_eq(eq1, eq1, 0) \
     MACRO##_eq(eq2, eq2, 1) \
     MACRO##_eq(eq3, eq3, 2) \
-    MACRO##_ccrange(on_) \
-    MACRO##_ccrange() \
+    MACRO##_ccrange(on_cc, on_) \
+    MACRO##_ccrange(cc, ) \
+    MACRO##_midicurve(amp_velcurve) \
 
 // XXXKF: consider making send1gain the dBamp type... except it's
 // a linear percentage value in SFZ spec - bit weird!
@@ -406,6 +422,15 @@ struct sampler_eq_has_fields
     EQ_FIELDS(PROC_SUBSTRUCT_HAS_FIELD, name)
 };
 
+struct sampler_cc_range
+{
+    uint8_t locc;
+    uint8_t hicc;
+    uint8_t cc_number;
+    uint8_t has_locc:1;
+    uint8_t has_hicc:1;
+};
+
 #define PROC_FIELDS_TO_STRUCT(type, name, def_value) \
     type name;
 #define PROC_FIELDS_TO_STRUCT_string(name) \
@@ -423,10 +448,11 @@ struct sampler_eq_has_fields
     struct sampler_lfo_params name;
 #define PROC_FIELDS_TO_STRUCT_eq(name, parname, index) \
     struct sampler_eq_params name;
-#define PROC_FIELDS_TO_STRUCT_ccrange(name) \
-    int8_t name##locc; \
-    int8_t name##hicc; \
-    int8_t name##cc_number;
+#define PROC_FIELDS_TO_STRUCT_ccrange(name, parname) \
+    struct sampler_cc_range name;
+#define PROC_FIELDS_TO_STRUCT_midicurve(name) \
+    float name[128]; \
+    float eff_##name[128]; \
 
 #define PROC_HAS_FIELD(type, name, def_value) \
     unsigned int has_##name:1;
@@ -443,10 +469,9 @@ struct sampler_eq_has_fields
     struct sampler_lfo_has_fields has_##name;
 #define PROC_HAS_FIELD_eq(name, parname, index) \
     struct sampler_eq_has_fields has_##name;
-
-#define PROC_HAS_FIELD_ccrange(name) \
-    unsigned int has_##name##locc:1; \
-    unsigned int has_##name##hicc:1;
+#define PROC_HAS_FIELD_ccrange(name, parname)
+#define PROC_HAS_FIELD_midicurve(name) \
+    uint8_t has_##name[128];
 
 CBOX_EXTERN_CLASS(sampler_layer)
 
@@ -455,11 +480,8 @@ struct sampler_layer_data
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
     SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)    
 
-    float velcurve[128];
-    float eff_velcurve[128];
-
     GSList *modulations;
-    GSList *nifs;
+    GSList *voice_nifs, *prevoice_nifs;
 
     // computed values:
     float eff_freq;
