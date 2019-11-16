@@ -37,7 +37,7 @@ struct sampler_rll
     uint8_t lokey, hikey;
     uint8_t ranges_by_key[128];
     uint32_t layers_by_range_count;
-    GSList **layers_by_range;
+    GSList **layers_by_range, **release_layers_by_range;
 };
 
 struct sampler_ctrlinit
