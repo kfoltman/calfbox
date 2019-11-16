@@ -742,6 +742,16 @@ ENUM_LIST(MAKE_FROM_TO_STRING)
 //////////////////////////////////////////////////////////////////////////
 // Note initialisation functions
 
+void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv)
+{
+    pv->delay_computed += nif->param * pv->channel->cc[nif->variant] * (1.0 / 127.0);
+}
+
+void sampler_nif_addrandomdelay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv)
+{
+    pv->delay_computed += nif->param * rand() * (1.0 / RAND_MAX);
+}
+
 void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
     v->pitch_shift += nif->param * v->vel * (1.0 / 127.0);
@@ -750,11 +760,6 @@ void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voic
 void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
     v->reloffset += nif->param * v->vel * (1.0 / 127.0);
-}
-
-void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv)
-{
-    pv->delay_ccs += nif->param * pv->channel->cc[nif->variant] * (1.0 / 127.0);
 }
 
 void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)

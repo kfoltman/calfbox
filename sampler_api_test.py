@@ -99,7 +99,7 @@ verify_region(r2, [], ["transpose", "sample"])
 params_to_test = [
     'lokey', 'hikey', 'lovel', 'hivel', 'key',
     'cutoff', 'pan', 'offset', 'tune', 'position', 'width',
-    'amp_random', 'fil_random', 'pitch_random',
+    'amp_random', 'fil_random', 'pitch_random', 'delay_random',
     'pitch_veltrack', 'reloffset_veltrack',
     'delay_cc5', 'delay_cc10', 'reloffset_cc5', 'reloffset_cc10',
     'cutoff_cc1', "resonance_cc1", 'pitch_cc1', 'tonectl_cc1', 'gain_cc1',

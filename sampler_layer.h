@@ -331,7 +331,6 @@ typedef int midi_note_t;
     MACRO(float, effect1, 0) \
     MACRO(float, effect2, 0) \
     MACRO(float, delay, 0) \
-    MACRO(float, delay_random, 0) \
     MACRO(int, output, 0) \
     MACRO(int, group, 0) \
     MACRO(int, off_by, 0) \
@@ -535,9 +534,11 @@ extern void sampler_layer_data_destroy(struct sampler_layer_data *l);
 extern void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
-extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
 extern void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+
+extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
+extern void sampler_nif_addrandomdelay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
 
 static inline gboolean sampler_layer_data_is_4pole(struct sampler_layer_data *v)
 {

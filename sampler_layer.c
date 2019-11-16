@@ -353,11 +353,11 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_AMOUNT_CC("tonectl_cc#", tonectl)
 
     FIELD_VOICE_NIF("amp_random", sampler_nif_addrandom, 0)
-    FIELD_VOICE_NIF("amp_random", sampler_nif_addrandom, 0)
     FIELD_VOICE_NIF("fil_random", sampler_nif_addrandom, 1)
     FIELD_VOICE_NIF("pitch_random", sampler_nif_addrandom, 2)
     FIELD_VOICE_NIF("pitch_veltrack", sampler_nif_vel2pitch, 0)
     FIELD_VOICE_NIF("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
+    FIELD_PREVOICE_NIF("delay_random", sampler_nif_addrandomdelay, 0)
     FIELD_PREVOICE_CC_NIF("delay_cc#", sampler_nif_cc2delay)
     FIELD_VOICE_CC_NIF("reloffset_cc#", sampler_nif_cc2reloffset)
 
@@ -1185,7 +1185,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         | ((l->eq2.gain != 0 || l->eq2.vel2gain != 0) ? 2 : 0)
         | ((l->eq3.gain != 0 || l->eq3.vel2gain != 0) ? 4 : 0);
 
-    l->use_prevoice = (l->delay || l->delay_random || l->prevoice_nifs);
+    l->use_prevoice = (l->delay || l->prevoice_nifs);
 }
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)
@@ -1358,6 +1358,8 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             g_string_append_printf(outstr, " reloffset_cc%d=%s", nd->variant, floatbuf);
         else if (nd->notefunc_voice == sampler_nif_vel2env && v >= snif_env_delay && (v & 15) <= snif_env_start && (v >> 4) < 3)
             g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], floatbuf);
+        else
+            assert(0); // unknown NIF
     }
     for(GSList *nif = l->prevoice_nifs; nif; nif = nif->next)
     {
@@ -1369,6 +1371,10 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
 
         if (nd->notefunc_prevoice == sampler_nif_cc2delay && v >= 0 && v < 120)
             g_string_append_printf(outstr, " delay_cc%d=%s", nd->variant, floatbuf);
+        else if (nd->notefunc_prevoice == sampler_nif_addrandomdelay)
+            g_string_append_printf(outstr, " delay_random=%s", floatbuf);
+        else
+            assert(0); // unknown NIF
     }
     for(GSList *mod = l->modulations; mod; mod = mod->next)
     {

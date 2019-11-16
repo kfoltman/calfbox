@@ -15,11 +15,7 @@ void sampler_prevoice_start(struct sampler_prevoice *pv, struct sampler_channel 
     pv->note = note;
     pv->vel = vel;
     pv->age = 0;
-    if (l->delay_random)
-        pv->delay_random = rand() * (1.0 / RAND_MAX);
-    else
-        pv->delay_random = 0.f;
-    pv->delay_ccs = 0.f;
+    pv->delay_computed = 0.f;
 
     GSList *nif = pv->layer_data->prevoice_nifs;
     while(nif)
@@ -57,7 +53,7 @@ int sampler_prevoice_process(struct sampler_prevoice *pv, struct sampler_module 
 {
     struct sampler_layer_data *layer_data = pv->layer_data;
     pv->age += CBOX_BLOCK_SIZE;
-    if (pv->age >= (layer_data->delay + pv->delay_random * layer_data->delay_random + pv->delay_ccs) * m->module.srate)
+    if (pv->age >= (layer_data->delay + pv->delay_computed) * m->module.srate)
         return 1;
     
     return 0;

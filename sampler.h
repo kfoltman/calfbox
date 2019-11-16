@@ -113,7 +113,7 @@ struct sampler_prevoice
     struct sampler_channel *channel;
     int note, vel;
     int age;
-    float delay_random, delay_ccs;
+    float delay_computed;
 };
 
 struct sampler_voice
