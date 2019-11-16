@@ -520,9 +520,9 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
         struct sampler_layer *l = p->data;
-        int cc = l->data.on_cc.cc_number;
-        if (cc != -1)
+        if (l->data.on_cc.has_locc || l->data.on_cc.has_hicc)
         {
+            int cc = l->data.on_cc.cc_number;
             rll->layers_oncc = g_slist_prepend(rll->layers_oncc, l);
             rll->cc_trigger_bitmask[cc >> 5] |= 1 << (cc & 31);
         }
