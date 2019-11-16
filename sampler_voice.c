@@ -668,7 +668,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     
     // XXXKF or maybe check for on-cc being in the on-cc range instead?
-    gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || playing_sustain_loop) && v->layer->on_cc.cc_number == -1;
+    gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || playing_sustain_loop) && !(v->layer->on_cc.has_locc || v->layer->on_cc.has_hicc);
     loop_start = play_loop ? v->layer->loop_start : (v->layer->count ? 0 : (uint32_t)-1);
     loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
 

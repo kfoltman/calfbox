@@ -38,6 +38,16 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
         struct sampler_layer_data *l = lr->runtime;
         if (!l->eff_waveform)
             continue;
+
+        if (l->eff_use_simple_trigger_logic)
+        {
+            if (note >= l->lokey && note <= l->hikey &&
+                vel >= l->lovel && vel <= l->hivel)
+                return next_layer;
+            else
+                continue;
+        }
+
         if ((l->trigger == stm_first && !is_first) ||
             (l->trigger == stm_legato && is_first))
             continue;
@@ -53,7 +63,7 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
             c->pitchwheel >= l->lobend && c->pitchwheel < l->hibend &&
             c->cc[smsrc_chanaft] >= l->lochanaft && c->cc[smsrc_chanaft] <= l->hichanaft &&
             c->cc[smsrc_lastpolyaft] >= l->lopolyaft && c->cc[smsrc_lastpolyaft] <= l->hipolyaft &&
-            (l->cc.cc_number == -1 || (c->cc[l->cc.cc_number] >= l->cc.locc && c->cc[l->cc.cc_number] <= l->cc.hicc)))
+            ((!l->cc.has_locc && !l->cc.has_hicc) || (c->cc[l->cc.cc_number] >= l->cc.locc && c->cc[l->cc.cc_number] <= l->cc.hicc)))
         {
             if (!l->eff_use_keyswitch || 
                 ((l->sw_last == -1 || l->sw_last == lr->last_key) &&

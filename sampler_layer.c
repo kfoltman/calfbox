@@ -1125,6 +1125,17 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         l->sample_changed = FALSE;
     }
     
+    l->eff_use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
+    l->eff_use_simple_trigger_logic =
+        (l->seq_length == 1 && l->seq_position == 1) &&
+        (l->trigger != stm_first && l->trigger != stm_legato) &&
+        (l->lochan == 1 && l->hichan == 16) &&
+        (l->lorand == 0 && l->hirand == 1) &&
+        (l->lobend == -8192 && l->hibend == 8192) &&
+        (l->lochanaft == 0 && l->hichanaft == 127) &&
+        (l->lopolyaft == 0 && l->hipolyaft == 127) &&
+        (!l->cc.has_locc && !l->cc.has_hicc) &&
+        !l->eff_use_keyswitch;
     l->eff_freq = (l->eff_waveform && l->eff_waveform->info.samplerate) ? l->eff_waveform->info.samplerate : 44100;
     l->eff_loop_mode = l->loop_mode;
     if (l->loop_mode == slm_unknown)
@@ -1152,9 +1163,6 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     // XXXKF this is dodgy, needs to convert to use 'programmed vs effective' values pattern
     if (l->key >= 0 && l->key <= 127)
         l->lokey = l->hikey = l->pitch_keycenter = l->key;
-
-    // interpolate missing points in velcurve
-    l->eff_use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
 
     // 'linearize' the virtual circular buffer - write 3 (or N) frames before end of the loop
     // and 3 (N) frames at the start of the loop, and play it; in rare cases this will need to be
