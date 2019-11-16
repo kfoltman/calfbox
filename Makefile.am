@@ -57,8 +57,10 @@ libcalfbox_la_SOURCES = \
     sampler_channel.c \
     sampler_gen.c \
     sampler_layer.c \
+    sampler_nif.c \
     sampler_prevoice.c \
     sampler_prg.c \
+    sampler_rll.c \
     sampler_voice.c \
     scene.c \
     scripting.c \
