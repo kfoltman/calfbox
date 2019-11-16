@@ -62,9 +62,9 @@ void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voic
     }
 }
 
-void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
+static void modify_env_stage_by_nif(struct sampler_noteinitfunc *nif, struct sampler_voice *v, uint32_t variant, float value)
 {
-    int env_type = (nif->variant) >> 4;
+    int env_type = variant >> 4;
     struct cbox_envelope *env = NULL;
     switch(env_type)
     {
@@ -85,9 +85,19 @@ void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice 
         memcpy(&v->dyn_envs[env_type], env->shape, sizeof(struct cbox_envelope_shape));
         env->shape = &v->dyn_envs[env_type];
     }
-    float param = nif->param * v->vel * (1.0 / 127.0);
-    if ((nif->variant & 15) == snif_env_sustain || (nif->variant & 15) == snif_env_start)
+    float param = nif->param * value;
+    if ((variant & 15) == snif_env_sustain || (variant & 15) == snif_env_start)
         param *= 0.01;
-    cbox_envelope_modify_dahdsr(env->shape, nif->variant & 15, param, v->channel->module->module.srate * (1.0 / CBOX_BLOCK_SIZE));
+    cbox_envelope_modify_dahdsr(env->shape, variant & 15, param, v->channel->module->module.srate * (1.0 / CBOX_BLOCK_SIZE));
+}
+
+void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
+{
+    modify_env_stage_by_nif(nif, v, nif->variant, v->vel * (1.0 / 127.0));
+}
+
+void sampler_nif_cc2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
+{
+    modify_env_stage_by_nif(nif, v, nif->variant >> 8, v->channel->cc[nif->variant & 255] * (1.0 / 127.0));
 }
 

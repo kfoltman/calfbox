@@ -116,6 +116,7 @@ params_to_test = [
     'amplfo_freqpolyaft', 'fillfo_freqpolyaft', 'pitchlfo_freqpolyaft',
     'eq1_freqcc1', 'eq2_gaincc2', 'eq3_bwcc3',
     'fileg_vel2start', 'fileg_vel2delay', 'fileg_vel2attack', 'fileg_vel2hold', 'fileg_vel2decay', 'fileg_vel2sustain', 'fileg_vel2release',
+    'fileg_startcc1', 'fileg_delaycc1', 'fileg_attackcc1', 'fileg_holdcc1', 'fileg_decaycc1', 'fileg_sustaincc1', 'fileg_releasecc1',
     'amp_velcurve_5', 'amp_velcurve_127',
     'locc5', 'hicc5',
     'on_locc8', 'on_hicc8',

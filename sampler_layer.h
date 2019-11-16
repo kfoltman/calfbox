@@ -543,6 +543,7 @@ extern void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct s
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_cc2offset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
+extern void sampler_nif_cc2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 
 extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);

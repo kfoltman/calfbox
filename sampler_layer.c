@@ -286,10 +286,10 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
     { name, -1, slpt_voice_nif, 0, variant, nif, NULL },
 #define FIELD_PREVOICE_NIF(name, nif, variant) \
     { name, -1, slpt_prevoice_nif, 0, variant, nif, NULL },
-#define FIELD_VOICE_CC_NIF(name, nif) \
-    { name, -1, slpt_voice_cc_nif, 0, 0, nif, NULL },
-#define FIELD_PREVOICE_CC_NIF(name, nif) \
-    { name, -1, slpt_prevoice_cc_nif, 0, 0, nif, NULL },
+#define FIELD_VOICE_CC_NIF(name, nif, variant) \
+    { name, -1, slpt_voice_cc_nif, 0, variant, nif, NULL },
+#define FIELD_PREVOICE_CC_NIF(name, nif, variant) \
+    { name, -1, slpt_prevoice_cc_nif, 0, variant, nif, NULL },
 #define FIELD_ALIAS(alias, name) \
     { alias, -1, slpt_alias, 0, 0, name, NULL },
 
@@ -299,7 +299,8 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
 
 #define PROC_SUBSTRUCT_FIELD_DESCRIPTOR_DAHDSR(name, index, def_value, parent, parent_name, parent_index, parent_struct) \
     { #parent_name "_" #name, offsetof(struct sampler_layer_data, parent) + offsetof(struct parent_struct, name), slpt_float, def_value, parent_index * 100 + index, NULL, sampler_layer_data_##parent##_set_has_##name }, \
-    FIELD_VOICE_NIF(#parent_name "_vel2" #name, sampler_nif_vel2env, (parent_index << 4) + snif_env_##name)
+    FIELD_VOICE_NIF(#parent_name "_vel2" #name, sampler_nif_vel2env, (parent_index << 4) + snif_env_##name) \
+    FIELD_VOICE_CC_NIF(#parent_name "_" #name "cc#", sampler_nif_cc2env, (parent_index << 4) + snif_env_##name)
 
 #define PROC_FIELD_DESCRIPTOR(type, name, default_value) \
     { #name, LOFS(name), slpt_##type, default_value, 0, NULL, sampler_layer_data_set_has_##name },
@@ -359,9 +360,9 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_VOICE_NIF("offset_veltrack", sampler_nif_vel2offset, 0)
     FIELD_VOICE_NIF("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
     FIELD_PREVOICE_NIF("delay_random", sampler_nif_addrandomdelay, 0)
-    FIELD_PREVOICE_CC_NIF("delay_cc#", sampler_nif_cc2delay)
-    FIELD_VOICE_CC_NIF("reloffset_cc#", sampler_nif_cc2reloffset)
-    FIELD_VOICE_CC_NIF("offset_cc#", sampler_nif_cc2offset)
+    FIELD_PREVOICE_CC_NIF("delay_cc#", sampler_nif_cc2delay, 0)
+    FIELD_VOICE_CC_NIF("reloffset_cc#", sampler_nif_cc2reloffset, 0)
+    FIELD_VOICE_CC_NIF("offset_cc#", sampler_nif_cc2offset, 0)
 
     FIELD_ALIAS("hilev", "hivel")
     FIELD_ALIAS("lolev", "lovel")
@@ -555,12 +556,12 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
         case slpt_voice_cc_nif:
             VERIFY_FLOAT_VALUE;
             cc = args[0];
-            sampler_layer_add_nif(l, e->extra_ptr, NULL, cc, fvalue);
+            sampler_layer_add_nif(l, e->extra_ptr, NULL, cc + (e->extra_int << 8), fvalue);
             return TRUE;
         case slpt_prevoice_cc_nif:
             VERIFY_FLOAT_VALUE;
             cc = args[0];
-            sampler_layer_add_nif(l, NULL, e->extra_ptr, cc, fvalue);
+            sampler_layer_add_nif(l, NULL, e->extra_ptr, cc + (e->extra_int << 8), fvalue);
             return TRUE;
         case slpt_reserved:
         case slpt_invalid:
@@ -654,11 +655,11 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             return TRUE;
         case slpt_voice_cc_nif:
             cc = args[0];
-            sampler_layer_remove_nif(l, e->extra_ptr, NULL, cc, FALSE);
+            sampler_layer_remove_nif(l, e->extra_ptr, NULL, cc + (e->extra_int << 8), FALSE);
             return TRUE;
         case slpt_prevoice_cc_nif:
             cc = args[0];
-            sampler_layer_remove_nif(l, NULL, e->extra_ptr, cc, FALSE);
+            sampler_layer_remove_nif(l, NULL, e->extra_ptr, cc + (e->extra_int << 8), FALSE);
             return TRUE;
         case slpt_generic_modulation:
             sampler_layer_unset_modulation(l, args[0], args[1], args[2], FALSE);
@@ -1374,8 +1375,10 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             g_string_append_printf(outstr, " offset_veltrack=%s", floatbuf);
         else if (nd->notefunc_voice == sampler_nif_cc2offset && v >= 0 && v < 120)
             g_string_append_printf(outstr, " offset_cc%d=%s", nd->variant, floatbuf);
-        else if (nd->notefunc_voice == sampler_nif_vel2env && v >= snif_env_delay && (v & 15) <= snif_env_start && (v >> 4) < 3)
+        else if (nd->notefunc_voice == sampler_nif_vel2env && (v & 15) >= snif_env_delay && (v & 15) <= snif_env_start && ((v >> 4) & 3) < 3)
             g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], floatbuf);
+        else if (nd->notefunc_voice == sampler_nif_cc2env && ((v >> 8) & 15) >= snif_env_delay && ((v >> 8) & 15) <= snif_env_start && ((v >> 12) & 3) < 3 && (v & 0xFF) < 128)
+            g_string_append_printf(outstr, " %seg_%scc%d=%s", addrandom_variants[v >> 12], env_stages[1 + ((v >> 8) & 15)], v & 0xFF, floatbuf);
         else
             assert(0); // unknown NIF
     }
