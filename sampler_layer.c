@@ -412,7 +412,7 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
         case slpt_midi_note_t:
         {
             midi_note_t note = sfz_note_from_string(value);
-            if (note < 0)
+            if (note < -1)
             {
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "'%s' is not a valid note name for %s", value, e->name);
                 return FALSE;

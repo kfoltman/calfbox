@@ -31,11 +31,11 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
         {
             lo_count[l->data.lokey]++;
             hi_count[l->data.hikey]++;
+            if (l->data.lokey < low)
+                low = l->data.lokey;
+            if (l->data.hikey > high)
+                high = l->data.hikey;
         }
-        if (l->data.lokey < low)
-            low = l->data.lokey;
-        if (l->data.hikey > high)
-            high = l->data.hikey;
     }
     rll->lokey = low;
     rll->hikey = high;
