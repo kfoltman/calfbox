@@ -775,35 +775,36 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             resonance = 0.7f;
         if (resonance > 32.f)
             resonance = 32.f;
+        const struct cbox_sincos *sincos = &m->sincos[(int)logcutoff];
         switch(l->fil_type)
         {
         case sft_lp24hybrid:
-            cbox_biquadf_set_lp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance * resonance);
-            cbox_biquadf_set_1plp_lookup(&v->filter_coeffs_extra, &m->sincos[(int)logcutoff], 1);
+            cbox_biquadf_set_lp_rbj_lookup(&v->filter_coeffs, sincos, resonance * resonance);
+            cbox_biquadf_set_1plp_lookup(&v->filter_coeffs_extra, sincos, 1);
             second_filter = &v->filter_coeffs_extra;
             break;
             
         case sft_lp12:
         case sft_lp24:
-            cbox_biquadf_set_lp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance);
+            cbox_biquadf_set_lp_rbj_lookup(&v->filter_coeffs, sincos, resonance);
             break;
         case sft_hp12:
         case sft_hp24:
-            cbox_biquadf_set_hp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance);
+            cbox_biquadf_set_hp_rbj_lookup(&v->filter_coeffs, sincos, resonance);
             break;
         case sft_bp6:
         case sft_bp12:
-            cbox_biquadf_set_bp_rbj_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], resonance);
+            cbox_biquadf_set_bp_rbj_lookup(&v->filter_coeffs, sincos, resonance);
             break;
         case sft_lp6:
         case sft_lp12nr:
         case sft_lp24nr:
-            cbox_biquadf_set_1plp_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], l->fil_type != sft_lp6);
+            cbox_biquadf_set_1plp_lookup(&v->filter_coeffs, sincos, l->fil_type != sft_lp6);
             break;
         case sft_hp6:
         case sft_hp12nr:
         case sft_hp24nr:
-            cbox_biquadf_set_1php_lookup(&v->filter_coeffs, &m->sincos[(int)logcutoff], l->fil_type != sft_hp6);
+            cbox_biquadf_set_1php_lookup(&v->filter_coeffs, sincos, l->fil_type != sft_hp6);
             break;
         default:
             assert(0);

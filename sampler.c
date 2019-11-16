@@ -600,6 +600,7 @@ MODULE_CREATE_FUNCTION(sampler)
         m->sincos[i].sine = sinf(omega);
         m->sincos[i].cosine = cosf(omega);
         m->sincos[i].prewarp = 2.0 * tan(hz2w(freq, srate) * 0.5f);
+        m->sincos[i].prewarp2 = 1.0 / (1.0 + m->sincos[i].prewarp);
 
     }
     for (i = 0; ; i++)

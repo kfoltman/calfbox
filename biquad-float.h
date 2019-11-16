@@ -213,20 +213,20 @@ static inline void cbox_biquadf_set_1p(struct cbox_biquadf_coeffs *coeffs, float
     }
 }
 
-static inline void cbox_biquadf_set_1plp_lookup(struct cbox_biquadf_coeffs *coeffs, struct cbox_sincos *sincos, int two_copies)
+static inline void cbox_biquadf_set_1plp_lookup(struct cbox_biquadf_coeffs *coeffs, const struct cbox_sincos *sincos, int two_copies)
 {
     float x = sincos->prewarp;
-    float q = 1 / (1 + x);
+    float q = sincos->prewarp2;
     float a01 = x*q;
     float b1 = a01 - q;
     
     cbox_biquadf_set_1p(coeffs, a01, a01, b1, two_copies);    
 }
 
-static inline void cbox_biquadf_set_1php_lookup(struct cbox_biquadf_coeffs *coeffs, struct cbox_sincos *sincos, int two_copies)
+static inline void cbox_biquadf_set_1php_lookup(struct cbox_biquadf_coeffs *coeffs, const struct cbox_sincos *sincos, int two_copies)
 {
     float x = sincos->prewarp;
-    float q = 1 / (1 + x);
+    float q = sincos->prewarp2;
     float a01 = x*q;
     float b1 = a01 - q;
     

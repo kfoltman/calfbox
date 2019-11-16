@@ -38,6 +38,7 @@ struct cbox_sincos
     float sine;
     float cosine;
     float prewarp;
+    float prewarp2;
 };
 
 static inline float hz2w(float hz, float sr)
