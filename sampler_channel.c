@@ -200,7 +200,19 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
     if (!prg || !prg->rll || prg->deleting)
         return;
 
-    GSList *next_layer = sampler_program_get_next_layer(prg, c, !is_release_trigger ? prg->rll->layers : prg->rll->layers_release, note, vel, random, is_first);
+    GSList *first_layer = NULL;
+    if (is_release_trigger)
+        first_layer = prg->rll->layers_release;
+    else
+    {
+        if (note >= prg->rll->lokey && note <= prg->rll->hikey)
+        {
+            assert(note >= 0 && note <= 127);
+            first_layer = prg->rll->layers_by_range[prg->rll->ranges_by_key[note]];
+        }
+    }
+
+    GSList *next_layer = first_layer ? sampler_program_get_next_layer(prg, c, first_layer, note, vel, random, is_first) : NULL;
     if (!next_layer)
     {
         if (!is_release_trigger)

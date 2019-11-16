@@ -34,6 +34,10 @@ struct sampler_rll
     GSList *layers_release; // of sampler_layer
     GSList *layers_oncc;
     uint32_t cc_trigger_bitmask[4]; // one bit per CC
+    uint8_t lokey, hikey;
+    uint8_t ranges_by_key[128];
+    uint32_t layers_by_range_count;
+    GSList **layers_by_range;
 };
 
 struct sampler_ctrlinit
