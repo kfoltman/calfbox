@@ -575,32 +575,5 @@ PyInit_cbox(void)
     return m;
 }
 
-void cbox_script_run(const char *name)
-{
-    FILE *fp = fopen(name, "rb");
-    if (!fp)
-    {
-        g_warning("Cannot open script file '%s': %s", name, strerror(errno));
-        return;
-    }
-    PyImport_AppendInittab("_cbox", &PyInit_cbox);
-    Py_Initialize();
-    if (PyType_Ready(&CboxCallbackType) < 0)
-    {
-        g_warning("Cannot install the C callback type");
-        return;
-    }
-    Py_INCREF(&CboxCallbackType);
-    engine_initialised = TRUE;
-    
-    if (PyRun_SimpleFile(fp, name) == 1)
-    {
-        GError *error = NULL;
-        set_error_from_python(&error);
-        cbox_print_error(error);
-    }
-    Py_Finalize();
-}
-
 #endif
 #endif

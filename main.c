@@ -104,6 +104,65 @@ void print_help(char *progname)
     exit(0);
 }
 
+#if USE_PYTHON
+
+// This is a workaround for what I consider a defect in pyconfig.h
+#undef _XOPEN_SOURCE
+#undef _POSIX_C_SOURCE
+
+#include <Python.h>
+
+static gboolean set_error_from_python(GError **error)
+{
+    PyObject *ptype = NULL, *pvalue = NULL, *ptraceback = NULL;
+    PyErr_Fetch(&ptype, &pvalue, &ptraceback);
+    PyObject *ptypestr = PyObject_Str(ptype);
+    PyObject *pvaluestr = PyObject_Str(pvalue);
+    PyObject *ptypestr_unicode = PyUnicode_AsUTF8String(ptypestr);
+    PyObject *pvaluestr_unicode = PyUnicode_AsUTF8String(pvaluestr);
+    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "%s: %s", PyBytes_AsString(ptypestr_unicode), PyBytes_AsString(pvaluestr_unicode));
+    Py_DECREF(pvaluestr_unicode);
+    Py_DECREF(ptypestr_unicode);
+    //g_error("%s:%s", PyString_AsString(ptypestr), PyString_AsString(pvaluestr));
+    Py_DECREF(ptypestr);
+    Py_DECREF(pvaluestr);
+    Py_DECREF(ptype);
+    Py_XDECREF(pvalue);
+    Py_XDECREF(ptraceback);
+    return FALSE;
+}
+
+void cbox_script_run(const char *name)
+{
+    FILE *fp = fopen(name, "rb");
+    if (!fp)
+    {
+        g_warning("Cannot open script file '%s': %s", name, strerror(errno));
+        return;
+    }
+    // (_cbox module is discontinued, use _cbox2)
+    // PyImport_AppendInittab("_cbox", &PyInit_cbox);
+    Py_Initialize();
+#if 0
+    if (PyType_Ready(&CboxCallbackType) < 0)
+    {
+        g_warning("Cannot install the C callback type");
+        return;
+    }
+    Py_INCREF(&CboxCallbackType);
+    engine_initialised = TRUE;
+#endif
+    if (PyRun_SimpleFile(fp, name) == 1)
+    {
+        GError *error = NULL;
+        set_error_from_python(&error);
+        cbox_print_error(error);
+    }
+    Py_Finalize();
+}
+
+#endif
+
 static int (*old_menu_on_idle)(struct cbox_ui_page *page);
 
 static int on_idle_with_ui_poll(struct cbox_ui_page *page)
