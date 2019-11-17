@@ -311,12 +311,14 @@ static gboolean cbox_scene_process_cmd(struct cbox_command_target *ct, struct cb
     if (!strcmp(cmd->command, "/enable_default_song_input") && !strcmp(cmd->arg_types, "i"))
     {
         s->enable_default_song_input = CBOX_ARG_I(cmd, 0);
+        cbox_scene_update_connected_inputs(s);
         return TRUE;
     }
     else
     if (!strcmp(cmd->command, "/enable_default_external_input") && !strcmp(cmd->arg_types, "i"))
     {
         s->enable_default_external_input = CBOX_ARG_I(cmd, 0);
+        cbox_scene_update_connected_inputs(s);
         return TRUE;
     }
     else
