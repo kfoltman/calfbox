@@ -146,7 +146,7 @@ struct sampler_voice
     int send1bus, send2bus;
     float send1gain, send2gain;
     int serial_no;
-    struct cbox_envelope_shape dyn_envs[3]; // amp, filter, pitch
+    struct cbox_envelope_shape vel_envs[3], cc_envs[3]; // amp, filter, pitch
     struct cbox_biquadf_state eq_left[3], eq_right[3];
     struct cbox_biquadf_coeffs eq_coeffs[3];
     gboolean layer_changed;

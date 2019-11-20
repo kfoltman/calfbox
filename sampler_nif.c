@@ -80,10 +80,10 @@ static void modify_env_stage_by_nif(struct sampler_noteinitfunc *nif, struct sam
         default:
             assert(0);
     }
-    if (env->shape != &v->dyn_envs[env_type])
+    if (env->shape != &v->vel_envs[env_type])
     {
-        memcpy(&v->dyn_envs[env_type], env->shape, sizeof(struct cbox_envelope_shape));
-        env->shape = &v->dyn_envs[env_type];
+        memcpy(&v->vel_envs[env_type], env->shape, sizeof(struct cbox_envelope_shape));
+        env->shape = &v->vel_envs[env_type];
     }
     float param = nif->param * value;
     if ((variant & 15) == snif_env_sustain || (variant & 15) == snif_env_start)
@@ -95,9 +95,3 @@ void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice 
 {
     modify_env_stage_by_nif(nif, v, nif->variant, v->vel * (1.0 / 127.0));
 }
-
-void sampler_nif_cc2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
-{
-    modify_env_stage_by_nif(nif, v, nif->variant >> 8, v->channel->cc[nif->variant & 255] * (1.0 / 127.0));
-}
-

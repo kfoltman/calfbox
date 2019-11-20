@@ -300,7 +300,7 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
 #define PROC_SUBSTRUCT_FIELD_DESCRIPTOR_DAHDSR(name, index, def_value, parent, parent_name, parent_index, parent_struct) \
     { #parent_name "_" #name, offsetof(struct sampler_layer_data, parent) + offsetof(struct parent_struct, name), slpt_float, def_value, parent_index * 100 + index, NULL, sampler_layer_data_##parent##_set_has_##name }, \
     FIELD_VOICE_NIF(#parent_name "_vel2" #name, sampler_nif_vel2env, (parent_index << 4) + snif_env_##name) \
-    FIELD_VOICE_CC_NIF(#parent_name "_" #name "cc#", sampler_nif_cc2env, (parent_index << 4) + snif_env_##name)
+    FIELD_AMOUNT_CC(#parent_name "_" #name "cc#", ampeg_stage + (parent_index << 4) + snif_env_##name)
 
 #define PROC_FIELD_DESCRIPTOR(type, name, default_value) \
     { #name, LOFS(name), slpt_##type, default_value, 0, NULL, sampler_layer_data_set_has_##name },
@@ -1199,6 +1199,13 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     l->eq_bitmask = ((l->eq1.gain != 0 || l->eq1.vel2gain != 0) ? 1 : 0)
         | ((l->eq2.gain != 0 || l->eq2.vel2gain != 0) ? 2 : 0)
         | ((l->eq3.gain != 0 || l->eq3.vel2gain != 0) ? 4 : 0);
+    l->mod_bitmask = 0;
+    for(GSList *mod = l->modulations; mod; mod = g_slist_next(mod))
+    {
+        const struct sampler_modulation *mval = (const struct sampler_modulation *)mod->data;
+        if (mval->dest >= smdest_eg_stage_start && mval->dest <= smdest_eg_stage_end)
+            l->mod_bitmask |= slmb_ampeg_cc << ((mval->dest >> 4) & 3);
+    }
 
     l->use_prevoice = (l->delay || l->prevoice_nifs);
 }
@@ -1377,8 +1384,6 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             g_string_append_printf(outstr, " offset_cc%d=%s", nd->variant, floatbuf);
         else if (nd->notefunc_voice == sampler_nif_vel2env && (v & 15) >= snif_env_delay && (v & 15) <= snif_env_start && ((v >> 4) & 3) < 3)
             g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], floatbuf);
-        else if (nd->notefunc_voice == sampler_nif_cc2env && ((v >> 8) & 15) >= snif_env_delay && ((v >> 8) & 15) <= snif_env_start && ((v >> 12) & 3) < 3 && (v & 0xFF) < 128)
-            g_string_append_printf(outstr, " %seg_%scc%d=%s", addrandom_variants[v >> 12], env_stages[1 + ((v >> 8) & 15)], v & 0xFF, floatbuf);
         else
             assert(0); // unknown NIF
     }

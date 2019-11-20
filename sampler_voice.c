@@ -539,14 +539,27 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->layer_changed = FALSE;
     }
 
+    struct cbox_envelope_shape *pitcheg_shape = v->pitch_env.shape, *fileg_shape = v->filter_env.shape, *ampeg_shape = v->amp_env.shape;
+    if (__builtin_expect(l->mod_bitmask, 0))
+    {
+        #define COPY_ORIG_SHAPE(envtype, envtype2, index) \
+            if (l->mod_bitmask & slmb_##envtype2##eg_cc) { \
+                memcpy(&v->cc_envs[index], envtype2##eg_shape, sizeof(struct cbox_envelope_shape)); \
+                envtype2##eg_shape = &v->cc_envs[index]; \
+            }
+        COPY_ORIG_SHAPE(amp, amp, 0)
+        COPY_ORIG_SHAPE(filter, fil, 1)
+        COPY_ORIG_SHAPE(pitch, pitch, 2)
+    }
+
     float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + velscl * l->pitch_veltrack + l->tune + l->transpose * 100 + v->pitch_shift;
     float modsrcs[smsrc_pernote_count];
     modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * velscl;
     modsrcs[smsrc_pitch - smsrc_pernote_offset] = pitch * (1.f / 100.f);
     modsrcs[smsrc_polyaft - smsrc_pernote_offset] = (c->poly_pressure_mask & (1 << (v->note >> 2))) ? c->poly_pressure[v->note] * (1.f / 127.f) : 0;
-    modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released) * 0.01f;
-    modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released) * 0.01f;
-    modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->amp_env, v->released) * 0.01f;
+    modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released, pitcheg_shape) * 0.01f;
+    modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released, fileg_shape) * 0.01f;
+    modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->amp_env, v->released, ampeg_shape) * 0.01f;
 
     modsrcs[smsrc_amplfo - smsrc_pernote_offset] = lfo_run(&v->amp_lfo);
     modsrcs[smsrc_fillfo - smsrc_pernote_offset] = lfo_run(&v->filter_lfo);
@@ -617,13 +630,22 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             value2 = modoffset[(sm->flags & 12) >> 2] + value2 * modscale[(sm->flags & 12) >> 2];
             value *= value2;
         }
-        if (!(modmask & (1 << sm->dest))) // first value
+        if (sm->dest < 32)
         {
-            moddests[sm->dest] = value * sm->amount;
-            modmask |= (1 << sm->dest);
+            if (!(modmask & (1 << sm->dest))) // first value
+            {
+                moddests[sm->dest] = value * sm->amount;
+                modmask |= (1 << sm->dest);
+            }
+            else
+                moddests[sm->dest] += value * sm->amount;
+        } else {
+            assert (sm->dest >= smdest_eg_stage_start && sm->dest <= smdest_eg_stage_end);
+            uint32_t param = sm->dest - smdest_eg_stage_start;
+            if (value * sm->amount != 0) {
+                cbox_envelope_modify_dahdsr(&v->cc_envs[(param >> 4)], param & 0x0F, value * sm->amount, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
+            }
         }
-        else
-            moddests[sm->dest] += value * sm->amount;
         
         mod = g_slist_next(mod);
     }
@@ -645,10 +667,20 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
                 cbox_biquadf_reset(&v->eq_right[index-1]); \
             } \
         }
-    if (recalc_eq_mask) {
+    if (__builtin_expect(recalc_eq_mask, 0))
+    {
         RECALC_EQ_IF(1)
         RECALC_EQ_IF(2)
         RECALC_EQ_IF(3)
+    }
+    if (__builtin_expect(l->mod_bitmask, 0))
+    {
+        #define UPDATE_ENV_POSITION(envtype, envtype2) \
+            if (l->mod_bitmask & slmb_##envtype##eg_cc) \
+                cbox_envelope_update_shape_after_modify(&v->envtype2##_env, envtype##eg_shape, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
+        UPDATE_ENV_POSITION(amp, amp)
+        UPDATE_ENV_POSITION(fil, filter)
+        UPDATE_ENV_POSITION(pitch, pitch)
     }
     
     double maxv = 127 << 7;

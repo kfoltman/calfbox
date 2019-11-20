@@ -210,6 +210,13 @@ enum sampler_moddest
     smdest_from_ampeg = smdest_gain,
     smdest_from_fileg = smdest_cutoff,
     smdest_from_pitcheg = smdest_pitch,
+
+    smdest_ampeg_stage = 0x80,
+    smdest_fileg_stage = 0x90,
+    smdest_pitcheg_stage = 0xA0,
+
+    smdest_eg_stage_start = 0x80,
+    smdest_eg_stage_end = 0xAF,
 };
 
 struct sampler_modulation
@@ -478,6 +485,13 @@ struct sampler_cc_range
 
 CBOX_EXTERN_CLASS(sampler_layer)
 
+enum sampler_layer_mod_bitmasks
+{
+    slmb_ampeg_cc = 0x01,
+    slmb_fileg_cc = 0x02,
+    slmb_pitcheg_cc = 0x04,
+};
+
 struct sampler_layer_data
 {
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
@@ -496,7 +510,7 @@ struct sampler_layer_data
     int16_t scratch_end[2 * MAX_INTERPOLATION_ORDER * 2];
     float resonance_scaled;
     float logcutoff;
-    uint32_t eq_bitmask;
+    uint32_t eq_bitmask, mod_bitmask;
     gboolean eff_use_xfcc;
     gboolean use_prevoice;
 };
@@ -543,7 +557,6 @@ extern void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct s
 extern void sampler_nif_vel2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_cc2offset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
-extern void sampler_nif_cc2env(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 
 extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
