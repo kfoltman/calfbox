@@ -573,6 +573,7 @@ gboolean cbox_io_process_cmd(struct cbox_io *io, struct cbox_command_target *fb,
         struct cbox_audio_output *left = cbox_io_get_audio_output_by_uuid_string(io, uuidstr, error);
         if (!left)
             return FALSE;
+        uuidstr = CBOX_ARG_S(cmd, 1);
         struct cbox_audio_output *right = cbox_io_get_audio_output_by_uuid_string(io, uuidstr, error);
         if (!right)
             return FALSE;
