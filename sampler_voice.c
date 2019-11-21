@@ -500,47 +500,10 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     struct sampler_layer_data *l = v->layer;
     assert(v->gen.mode != spt_inactive);
     
-    // if it's a DAHD envelope without sustain, consider the note finished
-    if (__builtin_expect(v->amp_env.cur_stage == 4 && v->amp_env.shape->stages[3].end_value <= 0.f, 0))
-        cbox_envelope_go_to(&v->amp_env, 15);                
-
     struct sampler_channel *c = v->channel;
     v->age += CBOX_BLOCK_SIZE;
     
     const float velscl = v->vel * (1.f / 127.f);
-
-    #define RECALC_EQ_MASK_EQ1 (7 << smdest_eq1_freq)
-    #define RECALC_EQ_MASK_EQ2 (7 << smdest_eq2_freq)
-    #define RECALC_EQ_MASK_EQ3 (7 << smdest_eq3_freq)
-    #define RECALC_EQ_MASK_ALL (RECALC_EQ_MASK_EQ1 | RECALC_EQ_MASK_EQ2 | RECALC_EQ_MASK_EQ3)
-    uint32_t recalc_eq_mask = 0;
-
-    if (__builtin_expect(v->layer_changed, 0))
-    {
-        v->last_level = -1;
-        if (v->last_waveform != v->layer->eff_waveform)
-        {
-            v->last_waveform = v->layer->eff_waveform;
-            if (v->layer->eff_waveform)
-            {
-                v->gen.mode = v->layer->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-                v->gen.cur_sample_end = v->layer->eff_waveform->info.frames;
-            }
-            else
-            {
-                sampler_voice_inactivate(v, TRUE);
-                return;
-            }
-        }
-        if (l->eq_bitmask & (1 << 0)) recalc_eq_mask |= RECALC_EQ_MASK_EQ1;
-        if (l->eq_bitmask & (1 << 1)) recalc_eq_mask |= RECALC_EQ_MASK_EQ2;
-        if (l->eq_bitmask & (1 << 2)) recalc_eq_mask |= RECALC_EQ_MASK_EQ3;
-        v->last_eq_bitmask = l->eq_bitmask;
-        v->layer_changed = FALSE;
-    }
-
-    static const int modoffset[4] = {0, -1, -1, 1 };
-    static const int modscale[4] = {1, 1, 2, -2 };
 
     struct cbox_envelope_shape *pitcheg_shape = v->pitch_env.shape, *fileg_shape = v->filter_env.shape, *ampeg_shape = v->amp_env.shape;
     if (__builtin_expect(l->mod_bitmask, 0))
@@ -577,6 +540,43 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         UPDATE_ENV_POSITION(fil, filter)
         UPDATE_ENV_POSITION(pitch, pitch)
     }
+
+    // if it's a DAHD envelope without sustain, consider the note finished
+    if (__builtin_expect(v->amp_env.cur_stage == 4 && ampeg_shape->stages[3].end_value <= 0.f, 0))
+        cbox_envelope_go_to(&v->amp_env, 15);
+
+    #define RECALC_EQ_MASK_EQ1 (7 << smdest_eq1_freq)
+    #define RECALC_EQ_MASK_EQ2 (7 << smdest_eq2_freq)
+    #define RECALC_EQ_MASK_EQ3 (7 << smdest_eq3_freq)
+    #define RECALC_EQ_MASK_ALL (RECALC_EQ_MASK_EQ1 | RECALC_EQ_MASK_EQ2 | RECALC_EQ_MASK_EQ3)
+    uint32_t recalc_eq_mask = 0;
+
+    if (__builtin_expect(v->layer_changed, 0))
+    {
+        v->last_level = -1;
+        if (v->last_waveform != v->layer->eff_waveform)
+        {
+            v->last_waveform = v->layer->eff_waveform;
+            if (v->layer->eff_waveform)
+            {
+                v->gen.mode = v->layer->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+                v->gen.cur_sample_end = v->layer->eff_waveform->info.frames;
+            }
+            else
+            {
+                sampler_voice_inactivate(v, TRUE);
+                return;
+            }
+        }
+        if (l->eq_bitmask & (1 << 0)) recalc_eq_mask |= RECALC_EQ_MASK_EQ1;
+        if (l->eq_bitmask & (1 << 1)) recalc_eq_mask |= RECALC_EQ_MASK_EQ2;
+        if (l->eq_bitmask & (1 << 2)) recalc_eq_mask |= RECALC_EQ_MASK_EQ3;
+        v->last_eq_bitmask = l->eq_bitmask;
+        v->layer_changed = FALSE;
+    }
+
+    static const int modoffset[4] = {0, -1, -1, 1 };
+    static const int modscale[4] = {1, 1, 2, -2 };
 
     float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + velscl * l->pitch_veltrack + l->tune + l->transpose * 100 + v->pitch_shift;
     float modsrcs[smsrc_pernote_count];
@@ -623,7 +623,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     
     if (c->pitchwheel)
     {
-        int pw = c->pitchwheel * (c->pitchwheel > 0 ? l->bend_up : l->bend_down);
+        int pw = c->pitchwheel * (c->pitchwheel > 0 ? l->bend_up : -l->bend_down);
         // approximate dividing by 8191
         if (pw < 0)
             pw >>= 13;
@@ -819,7 +819,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     // http://drealm.info/sfz/plj-sfz.xhtml#amp "The overall gain must remain in the range -144 to 6 decibels."
     if (gain > 2.f)
         gain = 2.f;
-    float pan = (l->pan + 100.f) * (1.f / 200.f) + (c->channel_pan_cc * 1.f / maxv - 0.5f) * 2.f;
+    float pan = (l->pan + ((modmask & (1 << smdest_pan) ? moddests[smdest_pan] : 0)) + 100.f) * (1.f / 200.f) + (c->channel_pan_cc * 1.f / maxv - 0.5f) * 2.f;
     if (pan < 0.f)
         pan = 0.f;
     if (pan > 1.f)

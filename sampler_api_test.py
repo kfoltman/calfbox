@@ -40,7 +40,12 @@ instrument = scene.add_new_instrument_layer("test_sampler", "sampler").get_instr
 npfs = instrument.engine.load_patch_from_string(0, '.', '', 'new_patch')
 instrument.engine.set_patch(1, 0)
 
-g1 = npfs.new_group()
+glb = npfs.get_global()
+assert glb
+assert glb.get_children()
+master = glb.get_children()[0]
+
+g1 = master.new_child()
 g1.set_param("cutoff", "100")
 g1.set_param("resonance", "6")
 g1.set_param("fil_type", "lpf_4p")
@@ -76,13 +81,13 @@ check_exception("hicc8", "110", "Conflicting controller")
 #g1.set_param("fillfo_depth", "2400")
 #g1.set_param("fillfo_wave", "12")
 
-r1 = g1.new_region()
+r1 = g1.new_child()
 r1.set_param("sample", "*saw")
 r1.set_param("transpose", "0")
 r1.set_param("tune", "5")
 r1.set_param("gain_cc17", "12")
 
-r2 = g1.new_region()
+r2 = g1.new_child()
 r2.set_param("sample", "*sqr")
 r2.set_param("transpose", "12")
 r2.set_param("gain_cc17", "-12")

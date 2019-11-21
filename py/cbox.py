@@ -1102,15 +1102,17 @@ class SamplerProgram(DocObj):
         in_use = int
     def get_regions(self):
         return self.get_thing("/regions", '/region', [SamplerLayer])
-    def get_groups(self):
-        g = self.get_things("/groups", ['*group', 'default_group'])
-        return [Document.map_uuid(g.default_group)] + list(map(Document.map_uuid, g.group))
+    def get_global(self):
+        return self.cmd_makeobj("/global")
     def get_control_inits(self):
         return self.get_thing("/control_inits", '/control_init', [(int, int)])
     def new_group(self):
+        # Obsolete
         return self.cmd_makeobj("/new_group")
     def add_control_init(self, controller, value):
         return self.cmd("/add_control_init", None, controller, value)
+    def add_control_label(self, controller, label):
+        return self.cmd("/add_control_label", None, controller, label)
     # which = -1 -> remove all controllers with that number from the list
     def delete_control_init(self, controller, which = 0):
         return self.cmd("/delete_control_init", None, controller, which)
@@ -1130,7 +1132,7 @@ class SamplerLayer(DocObj):
         parent_program = SamplerProgram
         parent_group = DocObj
     def get_children(self):
-        return self.get_thing("/get_children", '/region', [SamplerLayer])
+        return self.get_thing("/get_children", '/child', [SamplerLayer])
     def as_string(self):
         return self.get_thing("/as_string", '/value', str)
     def as_string_full(self):
@@ -1139,7 +1141,7 @@ class SamplerLayer(DocObj):
         self.cmd("/set_param", None, key, str(value))
     def unset_param(self, key):
         self.cmd("/unset_param", None, key)
-    def new_region(self):
-        return self.cmd_makeobj("/new_region")
+    def new_child(self):
+        return self.cmd_makeobj("/new_child")
 Document.classmap['sampler_layer'] = SamplerLayer
 

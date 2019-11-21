@@ -189,6 +189,7 @@ enum sampler_moddest
     smdest_cutoff,
     smdest_resonance,
     smdest_tonectl,
+    smdest_pan,
     smdest_pitchlfo_freq,
     smdest_fillfo_freq,
     smdest_amplfo_freq,
@@ -346,7 +347,7 @@ typedef int midi_note_t;
     MACRO(int, off_by, 0) \
     MACRO(int, count, 0) \
     MACRO(int, bend_up, 200) \
-    MACRO(int, bend_down, 200) \
+    MACRO(int, bend_down, -200) \
     MACRO(int, bend_step, 1) \
     MACRO(int, timestretch, 0) \
     MACRO(float, timestretch_jump, 500) \
@@ -527,7 +528,7 @@ struct sampler_layer
 
     struct sampler_module *module;
     struct sampler_program *parent_program;
-    struct sampler_layer *parent_group;
+    struct sampler_layer *parent, *default_child;
 
     int last_key, current_seq_position;
     

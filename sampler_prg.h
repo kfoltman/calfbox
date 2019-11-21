@@ -42,13 +42,18 @@ struct sampler_rll
 
 struct sampler_ctrlinit
 {
-    uint8_t controller;
+    uint16_t controller;
     uint8_t value;
 };
 
 union sampler_ctrlinit_union {
     gpointer ptr;
     struct sampler_ctrlinit cinit;
+};
+
+struct sampler_ctrllabel {
+    uint16_t controller;
+    gchar *label;
 };
 
 
@@ -60,10 +65,10 @@ struct sampler_program
     struct sampler_module *module;
     gchar *name;
     int prog_no;
-    struct sampler_layer *default_group;
-    GSList *groups;
+    struct sampler_layer *global;
     GSList *all_layers;
     GSList *ctrl_init_list;
+    GSList *ctrl_label_list;
     struct sampler_rll *rll;
     gchar *sample_dir; // can be empty, cannot be NULL
     gchar *source_file; // can be empty, cannot be NULL
@@ -81,8 +86,9 @@ extern struct sampler_program *sampler_program_new_from_cfg(struct sampler_modul
 extern void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer *l);
 extern void sampler_program_delete_layer(struct sampler_program *prg, struct sampler_layer *l);
 extern void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer *l);
-extern void sampler_program_add_controller_init(struct sampler_program *prg, uint8_t controller, uint8_t value);
-extern void sampler_program_remove_controller_init(struct sampler_program *prg, uint8_t controller, int which);
+extern void sampler_program_add_controller_init(struct sampler_program *prg, uint16_t controller, uint8_t value);
+extern void sampler_program_add_controller_label(struct sampler_program *prg, uint16_t controller, gchar *label); // keeps ownership
+extern void sampler_program_remove_controller_init(struct sampler_program *prg, uint16_t controller, int which);
 extern void sampler_program_update_layers(struct sampler_program *prg);
 extern struct sampler_program *sampler_program_clone(struct sampler_program *prg, struct sampler_module *m, int prog_no, GError **error);
 

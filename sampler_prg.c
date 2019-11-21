@@ -118,13 +118,11 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
             return FALSE;
         return return_layers(program->all_layers, "/region", fb, error);
     }
-    if (!strcmp(cmd->command, "/groups") && !strcmp(cmd->arg_types, ""))
+    if (!strcmp(cmd->command, "/global") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        if (!cbox_execute_on(fb, NULL, "/default_group", "o", error, program->default_group))
-            return FALSE;
-        return return_layers(program->groups, "/group", fb, error);
+        return cbox_execute_on(fb, NULL, "/uuid", "o", error, program->global);
     }
     if (!strcmp(cmd->command, "/control_inits") && !strcmp(cmd->arg_types, ""))
     {
@@ -134,6 +132,18 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
         {
             const struct sampler_ctrlinit *cin = (const struct sampler_ctrlinit *)&p->data;
             if (!cbox_execute_on(fb, NULL, "/control_init", "ii", error, (int)cin->controller, (int)cin->value))
+                return FALSE;
+        }
+        return TRUE;
+    }
+    if (!strcmp(cmd->command, "/control_labels") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (GSList *p = program->ctrl_label_list; p; p = p->next)
+        {
+            const struct sampler_ctrllabel *cin = (const struct sampler_ctrllabel *)&p->data;
+            if (!cbox_execute_on(fb, NULL, "/control_label", "is", error, (int)cin->controller, cin->label))
                 return FALSE;
         }
         return TRUE;
@@ -150,8 +160,7 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
     }
     if (!strcmp(cmd->command, "/new_group") && !strcmp(cmd->arg_types, ""))
     {
-        struct sampler_layer *l = sampler_layer_new(program->module, program, NULL);
-        sampler_program_add_group(program, l);
+        struct sampler_layer *l = sampler_layer_new(program->module, program, program->global->default_child);
         return cbox_execute_on(fb, NULL, "/uuid", "o", error, l);
     }
     if (!strcmp(cmd->command, "/clone_to") && !strcmp(cmd->arg_types, "si"))
@@ -208,9 +217,11 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->sample_dir = perm_sample_dir;
     prg->all_layers = NULL;
     prg->rll = NULL;
-    prg->groups = NULL;
     prg->ctrl_init_list = NULL;
-    prg->default_group = sampler_layer_new(m, prg, NULL);
+    prg->ctrl_label_list = NULL;
+    prg->global = sampler_layer_new(m, prg, NULL);
+    prg->global->default_child = sampler_layer_new(m, prg, prg->global);
+    prg->global->default_child->default_child = sampler_layer_new(m, prg, prg->global->default_child);
     prg->deleting = FALSE;
     prg->in_use = 0;
     CBOX_OBJECT_REGISTER(prg);
@@ -328,12 +339,13 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
             break;
         
         gchar *swhere = g_strdup_printf("sgroup:%s", group_section);
-        struct sampler_layer *g = sampler_layer_new_from_section(m, prg, NULL, swhere);
+        struct sampler_layer *g = sampler_layer_new_from_section(m, prg, prg->global->default_child, swhere);
         if (!g)
             g_warning("Sample layer '%s' cannot be created - skipping", group_section);
         else
         {
-            sampler_program_add_group(prg, g);
+            // XXXKF
+            // sampler_program_add_group(prg, g);
             for (int j = 0; ; j++)
             {
                 char *where = NULL;
@@ -397,6 +409,10 @@ void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer
 {
     // Always call sampler_update_layer before sampler_program_add_layer.
     assert(l->runtime);
+    assert(l->parent);
+    assert(l->parent->parent);
+    assert(l->parent->parent->parent);
+    assert(l->parent->parent->parent == prg->global);
     prg->all_layers = g_slist_prepend(prg->all_layers, l);
 }
 
@@ -406,12 +422,7 @@ void sampler_program_delete_layer(struct sampler_program *prg, struct sampler_la
 }
 
 
-void sampler_program_add_group(struct sampler_program *prg, struct sampler_layer *l)
-{
-    prg->groups = g_slist_prepend(prg->groups, l);
-}
-
-void sampler_program_add_controller_init(struct sampler_program *prg, uint8_t controller, uint8_t value)
+void sampler_program_add_controller_init(struct sampler_program *prg, uint16_t controller, uint8_t value)
 {
     union sampler_ctrlinit_union u;
     u.ptr = NULL;
@@ -420,7 +431,22 @@ void sampler_program_add_controller_init(struct sampler_program *prg, uint8_t co
     prg->ctrl_init_list = g_slist_append(prg->ctrl_init_list, u.ptr);
 }
 
-void sampler_program_remove_controller_init(struct sampler_program *prg, uint8_t controller, int which)
+static void sampler_ctrl_label_destroy(gpointer value)
+{
+    struct sampler_ctrllabel *label = value;
+    free(label->label);
+    free(label);
+}
+
+void sampler_program_add_controller_label(struct sampler_program *prg, uint16_t controller, gchar *text)
+{
+    struct sampler_ctrllabel *label = calloc(1, sizeof(struct sampler_ctrllabel));
+    label->controller = controller;
+    label->label = text;
+    prg->ctrl_label_list = g_slist_append(prg->ctrl_label_list, label);
+}
+
+void sampler_program_remove_controller_init(struct sampler_program *prg, uint16_t controller, int which)
 {
     for (GSList **p = &prg->ctrl_init_list; *p; )
     {
@@ -439,6 +465,25 @@ void sampler_program_remove_controller_init(struct sampler_program *prg, uint8_t
     }
 }
 
+static void delete_layers_recursively(struct sampler_layer *layer)
+{
+    GHashTableIter iter;
+    g_hash_table_iter_init(&iter, layer->child_layers);
+    GSList *dellist = NULL;
+    gpointer key, value;
+    while(g_hash_table_iter_next(&iter, &key, &value))
+        dellist = g_slist_prepend(dellist, key);
+    GSList *liter = dellist;
+    while(liter)
+    {
+        struct sampler_layer *chl = liter->data;
+        delete_layers_recursively(chl);
+        liter = liter->next;
+    }
+    g_slist_free(dellist);
+    CBOX_DELETE(layer);
+}
+
 void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
 {
     struct sampler_program *prg = CBOX_H2O(hdr_ptr);
@@ -450,15 +495,14 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
     }
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
         CBOX_DELETE((struct sampler_layer *)p->data);
-    for (GSList *p = prg->groups; p; p = g_slist_next(p))
-        CBOX_DELETE((struct sampler_layer *)p->data);
-    CBOX_DELETE(prg->default_group);
+    delete_layers_recursively(prg->global);
 
     g_free(prg->name);
     g_free(prg->sample_dir);
     g_free(prg->source_file);
     g_slist_free(prg->all_layers);
     g_slist_free(prg->ctrl_init_list);
+    g_slist_free_full(prg->ctrl_label_list, sampler_ctrl_label_destroy);
     if (prg->tarfile)
         cbox_tarpool_release_tarfile(app.tarpool, prg->tarfile);
     free(prg);
@@ -473,20 +517,6 @@ void sampler_program_update_layers(struct sampler_program *prg)
         sampler_rll_destroy(old_rll);
 }
 
-static void add_child_layers_of_group(struct sampler_program *newprg, struct sampler_layer *group)
-{
-    sampler_layer_update(group);
-
-    GHashTableIter iter;
-    g_hash_table_iter_init(&iter, group->child_layers);
-    gpointer key, value;
-    while(g_hash_table_iter_next(&iter, &key, &value))
-    {
-        sampler_layer_reset_switches((struct sampler_layer *)key, newprg->module);
-        sampler_program_add_layer(newprg, (struct sampler_layer *)key);
-    }
-}
-
 struct sampler_program *sampler_program_clone(struct sampler_program *prg, struct sampler_module *m, int prog_no, GError **error)
 {
     struct sampler_program *newprg = sampler_program_new(m, prog_no, prg->name, prg->tarfile, prg->sample_dir, error);
@@ -496,21 +526,9 @@ struct sampler_program *sampler_program_clone(struct sampler_program *prg, struc
         newprg->source_file = g_strdup(prg->source_file);
     // The values are stored as a union aliased with the data pointer, so no need to deep-copy
     newprg->ctrl_init_list = g_slist_copy(prg->ctrl_init_list);
+    // XXXKF ctrl_label_list
     newprg->rll = NULL;
-    if (prg->default_group)
-    {
-        // XXXKF remove the original default group
-        newprg->default_group = sampler_layer_new_clone(prg->default_group, m, newprg, NULL);
-        add_child_layers_of_group(newprg, newprg->default_group);
-    }
-    newprg->groups = g_slist_copy(prg->groups);
-    for (GSList *p = newprg->groups; p; p = g_slist_next(p))
-    {
-        struct sampler_layer *l = p->data;
-        l = sampler_layer_new_clone(l, m, newprg, NULL);
-        p->data = l;
-        add_child_layers_of_group(newprg, l);
-    }
+    newprg->global = sampler_layer_new_clone(prg->global, m, newprg, NULL);
     sampler_program_update_layers(newprg);
     if (newprg->tarfile)
         newprg->tarfile->refs++;

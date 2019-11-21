@@ -118,7 +118,7 @@ void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc s
 
 void sampler_layer_unset_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, gboolean remove_propagated)
 {
-    sampler_layer_data_unset_modulation(&l->data, (!remove_propagated && l->parent_group) ? &l->parent_group->data : NULL, src, src2, dest, remove_propagated);
+    sampler_layer_data_unset_modulation(&l->data, (!remove_propagated && l->parent) ? &l->parent->data : NULL, src, src2, dest, remove_propagated);
 
     if (l->child_layers) {
         // Also recursively remove propagated copies from child layers, if any
@@ -200,7 +200,7 @@ void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc
 
 void sampler_layer_remove_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant, gboolean remove_propagated)
 {
-    sampler_layer_data_remove_nif(&l->data, !remove_propagated && l->parent_group ? &l->parent_group->data : NULL, notefunc_voice, notefunc_prevoice, variant, remove_propagated);
+    sampler_layer_data_remove_nif(&l->data, !remove_propagated && l->parent ? &l->parent->data : NULL, notefunc_voice, notefunc_prevoice, variant, remove_propagated);
 
     if (l->child_layers) {
         // Also recursively remove propagated copies from child layers, if any
@@ -300,7 +300,8 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
 #define PROC_SUBSTRUCT_FIELD_DESCRIPTOR_DAHDSR(name, index, def_value, parent, parent_name, parent_index, parent_struct) \
     { #parent_name "_" #name, offsetof(struct sampler_layer_data, parent) + offsetof(struct parent_struct, name), slpt_float, def_value, parent_index * 100 + index, NULL, sampler_layer_data_##parent##_set_has_##name }, \
     FIELD_VOICE_NIF(#parent_name "_vel2" #name, sampler_nif_vel2env, (parent_index << 4) + snif_env_##name) \
-    FIELD_AMOUNT_CC(#parent_name "_" #name "cc#", ampeg_stage + (parent_index << 4) + snif_env_##name)
+    FIELD_AMOUNT_CC(#parent_name "_" #name "cc#", ampeg_stage + (parent_index << 4) + snif_env_##name) \
+    FIELD_AMOUNT_CC(#parent_name "_" #name "_oncc#", ampeg_stage + (parent_index << 4) + snif_env_##name)
 
 #define PROC_FIELD_DESCRIPTOR(type, name, default_value) \
     { #name, LOFS(name), slpt_##type, default_value, 0, NULL, sampler_layer_data_set_has_##name },
@@ -351,7 +352,10 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_AMOUNT_CC("cutoff_cc#", cutoff)
     FIELD_AMOUNT_CC("resonance_cc#", resonance)
     FIELD_AMOUNT_CC("pitch_cc#", pitch)
+    FIELD_AMOUNT_CC("tune_oncc#", pitch)
     FIELD_AMOUNT_CC("tonectl_cc#", tonectl)
+    FIELD_AMOUNT_CC("pan_cc#", pan)
+    FIELD_AMOUNT_CC("pan_oncc#", pan)
 
     FIELD_VOICE_NIF("amp_random", sampler_nif_addrandom, 0)
     FIELD_VOICE_NIF("fil_random", sampler_nif_addrandom, 1)
@@ -512,8 +516,8 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
                 range->cc_number = cc;
             else if (range->cc_number != cc)
             {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Conflicting controller number for %s (%d vs previously used %d)", e->name, cc, (int)range->cc_number);
-                return FALSE;
+                //g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Conflicting controller number for %s (%d vs previously used %d)", e->name, cc, (int)range->cc_number);
+                //return FALSE;
             }
             switch(e->extra_int) {
                 case 0: range->locc = number; range->is_active = 1; break;
@@ -581,7 +585,7 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
 gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry *e, struct sampler_layer *l, const uint32_t *args, GError **error)
 {
     void *p = ((uint8_t *)&l->data) + e->offset;
-    void *pp = l->parent_group ? ((uint8_t *)&l->parent_group->data) + e->offset : NULL;
+    void *pp = l->parent ? ((uint8_t *)&l->parent->data) + e->offset : NULL;
     uint32_t cc;
 
     switch(e->type)
@@ -770,7 +774,7 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
             return FALSE;
 
         if (!((!layer->parent_program || cbox_execute_on(fb, NULL, "/parent_program", "o", error, layer->parent_program)) && 
-            (!layer->parent_group || cbox_execute_on(fb, NULL, "/parent_group", "o", error, layer->parent_group)) && 
+            (!layer->parent || cbox_execute_on(fb, NULL, "/parent", "o", error, layer->parent)) && 
             CBOX_OBJECT_DEFAULT_STATUS(layer, fb, error)))
             return FALSE;
         return TRUE;
@@ -807,21 +811,24 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         }
         return FALSE;
     }
-    if (!strcmp(cmd->command, "/new_region") && !strcmp(cmd->arg_types, ""))
+    if (!strcmp(cmd->command, "/new_child") && !strcmp(cmd->arg_types, ""))
     {
         // XXXKF needs a string argument perhaps
-        if (layer->parent_group)
+        if (layer->parent && layer->parent->parent && layer->parent->parent->parent)
         {
             g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot create a region within a region");
             return FALSE;
         }
         struct sampler_layer *l = sampler_layer_new(layer->module, layer->parent_program, layer);
-        sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, layer->parent_program);
+        sampler_layer_data_finalize(&l->data, l->parent ? &l->parent->data : NULL, layer->parent_program);
         sampler_layer_reset_switches(l, l->module);
         sampler_layer_update(l);
 
-        sampler_program_add_layer(layer->parent_program, l);
-        sampler_program_update_layers(layer->parent_program);
+        if (l->parent && l->parent->parent && l->parent->parent->parent)
+        {
+            sampler_program_add_layer(layer->parent_program, l);
+            sampler_program_update_layers(layer->parent_program);
+        }
 
         return cbox_execute_on(fb, NULL, "/uuid", "o", error, l);
     }
@@ -834,7 +841,7 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         gpointer key, value;
         while(g_hash_table_iter_next(&iter, &key, &value))
         {
-            if (!cbox_execute_on(fb, NULL, "/region", "o", error, key))
+            if (!cbox_execute_on(fb, NULL, "/child", "o", error, key))
                 return FALSE;
         }
         return TRUE;
@@ -880,7 +887,7 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_layer)
 
-struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group)
+struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent)
 {
     struct sampler_layer *l = calloc(1, sizeof(struct sampler_layer));
     struct cbox_document *doc = CBOX_GET_DOCUMENT(parent_program);
@@ -890,12 +897,12 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     
     l->module = m;
     l->child_layers = g_hash_table_new(NULL, NULL);
-    if (parent_group)
+    if (parent)
     {
-        sampler_layer_data_clone(&l->data, &parent_group->data, FALSE);
+        sampler_layer_data_clone(&l->data, &parent->data, FALSE);
         l->parent_program = parent_program;
-        l->parent_group = parent_group;
-        g_hash_table_replace(parent_group->child_layers, l, l);
+        l->parent = parent;
+        g_hash_table_replace(parent->child_layers, l, l);
         l->runtime = NULL;
         CBOX_OBJECT_REGISTER(l);
         return l;
@@ -913,8 +920,9 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
 
     ld->eff_use_keyswitch = 0;
     l->last_key = -1;
-    if (!parent_group)
+    if (!parent)
     {
+        // Systemwide default instead?
         sampler_layer_set_modulation(l, 74, smsrc_none, smdest_cutoff, 9600, 2);
         sampler_layer_set_modulation(l, 71, smsrc_none, smdest_resonance, 12, 2);
         sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
@@ -1258,11 +1266,11 @@ void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_secti
     cbox_config_foreach_key(layer_foreach_func, cfg_section, &lfs);
 }
 
-struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group, const char *cfg_section)
+struct sampler_layer *sampler_layer_new_from_section(struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent, const char *cfg_section)
 {
-    struct sampler_layer *l = sampler_layer_new(m, parent_program, parent_group ? parent_group : parent_program->default_group);
+    struct sampler_layer *l = sampler_layer_new(m, parent_program, parent ? parent : parent_program->global->default_child->default_child);
     sampler_layer_load_overrides(l, cfg_section);
-    sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, parent_program);
+    sampler_layer_data_finalize(&l->data, l->parent ? &l->parent->data : NULL, parent_program);
     sampler_layer_reset_switches(l, m);
     return l;
 }
@@ -1281,8 +1289,10 @@ gboolean sampler_layer_apply_param(struct sampler_layer *l, const char *key, con
     if (res >= 0)
         return res;
     sampler_layer_apply_unknown(l, key, value);
-    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown SFZ property key: '%s'", key);
-    return FALSE;
+    //g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Unknown SFZ property key: '%s'", key);
+    //return FALSE;
+    g_warning("Unknown SFZ property key: '%s'", key);
+    return TRUE;
 }
 
 gboolean sampler_layer_unapply_param(struct sampler_layer *layer, const char *key, GError **error)
@@ -1355,8 +1365,9 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
     
     static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
+    static const char *env_stages[] = { "delay", "attack", "hold", "decay", "sustain", "release", "start" };
     static const char *modsrc_names[] = { "chanaft", "lastpolyaft", "vel", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
-    static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pitchlfo_freq", "fillfo_freq", "amplfo_freq",
+    static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pan", "pitchlfo_freq", "fillfo_freq", "amplfo_freq",
         "eq1_freq", "eq1_bw", "eq1_gain",
         "eq2_freq", "eq2_bw", "eq2_gain",
         "eq3_freq", "eq3_bw", "eq3_gain",
@@ -1412,7 +1423,14 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
 
         if (md->src2 == smsrc_none)
         {
+            gboolean is_egcc = md->dest >= smdest_eg_stage_start && md->dest <= smdest_eg_stage_end;
             gboolean is_lfofreq = md->dest >= smdest_pitchlfo_freq && md->dest <= smdest_eq3_gain;
+            if (is_egcc)
+            {
+                uint32_t param = md->dest - smdest_eg_stage_start;
+                g_string_append_printf(outstr, " %seg_%scc%d=%s", addrandom_variants[(param >> 4) & 3], env_stages[param & 15], md->src, floatbuf);
+                continue;
+            }
             if (md->src < 120)
             {
                 // Inconsistency: cutoff_cc5 but amplfo_freqcc5
@@ -1522,10 +1540,11 @@ void sampler_layer_data_destroy(struct sampler_layer_data *l)
 }
 
 struct sampler_layer *sampler_layer_new_clone(struct sampler_layer *layer,
-    struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent_group)
+    struct sampler_module *m, struct sampler_program *parent_program, struct sampler_layer *parent)
 {
-    struct sampler_layer *l = sampler_layer_new(m, parent_program, parent_group);
+    struct sampler_layer *l = sampler_layer_new(m, parent_program, parent);
     sampler_layer_data_clone(&l->data, &layer->data, TRUE);
+    sampler_layer_reset_switches(l, m);
     if (layer->unknown_keys)
     {
         GHashTableIter iter;
@@ -1538,10 +1557,15 @@ struct sampler_layer *sampler_layer_new_clone(struct sampler_layer *layer,
     GHashTableIter iter;
     g_hash_table_iter_init(&iter, layer->child_layers);
     gpointer key, value;
+    gboolean is_child_a_region = layer->parent && layer->parent->parent;
     while(g_hash_table_iter_next(&iter, &key, &value))
     {
-        sampler_layer_new_clone(key, m, parent_program, l);
-        // g_hash_table_insert(l->child_layers, chl, NULL);
+        struct sampler_layer *chl = sampler_layer_new_clone(key, m, parent_program, l);
+        g_hash_table_insert(l->child_layers, chl, NULL);
+        if (key == layer->default_child)
+            l->default_child = chl;
+        if (is_child_a_region)
+            sampler_program_add_layer(parent_program, chl);
     }
 
     return l;
@@ -1553,15 +1577,15 @@ void sampler_layer_destroyfunc(struct cbox_objhdr *objhdr)
     struct sampler_program *prg = l->parent_program;
     assert(g_hash_table_size(l->child_layers) == 0);
 
-    if (l->parent_group)
+    if (l->parent)
     {
-        g_hash_table_remove(l->parent_group->child_layers, l);
+        g_hash_table_remove(l->parent->child_layers, l);
         if (prg && prg->rll)
         {
             sampler_program_delete_layer(prg, l);
             sampler_program_update_layers(l->parent_program);
         }
-        l->parent_group = NULL;
+        l->parent = NULL;
     }
     sampler_layer_data_close(&l->data);
     if (l->runtime)
@@ -1591,7 +1615,7 @@ static int sampler_layer_update_cmd_prepare(void *data)
     cmd->new_data = calloc(1, sizeof(struct sampler_layer_data));
     
     sampler_layer_data_clone(cmd->new_data, &cmd->layer->data, TRUE);
-    sampler_layer_data_finalize(cmd->new_data, cmd->layer->parent_group ? &cmd->layer->parent_group->data : NULL, cmd->layer->parent_program);
+    sampler_layer_data_finalize(cmd->new_data, cmd->layer->parent ? &cmd->layer->parent->data : NULL, cmd->layer->parent_program);
     if (cmd->layer->runtime == NULL)
     {
         // initial update of the layer, so none of the voices need updating yet

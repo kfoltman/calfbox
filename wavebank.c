@@ -139,6 +139,11 @@ float func_sine(float v, void *user_data)
     return sin(2 * M_PI * v);
 }
 
+float func_silence(float v, void *user_data)
+{
+    return 0.f;
+}
+
 float func_sqr(float v, void *user_data)
 {
     return v < 0.5 ? -1 : 1;
@@ -244,6 +249,8 @@ void cbox_wavebank_init()
     bank.streaming_prefetch_size = cbox_config_get_int("streaming", "prefetch_size", 65536);
     
     cbox_wavebank_add_std_waveform("*sine", func_sine, NULL, 0);
+    // XXXKF this should not be a real waveform
+    cbox_wavebank_add_std_waveform("*silence", func_silence, NULL, 0);
     cbox_wavebank_add_std_waveform("*saw", func_saw, NULL, 11);
     cbox_wavebank_add_std_waveform("*sqr", func_sqr, NULL, 11);
     cbox_wavebank_add_std_waveform("*tri", func_tri, NULL, 11);

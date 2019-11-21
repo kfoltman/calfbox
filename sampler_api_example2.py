@@ -21,7 +21,7 @@ print (instrument.get_output_slot(0).status())
 instrument.get_output_slot(0).set_insert_engine("reverb")
 print (instrument.get_output_slot(0).status())
 instrument.get_output_slot(0).engine.cmd("/wet_amt", None, 1.0)
-for i in pgm.get_groups():
+for i in pgm.get_global().get_children()[0].get_children():
     print ("<group>", i.as_string())
     for j in i.get_children():
         print ("<region>", j.as_string())

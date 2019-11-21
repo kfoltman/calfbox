@@ -18,7 +18,8 @@ instrument = scene.add_new_instrument_layer("test_sampler", "sampler").get_instr
 npfs = instrument.engine.load_patch_from_string(0, '.', '', 'new_patch')
 instrument.engine.set_patch(1, 0)
 
-g1 = npfs.new_group()
+mgrp = npfs.get_global().get_children()[0]
+g1 = mgrp.new_child()
 g1.set_param("cutoff", "100")
 g1.set_param("resonance", "6")
 g1.set_param("fil_type", "lpf_4p")
@@ -39,13 +40,13 @@ g1.set_param("fileg_depthcc14", "-5400")
 #g1.set_param("fillfo_wave", "12")
 #g1.set_param("fillfo_freqcc2", "4")
 
-r1 = g1.new_region()
+r1 = g1.new_child()
 r1.set_param("sample", "*saw")
 r1.set_param("transpose", "0")
 r1.set_param("tune", "5")
 r1.set_param("gain_cc17", "12")
 
-r2 = g1.new_region()
+r2 = g1.new_child()
 r2.set_param("sample", "*sqr")
 r2.set_param("transpose", "12")
 r2.set_param("gain_cc17", "-12")

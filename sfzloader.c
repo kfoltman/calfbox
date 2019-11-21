@@ -21,14 +21,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define DUMP_LAYER_ATTRIBS 0
 
+enum sfz_load_section_type
+{
+    slst_normal,
+    slst_control,
+    slst_effect,
+    slst_curve,
+};
+
 struct sfz_load_state
 {
     struct sampler_module *m;
     const char *filename;
     struct sampler_program *program;
-    struct sampler_layer *group;
-    struct sampler_layer *region;
-    gboolean is_control;
+    struct sampler_layer *global, *master, *group, *region, *target;
+    enum sfz_load_section_type section_type;
     GError **error;
 };
 
@@ -37,7 +44,7 @@ static void load_sfz_end_region(struct sfz_parser_client *client)
     struct sfz_load_state *ls = client->user_data;
     // printf("-- copy current region to the list of layers\n");
     struct sampler_layer *l = ls->region;
-    sampler_layer_data_finalize(&l->data, l->parent_group ? &l->parent_group->data : NULL, ls->program);
+    sampler_layer_data_finalize(&l->data, l->parent ? &l->parent->data : NULL, ls->program);
     sampler_layer_reset_switches(l, ls->m);
     sampler_layer_update(l);
     sampler_program_add_layer(ls->program, ls->region);
@@ -62,15 +69,33 @@ static void end_token(struct sfz_parser_client *client)
 #endif
     if (ls->region)
         load_sfz_end_region(client);
-    ls->is_control = FALSE;
+    ls->section_type = slst_normal;
+}
+
+static gboolean load_sfz_global(struct sfz_parser_client *client)
+{
+    struct sfz_load_state *ls = client->user_data;
+    // printf("-- start global\n");
+    ls->target = ls->global = ls->program->global;
+    ls->master = ls->global->default_child;
+    ls->group = ls->master->default_child;
+    return TRUE;
+}
+
+static gboolean load_sfz_master(struct sfz_parser_client *client)
+{
+    struct sfz_load_state *ls = client->user_data;
+    // printf("-- start group\n");
+    ls->target = ls->master = sampler_layer_new(ls->m, ls->program, ls->program->global);
+    ls->group = ls->master->default_child;
+    return TRUE;
 }
 
 static gboolean load_sfz_group(struct sfz_parser_client *client)
 {
     struct sfz_load_state *ls = client->user_data;
     // printf("-- start group\n");
-    ls->group = sampler_layer_new(ls->m, ls->program, NULL);
-    sampler_program_add_group(ls->program, ls->group);
+    ls->target = ls->group = sampler_layer_new(ls->m, ls->program, ls->master);
     return TRUE;
 }
 
@@ -78,7 +103,7 @@ static gboolean load_sfz_region(struct sfz_parser_client *client)
 {
     struct sfz_load_state *ls = client->user_data;
     
-    ls->region = sampler_layer_new(ls->m, ls->program, ls->group);
+    ls->target = ls->region = sampler_layer_new(ls->m, ls->program, ls->group);
     // g_warning("-- start region");
     return TRUE;
 }
@@ -87,9 +112,24 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
 {
     struct sfz_load_state *ls = client->user_data;
     
-    if (ls->is_control)
+    if (ls->section_type == slst_curve)
     {
-        if (!strncmp(key, "set_cc", 6))
+        g_warning("Parameter found in unsupported curve section: %s=%s", key, value);
+        return TRUE;
+    }
+    if (ls->section_type == slst_effect)
+    {
+        g_warning("Parameter found in unsupported effect section: %s=%s", key, value);
+        return TRUE;
+    }
+    if (ls->section_type == slst_control)
+    {
+        if (!strncmp(key, "label_cc", 8))
+        {
+            int ctrl = atoi(key + 8);
+            sampler_program_add_controller_label(ls->program, ctrl, g_strdup(value));
+        }
+        else if (!strncmp(key, "set_cc", 6))
         {
             int ctrl = atoi(key + 6);
             int val = atoi(value);
@@ -103,10 +143,10 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         return TRUE;
     }
     
-    struct sampler_layer *l = ls->region ? ls->region : ls->group;
-    if (!ls->region && !ls->group)
+    struct sampler_layer *l = ls->target;
+    if (!ls->target)
     {
-        g_warning("Cannot use parameter '%s' outside of region or group", key);
+        g_warning("Parameter '%s' entered outside of global, master, region or group", key);
         return TRUE;
     }
     
@@ -127,9 +167,27 @@ static gboolean handle_token(struct sfz_parser_client *client, const char *token
     if (!strcmp(token, "group"))
         return load_sfz_group(client);
 
+    if (!strcmp(token, "master"))
+        return load_sfz_master(client);
+
+    if (!strcmp(token, "global"))
+        return load_sfz_global(client);
+
     if (!strcmp(token, "control"))
     {
-        ls->is_control = TRUE;
+        ls->section_type = slst_control;
+        return TRUE;
+    }
+
+    if (!strcmp(token, "curve"))
+    {
+        ls->section_type = slst_curve;
+        return TRUE;
+    }
+
+    if (!strcmp(token, "effect"))
+    {
+        ls->section_type = slst_effect;
         return TRUE;
     }
 
@@ -139,7 +197,7 @@ static gboolean handle_token(struct sfz_parser_client *client, const char *token
 
 gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, int is_from_string, GError **error)
 {
-    struct sfz_load_state ls = { .group = prg->default_group, .m = m, .filename = sfz, .region = NULL, .error = error, .program = prg, .is_control = FALSE };
+    struct sfz_load_state ls = { .global = prg->global, .master = prg->global->default_child, .group = prg->global->default_child->default_child, .m = m, .filename = sfz, .region = NULL, .error = error, .program = prg, .section_type = slst_normal };
     struct sfz_parser_client c = { .user_data = &ls, .token = handle_token, .key_value = load_sfz_key_value };
     g_clear_error(error);
 
