@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "app.h"
 #include "blob.h"
+#include "engine.h"
 #include "instr.h"
 #include "rt.h"
 #include "sampler.h"
@@ -63,6 +64,7 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
             c->pitchwheel >= l->lobend && c->pitchwheel < l->hibend &&
             c->cc[smsrc_chanaft] >= l->lochanaft && c->cc[smsrc_chanaft] <= l->hichanaft &&
             c->cc[smsrc_lastpolyaft] >= l->lopolyaft && c->cc[smsrc_lastpolyaft] <= l->hipolyaft &&
+            c->module->module.engine->master->tempo >= l->lobpm && c->module->module.engine->master->tempo < l->hibpm  &&
             (!l->cc.is_active || (c->cc[l->cc.cc_number] >= l->cc.locc && c->cc[l->cc.cc_number] <= l->cc.hicc)))
         {
             if (!l->eff_use_keyswitch || 

@@ -1141,6 +1141,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         (l->lobend == -8192 && l->hibend == 8192) &&
         (l->lochanaft == 0 && l->hichanaft == 127) &&
         (l->lopolyaft == 0 && l->hipolyaft == 127) &&
+        (l->lobpm == 0 && l->hibpm == NO_HI_BPM_VALUE) &&
         !l->cc.is_active && !l->eff_use_keyswitch;
     l->eff_use_xfcc = l->xfin_cc.is_active || l->xfout_cc.is_active;
     l->eff_freq = (l->eff_waveform && l->eff_waveform->info.samplerate) ? l->eff_waveform->info.samplerate : 44100;

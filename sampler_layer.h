@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // arbitrary value that doesn't collide with a useful range
 #define SAMPLER_CURVE_GAP -100000
+#define NO_HI_BPM_VALUE 10000
 
 struct sampler_program;
 struct sampler_voice;
@@ -319,6 +320,8 @@ typedef int midi_note_t;
     MACRO(int, hichanaft, 127) \
     MACRO(int, lopolyaft, 0) \
     MACRO(int, hipolyaft, 127) \
+    MACRO(float, lobpm, 0.0) \
+    MACRO(float, hibpm, NO_HI_BPM_VALUE) \
     MACRO(int, velcurve_quadratic, 1) \
     MACRO##_enum(sampler_filter_type, fil_type, sft_lp12) \
     MACRO##_enum(sampler_off_mode, off_mode, som_unknown) \
