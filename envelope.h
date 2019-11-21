@@ -128,10 +128,14 @@ static inline void cbox_envelope_update_shape_after_modify(struct cbox_envelope 
     if (es->end_value != env->orig_target)
     {
         // Adjust the start value to keep the current value intact given the change in the slope
-        if (es->is_exp)
-            env->stage_start_value *= es->end_value / (env->orig_target >= EXP_NOISE_FLOOR ? env->orig_target : EXP_NOISE_FLOOR);
-        else
-            env->stage_start_value += es->end_value - env->orig_target;
+        double pos = es->time > 0 ? env->cur_time * env->inv_time : 1;
+        if (pos < 1)
+        {
+            if (es->is_exp)
+                env->stage_start_value /= pow(es->end_value / (env->orig_target >= EXP_NOISE_FLOOR ? env->orig_target : EXP_NOISE_FLOOR), pos / (1 - pos)); // untested, likely never used
+            else
+                env->stage_start_value -= (es->end_value - env->orig_target) * pos / (1 - pos);
+        }
         env->orig_target = es->end_value;
     }
 }
@@ -145,11 +149,12 @@ static inline void cbox_envelope_advance(struct cbox_envelope *env, int released
     env->cur_time++;
     if (pos >= 1 || (es->break_on_release && released))
     {
-        env->cur_stage = released ? es->next_if_released : es->next_if_pressed;
-        if (!es->keep_last_value || (es->keep_last_value == 2 && !released))
+        int next_stage = released ? es->next_if_released : es->next_if_pressed;
+        if (!es->keep_last_value || (es->keep_last_value == 2 && !released) || next_stage == env->cur_stage)
             env->stage_start_value = es->end_value;
         else
             env->stage_start_value = env->cur_value;
+        env->cur_stage = next_stage;
         env->cur_time = 0;
         cbox_envelope_init_stage(env);
     }
@@ -268,7 +273,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[4].time = 1 * sr;
     env->stages[4].next_if_pressed = 4;
     env->stages[4].next_if_released = 5;
-    env->stages[4].keep_last_value = 0;
+    env->stages[4].keep_last_value = 1;
     env->stages[4].break_on_release = 1;
     env->stages[4].is_exp = 0;
 
@@ -304,6 +309,7 @@ static inline void cbox_envelope_modify_dahdsr(struct cbox_envelope_shape *env, 
         case 4: // sustain
             env->stages[3].end_value += value;
             env->stages[4].end_value += value;
+            env->stages[4].time = 0.02 * sr; // more rapid transition
             break;
         case 6: // start
             env->stages[0].end_value += value;
