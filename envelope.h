@@ -30,6 +30,7 @@ struct cbox_envstage
 };
 
 #define MAX_ENV_STAGES 16
+#define EXP_NOISE_FLOOR (100.0 / 16384.0)
 
 struct cbox_envelope_shape
 {
@@ -40,22 +41,24 @@ struct cbox_envelope_shape
 struct cbox_envelope
 {
     struct cbox_envelope_shape *shape;
-    double stage_start_value, cur_value, exp_factor, inv_time;
-    int cur_stage, cur_time;
+    double stage_start_value, cur_value, exp_factor, inv_time, cur_time, orig_time, orig_target;
+    int cur_stage;
 };
 
 static inline void cbox_envelope_init_stage(struct cbox_envelope *env)
 {
     struct cbox_envstage *es = &env->shape->stages[env->cur_stage];
+    env->orig_time = es->time;
+    env->orig_target = es->end_value;
     env->inv_time = es->time > 0 ? 1.0 / es->time : 1e6;
     if (es->is_exp)
     {
-        if (env->stage_start_value < 1.0/16384.0)
-            env->stage_start_value = 1.0/16384.0;
+        if (env->stage_start_value < EXP_NOISE_FLOOR)
+            env->stage_start_value = EXP_NOISE_FLOOR;
         double ev = es->end_value;
-        if (ev < 1.0/16384.0)
-            ev = 1.0/16384.0;
-        env->exp_factor = log(ev/env->stage_start_value);
+        if (ev < EXP_NOISE_FLOOR)
+            ev = EXP_NOISE_FLOOR;
+        env->exp_factor = log(ev / env->stage_start_value);
     }
 }
 
@@ -89,62 +92,12 @@ static inline void cbox_envelope_update_shape(struct cbox_envelope *env, struct 
         env->cur_time = ns->time;
 }
 
-static inline void cbox_envelope_update_shape_after_modify(struct cbox_envelope *env, struct cbox_envelope_shape *shape, double sr)
-{
-    struct cbox_envstage *es = &shape->stages[env->cur_stage];
-    env->inv_time = es->time > 0 ? 1.0 / es->time : 1e6;
-    if (es->is_exp)
-    {
-        double start = env->stage_start_value;
-        if (start < (1.0 / 16384.0))
-            start = 1.0 / 16384.0;
-        double end = es->end_value;
-        if (end < (1.0 / 16384.0))
-            end = 1.0 / 16384.0;
-        double cur_value = env->cur_value;
-        if (cur_value < (1.0 / 16384.0))
-            cur_value = 1.0 / 16384.0;
-        double slope = end / start;
-        if (fabs(slope - 1.f) < 1.0 / 16384.0)
-        {
-            // flat segment, transition in 20 ms before the end of the stage
-            env->stage_start_value = env->cur_value;
-            env->cur_time = es->time - 0.02 * sr;
-            return;
-        }
-        double pos = log(cur_value / start) / log(slope);
-        if (pos < 0)
-            pos = 0;
-        //double newv = start * pow(slope, pos);
-        //printf("cur %f (%d) start %f end %f pos %f new %f (%d)\n", cur_value, env->cur_time, start, end, pos, newv, (int)ceilf(pos * es->time + 1));
-        env->cur_time = ceilf(pos * es->time + 1);
-    }
-    else
-    {
-        double slope = es->end_value - env->stage_start_value;
-        if (!slope)
-        {
-            // flat segment, transition in 20 ms before the end of the stage
-            env->stage_start_value = env->cur_value;
-            env->cur_time = es->time - 0.02 * sr;
-            return;
-        }
-        double pos = (env->cur_value - env->stage_start_value) / slope;
-        //double newv = env->stage_start_value + slope * pos;
-        //printf("cur %f (%d) start %f end %f pos %f new %f (%d)\n", env->cur_value, env->cur_time, env->stage_start_value, es->end_value, pos, newv, (int)ceilf(pos * es->time + 1));
-        env->cur_time = ceilf(pos * es->time) + 1;
-    }
-}
-
-static inline float cbox_envelope_get_next(struct cbox_envelope *env, int released, const struct cbox_envelope_shape *shape)
+static inline float cbox_envelope_get_value(struct cbox_envelope *env, const struct cbox_envelope_shape *shape)
 {
     if (env->cur_stage < 0)
-    {
         return env->cur_value;
-    }
     const struct cbox_envstage *es = &shape->stages[env->cur_stage];
-    double pos = es->time > 0 ? env->cur_time * env->inv_time : 1;
-    env->cur_time++;
+    double pos = es->time > 0 ? env->cur_time * env->inv_time : 0;
     if (pos > 1)
         pos = 1;
     if (es->is_exp)
@@ -152,22 +105,54 @@ static inline float cbox_envelope_get_next(struct cbox_envelope *env, int releas
         // instead of exp, may use 2**x which can be factored
         // into a shift and a table lookup
         env->cur_value = env->stage_start_value * expf(pos * env->exp_factor);
-        if (env->cur_value <= 1.001/16384.0)
+        if (env->cur_value <= EXP_NOISE_FLOOR)
             env->cur_value = 0;
     }
     else
         env->cur_value = env->stage_start_value + (es->end_value - env->stage_start_value) * pos;
+    return env->cur_value;
+}
+
+#define DEBUG_UPDATE_SHAPE(...)
+
+static inline void cbox_envelope_update_shape_after_modify(struct cbox_envelope *env, struct cbox_envelope_shape *shape, double sr)
+{
+    struct cbox_envstage *es = &shape->stages[env->cur_stage];
+    if (es->time != env->orig_time)
+    {
+        // Scale cur_time to reflect the same relative position within the stage
+        env->cur_time = env->cur_time * es->time / (env->orig_time > 0 ? env->orig_time : 1);
+        env->orig_time = es->time;
+        env->inv_time = es->time > 0 ? 1.0 / es->time : 1e6;
+    }
+    if (es->end_value != env->orig_target)
+    {
+        // Adjust the start value to keep the current value intact given the change in the slope
+        if (es->is_exp)
+            env->stage_start_value *= es->end_value / (env->orig_target >= EXP_NOISE_FLOOR ? env->orig_target : EXP_NOISE_FLOOR);
+        else
+            env->stage_start_value += es->end_value - env->orig_target;
+        env->orig_target = es->end_value;
+    }
+}
+
+static inline void cbox_envelope_advance(struct cbox_envelope *env, int released, const struct cbox_envelope_shape *shape)
+{
+    if (env->cur_stage < 0)
+        return;
+    const struct cbox_envstage *es = &shape->stages[env->cur_stage];
+    double pos = es->time > 0 ? env->cur_time * env->inv_time : 1;
+    env->cur_time++;
     if (pos >= 1 || (es->break_on_release && released))
     {
         env->cur_stage = released ? es->next_if_released : es->next_if_pressed;
-        if (!es->keep_last_value)
+        if (!es->keep_last_value || (es->keep_last_value == 2 && !released))
             env->stage_start_value = es->end_value;
         else
             env->stage_start_value = env->cur_value;
         env->cur_time = 0;
         cbox_envelope_init_stage(env);
     }
-    return env->cur_value;
 }
 
 struct cbox_adsr
@@ -184,7 +169,7 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
     env->stages[0].end_value = 1;
     env->stages[0].time = adsr->attack * sr;
     env->stages[0].next_if_pressed = 1;
-    env->stages[0].next_if_released = 1;
+    env->stages[0].next_if_released = 3;
     env->stages[0].keep_last_value = 1;
     env->stages[0].break_on_release = 0;
     env->stages[0].is_exp = 0;
@@ -192,8 +177,8 @@ static inline void cbox_envelope_init_adsr(struct cbox_envelope_shape *env, cons
     env->stages[1].end_value = adsr->sustain;
     env->stages[1].time = adsr->decay * sr;
     env->stages[1].next_if_pressed = 2;
-    env->stages[1].next_if_released = 2;
-    env->stages[1].keep_last_value = 0;
+    env->stages[1].next_if_released = 3;
+    env->stages[1].keep_last_value = 1;
     env->stages[1].break_on_release = 0;
     env->stages[1].is_exp = 0;
 
@@ -259,7 +244,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[1].time = dahdsr->attack * sr;
     env->stages[1].next_if_pressed = 2;
     env->stages[1].next_if_released = 5;
-    env->stages[1].keep_last_value = 1;
+    env->stages[1].keep_last_value = 2;
     env->stages[1].break_on_release = 1;
     env->stages[1].is_exp = 0;
 
@@ -267,7 +252,7 @@ static inline void cbox_envelope_init_dahdsr(struct cbox_envelope_shape *env, co
     env->stages[2].time = dahdsr->hold * sr;
     env->stages[2].next_if_pressed = 3;
     env->stages[2].next_if_released = 5;
-    env->stages[2].keep_last_value = 1;
+    env->stages[2].keep_last_value = 2;
     env->stages[2].break_on_release = 1;
     env->stages[2].is_exp = 0;
 

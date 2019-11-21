@@ -539,6 +539,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->layer_changed = FALSE;
     }
 
+    static const int modoffset[4] = {0, -1, -1, 1 };
+    static const int modscale[4] = {1, 1, 2, -2 };
+
     struct cbox_envelope_shape *pitcheg_shape = v->pitch_env.shape, *fileg_shape = v->filter_env.shape, *ampeg_shape = v->amp_env.shape;
     if (__builtin_expect(l->mod_bitmask, 0))
     {
@@ -550,6 +553,29 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         COPY_ORIG_SHAPE(amp, amp, 0)
         COPY_ORIG_SHAPE(filter, fil, 1)
         COPY_ORIG_SHAPE(pitch, pitch, 2)
+
+        GSList *mod = l->modulations;
+        while(mod)
+        {
+            // Simplified modulations for EG stages (CCs only)
+            struct sampler_modulation *sm = mod->data;
+            if (sm->dest >= smdest_eg_stage_start && sm->dest <= smdest_eg_stage_end)
+            {
+                float value = 0.f;
+                if (sm->src < smsrc_pernote_offset)
+                    value = c->cc[sm->src] * (1.f / 127.f);
+                uint32_t param = sm->dest - smdest_eg_stage_start;
+                if (value * sm->amount != 0)
+                    cbox_envelope_modify_dahdsr(&v->cc_envs[(param >> 4)], param & 0x0F, value * sm->amount, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
+            }
+            mod = g_slist_next(mod);
+        }
+        #define UPDATE_ENV_POSITION(envtype, envtype2) \
+            if (l->mod_bitmask & slmb_##envtype##eg_cc) \
+                cbox_envelope_update_shape_after_modify(&v->envtype2##_env, envtype##eg_shape, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
+        UPDATE_ENV_POSITION(amp, amp)
+        UPDATE_ENV_POSITION(fil, filter)
+        UPDATE_ENV_POSITION(pitch, pitch)
     }
 
     float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + velscl * l->pitch_veltrack + l->tune + l->transpose * 100 + v->pitch_shift;
@@ -557,9 +583,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * velscl;
     modsrcs[smsrc_pitch - smsrc_pernote_offset] = pitch * (1.f / 100.f);
     modsrcs[smsrc_polyaft - smsrc_pernote_offset] = (c->poly_pressure_mask & (1 << (v->note >> 2))) ? c->poly_pressure[v->note] * (1.f / 127.f) : 0;
-    modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->pitch_env, v->released, pitcheg_shape) * 0.01f;
-    modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->filter_env, v->released, fileg_shape) * 0.01f;
-    modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_next(&v->amp_env, v->released, ampeg_shape) * 0.01f;
+    modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->pitch_env, pitcheg_shape) * 0.01f;
+    modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->filter_env, fileg_shape) * 0.01f;
+    modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->amp_env, ampeg_shape) * 0.01f;
 
     modsrcs[smsrc_amplfo - smsrc_pernote_offset] = lfo_run(&v->amp_lfo);
     modsrcs[smsrc_fillfo - smsrc_pernote_offset] = lfo_run(&v->filter_lfo);
@@ -608,8 +634,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         moddests[smdest_pitch] += pw;
     }
     
-    static const int modoffset[4] = {0, -1, -1, 1 };
-    static const int modscale[4] = {1, 1, 2, -2 };
     while(mod)
     {
         struct sampler_modulation *sm = mod->data;
@@ -639,14 +663,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             }
             else
                 moddests[sm->dest] += value * sm->amount;
-        } else {
-            assert (sm->dest >= smdest_eg_stage_start && sm->dest <= smdest_eg_stage_end);
-            uint32_t param = sm->dest - smdest_eg_stage_start;
-            if (value * sm->amount != 0) {
-                cbox_envelope_modify_dahdsr(&v->cc_envs[(param >> 4)], param & 0x0F, value * sm->amount, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
-            }
         }
-        
         mod = g_slist_next(mod);
     }
     lfo_update_xdelta(m, &v->pitch_lfo, modmask, smdest_pitchlfo_freq, moddests);
@@ -673,15 +690,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         RECALC_EQ_IF(2)
         RECALC_EQ_IF(3)
     }
-    if (__builtin_expect(l->mod_bitmask, 0))
-    {
-        #define UPDATE_ENV_POSITION(envtype, envtype2) \
-            if (l->mod_bitmask & slmb_##envtype##eg_cc) \
-                cbox_envelope_update_shape_after_modify(&v->envtype2##_env, envtype##eg_shape, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
-        UPDATE_ENV_POSITION(amp, amp)
-        UPDATE_ENV_POSITION(fil, filter)
-        UPDATE_ENV_POSITION(pitch, pitch)
-    }
+    cbox_envelope_advance(&v->pitch_env, v->released, pitcheg_shape);
+    cbox_envelope_advance(&v->filter_env, v->released, fileg_shape);
+    cbox_envelope_advance(&v->amp_env, v->released, ampeg_shape);
     
     double maxv = 127 << 7;
     double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;
