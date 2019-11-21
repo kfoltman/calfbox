@@ -85,9 +85,9 @@ static gboolean load_sfz_global(struct sfz_parser_client *client)
 static gboolean load_sfz_master(struct sfz_parser_client *client)
 {
     struct sfz_load_state *ls = client->user_data;
-    // printf("-- start group\n");
+    // printf("-- start master\n");
     ls->target = ls->master = sampler_layer_new(ls->m, ls->program, ls->program->global);
-    ls->group = ls->master->default_child;
+    ls->group = ls->master->default_child = sampler_layer_new(ls->m, ls->program, ls->master);
     return TRUE;
 }
 
@@ -197,7 +197,7 @@ static gboolean handle_token(struct sfz_parser_client *client, const char *token
 
 gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, int is_from_string, GError **error)
 {
-    struct sfz_load_state ls = { .global = prg->global, .master = prg->global->default_child, .group = prg->global->default_child->default_child, .m = m, .filename = sfz, .region = NULL, .error = error, .program = prg, .section_type = slst_normal };
+    struct sfz_load_state ls = { .global = prg->global, .master = prg->global->default_child, .group = prg->global->default_child->default_child, .target = NULL, .m = m, .filename = sfz, .region = NULL, .error = error, .program = prg, .section_type = slst_normal };
     struct sfz_parser_client c = { .user_data = &ls, .token = handle_token, .key_value = load_sfz_key_value };
     g_clear_error(error);
 
