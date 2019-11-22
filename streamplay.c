@@ -109,6 +109,12 @@ static void init_cue(struct stream_state *ss, struct stream_player_cue_point *pt
     pt->position = pos;
 }
 
+static void destroy_cue(struct stream_player_cue_point *pt)
+{
+    free(pt->data);
+    pt->data = NULL;
+}
+
 static void load_at_cue(struct stream_state *ss, struct stream_player_cue_point *pt)
 {
     if (pt->position != NO_SAMPLE_LOOP)
@@ -412,7 +418,10 @@ static void stream_state_destroy(struct stream_state *ss)
         cbox_fifo_write_atomic(ss->rb_for_reading, &cmd, 1);
         pthread_join(ss->thr_preload, NULL);
     }
-    
+    destroy_cue(&ss->cp_start);
+    destroy_cue(&ss->cp_loop);
+    for (int i = 0; i < MAX_READAHEAD_BUFFERS; i++)
+        destroy_cue(&ss->cp_readahead[i]);
     if (ss->rb_for_reading)
         cbox_fifo_destroy(ss->rb_for_reading);
     if (ss->rb_just_read)
@@ -443,7 +452,7 @@ static struct stream_state *stream_state_new(const char *context, const gchar *f
         free(stream);
         return NULL;
     }
-    g_message("Frames %d channels %d", (int)stream->info.frames, (int)stream->info.channels);
+    // g_message("Frames %d channels %d", (int)stream->info.frames, (int)stream->info.channels);
     
     stream->rb_for_reading = cbox_fifo_new(MAX_READAHEAD_BUFFERS + 1);
     stream->rb_just_read = cbox_fifo_new(MAX_READAHEAD_BUFFERS + 1);
@@ -639,6 +648,8 @@ gboolean stream_player_process_cmd(struct cbox_command_target *ct, struct cbox_c
             return cbox_execute_on(fb, NULL, "/filename", "s", error, m->stream->filename) &&
                 cbox_execute_on(fb, NULL, "/pos", "i", error, m->stream->readptr) &&
                 cbox_execute_on(fb, NULL, "/length", "i", error, m->stream->info.frames) &&
+                cbox_execute_on(fb, NULL, "/channels", "i", error, m->stream->info.channels) &&
+                cbox_execute_on(fb, NULL, "/sample_rate", "i", error, m->stream->info.samplerate) &&
                 cbox_execute_on(fb, NULL, "/playing", "i", error, m->stream->phase != STOPPED);
         }
         else

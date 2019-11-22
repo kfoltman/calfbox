@@ -136,9 +136,9 @@ static void config_key_process(void *user_data, const char *key)
     {
         char *title = cbox_config_get_string(key, "title");
         if (title)
-            cbox_menu_add_item(data->menu, cbox_menu_item_new_command(title, data->func, strdup(key + strlen(data->prefix))));
+            cbox_menu_add_item(data->menu, cbox_menu_item_new_command(title, data->func, strdup(key + strlen(data->prefix)), mif_dup_label | mif_free_context));
         else
-            cbox_menu_add_item(data->menu, cbox_menu_item_new_command(key, data->func, strdup(key + strlen(data->prefix))));
+            cbox_menu_add_item(data->menu, cbox_menu_item_new_command(key, data->func, strdup(key + strlen(data->prefix)), mif_dup_label | mif_free_context));
     }
 }
 
@@ -147,43 +147,36 @@ struct cbox_menu *create_scene_menu(struct cbox_menu_item_menu *item, void *menu
     struct cbox_menu *scene_menu = cbox_menu_new();
     struct cbox_config_section_cb_data cb = { .menu = scene_menu };
 
-    cbox_menu_add_item(scene_menu, cbox_menu_item_new_static("Scenes", NULL, NULL));
+    cbox_menu_add_item(scene_menu, cbox_menu_item_new_static("Scenes", NULL, NULL, 0));
     cb.prefix = "scene:";
     cb.func = cmd_load_scene;
     cbox_config_foreach_section(config_key_process, &cb);
-    cbox_menu_add_item(scene_menu, cbox_menu_item_new_static("Layers", NULL, NULL));
+    cbox_menu_add_item(scene_menu, cbox_menu_item_new_static("Layers", NULL, NULL, 0));
     cb.prefix = "layer:";
     cb.func = cmd_load_layer;
     cbox_config_foreach_section(config_key_process, &cb);
-    cbox_menu_add_item(scene_menu, cbox_menu_item_new_static("Instruments", NULL, NULL));
+    cbox_menu_add_item(scene_menu, cbox_menu_item_new_static("Instruments", NULL, NULL, 0));
     cb.prefix = "instrument:";
     cb.func = cmd_load_instrument;
     cbox_config_foreach_section(config_key_process, &cb);
     
-    cbox_menu_add_item(scene_menu, cbox_menu_item_new_menu("OK", NULL, NULL));    
-    
+    cbox_menu_add_item(scene_menu, cbox_menu_item_new_ok());
     return scene_menu;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static struct cbox_command_target *find_module_target(const char *type, GError **error)
+static struct cbox_command_target *find_module_target(const struct cbox_menu_item_command *item)
 {
-    struct cbox_scene *scene = app.engine->scenes[0];
-    for (uint32_t i = 0; i < scene->instrument_count; i++)
-    {
-        if (!strcmp(scene->instruments[i]->module->engine_name, type))
-            return &scene->instruments[i]->module->cmd_target;
-    }
-    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot find a module of type '%s'", type);
-    return NULL;
+    struct cbox_instrument *instr = item->item.item_context;
+    return &instr->module->cmd_target;
     
 }
 
 int cmd_stream_rewind(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_command_target *target = find_module_target("stream_player", &error);
+    struct cbox_command_target *target = find_module_target(item);
     if (target)
         cbox_execute_on(target, NULL, "/seek", "i", &error, 0);
     cbox_print_error_if(error);
@@ -193,7 +186,7 @@ int cmd_stream_rewind(struct cbox_menu_item_command *item, void *context)
 int cmd_stream_play(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_command_target *target = find_module_target("stream_player", &error);
+    struct cbox_command_target *target = find_module_target(item);
     if (target)
         cbox_execute_on(target, NULL, "/play", "", &error);
     cbox_print_error_if(error);
@@ -203,7 +196,7 @@ int cmd_stream_play(struct cbox_menu_item_command *item, void *context)
 int cmd_stream_stop(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_command_target *target = find_module_target("stream_player", &error);
+    struct cbox_command_target *target = find_module_target(item);
     if (target)
         cbox_execute_on(target, NULL, "/stop", "", &error);
     cbox_print_error_if(error);
@@ -213,64 +206,138 @@ int cmd_stream_stop(struct cbox_menu_item_command *item, void *context)
 int cmd_stream_unload(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
-    struct cbox_command_target *target = find_module_target("stream_player", &error);
+    struct cbox_command_target *target = find_module_target(item);
     if (target)
         cbox_execute_on(target, NULL, "/unload", "", &error);
     cbox_print_error_if(error);
     return 0;
 }
 
+struct stream_response_data
+{
+    gchar *filename;
+    uint32_t pos, length, sample_rate, channels;
+};
+
 gboolean result_parser_status(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
-    cbox_osc_command_dump(cmd);
+    struct stream_response_data *res = ct->user_data;
+    if (!strcmp(cmd->command, "/filename"))
+        res->filename = g_strdup(cmd->arg_values[0]);
+    if (!strcmp(cmd->command, "/pos"))
+        res->pos = *((uint32_t **)cmd->arg_values)[0];
+    if (!strcmp(cmd->command, "/length"))
+        res->length = *((uint32_t **)cmd->arg_values)[0];
+    if (!strcmp(cmd->command, "/sample_rate"))
+        res->sample_rate = *((uint32_t **)cmd->arg_values)[0];
+    if (!strcmp(cmd->command, "/channels"))
+        res->channels = *((uint32_t **)cmd->arg_values)[0];
+    //cbox_osc_command_dump(cmd);
     return TRUE;
 }
 
-int cmd_stream_status(struct cbox_menu_item_command *item, void *context)
+char *cmd_stream_status(const struct cbox_menu_item_static *item, void *context)
 {
-    struct cbox_command_target response = { NULL, result_parser_status };
+    struct stream_response_data data = { NULL, 0, 0, 0, 0 };
+    struct cbox_command_target response = { &data, result_parser_status };
     GError *error = NULL;
-    struct cbox_command_target *target = find_module_target("stream_player", &error);
+    struct cbox_command_target *target = find_module_target((struct cbox_menu_item_command *)item);
     if (target)
         cbox_execute_on(target, &response, "/status", "", &error);
     cbox_print_error_if(error);
-    return 0;
+    gchar *res = NULL;
+    if (data.filename && data.length && data.sample_rate)
+    {
+        double duration = data.length * 1.0 / data.sample_rate;
+        res = g_strdup_printf("%s (%um%0.2fs, %uch, %uHz) (%0.2f%%)", data.filename, (unsigned)floor(duration / 60), duration - 60 * floor(duration / 60), (unsigned)data.channels, (unsigned)data.sample_rate, data.pos * 100.0 / data.length);
+    }
+    else
+        res = g_strdup("-");
+    g_free(data.filename);
+    return res;
+}
+
+struct load_waveform_context
+{
+    struct cbox_menu_item_context header;
+    struct cbox_instrument *instrument;
+    char *filename;
+};
+
+static void destroy_load_waveform_context(void *p)
+{
+    struct load_waveform_context *context = p;
+    g_free(context->filename);
+    free(context);
 }
 
 int cmd_stream_load(struct cbox_menu_item_command *item, void *context)
 {
+    struct load_waveform_context *ctx = item->item.item_context;
     GError *error = NULL;
-    struct cbox_command_target *target = find_module_target("stream_player", &error);
+    struct cbox_command_target *target = &ctx->instrument->module->cmd_target;
     if (target)
-        cbox_execute_on(target, NULL, "/load", "si", &error, (gchar *)item->item.item_context, 0);
+        cbox_execute_on(target, NULL, "/load", "si", &error, ctx->filename, 0);
     cbox_print_error_if(error);
     return 0;
 }
 
-struct cbox_menu *create_stream_menu(struct cbox_menu_item_menu *item, void *menu_context)
+struct cbox_menu *create_streamplay_menu(struct cbox_menu_item_menu *item, void *menu_context)
 {
     struct cbox_menu *menu = cbox_menu_new();
+    struct cbox_instrument *instr = item->item.item_context;
 
-    cbox_menu_add_item(menu, cbox_menu_item_new_static("Module commands", NULL, NULL));
-    cbox_menu_add_item(menu, cbox_menu_item_new_command("Play stream", cmd_stream_play, NULL));
-    cbox_menu_add_item(menu, cbox_menu_item_new_command("Stop stream", cmd_stream_stop, NULL));
-    cbox_menu_add_item(menu, cbox_menu_item_new_command("Rewind stream", cmd_stream_rewind, NULL));
-    cbox_menu_add_item(menu, cbox_menu_item_new_command("Describe stream", cmd_stream_status, NULL));
-    cbox_menu_add_item(menu, cbox_menu_item_new_command("Unload stream", cmd_stream_unload, NULL));
+    assert(instr);
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Current stream", NULL, NULL, 0));
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("File", cmd_stream_status, instr, 0));
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Module commands", NULL, NULL, 0));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Play stream", cmd_stream_play, instr, 0));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Stop stream", cmd_stream_stop, instr, 0));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Rewind stream", cmd_stream_rewind, instr, 0));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Unload stream", cmd_stream_unload, instr, 0));
 
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Files available", NULL, NULL, 0));
     glob_t g;
-    if (glob("*.wav", GLOB_TILDE_CHECK, NULL, &g) == 0)
+    gboolean found = (glob("*.wav", GLOB_TILDE_CHECK, NULL, &g) == 0);
+    found = glob("*.ogg", GLOB_TILDE_CHECK | (found ? GLOB_APPEND : 0), NULL, &g) || found;
+    if (found)
     {
         for (size_t i = 0; i < g.gl_pathc; i++)
         {
-            cbox_menu_add_item(menu, cbox_menu_item_new_command(g_strdup_printf("Load: %s", g.gl_pathv[i]), cmd_stream_load, g_strdup(g.gl_pathv[i])));
+            struct load_waveform_context *context = calloc(1, sizeof(struct load_waveform_context));
+            context->header.destroy_func = destroy_load_waveform_context;
+            context->instrument = instr;
+            context->filename = g_strdup(g.gl_pathv[i]);
+            cbox_menu_add_item(menu, cbox_menu_item_new_command(g_strdup_printf("Load: %s", g.gl_pathv[i]), cmd_stream_load, context, mif_free_label | mif_context_is_struct));
         }
     }
-    
     globfree(&g);
-        
-    cbox_menu_add_item(menu, cbox_menu_item_new_menu("OK", NULL, NULL));    
-    
+
+    cbox_menu_add_item(menu, cbox_menu_item_new_ok());
+    return menu;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+struct cbox_menu *create_module_menu(struct cbox_menu_item_menu *item, void *menu_context)
+{
+    struct cbox_menu *menu = cbox_menu_new();
+
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Scene instruments", NULL, NULL, 0));
+    struct cbox_scene *scene = app.engine->scenes[0];
+    for (uint32_t i = 0; i < scene->instrument_count; ++i)
+    {
+        struct cbox_instrument *instr = scene->instruments[i];
+        create_menu_func menufunc = NULL;
+
+        if (!strcmp(instr->module->engine_name, "stream_player"))
+            menufunc = create_streamplay_menu;
+        if (menufunc)
+            cbox_menu_add_item(menu, cbox_menu_item_new_dynamic_menu(g_strdup_printf("%s (%s)", instr->module->instance_name, instr->module->engine_name), menufunc, instr, mif_free_label));
+        else
+            cbox_menu_add_item(menu, cbox_menu_item_new_static(g_strdup_printf("%s (%s)", instr->module->instance_name, instr->module->engine_name), NULL, NULL, mif_free_label));
+    }
+    cbox_menu_add_item(menu, cbox_menu_item_new_ok());
     return menu;
 }
 
@@ -337,51 +404,50 @@ struct cbox_menu *create_pattern_menu(struct cbox_menu_item_menu *item, void *me
     struct cbox_menu *menu = cbox_menu_new();
     struct cbox_config_section_cb_data cb = { .menu = menu };
 
-    cbox_menu_add_item(menu, cbox_menu_item_new_static("Pattern commands", NULL, NULL));
-    cbox_menu_add_item(menu, cbox_menu_item_new_command("No pattern", cmd_pattern_none, NULL));
-    cbox_menu_add_item(menu, cbox_menu_item_new_command("Simple metronome", cmd_pattern_simple, NULL));
-    cbox_menu_add_item(menu, cbox_menu_item_new_command("Normal metronome", cmd_pattern_normal, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Pattern commands", NULL, NULL, 0));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("No pattern", cmd_pattern_none, NULL, 0));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Simple metronome", cmd_pattern_simple, NULL, 0));
+    cbox_menu_add_item(menu, cbox_menu_item_new_command("Normal metronome", cmd_pattern_normal, NULL, 0));
 
-    cbox_menu_add_item(menu, cbox_menu_item_new_static("Drum tracks", NULL, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Drum tracks", NULL, NULL, 0));
     cb.prefix = "drumtrack:";
     cb.func = cmd_load_drumtrack;
     cbox_config_foreach_section(config_key_process, &cb);
     
-    cbox_menu_add_item(menu, cbox_menu_item_new_static("Melodic tracks", NULL, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Melodic tracks", NULL, NULL, 0));
     cb.prefix = "track:";
     cb.func = cmd_load_track;
     cbox_config_foreach_section(config_key_process, &cb);
     
-    cbox_menu_add_item(menu, cbox_menu_item_new_static("Drum patterns", NULL, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Drum patterns", NULL, NULL, 0));
     cb.prefix = "drumpattern:";
     cb.func = cmd_load_drumpattern;
     cbox_config_foreach_section(config_key_process, &cb);
 
-    cbox_menu_add_item(menu, cbox_menu_item_new_static("Melodic patterns", NULL, NULL));
+    cbox_menu_add_item(menu, cbox_menu_item_new_static("Melodic patterns", NULL, NULL, 0));
     cb.prefix = "pattern:";
     cb.func = cmd_load_pattern;
     cbox_config_foreach_section(config_key_process, &cb);
 
-    cbox_menu_add_item(menu, cbox_menu_item_new_menu("OK", NULL, NULL));    
-    
+    cbox_menu_add_item(menu, cbox_menu_item_new_ok());
     return menu;
 }
 
 struct cbox_menu *create_main_menu()
 {
     struct cbox_menu *main_menu = cbox_menu_new();
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Current scene:", scene_format_value, NULL));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Set scene", create_scene_menu, NULL));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Module control", create_stream_menu, NULL));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Pattern control", create_pattern_menu, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Current scene:", scene_format_value, NULL, 0));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Set scene", create_scene_menu, NULL, 0));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Module control", create_module_menu, NULL, 0));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_dynamic_menu("Pattern control", create_pattern_menu, NULL, 0));
     
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Variables", NULL, NULL));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Variables", NULL, NULL, 0));
     // cbox_menu_add_item(main_menu, cbox_menu_item_new_int("foo:", &var1, 0, 127, NULL));
     // cbox_menu_add_item(main_menu, "bar:", menu_item_value_double, &mx_double_var2, &var2);
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("pos:", transport_format_value, "pos"));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("bbt:", transport_format_value, "bbt"));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Commands", NULL, NULL));
-    cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Quit", cmd_quit, NULL));
+    //cbox_menu_add_item(main_menu, cbox_menu_item_new_static("pos:", transport_format_value, "pos", 0));
+    //cbox_menu_add_item(main_menu, cbox_menu_item_new_static("bbt:", transport_format_value, "bbt", 0));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_static("Commands", NULL, NULL, 0));
+    cbox_menu_add_item(main_menu, cbox_menu_item_new_command("Quit", cmd_quit, NULL, 0));
     return main_menu;
 }
 

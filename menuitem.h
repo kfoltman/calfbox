@@ -56,6 +56,7 @@ struct cbox_menu_item
     gchar *label;
     struct cbox_menu_item_class *item_class;
     void *item_context;
+    uint32_t flags;
     int x, y;
     /* TODO: is_active? */
 };
@@ -94,6 +95,11 @@ struct cbox_menu_item_static
 
 typedef struct cbox_menu *(*create_menu_func)(struct cbox_menu_item_menu *item, void *menu_context);
 
+struct cbox_menu_item_context
+{
+    void (*destroy_func)(void *menu_context);
+};
+
 struct cbox_menu_item_menu
 {
     struct cbox_menu_item item;
@@ -101,11 +107,23 @@ struct cbox_menu_item_menu
     create_menu_func create_menu;
 };
 
-extern struct cbox_menu_item *cbox_menu_item_new_command(const char *label, cbox_menu_item_execute_func exec, void *item_context);
-extern struct cbox_menu_item *cbox_menu_item_new_static(const char *label, cbox_menu_item_format_value fmt, void *item_context);
-extern struct cbox_menu_item *cbox_menu_item_new_int(const char *label, int *value, int vmin, int vmax, void *item_context);
-extern struct cbox_menu_item *cbox_menu_item_new_menu(const char *label, struct cbox_menu *menu, void *item_context);
-extern struct cbox_menu_item *cbox_menu_item_new_dynamic_menu(const char *label, create_menu_func func, void *item_context);
+enum {
+    mif_free_label = 1, // release the label on destroy
+    mif_free_context = 2, // release the context on destroy
+    mif_dup_label = 4 | mif_free_label, // clone the label, release the clone on destroy
+    mif_context_is_struct = 8, // cast context to cbox_menu_item_context and call destroy_func on destroy (it may or may not free() itself)
+};
+
+extern struct cbox_menu_item *cbox_menu_item_new_command(const char *label, cbox_menu_item_execute_func exec, void *item_context, uint32_t flags);
+extern struct cbox_menu_item *cbox_menu_item_new_static(const char *label, cbox_menu_item_format_value fmt, void *item_context, uint32_t flags);
+extern struct cbox_menu_item *cbox_menu_item_new_int(const char *label, int *value, int vmin, int vmax, void *item_context, uint32_t flags);
+extern struct cbox_menu_item *cbox_menu_item_new_menu(const char *label, struct cbox_menu *menu, void *item_context, uint32_t flags);
+extern struct cbox_menu_item *cbox_menu_item_new_dynamic_menu(const char *label, create_menu_func func, void *item_context, uint32_t flags);
 extern void cbox_menu_item_destroy(struct cbox_menu_item *);
+
+static inline struct cbox_menu_item *cbox_menu_item_new_ok(void)
+{
+    return cbox_menu_item_new_menu("OK", NULL, NULL, 0);
+}
 
 #endif

@@ -41,7 +41,15 @@ static void item_measure(struct cbox_menu_item *item, struct cbox_menu_state *st
 
 static void item_destroy(struct cbox_menu_item *item)
 {
-    g_free(item->label);
+    if (item->flags & mif_free_label)
+        g_free(item->label);
+    if (item->flags & mif_free_context)
+        free(item->item_context);
+    if (item->flags & mif_context_is_struct)
+    {
+        struct cbox_menu_item_context *ctx = item->item_context;
+        ctx->destroy_func(ctx);
+    }
     g_free(item);
 }
 
@@ -177,29 +185,34 @@ static gchar *menu_format(const struct cbox_menu_item *item, struct cbox_menu_st
 
 static int menu_on_key(struct cbox_menu_item *item, struct cbox_menu_state *state, int key)
 {
+    struct cbox_menu_page *page = state->page;
     if (key == 10)
     {
         struct cbox_menu_item_menu *mitem = (struct cbox_menu_item_menu *)item;
         if (mitem->create_menu)
         {
-            struct cbox_menu_state *new_state = cbox_menu_state_new(state->page, mitem->create_menu(mitem, state->context), state->window, state->context);
+            struct cbox_menu_state *new_state = cbox_menu_state_new(page, mitem->create_menu(mitem, state->context), state->window, state->context);
             new_state->caller = state;
-            state->page->state = new_state;
+            new_state->menu_is_temporary = 1;
+
+            page->state = new_state;
         }
         else
         if (mitem->menu)
         {
-            struct cbox_menu_state *new_state = cbox_menu_state_new(state->page, mitem->menu, state->window, state->context);
+            struct cbox_menu_state *new_state = cbox_menu_state_new(page, mitem->menu, state->window, state->context);
             new_state->caller = state;
-            state->page->state = new_state;
+
+            page->state = new_state;
         }
         else
         {
-            struct cbox_menu_state *old_state = state;
-            state->page->state = state->caller;
-            if (old_state->menu_is_temporary)
-                cbox_menu_destroy(old_state->menu);
-            cbox_menu_state_destroy(old_state);
+            struct cbox_menu_state *caller_state = state->caller;
+            if (state->menu_is_temporary)
+                cbox_menu_destroy(state->menu);
+            cbox_menu_state_destroy(state);
+
+            page->state = caller_state;
             return -1;
         }
         return 0;
@@ -218,30 +231,35 @@ struct cbox_menu_item_class menu_item_class_menu = {
 
 /*******************************************************************/
 
-struct cbox_menu_item *cbox_menu_item_new_command(const char *label, cbox_menu_item_execute_func exec, void *item_context)
+#define TREAT_LABEL(label) ((flags & mif_dup_label) == mif_dup_label ? g_strdup(label) : (char *)(label))
+
+struct cbox_menu_item *cbox_menu_item_new_command(const char *label, cbox_menu_item_execute_func exec, void *item_context, uint32_t flags)
 {
-    struct cbox_menu_item_command *item = malloc(sizeof(struct cbox_menu_item_command));
-    item->item.label = g_strdup(label);
+    struct cbox_menu_item_command *item = calloc(1, sizeof(struct cbox_menu_item_command));
+    item->item.label = TREAT_LABEL(label);
+    item->item.flags = flags;
     item->item.item_class = &menu_item_class_command;
     item->item.item_context = item_context;
     item->execute = exec;
     return &item->item;
 }
 
-struct cbox_menu_item *cbox_menu_item_new_static(const char *label, cbox_menu_item_format_value fmt, void *item_context)
+struct cbox_menu_item *cbox_menu_item_new_static(const char *label, cbox_menu_item_format_value fmt, void *item_context, uint32_t flags)
 {
-    struct cbox_menu_item_static *item = malloc(sizeof(struct cbox_menu_item_static));
-    item->item.label = g_strdup(label);
+    struct cbox_menu_item_static *item = calloc(1, sizeof(struct cbox_menu_item_static));
+    item->item.label = TREAT_LABEL(label);
+    item->item.flags = flags;
     item->item.item_class = &menu_item_class_static;
     item->item.item_context = item_context;
     item->format_value = fmt;
     return &item->item;
 }
 
-struct cbox_menu_item *cbox_menu_item_new_int(const char *label, int *value, int vmin, int vmax, void *item_context)
+struct cbox_menu_item *cbox_menu_item_new_int(const char *label, int *value, int vmin, int vmax, void *item_context, uint32_t flags)
 {
-    struct cbox_menu_item_int *item = malloc(sizeof(struct cbox_menu_item_int));
-    item->item.label = g_strdup(label);
+    struct cbox_menu_item_int *item = calloc(1, sizeof(struct cbox_menu_item_int));
+    item->item.label = TREAT_LABEL(label);
+    item->item.flags = flags;
     item->item.item_class = &menu_item_class_int;
     item->item.item_context = item_context;
     item->value = value;
@@ -251,10 +269,11 @@ struct cbox_menu_item *cbox_menu_item_new_int(const char *label, int *value, int
     return &item->item;
 }
 
-struct cbox_menu_item *cbox_menu_item_new_menu(const char *label, struct cbox_menu *menu, void *item_context)
+struct cbox_menu_item *cbox_menu_item_new_menu(const char *label, struct cbox_menu *menu, void *item_context, uint32_t flags)
 {
-    struct cbox_menu_item_menu *item = malloc(sizeof(struct cbox_menu_item_menu));
-    item->item.label = g_strdup(label);
+    struct cbox_menu_item_menu *item = calloc(1, sizeof(struct cbox_menu_item_menu));
+    item->item.label = TREAT_LABEL(label);
+    item->item.flags = flags;
     item->item.item_class = &menu_item_class_menu;
     item->item.item_context = item_context;
     item->menu = menu;
@@ -262,10 +281,11 @@ struct cbox_menu_item *cbox_menu_item_new_menu(const char *label, struct cbox_me
     return &item->item;
 }
 
-struct cbox_menu_item *cbox_menu_item_new_dynamic_menu(const char *label, create_menu_func func, void *item_context)
+struct cbox_menu_item *cbox_menu_item_new_dynamic_menu(const char *label, create_menu_func func, void *item_context, uint32_t flags)
 {
-    struct cbox_menu_item_menu *item = malloc(sizeof(struct cbox_menu_item_menu));
-    item->item.label = g_strdup(label);
+    struct cbox_menu_item_menu *item = calloc(1, sizeof(struct cbox_menu_item_menu));
+    item->item.label = TREAT_LABEL(label);
+    item->item.flags = flags;
     item->item.item_class = &menu_item_class_menu;
     item->item.item_context = item_context;
     item->menu = NULL;
