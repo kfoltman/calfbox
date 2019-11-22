@@ -295,9 +295,40 @@ static void cbox_audio_output_router_record_block(struct cbox_recorder *handler,
     cbox_gain_add_stereo(&router->gain, &router->left->buffer[offset], buffers[0], &router->right->buffer[offset], buffers[1], numsamples);
 }
 
+static gboolean cbox_audio_output_router_attach(struct cbox_recorder *handler, struct cbox_recording_source *src, GError **error)
+{
+    struct cbox_audio_output_router *router = handler->user_data;
+    if (router->attached)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Router already attached");
+        return FALSE;
+    }
+    router->source = src;
+    router->attached++;
+    return TRUE;
+}
+
+static gboolean cbox_audio_output_router_detach(struct cbox_recorder *handler, GError **error)
+{
+    struct cbox_audio_output_router *router = handler->user_data;
+    if (router->attached != 1)
+    {
+        g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Router not yet attached");
+        return FALSE;
+    }
+    assert (router->source);
+    --router->attached;
+    assert (router->attached == 0);
+    router->source = NULL;
+    return TRUE;
+}
+
 static void cbox_audio_output_router_destroy(struct cbox_recorder *handler)
 {
     struct cbox_audio_output_router *router = handler->user_data;
+    if (router->attached)
+        cbox_recording_source_detach(router->source, &router->recorder, NULL);
+    assert(!router->attached);
     router->left->users--;
     router->right->users--;
 }
@@ -328,12 +359,14 @@ struct cbox_audio_output_router *cbox_io_create_audio_output_router(struct cbox_
     CBOX_OBJECT_HEADER_INIT(&router->recorder, cbox_recorder, CBOX_GET_DOCUMENT(engine));
     cbox_command_target_init(&router->recorder.cmd_target, cbox_audio_output_router_process_cmd, &router->recorder);
     router->recorder.user_data = router;
-    router->recorder.attach = NULL;
+    router->recorder.attach = cbox_audio_output_router_attach;
     router->recorder.record_block = cbox_audio_output_router_record_block;
-    router->recorder.detach = NULL;
+    router->recorder.detach = cbox_audio_output_router_detach;
     router->recorder.destroy = cbox_audio_output_router_destroy;
+    router->source = NULL;
     router->left = left;
     router->right = right;
+    router->attached = 0;
     cbox_gain_init(&router->gain);
     cbox_gain_set_db(&router->gain, 12.0);
     left->users++;

@@ -156,8 +156,10 @@ struct cbox_audio_output
 struct cbox_audio_output_router
 {
     struct cbox_recorder recorder;
+    struct cbox_recording_source *source;
     struct cbox_audio_output *left, *right;
     struct cbox_gain gain;
+    int attached;
 };
 
 extern gboolean cbox_io_init(struct cbox_io *io, struct cbox_open_params *const params, struct cbox_command_target *fb, GError **error);
