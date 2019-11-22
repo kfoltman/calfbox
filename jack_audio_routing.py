@@ -5,24 +5,6 @@ def cmd_dumper(cmd, fb, args):
     print ("%s(%s)" % (cmd, ",".join(list(map(repr,args)))))
 
 cbox.init_engine()
-
-cbox.Config.add_section("drumpattern:pat1", """
-title=Straight - Verse
-beats=4
-track1=bd
-track2=sd
-track3=hh
-track4=ho
-bd_note=c1
-sd_note=d1
-hh_note=f#1
-ho_note=a#1
-bd_trigger=9... .... 9.6. ....
-sd_trigger=.... 9..5 .2.. 9...
-hh_trigger=9353 7353 7353 73.3
-ho_trigger=.... .... .... ..3.
-""")
-
 cbox.Config.set("io", "use_usb", 0)
 cbox.start_audio(cmd_dumper)
 
