@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config-api.h"
 #include "dspmath.h"
+#include "engine.h"
 #include "errors.h"
 #include "midi.h"
 #include "module.h"
@@ -35,6 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 
+static inline void set_cc_int(struct sampler_channel *c, uint32_t cc, uint8_t value)
+{
+    c->intcc[cc] = value;
+    c->floatcc[cc] = value * (1.0f / 127.f);
+}
+
+static inline void set_cc_float(struct sampler_channel *c, uint32_t cc, float value)
+{
+    c->intcc[cc] = (uint8_t)(value * 127) & 127;
+    c->floatcc[cc] = value;
+}
+
 void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
 {
     c->module = m;
@@ -43,7 +56,11 @@ void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
     c->active_prevoices = 0;
     c->pitchwheel = 0;
     c->output_shift = 0;
-    memset(c->cc, 0, sizeof(c->cc));
+    for (int i = 0; i < smsrc_perchan_count; ++i)
+    {
+        c->intcc[i] = 0;
+        c->floatcc[i] = 0;
+    }
     c->poly_pressure_mask = 0;
     
     // default to maximum and pan=centre if MIDI mixing disabled
@@ -59,10 +76,12 @@ void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
         sampler_channel_process_cc(c, 10, 64);
         sampler_channel_process_cc(c, 10 + 32, 0);
     }
-    c->cc[11] = 127;
-    c->cc[71] = 64;
-    c->cc[74] = 64;
+    set_cc_int(c, 11, 127);
+    set_cc_int(c, 71, 64);
+    set_cc_int(c, 74, 64);
+    set_cc_float(c, smsrc_alternate, 0);
     c->previous_note = -1;
+    c->last_polyaft = 0;
     c->first_note_vel = 100;
     c->program = NULL;
     sampler_channel_set_program_RT(c, m->program_count ? m->programs[0] : NULL);
@@ -80,7 +99,7 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
         struct sampler_rll *rll = c->program->rll;
         if (!(rll->cc_trigger_bitmask[cc >> 5] & (1 << (cc & 31))))
             return;
-        int old_value = c->cc[cc];
+        int old_value = c->intcc[cc];
         for (GSList *p = rll->layers_oncc; p; p = p->next)
         {
             struct sampler_layer *layer = p->data;
@@ -101,19 +120,19 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
             }
         }        
     }
-    int was_enabled = c->cc[cc] >= 64;
+    int was_enabled = c->intcc[cc] >= 64;
     int enabled = val >= 64;
     switch(cc)
     {
         case 10:
         case 10 + 32:
-            c->cc[cc] = val;
+            set_cc_int(c, cc, val);
             if (!c->module->disable_mixer_controls)
                 c->channel_pan_cc = sampler_channel_addcc(c, 10);
             break;
         case 7:
         case 7 + 32:
-            c->cc[cc] = val;
+            set_cc_int(c, cc, val);
             if (!c->module->disable_mixer_controls)
                 c->channel_volume_cc = sampler_channel_addcc(c, 7);
             break;
@@ -139,15 +158,17 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
             // http://www.midi.org/techspecs/rp15.php
             sampler_channel_process_cc(c, 64, 0);
             sampler_channel_process_cc(c, 66, 0);
-            c->cc[11] = 127;
-            c->cc[1] = 0;
+            set_cc_int(c, 11, 127);
+            set_cc_int(c, 1, 0);
+            set_cc_float(c, smsrc_alternate, 0);
             c->pitchwheel = 0;
-            c->cc[smsrc_chanaft] = 0;
+            c->last_chanaft = 0;
             c->poly_pressure_mask = 0;
+            c->last_polyaft = 0;
             return;
     }
-    if (cc < 120)
-        c->cc[cc] = val;
+    if (cc < smsrc_perchan_count)
+        set_cc_int(c, cc, val);
 }
 
 void sampler_channel_release_groups(struct sampler_channel *c, int note, int exgroups[MAX_RELEASED_GROUPS], int exgroupcount)
@@ -180,6 +201,10 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
 {
     struct sampler_module *m = c->module;
     float random = rand() * 1.0 / (RAND_MAX + 1.0);
+
+    set_cc_float(c, smsrc_alternate, c->intcc[smsrc_alternate] ? 0.f : 1.f);
+    set_cc_float(c, smsrc_random_unipolar, random); // is that a per-voice or per-channel value? is it generated per region or per note?
+
     gboolean is_first = FALSE;
     if (!is_release_trigger)
     {
@@ -294,16 +319,17 @@ void sampler_channel_stop_note(struct sampler_channel *c, int note, int vel, gbo
     {
         if (v->note == note && v->layer->trigger != stm_release)
         {
+            v->off_vel = vel;
             if (v->captured_sostenuto)
                 v->released_with_sostenuto = 1;
-            else if (c->cc[64] >= 64)
+            else if (c->intcc[64] >= 64)
                 v->released_with_sustain = 1;
             else
                 sampler_voice_release(v, is_polyaft);
                 
         }
     }
-    if (c->cc[64] < 64)
+    if (c->intcc[64] < 64)
         sampler_channel_start_release_triggered_voices(c, note);
     else
         c->sustainmask[note >> 5] |= (1 << (note & 31));
@@ -399,7 +425,7 @@ void sampler_channel_set_program_RT(struct sampler_channel *c, struct sampler_pr
             union sampler_ctrlinit_union u;
             u.ptr = p->data;
             // printf("Setting controller %d -> %d\n", u.cinit.controller, u.cinit.value);
-            c->cc[u.cinit.controller] = u.cinit.value;
+            set_cc_int(c, u.cinit.controller, u.cinit.value);
         }
         c->program->in_use++;
     }
@@ -430,3 +456,37 @@ void sampler_channel_program_change(struct sampler_channel *c, int program)
         sampler_channel_set_program_RT(c, m->programs[0]);
 }
 
+float sampler_channel_get_expensive_cc(struct sampler_channel *c, struct sampler_voice *v, struct sampler_prevoice *pv, int cc_no)
+{
+    switch(cc_no)
+    {
+        case smsrc_pitchbend:
+            return c->pitchwheel / 8191.f;
+        case smsrc_lastpolyaft: // how this is defined? is it last or is it current voice's?
+            return sampler_channel_get_poly_pressure(c, v ? v->note : (pv ? pv->note : 0));
+        case smsrc_noteonvel:
+            return v ? v->vel / 127.0 : (pv ? pv->vel / 127.0 : 0);
+        case smsrc_noteoffvel:
+            return v ? v->off_vel / 127.0 : 0;
+        case smsrc_keynotenum:
+            return v ? v->note / 127.0 : (pv ? pv->note / 127.0 : 0);
+        case smsrc_keynotegate:
+            return c->switchmask[0] || c->switchmask[1] || c->switchmask[2] || c->switchmask[3]; // XXXKF test interactions with sustain/sostenuto
+        case smsrc_chanaft:
+            return c->last_chanaft / 127.0;
+        case smsrc_random_unipolar:
+        case smsrc_alternate:
+            return c->floatcc[cc_no];
+        case smsrc_random_bipolar:
+            return -1 + 2 * c->floatcc[smsrc_random_unipolar];
+        case smsrc_keydelta: // not supported yet
+            return 0;
+        case smsrc_keydelta_abs:
+            return 0;
+        case smsrc_tempo:
+            return c->module->module.engine->master->tempo; // XXXKF what scale???
+        default:
+            assert(0);
+            return 0.f;
+    }
+}

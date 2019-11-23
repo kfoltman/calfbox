@@ -156,8 +156,20 @@ ENUM_LIST(MAKE_FROM_TO_STRING_EXTERN)
 enum sampler_modsrc
 {
     smsrc_cc0 = 0,
-    smsrc_chanaft = 120,
-    smsrc_lastpolyaft,
+
+    smsrc_pitchbend = 128,
+    smsrc_chanaft = 129,
+    smsrc_lastpolyaft = 130, // ?
+    smsrc_noteonvel = 131,
+    smsrc_noteoffvel = 132,
+    smsrc_keynotenum = 133,
+    smsrc_keynotegate = 134,
+    smsrc_random_unipolar = 135,
+    smsrc_random_bipolar = 136,
+    smsrc_alternate = 137,
+    smsrc_keydelta = 140,
+    smsrc_keydelta_abs = 141,
+    smsrc_tempo = 142,
 
     // those are per-note, not per-channel
     smsrc_vel,

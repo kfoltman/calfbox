@@ -12,7 +12,7 @@
 
 void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv)
 {
-    pv->delay_computed += nif->param * pv->channel->cc[nif->variant] * (1.0 / 127.0);
+    pv->delay_computed += nif->param * sampler_channel_getcc_prevoice(pv->channel, pv, nif->variant);
 }
 
 void sampler_nif_addrandomdelay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv)
@@ -32,7 +32,7 @@ void sampler_nif_vel2offset(struct sampler_noteinitfunc *nif, struct sampler_voi
 
 void sampler_nif_cc2offset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
-    v->offset += nif->param * v->channel->cc[nif->variant] * (1.0 / 127.0);
+    v->offset += nif->param * sampler_channel_getcc(v->channel, v, nif->variant);
 }
 
 void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
@@ -42,7 +42,7 @@ void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_
 
 void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
-    v->reloffset += nif->param * v->channel->cc[nif->variant] * (1.0 / 127.0);
+    v->reloffset += nif->param * sampler_channel_getcc(v->channel, v, nif->variant);
 }
 
 void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v)

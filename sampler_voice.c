@@ -322,6 +322,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
 
     v->note = note;
     v->vel = vel;
+    v->off_vel = 0;
     v->pitch_shift = 0;
     v->released = 0;
     v->released_with_sustain = 0;
@@ -526,7 +527,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             {
                 float value = 0.f;
                 if (sm->src < smsrc_pernote_offset)
-                    value = c->cc[sm->src] * (1.f / 127.f);
+                    value = sampler_channel_getcc(c, v, sm->src);
                 uint32_t param = sm->dest - smdest_eg_stage_start;
                 if (value * sm->amount != 0)
                     cbox_envelope_modify_dahdsr(&v->cc_envs[(param >> 4)], param & 0x0F, value * sm->amount, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
@@ -582,7 +583,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float modsrcs[smsrc_pernote_count];
     modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * velscl;
     modsrcs[smsrc_pitch - smsrc_pernote_offset] = pitch * (1.f / 100.f);
-    modsrcs[smsrc_polyaft - smsrc_pernote_offset] = (c->poly_pressure_mask & (1 << (v->note >> 2))) ? c->poly_pressure[v->note] * (1.f / 127.f) : 0;
+    modsrcs[smsrc_polyaft - smsrc_pernote_offset] = sampler_channel_get_poly_pressure(c, v->note);
     modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->pitch_env, pitcheg_shape) * 0.01f;
     modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->filter_env, fileg_shape) * 0.01f;
     modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->amp_env, ampeg_shape) * 0.01f;
@@ -639,7 +640,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         struct sampler_modulation *sm = mod->data;
         float value = 0.f, value2 = 1.f;
         if (sm->src < smsrc_pernote_offset)
-            value = c->cc[sm->src] * (1.f / 127.f);
+            value = sampler_channel_getcc(c, v, sm->src);
         else
             value = modsrcs[sm->src - smsrc_pernote_offset];
         value = modoffset[sm->flags & 3] + value * modscale[sm->flags & 3];
@@ -647,7 +648,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (sm->src2 != smsrc_none)
         {
             if (sm->src2 < smsrc_pernote_offset)
-                value2 = c->cc[sm->src2] * (1.f / 127.f);
+                value2 = sampler_channel_getcc(c, v, sm->src2);
             else
                 value2 = modsrcs[sm->src2 - smsrc_pernote_offset];
             
@@ -811,8 +812,8 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * c->channel_volume_cc * sampler_channel_addcc(c, 11) / (maxv * maxv);
     if (l->eff_use_xfcc) {
         gain *=
-            (l->xfin_cc.is_active ? sfz_crossfade2(c->cc[l->xfin_cc.cc_number], l->xfin_cc.locc, l->xfin_cc.hicc, 0, 1, l->xf_cccurve) : 1.f) *
-            (l->xfout_cc.is_active ? sfz_crossfade2(c->cc[l->xfout_cc.cc_number], l->xfout_cc.locc, l->xfout_cc.hicc, 1, 0, l->xf_cccurve) : 1.f);
+            (l->xfin_cc.is_active ? sfz_crossfade2(c->intcc[l->xfin_cc.cc_number], l->xfin_cc.locc, l->xfin_cc.hicc, 0, 1, l->xf_cccurve) : 1.f) *
+            (l->xfout_cc.is_active ? sfz_crossfade2(c->intcc[l->xfout_cc.cc_number], l->xfout_cc.locc, l->xfout_cc.hicc, 1, 0, l->xf_cccurve) : 1.f);
     }
     if ((modmask & (1 << smdest_gain)) && moddests[smdest_gain] != 0.f)
         gain *= dB2gain(moddests[smdest_gain]);

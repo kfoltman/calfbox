@@ -57,7 +57,6 @@ struct sampler_channel
     uint32_t sustainmask[4];
     uint32_t sostenutomask[4];
     int previous_note, first_note_vel;
-    uint8_t cc[smsrc_perchan_count];
     struct sampler_program *program;
     struct sampler_voice *voices_running;
     int active_voices, active_prevoices;
@@ -67,6 +66,9 @@ struct sampler_channel
     int channel_volume_cc, channel_pan_cc;
     int output_shift;
     uint32_t poly_pressure_mask;
+    uint8_t intcc[smsrc_perchan_count];
+    float floatcc[smsrc_perchan_count];
+    uint8_t last_polyaft, last_chanaft;
 };
 
 struct sampler_lfo
@@ -155,6 +157,7 @@ struct sampler_voice
     uint32_t last_eq_bitmask;
     float reloffset;
     uint32_t offset;
+    int off_vel;
 };
 
 struct sampler_module
@@ -207,6 +210,7 @@ extern void sampler_voice_link(struct sampler_voice **pv, struct sampler_voice *
 extern void sampler_voice_unlink(struct sampler_voice **pv, struct sampler_voice *v);
 extern void sampler_voice_inactivate(struct sampler_voice *v, gboolean expect_active);
 extern void sampler_voice_update_params_from_layer(struct sampler_voice *v);
+extern float sampler_channel_get_expensive_cc(struct sampler_channel *c, struct sampler_voice *v, struct sampler_prevoice *pv, int cc_no);
 
 extern void sampler_prevoice_start(struct sampler_prevoice *pv, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel);
 extern int sampler_prevoice_process(struct sampler_prevoice *pv, struct sampler_module *m);
@@ -217,7 +221,34 @@ extern float sampler_sine_wave[2049];
 
 static inline int sampler_channel_addcc(struct sampler_channel *c, int cc_no)
 {
-    return (((int)c->cc[cc_no]) << 7) + c->cc[cc_no + 32];
+    return (((int)c->intcc[cc_no]) << 7) + c->intcc[cc_no + 32];
+}
+
+static inline float sampler_channel_getcc(struct sampler_channel *c, struct sampler_voice *v, int cc_no)
+{
+    if (cc_no < 128)
+        return c->floatcc[cc_no];
+    return sampler_channel_get_expensive_cc(c, v, NULL, cc_no);
+}
+
+static inline int sampler_channel_getintcc(struct sampler_channel *c, struct sampler_voice *v, int cc_no)
+{
+    if (cc_no < 128)
+        return c->intcc[cc_no];
+    return (int)127 * (sampler_channel_get_expensive_cc(c, v, NULL, cc_no));
+}
+
+static inline float sampler_channel_getcc_prevoice(struct sampler_channel *c, struct sampler_prevoice *pv, int cc_no)
+{
+    if (cc_no < 128)
+        return c->floatcc[cc_no];
+    return sampler_channel_get_expensive_cc(c, NULL, pv, cc_no);
+}
+
+static inline float sampler_channel_get_poly_pressure(struct sampler_channel *c, uint8_t note)
+{
+    note &= 0x7F;
+    return (c->poly_pressure_mask & (1 << (note >> 2))) ? c->poly_pressure[note] * (1.f / 127.f) : 0;;
 }
 
 #define FOREACH_VOICE(var, p) \

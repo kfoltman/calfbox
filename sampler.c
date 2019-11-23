@@ -169,7 +169,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 break;
             
             case 10:
-                c->cc[smsrc_lastpolyaft] = data[2];
+                c->last_polyaft = data[2];
                 // Lazy clearing
                 if (!(c->poly_pressure_mask & (1 << (data[1] >> 2))))
                 {
@@ -192,7 +192,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 break;
 
             case 13:
-                c->cc[smsrc_chanaft] = data[1];
+                c->last_chanaft = data[1];
                 break;
 
             case 14:
