@@ -1366,7 +1366,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     
     static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
     static const char *env_stages[] = { "delay", "attack", "hold", "decay", "sustain", "release", "start" };
-    static const char *modsrc_names[] = { "chanaft", "lastpolyaft", "vel", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
+    static const char *modsrc_names[] = { "vel", "chanaft", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
     static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pan", "pitchlfo_freq", "fillfo_freq", "amplfo_freq",
         "eq1_freq", "eq1_bw", "eq1_gain",
         "eq2_freq", "eq2_bw", "eq2_gain",
@@ -1388,11 +1388,11 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             g_string_append_printf(outstr, " pitch_veltrack=%s", floatbuf);
         else if (nd->notefunc_voice == sampler_nif_vel2reloffset)
             g_string_append_printf(outstr, " reloffset_veltrack=%s", floatbuf);
-        else if (nd->notefunc_voice == sampler_nif_cc2reloffset && v >= 0 && v < 120)
+        else if (nd->notefunc_voice == sampler_nif_cc2reloffset)
             g_string_append_printf(outstr, " reloffset_cc%d=%s", nd->variant, floatbuf);
         else if (nd->notefunc_voice == sampler_nif_vel2offset)
             g_string_append_printf(outstr, " offset_veltrack=%s", floatbuf);
-        else if (nd->notefunc_voice == sampler_nif_cc2offset && v >= 0 && v < 120)
+        else if (nd->notefunc_voice == sampler_nif_cc2offset)
             g_string_append_printf(outstr, " offset_cc%d=%s", nd->variant, floatbuf);
         else if (nd->notefunc_voice == sampler_nif_vel2env && (v & 15) >= snif_env_delay && (v & 15) <= snif_env_start && ((v >> 4) & 3) < 3)
             g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], floatbuf);
@@ -1407,8 +1407,8 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         int v = nd->variant;
         g_ascii_dtostr(floatbuf, floatbufsize, nd->param);
 
-        if (nd->notefunc_prevoice == sampler_nif_cc2delay && v >= 0 && v < 120)
-            g_string_append_printf(outstr, " delay_cc%d=%s", nd->variant, floatbuf);
+        if (nd->notefunc_prevoice == sampler_nif_cc2delay)
+            g_string_append_printf(outstr, " delay_cc%d=%s", v, floatbuf);
         else if (nd->notefunc_prevoice == sampler_nif_addrandomdelay)
             g_string_append_printf(outstr, " delay_random=%s", floatbuf);
         else
@@ -1431,7 +1431,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                 g_string_append_printf(outstr, " %seg_%scc%d=%s", addrandom_variants[(param >> 4) & 3], env_stages[param & 15], md->src, floatbuf);
                 continue;
             }
-            if (md->src < 120)
+            if (md->src < smsrc_perchan_count)
             {
                 // Inconsistency: cutoff_cc5 but amplfo_freqcc5
                 if (is_lfofreq)
@@ -1440,18 +1440,18 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                     g_string_append_printf(outstr, " %s_cc%d=%s", moddest_names[md->dest], md->src, floatbuf);
                 continue;
             }
-            if (md->src < 120 + sizeof(modsrc_names) / sizeof(modsrc_names[0]))
+            if (md->src < smsrc_perchan_count + sizeof(modsrc_names) / sizeof(modsrc_names[0]))
             {
                 if ((md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
                     (md->src == smsrc_pitchenv && md->dest == smdest_pitch) ||
                     (md->src == smsrc_amplfo && md->dest == smdest_gain) ||
                     (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
                     (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
-                    g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - 120], floatbuf);
+                    g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
                 else if (is_lfofreq)
-                    g_string_append_printf(outstr, " %s%s=%s", moddest_names[md->dest], modsrc_names[md->src - 120], floatbuf);
+                    g_string_append_printf(outstr, " %s%s=%s", moddest_names[md->dest], modsrc_names[md->src - smsrc_perchan_count], floatbuf);
                 else
-                    g_string_append_printf(outstr, " %s_%s=%s", moddest_names[md->dest], modsrc_names[md->src - 120], floatbuf);
+                    g_string_append_printf(outstr, " %s_%s=%s", moddest_names[md->dest], modsrc_names[md->src - smsrc_perchan_count], floatbuf);
                 continue;
             }
         }
@@ -1463,15 +1463,15 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             {
             case smsrc_chanaft:
             case smsrc_polyaft:
-                g_string_append_printf(outstr, " %s_depth%s=%s", modsrc_names[md->src - 120], modsrc_names[md->src2 - 120], floatbuf);
+                g_string_append_printf(outstr, " %s_depth%s=%s", modsrc_names[md->src - smsrc_perchan_count], modsrc_names[md->src2 - smsrc_perchan_count], floatbuf);
                 continue;
             case smsrc_none:
-                g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - 120], floatbuf);
+                g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
                 continue;
             default:
                 if (md->src2 < 120)
                 {
-                    g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - 120], md->src2, floatbuf);
+                    g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
                     continue;
                 }
                 break;
@@ -1483,17 +1483,17 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         {
             if (md->src2 == smsrc_vel)
             {
-                g_string_append_printf(outstr, " %s_vel2depth=%s", modsrc_names[md->src - 120], floatbuf);
+                g_string_append_printf(outstr, " %s_vel2depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
                 continue;
             }
             if (md->src2 == smsrc_none)
             {
-                g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - 120], floatbuf);
+                g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
                 continue;
             }
             if (md->src2 < 120)
             {
-                g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - 120], md->src2, floatbuf);
+                g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
                 continue;
             }
         }

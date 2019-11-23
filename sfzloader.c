@@ -32,7 +32,7 @@ enum sfz_load_section_type
 struct sfz_load_state
 {
     struct sampler_module *m;
-    const char *filename;
+    const char *filename, *default_path;
     struct sampler_program *program;
     struct sampler_layer *global, *master, *group, *region, *target;
     enum sfz_load_section_type section_type;
@@ -138,6 +138,19 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
             else
                 g_warning("Invalid CC initialisation: %s=%s", key, value);
         }
+        else if (!strcmp(key, "default_path"))
+        {
+            g_free(ls->program->sample_dir);
+            gchar *dir = g_path_get_dirname(ls->filename);
+            char value2[strlen(value) + 1];
+            int i;
+            for (i = 0; value[i]; ++i)
+                value2[i] = value[i] == '\\' ? '/' : value[i];
+            value2[i] = '\0';
+            gchar *combined = g_build_filename(dir, value2, NULL);
+            ls->program->sample_dir = combined;
+            g_free(dir);
+        }
         else
             g_warning("Unrecognized SFZ key in control section: %s", key);
         return TRUE;
@@ -197,7 +210,7 @@ static gboolean handle_token(struct sfz_parser_client *client, const char *token
 
 gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sampler_program *prg, const char *sfz, int is_from_string, GError **error)
 {
-    struct sfz_load_state ls = { .global = prg->global, .master = prg->global->default_child, .group = prg->global->default_child->default_child, .target = NULL, .m = m, .filename = sfz, .region = NULL, .error = error, .program = prg, .section_type = slst_normal };
+    struct sfz_load_state ls = { .global = prg->global, .master = prg->global->default_child, .group = prg->global->default_child->default_child, .target = NULL, .m = m, .filename = sfz, .region = NULL, .error = error, .program = prg, .section_type = slst_normal, .default_path = NULL };
     struct sfz_parser_client c = { .user_data = &ls, .token = handle_token, .key_value = load_sfz_key_value };
     g_clear_error(error);
 

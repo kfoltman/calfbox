@@ -158,7 +158,7 @@ enum sampler_modsrc
     smsrc_cc0 = 0,
 
     smsrc_pitchbend = 128,
-    smsrc_chanaft = 129,
+    smsrc_chanaft_sfz2 = 129,
     smsrc_lastpolyaft = 130, // ?
     smsrc_noteonvel = 131,
     smsrc_noteoffvel = 132,
@@ -173,6 +173,7 @@ enum sampler_modsrc
 
     // those are per-note, not per-channel
     smsrc_vel,
+    smsrc_chanaft,
     smsrc_polyaft,
     smsrc_pitch,
     smsrc_pitchenv,

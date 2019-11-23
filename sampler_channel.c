@@ -472,7 +472,7 @@ float sampler_channel_get_expensive_cc(struct sampler_channel *c, struct sampler
             return v ? v->note / 127.0 : (pv ? pv->note / 127.0 : 0);
         case smsrc_keynotegate:
             return c->switchmask[0] || c->switchmask[1] || c->switchmask[2] || c->switchmask[3]; // XXXKF test interactions with sustain/sostenuto
-        case smsrc_chanaft:
+        case smsrc_chanaft_sfz2:
             return c->last_chanaft / 127.0;
         case smsrc_random_unipolar:
         case smsrc_alternate:
