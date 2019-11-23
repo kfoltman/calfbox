@@ -51,6 +51,13 @@ int cmd_quit(struct cbox_menu_item_command *item, void *context)
     return 1;
 }
 
+static void set_current_scene_name(gchar *name)
+{
+    if (app.current_scene_name)
+        g_free(app.current_scene_name);
+    app.current_scene_name = name;
+}
+
 int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
 {
     GError *error = NULL;
@@ -58,6 +65,7 @@ int cmd_load_scene(struct cbox_menu_item_command *item, void *context)
     cbox_scene_clear(scene);
     if (!cbox_scene_load(scene, item->item.item_context, &error))
         cbox_print_error(error);
+    set_current_scene_name(g_strdup_printf("scene:%s", (const char *)item->item.item_context));
     return 0;
 }
 
@@ -72,6 +80,7 @@ int cmd_load_instrument(struct cbox_menu_item_command *item, void *context)
     {
         if (!cbox_scene_add_layer(scene, layer, &error))
             cbox_print_error(error);
+        set_current_scene_name(g_strdup_printf("instrument:%s", (const char *)item->item.item_context));
     }
     else
     {
@@ -91,6 +100,7 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
     {
         if (!cbox_scene_add_layer(scene, layer, &error))
             cbox_print_error(error);
+        set_current_scene_name(g_strdup_printf("layer:%s", (const char *)item->item.item_context));
     }
     else
     {
@@ -103,9 +113,9 @@ int cmd_load_layer(struct cbox_menu_item_command *item, void *context)
 gchar *scene_format_value(const struct cbox_menu_item_static *item, void *context)
 {
     if (app.current_scene_name)
-        return strdup(app.current_scene_name);
+        return g_strdup(app.current_scene_name);
     else
-        return strdup("- No scene -");
+        return g_strdup("- No scene -");
 }
 
 gchar *transport_format_value(const struct cbox_menu_item_static *item, void *context)
