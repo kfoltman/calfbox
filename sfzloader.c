@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "sampler.h"
 #include "sfzparser.h"
+#include "sampler_impl.h"
 
 #define DUMP_LAYER_ATTRIBS 0
 
@@ -35,7 +36,9 @@ struct sfz_load_state
     const char *filename, *default_path;
     struct sampler_program *program;
     struct sampler_layer *global, *master, *group, *region, *target;
+    struct sampler_midi_curve *curve;
     enum sfz_load_section_type section_type;
+    uint32_t curve_index;
     GError **error;
 };
 
@@ -67,8 +70,31 @@ static void end_token(struct sfz_parser_client *client)
         sampler_layer_dump(&ls->region, stdout);
     }
 #endif
+    if (ls->section_type == slst_curve)
+    {
+        uint32_t i = ls->curve_index;
+        if (i < MAX_MIDI_CURVES)
+        {
+            if (ls->program->curves[i])
+                g_free(ls->program->curves[i]);
+            else
+                ls->program->interpolated_curves[i] = g_new(float, 128);
+            sampler_midi_curve_interpolate(ls->curve, ls->program->interpolated_curves[i], 0, 1, FALSE);
+            ls->program->curves[i] = ls->curve;
+        }
+        else
+        {
+            if (i == (uint32_t)-1)
+                g_warning("Curve index not specified");
+            else
+                g_warning("Curve number %u is greater than the maximum of %u", (unsigned)i, (unsigned)MAX_MIDI_CURVES);
+            g_free(ls->curve);
+        }
+        ls->curve = NULL;
+    }
     if (ls->region)
         load_sfz_end_region(client);
+    ls->region = NULL;
     ls->section_type = slst_normal;
 }
 
@@ -108,13 +134,50 @@ static gboolean load_sfz_region(struct sfz_parser_client *client)
     return TRUE;
 }
 
+static gboolean load_sfz_control(struct sfz_parser_client *client)
+{
+    struct sfz_load_state *ls = client->user_data;
+    ls->section_type = slst_control;
+    return TRUE;
+}
+
+static gboolean load_sfz_curve(struct sfz_parser_client *client)
+{
+    struct sfz_load_state *ls = client->user_data;
+    ls->section_type = slst_curve;
+    ls->curve = g_new0(struct sampler_midi_curve, 1);
+    ls->curve_index = -1;
+    sampler_midi_curve_init(ls->curve);
+    return TRUE;
+}
+
 static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char *key, const char *value)
 {
     struct sfz_load_state *ls = client->user_data;
     
     if (ls->section_type == slst_curve)
     {
-        g_warning("Parameter found in unsupported curve section: %s=%s", key, value);
+        if (key[0] == 'v' && isdigit(key[1]))
+        {
+            int pos = atoi(key + 1);
+            if (pos >= 0 && pos < 128)
+            {
+                double fvalue = -1;
+                if (!atof_C_verify(key, value, &fvalue, ls->error))
+                    return FALSE;
+                ls->curve->values[pos] = fvalue;
+                return TRUE;
+            }
+            else
+                g_warning("Out of range curve point: %s", key);
+        }
+        else if (!strcmp(key, "curve_index"))
+        {
+            ls->curve_index = atoi(value);
+            return TRUE;
+        }
+        else
+            g_warning("Unknown parameter in curve section: %s=%s", key, value);
         return TRUE;
     }
     if (ls->section_type == slst_effect)
@@ -187,16 +250,10 @@ static gboolean handle_token(struct sfz_parser_client *client, const char *token
         return load_sfz_global(client);
 
     if (!strcmp(token, "control"))
-    {
-        ls->section_type = slst_control;
-        return TRUE;
-    }
+        return load_sfz_control(client);
 
     if (!strcmp(token, "curve"))
-    {
-        ls->section_type = slst_curve;
-        return TRUE;
-    }
+        return load_sfz_curve(client);
 
     if (!strcmp(token, "effect"))
     {

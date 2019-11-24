@@ -27,6 +27,8 @@ struct sampler_channel;
 
 CBOX_EXTERN_CLASS(sampler_program)
 
+#define MAX_MIDI_CURVES 32
+
 // Runtime layer lists; in future, I might something more clever, like a tree
 struct sampler_rll
 {
@@ -56,7 +58,6 @@ struct sampler_ctrllabel {
     gchar *label;
 };
 
-
 struct sampler_program
 {
     CBOX_OBJECT_HEADER()
@@ -75,6 +76,8 @@ struct sampler_program
     int in_use;
     struct cbox_tarfile *tarfile;
     gboolean deleting;
+    struct sampler_midi_curve *curves[MAX_MIDI_CURVES];
+    float *interpolated_curves[MAX_MIDI_CURVES];
 };
 
 extern struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg);

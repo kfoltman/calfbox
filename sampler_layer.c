@@ -860,9 +860,7 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     ld->name##_changed = FALSE; \
     ld->has_##name = 0;
 #define PROC_FIELDS_INITIALISER_midicurve(name) \
-    for (uint32_t i = 0; i < 128; ++i) \
-        ld->name.values[i] = SAMPLER_CURVE_GAP; \
-    memset(ld->name.has_values, 0, 128);
+    sampler_midi_curve_init(&ld->name);
 #define PROC_FIELDS_INITIALISER_enum(type, name, def_value) \
     PROC_FIELDS_INITIALISER(type, name, def_value)
 #define PROC_FIELDS_INITIALISER_dBamp(type, name, def_value) \
@@ -1056,6 +1054,13 @@ static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct 
             sampler_layer_data_set_modulation(l, srcm->src, srcm->src2, srcm->dest, srcm->amount, srcm->flags, TRUE);
         }
     }
+}
+
+void sampler_midi_curve_init(struct sampler_midi_curve *curve)
+{
+    for (uint32_t i = 0; i < 128; ++i)
+        curve->values[i] = SAMPLER_CURVE_GAP;
+    memset(curve->has_values, 0, 128);
 }
 
 void sampler_midi_curve_interpolate(const struct sampler_midi_curve *curve, float dest[128], float def_start, float def_end, gboolean is_quadratic)

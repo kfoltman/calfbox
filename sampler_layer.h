@@ -584,6 +584,7 @@ extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampl
 extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
 extern void sampler_nif_addrandomdelay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
 
+extern void sampler_midi_curve_init(struct sampler_midi_curve *curve);
 extern void sampler_midi_curve_interpolate(const struct sampler_midi_curve *curve, float dest[128], float def_start, float def_end, gboolean is_quadratic);
 
 static inline gboolean sampler_layer_data_is_4pole(struct sampler_layer_data *v)

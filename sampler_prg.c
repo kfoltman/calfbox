@@ -225,6 +225,11 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->global->default_child->default_child = sampler_layer_new(m, prg, prg->global->default_child);
     prg->deleting = FALSE;
     prg->in_use = 0;
+    for (int i = 0; i < MAX_MIDI_CURVES; ++i)
+    {
+        prg->curves[i] = NULL;
+        prg->interpolated_curves[i] = NULL;
+    }
     CBOX_OBJECT_REGISTER(prg);
     return prg;
 }
@@ -498,6 +503,11 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
         CBOX_DELETE((struct sampler_layer *)p->data);
     delete_layers_recursively(prg->global);
 
+    for (int i = 0; i < MAX_MIDI_CURVES; ++i)
+    {
+        g_free(prg->curves[i]);
+        g_free(prg->interpolated_curves[i]);
+    }
     g_free(prg->name);
     g_free(prg->sample_dir);
     g_free(prg->source_file);
