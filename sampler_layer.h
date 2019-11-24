@@ -458,6 +458,12 @@ struct sampler_cc_range
     uint8_t is_active:1;
 };
 
+struct sampler_midi_curve
+{
+    float values[128];
+    uint8_t has_values[128];
+};
+
 #define PROC_FIELDS_TO_STRUCT(type, name, def_value) \
     type name;
 #define PROC_FIELDS_TO_STRUCT_string(name) \
@@ -478,8 +484,8 @@ struct sampler_cc_range
 #define PROC_FIELDS_TO_STRUCT_ccrange(name, parname) \
     struct sampler_cc_range name;
 #define PROC_FIELDS_TO_STRUCT_midicurve(name) \
-    float name[128]; \
-    float eff_##name[128]; \
+    struct sampler_midi_curve name; \
+    float eff_##name[128];
 
 #define PROC_HAS_FIELD(type, name, def_value) \
     unsigned int has_##name:1;
@@ -497,8 +503,7 @@ struct sampler_cc_range
 #define PROC_HAS_FIELD_eq(name, parname, index) \
     struct sampler_eq_has_fields has_##name;
 #define PROC_HAS_FIELD_ccrange(name, parname)
-#define PROC_HAS_FIELD_midicurve(name) \
-    uint8_t has_##name[128];
+#define PROC_HAS_FIELD_midicurve(name)
 
 CBOX_EXTERN_CLASS(sampler_layer)
 
@@ -578,6 +583,8 @@ extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampl
 
 extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
 extern void sampler_nif_addrandomdelay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
+
+extern void sampler_midi_curve_interpolate(const struct sampler_midi_curve *curve, float dest[128], float def_start, float def_end, gboolean is_quadratic);
 
 static inline gboolean sampler_layer_data_is_4pole(struct sampler_layer_data *v)
 {

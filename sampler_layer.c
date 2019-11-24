@@ -274,7 +274,7 @@ struct sampler_layer_param_entry
     static void sampler_layer_data_set_has_##name##_lo(struct sampler_layer_data *l, gboolean value) { l->name.has_locc = value; } \
     static void sampler_layer_data_set_has_##name##_hi(struct sampler_layer_data *l, gboolean value) { l->name.has_hicc = value; }
 #define PROC_FIELD_SETHASFUNC_midicurve(name) \
-    static void sampler_layer_data_set_has_##name(struct sampler_layer_data *l, uint32_t index, gboolean value) { l->has_##name[index] = value; }
+    static void sampler_layer_data_set_has_##name(struct sampler_layer_data *l, uint32_t index, gboolean value) { l->name.has_values[index] = value; }
 
 SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
 
@@ -490,7 +490,7 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
             VERIFY_FLOAT_VALUE;
             if (args[0] >= 0 && args[0] <= 127)
             {
-                ((float *)p)[args[0]] = fvalue;
+                ((struct sampler_midi_curve *)p)->values[args[0]] = fvalue;
                 void (*sethasfunc)(struct sampler_layer_data *, uint32_t, gboolean value) = e->extra_ptr;
                 sethasfunc(&l->data, args[0], 1);
             }
@@ -609,7 +609,8 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
         case slpt_midicurve:
             if (args[0] >= 0 && args[0] <= 127)
             {
-                ((float *)p)[args[0]] = pp ? ((float *)pp)[args[0]] : -1;
+                struct sampler_midi_curve *curve = p, *parent_curve = pp;
+                curve->values[args[0]] = parent_curve ? parent_curve->values[args[0]] : -1;
                 void (*sethasfunc)(struct sampler_layer_data *, uint32_t, gboolean value) = e->extra_ptr;
                 sethasfunc(&l->data, args[0], 0);
                 return TRUE;
@@ -860,8 +861,8 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     ld->has_##name = 0;
 #define PROC_FIELDS_INITIALISER_midicurve(name) \
     for (uint32_t i = 0; i < 128; ++i) \
-        ld->name[i] = SAMPLER_CURVE_GAP; \
-    memset(ld->has_##name, 0, 128);
+        ld->name.values[i] = SAMPLER_CURVE_GAP; \
+    memset(ld->name.has_values, 0, 128);
 #define PROC_FIELDS_INITIALISER_enum(type, name, def_value) \
     PROC_FIELDS_INITIALISER(type, name, def_value)
 #define PROC_FIELDS_INITIALISER_dBamp(type, name, def_value) \
@@ -941,9 +942,9 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     dst->name##_changed = src->name##_changed; \
     dst->has_##name = copy_hasattr ? src->has_##name : FALSE;
 #define PROC_FIELDS_CLONE_midicurve(name) \
-    memcpy(dst->name, src->name, sizeof(float) * 128); \
+    memcpy(dst->name.values, src->name.values, sizeof(float) * 128); \
     if(copy_hasattr) \
-        memcpy(dst->has_##name, src->has_##name, sizeof(uint8_t) * 128);
+        memcpy(dst->name.has_values, src->name.has_values, sizeof(src->name.has_values));
 #define PROC_FIELDS_CLONE_dBamp PROC_FIELDS_CLONE
 #define PROC_FIELDS_CLONE_enum PROC_FIELDS_CLONE
 #define PROC_FIELDS_CLONE_dahdsr(name, parname, index) \
@@ -1011,8 +1012,8 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
 // XXXKF use a better default
 #define PROC_FIELDS_CLONEPARENT_midicurve(name) \
     for (uint32_t i = 0; i < 128; ++i) \
-        if (!l->has_##name[i]) \
-            l->name[i] = parent ? parent->name[i] : SAMPLER_CURVE_GAP;
+        if (!l->name.has_values[i]) \
+            l->name.values[i] = parent ? parent->name.values[i] : SAMPLER_CURVE_GAP;
 #define PROC_FIELDS_CLONEPARENT_dBamp PROC_FIELDS_CLONEPARENT
 #define PROC_FIELDS_CLONEPARENT_enum PROC_FIELDS_CLONEPARENT
 #define PROC_FIELDS_CLONEPARENT_dahdsr(name, parname, index) \
@@ -1057,8 +1058,9 @@ static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct 
     }
 }
 
-static void interpolate_midicurve(float dest[128], const float src[128], float def_start, float def_end, gboolean is_quadratic)
+void sampler_midi_curve_interpolate(const struct sampler_midi_curve *curve, float dest[128], float def_start, float def_end, gboolean is_quadratic)
 {
+    const float *src = curve->values;
     int start = 0;
     float sv = src[start];
     if (sv == SAMPLER_CURVE_GAP)
@@ -1102,7 +1104,7 @@ static void interpolate_midicurve(float dest[128], const float src[128], float d
 #define PROC_FIELDS_FINALISER(type, name, def_value) 
 #define PROC_FIELDS_FINALISER_string(name)
 #define PROC_FIELDS_FINALISER_midicurve(name) \
-    interpolate_midicurve(l->eff_##name, l->name, START_VALUE_##name, END_VALUE_##name, IS_QUADRATIC_##name);
+    sampler_midi_curve_interpolate(&l->name, l->eff_##name, START_VALUE_##name, END_VALUE_##name, IS_QUADRATIC_##name);
 #define PROC_FIELDS_FINALISER_enum(type, name, def_value) 
 #define PROC_FIELDS_FINALISER_dBamp(type, name, def_value) \
     l->name##_linearized = dB2gain(l->name);
@@ -1329,8 +1331,8 @@ gboolean sampler_layer_unapply_param(struct sampler_layer *layer, const char *ke
         g_string_append_printf(outstr, " %s=%s", #name, l->name ? l->name : "");
 #define PROC_FIELDS_TO_FILEPTR_midicurve(name) \
     for (uint32_t i = 0; i < 128; ++i) { \
-        if ((show_inherited || l->has_##name[i]) && l->name[i] != SAMPLER_CURVE_GAP) \
-            g_string_append_printf(outstr, " %s_%u=%s", #name, (unsigned)i, g_ascii_dtostr(floatbuf, floatbufsize, l->name[i])); \
+        if ((show_inherited || l->name.has_values[i]) && l->name.values[i] != SAMPLER_CURVE_GAP) \
+            g_string_append_printf(outstr, " %s_%u=%s", #name, (unsigned)i, g_ascii_dtostr(floatbuf, floatbufsize, l->name.values[i])); \
         }
 #define PROC_FIELDS_TO_FILEPTR_dBamp(type, name, def_value) \
     if (show_inherited || l->has_##name) \
