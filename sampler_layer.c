@@ -1628,6 +1628,7 @@ static int sampler_layer_update_cmd_prepare(void *data)
         // initial update of the layer, so none of the voices need updating yet
         // because the layer hasn't been allocated to any voice
         cmd->layer->runtime = cmd->new_data;
+        free(cmd);
         return 1;
     }
     return 0;
