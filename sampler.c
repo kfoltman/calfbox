@@ -272,7 +272,7 @@ static int release_program_voices_execute(void *data)
         {
             FOREACH_VOICE(c->voices_running, v)
             {
-                if (m->deleting)
+                if (m->deleting || !m->module.rt)
                 {
                     sampler_voice_inactivate(v, TRUE);
                     continue;
