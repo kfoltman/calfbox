@@ -7,6 +7,8 @@ struct test_env
 {
     struct cbox_document *doc;
     struct cbox_engine *engine;
+    void *arg;
+    gchar *context;
     jmp_buf on_fail;
 };
 
@@ -22,7 +24,7 @@ struct test_env
     do { \
         type _v1 = (val1), _v2 = (val2); \
         if ((_v1) != (_v2)) \
-            test_assert_failed_free(env, __FILE__, __LINE__, g_strdup_printf(STR_FORMAT_##type " != " STR_FORMAT_##type, _v1, _v2)); \
+            test_assert_failed_free(env, __FILE__, __LINE__, g_strdup_printf("%s equal to " STR_FORMAT_##type ", not " STR_FORMAT_##type, #val1, _v1, _v2)); \
     } while(0)
 
 #define test_assert_equal_str(val1, val2) \
