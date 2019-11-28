@@ -21,6 +21,7 @@ config.log
 config.status
 stamp-h1
 calfbox
+calfbox_tests
 
 __pycache__/
 *.py[cod]
