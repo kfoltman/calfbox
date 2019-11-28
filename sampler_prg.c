@@ -196,7 +196,7 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
 struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_no, const char *name, struct cbox_tarfile *tarfile, const char *sample_dir, GError **error)
 {
     gchar *perm_sample_dir = g_strdup(sample_dir);
-    if (!perm_sample_dir)
+    if (sample_dir && !perm_sample_dir)
         return NULL;
 
     struct cbox_document *doc = CBOX_GET_DOCUMENT(&m->module);
