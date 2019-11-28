@@ -5,11 +5,17 @@ AM_CFLAGS = $(JACK_DEPS_CFLAGS) $(GLIB_DEPS_CFLAGS) $(FLUIDSYNTH_DEPS_CFLAGS) $(
 lib_LTLIBRARIES = libcalfbox.la
 
 bin_PROGRAMS = calfbox
+noinst_PROGRAMS = calfbox_tests
 
 calfbox_SOURCES = \
     main.c
 
 calfbox_LDADD = libcalfbox.la $(JACK_DEPS_LIBS) $(GLIB_DEPS_LIBS) $(FLUIDSYNTH_DEPS_LIBS) $(PYTHON_DEPS_LIBS) $(LIBSMF_DEPS_LIBS) $(LIBSNDFILE_DEPS_LIBS) $(LIBUSB_DEPS_LIBS) $(NCURSES_DEPS_LIBS) -lpthread -luuid -lm -lrt
+
+calfbox_tests_SOURCES = \
+    tests.c
+
+calfbox_tests_LDADD = libcalfbox.la $(GLIB_DEPS_LIBS) -lpthread -lm -lrt
 
 libcalfbox_la_SOURCES = \
     app.c \
@@ -137,6 +143,7 @@ noinst_HEADERS = \
     song.h \
     stm.h \
     tarfile.h \
+    tests.h \
     track.h \
     ui.h \
     usbio_impl.h \
