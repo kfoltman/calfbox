@@ -22,15 +22,24 @@ struct test_env
     do { \
         type _v1 = (val1), _v2 = (val2); \
         if ((_v1) != (_v2)) \
-            test_assert_failed(env, __FILE__, __LINE__, g_strdup_printf(STR_FORMAT_##type " != " STR_FORMAT_##type, _v1, _v2)); \
-    } while(0);
+            test_assert_failed_free(env, __FILE__, __LINE__, g_strdup_printf(STR_FORMAT_##type " != " STR_FORMAT_##type, _v1, _v2)); \
+    } while(0)
 
 #define test_assert_equal_str(val1, val2) \
     do { \
         const char *_v1 = (val1), *_v2 = (val2); \
         if (strcmp(_v1, _v2)) \
             test_assert_failed_free(env, __FILE__, __LINE__, g_strdup_printf("%s equal to '%s', not '%s'", #val1, _v1, _v2)); \
-    } while(0);
+    } while(0)
+
+#define test_assert_no_error(error) \
+    do { \
+        if (error) { \
+            gchar *copy = g_strdup(error->message); \
+            g_error_free(error); \
+            test_assert_failed_free(env, __FILE__, __LINE__, copy); \
+        } \
+    } while(0)
 
 extern void test_assert_failed(struct test_env *env, const char *file, int line, const char *check);
 extern void test_assert_failed_free(struct test_env *env, const char *file, int line, gchar *check);
