@@ -97,28 +97,32 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
     if (c->program && c->program->rll && c->program->rll->layers_oncc)
     {
         struct sampler_rll *rll = c->program->rll;
-        if (!(rll->cc_trigger_bitmask[cc >> 5] & (1 << (cc & 31))))
-            return;
-        int old_value = c->intcc[cc];
-        for (GSList *p = rll->layers_oncc; p; p = p->next)
+        if ((rll->cc_trigger_bitmask[cc >> 5] & (1 << (cc & 31))))
         {
-            struct sampler_layer *layer = p->data;
-            assert(layer->runtime);
-            // Only trigger on transition between 'out of range' and 'in range' values.
-            // XXXKF I'm not sure if it's what is expected here, but don't have
-            // the reference implementation handy.
-            if (layer->runtime->on_cc.cc_number == cc &&
-                (val >= layer->runtime->on_cc.locc && val <= layer->runtime->on_cc.hicc) &&
-                !(old_value >= layer->runtime->on_cc.locc && old_value <= layer->runtime->on_cc.hicc))
+            int old_value = c->intcc[cc];
+            for (GSList *p = rll->layers_oncc; p; p = p->next)
             {
-                struct sampler_voice *v = m->voices_free;
-                if (!v)
-                    break;
-                int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
-                sampler_voice_start(v, c, layer->runtime, layer->runtime->pitch_keycenter, 127, exgroups, &exgroupcount);
-                sampler_channel_release_groups(c, -1, exgroups, exgroupcount);
+                struct sampler_layer *layer = p->data;
+                assert(layer->runtime);
+                // Default (compatible) behaviour means the region will trigger
+                // on every CC that has value within the specified range.
+                // XXXKF add a switch for only triggering the region on
+                // transition between in-range and out-of-range.
+                gboolean compatible_oncc_behaviour = TRUE;
+
+                if (layer->runtime->on_cc.cc_number == cc &&
+                    (val >= layer->runtime->on_cc.locc && val <= layer->runtime->on_cc.hicc) &&
+                    (compatible_oncc_behaviour || !(old_value >= layer->runtime->on_cc.locc && old_value <= layer->runtime->on_cc.hicc)))
+                {
+                    struct sampler_voice *v = m->voices_free;
+                    if (!v)
+                        break;
+                    int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
+                    sampler_voice_start(v, c, layer->runtime, layer->runtime->pitch_keycenter, 127, exgroups, &exgroupcount);
+                    sampler_channel_release_groups(c, -1, exgroups, exgroupcount);
+                }
             }
-        }        
+        }
     }
     int was_enabled = c->intcc[cc] >= 64;
     int enabled = val >= 64;
@@ -233,7 +237,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
         first_layer = layers_by_range[prg->rll->ranges_by_key[note]];
     }
 
-    GSList *next_layer = first_layer ? sampler_program_get_next_layer(prg, c, first_layer, note, vel, random, is_first) : NULL;
+    GSList *next_layer = first_layer ? sampler_program_get_next_layer(prg, c, first_layer, note, vel, random, is_first, is_release_trigger) : NULL;
     if (!next_layer)
     {
         if (!is_release_trigger)
@@ -265,7 +269,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
             delayed_layers[dlcount++] = layer->runtime;
         else
             layers[lcount++] = layer->runtime;
-        next_layer = sampler_program_get_next_layer(prg, c, g_slist_next(next_layer), note, vel, random, is_first);
+        next_layer = sampler_program_get_next_layer(prg, c, g_slist_next(next_layer), note, vel, random, is_first, is_release_trigger);
     }
 
     int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;

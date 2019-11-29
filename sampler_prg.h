@@ -83,7 +83,7 @@ struct sampler_program
 extern struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg);
 extern void sampler_rll_destroy(struct sampler_rll *rll);
 
-extern GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random, gboolean is_first);
+extern GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random, gboolean is_first, gboolean is_release);
 extern struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_no, const char *name, struct cbox_tarfile *tarfile, const char *sample_dir, GError **error);
 extern struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, const char *cfg_section, const char *name, int pgm_id, GError **error);
 extern void sampler_program_add_layer(struct sampler_program *prg, struct sampler_layer *l);

@@ -316,10 +316,10 @@ REGION_LOGIC_TEST_SETUP(cc,
 struct region_logic_test_setup_step steps_oncc[] = {
     MIDI_DATA_STEP("\xB0\x10\x1F", 0),
     MIDI_DATA_STEP("\xB0\x10\x20", 1),
-    MIDI_DATA_STEP("\xB0\x10\x21", 0),
+    MIDI_DATA_STEP("\xB0\x10\x21", 1), // should probably be 1 according to test file 16, but that's madness
     MIDI_DATA_STEP("\xB0\x10\x22", 0),
     MIDI_DATA_STEP("\xB0\x10\x21", 1),
-    MIDI_DATA_STEP("\xB0\x10\x20", 0),
+    MIDI_DATA_STEP("\xB0\x10\x20", 1), // same
     MIDI_DATA_STEP("\xB0\x10\x1F", 0),
     MIDI_DATA_END,
 };
@@ -364,6 +364,56 @@ REGION_LOGIC_TEST_SETUP(firstlegato,
     "<region>trigger=legato sample=*saw"
 );
 
+struct region_logic_test_setup_step steps_switches[] = {
+    MIDI_DATA_STEP("\x90\x12\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 0),
+    MIDI_DATA_STEP("\x90\x10\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 1),
+    MIDI_DATA_STEP("\x90\x11\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 2),
+    MIDI_DATA_STEP("\x90\x10\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 1),
+    MIDI_DATA_STEP("\x90\x0F\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 1),
+    MIDI_DATA_STEP("\x90\x14\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 1),
+    MIDI_DATA_STEP("\x90\x12\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 0),
+    MIDI_DATA_END,
+};
+
+REGION_LOGIC_TEST_SETUP(switches,
+    "<region>sw_lokey=16 sw_hikey=19 sw_last=16 lokey=32 hikey=35 sample=*saw"
+    "<region>sw_lokey=16 sw_hikey=19 sw_last=17 lokey=32 hikey=35 sample=*saw"
+    "<region>sw_lokey=16 sw_hikey=19 sw_last=17 lokey=32 hikey=35 sample=*saw"
+);
+
+struct region_logic_test_setup_step steps_switches2[] = {
+    MIDI_DATA_STEP("\x90\x20\x7F", 0),
+    MIDI_DATA_STEP("\x90\x10\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 1),
+    MIDI_DATA_STEP("\x80\x10\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 0),
+    MIDI_DATA_STEP("\x90\x11\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 2),
+    MIDI_DATA_STEP("\x80\x11\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 0),
+    MIDI_DATA_STEP("\x90\x10\x7F", 0),
+    MIDI_DATA_STEP("\x90\x11\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 3),
+    MIDI_DATA_STEP("\x80\x10\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 2),
+    MIDI_DATA_STEP("\x80\x11\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 0),
+    MIDI_DATA_END,
+};
+
+REGION_LOGIC_TEST_SETUP(switches2,
+    "<region>sw_lokey=16 sw_hikey=19 sw_down=16 lokey=32 hikey=35 sample=*saw"
+    "<region>sw_lokey=16 sw_hikey=19 sw_down=17 lokey=32 hikey=35 sample=*saw"
+    "<region>sw_lokey=16 sw_hikey=19 sw_down=17 lokey=32 hikey=35 sample=*saw"
+);
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void test_assert_failed(struct test_env *env, const char *file, int line, const char *check)
@@ -404,6 +454,8 @@ struct test_info {
     { "test_sampler_note_region_logic/oncc", test_sampler_note_region_logic, &setup_oncc },
     { "test_sampler_note_region_logic/release", test_sampler_note_region_logic, &setup_release },
     { "test_sampler_note_region_logic/firstlegato", test_sampler_note_region_logic, &setup_firstlegato },
+    { "test_sampler_note_region_logic/switches", test_sampler_note_region_logic, &setup_switches },
+    { "test_sampler_note_region_logic/switches2", test_sampler_note_region_logic, &setup_switches2 },
 };
 
 int main(int argc, char *argv[])

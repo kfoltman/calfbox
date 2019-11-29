@@ -7,6 +7,23 @@
 
 /////////////////////////////////////////////////////////////////////////////////
 
+static void add_layers(struct sampler_rll *rll, GSList **layers, GSList **layers_by_range, struct sampler_layer *l, uint32_t lokey, uint32_t hikey)
+{
+    if (lokey >= 0 && lokey <= 127 &&
+        hikey >= 0 && hikey <= 127)
+    {
+        if (!*layers || (*layers)->data != l)
+            *layers = g_slist_prepend(*layers, l);
+        int start = rll->ranges_by_key[lokey];
+        int end = rll->ranges_by_key[hikey];
+        for (int i = start; i <= end; ++i)
+        {
+            if (!layers_by_range[i] || layers_by_range[i]->data != l)
+                layers_by_range[i] = g_slist_prepend(layers_by_range[i], l);
+        }
+    }
+}
+
 struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
 {
     struct sampler_rll *rll = malloc(sizeof(struct sampler_rll));
@@ -24,8 +41,7 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
         struct sampler_layer *l = p->data;
-        if (!l->data.on_cc.is_active &&
-            l->data.lokey >= 0 && l->data.lokey <= 127 &&
+        if (l->data.lokey >= 0 && l->data.lokey <= 127 &&
             l->data.hikey >= 0 && l->data.hikey <= 127)
         {
             lo_count[l->data.lokey]++;
@@ -34,6 +50,13 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
                 low = l->data.lokey;
             if (l->data.hikey > high)
                 high = l->data.hikey;
+            if (l->data.sw_last != -1)
+            {
+                if (l->data.sw_lokey < low)
+                    low = l->data.sw_lokey;
+                if (l->data.sw_hikey > high)
+                    high = l->data.sw_hikey;
+            }
         }
     }
     rll->lokey = low;
@@ -58,30 +81,13 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
             rll->layers_oncc = g_slist_prepend(rll->layers_oncc, l);
             rll->cc_trigger_bitmask[cc >> 5] |= 1 << (cc & 31);
         }
-        else if (l->data.trigger == stm_release)
-        {
-            rll->layers_release = g_slist_prepend(rll->layers_release, l);
-            if (l->data.lokey >= 0 && l->data.lokey <= 127 &&
-                l->data.hikey >= 0 && l->data.hikey <= 127)
-            {
-                int start = rll->ranges_by_key[l->data.lokey];
-                int end = rll->ranges_by_key[l->data.hikey];
-                for (int i = start; i <= end; ++i)
-                    rll->release_layers_by_range[i] = g_slist_prepend(rll->release_layers_by_range[i], l);
-            }
-        }
+        if (l->data.trigger == stm_release)
+            add_layers(rll, &rll->layers_release, rll->release_layers_by_range, l, l->data.lokey, l->data.hikey);
         else
-        {
-            rll->layers = g_slist_prepend(rll->layers, l);
-            if (l->data.lokey >= 0 && l->data.lokey <= 127 &&
-                l->data.hikey >= 0 && l->data.hikey <= 127)
-            {
-                int start = rll->ranges_by_key[l->data.lokey];
-                int end = rll->ranges_by_key[l->data.hikey];
-                for (int i = start; i <= end; ++i)
-                    rll->layers_by_range[i] = g_slist_prepend(rll->layers_by_range[i], l);
-            }
-        }
+            add_layers(rll, &rll->layers, rll->layers_by_range, l, l->data.lokey, l->data.hikey);
+        // Add key switches (add_layers avoids adding the duplicates).
+        if (l->data.sw_last != -1)
+            add_layers(rll, &rll->layers, rll->layers_by_range, l, l->data.sw_lokey, l->data.sw_hikey);
     }
     return rll;
 }

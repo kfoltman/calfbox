@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_program)
 
-GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random, gboolean is_first)
+GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random, gboolean is_first, gboolean is_release)
 {
     int ch = (c - c->module->channels) + 1;
     for(;next_layer;next_layer = g_slist_next(next_layer))
@@ -49,14 +49,15 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
                 continue;
         }
 
-        if ((l->trigger == stm_first && !is_first) ||
-            (l->trigger == stm_legato && is_first))
-            continue;
         if (l->sw_last != -1)
         {
             if (note >= l->sw_lokey && note <= l->sw_hikey)
                 lr->last_key = note;
         }
+        if ((l->trigger == stm_first && !is_first) ||
+            (l->trigger == stm_legato && is_first) ||
+            (l->trigger == stm_release && !is_release)) // sw_last keyswitches are still added to the note-on list in RLL
+            continue;
         int ccval = -1;
         if (note >= l->lokey && note <= l->hikey && 
             vel >= l->lovel && vel <= l->hivel && 
