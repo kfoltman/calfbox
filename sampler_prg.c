@@ -30,43 +30,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_program)
 
-GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampler_channel *c, GSList *next_layer, int note, int vel, float random, gboolean is_first, gboolean is_release)
+// GSList *sampler_channel_get_next_layer(struct sampler_channel *c, GSList *next_layer, int note, int vel, float random, gboolean is_first, gboolean is_release)
+
+struct sampler_layer *sampler_rll_iterator_next(struct sampler_rll_iterator *iter)
 {
-    int ch = (c - c->module->channels) + 1;
-    for(;next_layer;next_layer = g_slist_next(next_layer))
+    for(;iter->next_layer;)
     {
-        struct sampler_layer *lr = next_layer->data;
+        struct sampler_layer *lr = iter->next_layer->data;
         struct sampler_layer_data *l = lr->runtime;
+        iter->next_layer = g_slist_next(iter->next_layer);
         if (!l->eff_waveform)
             continue;
 
         if (l->eff_use_simple_trigger_logic)
         {
-            if (note >= l->lokey && note <= l->hikey &&
-                vel >= l->lovel && vel <= l->hivel)
-                return next_layer;
+            if (iter->note >= l->lokey && iter->note <= l->hikey &&
+                iter->vel >= l->lovel && iter->vel <= l->hivel)
+                return lr;
             else
                 continue;
         }
 
         if (l->sw_last != -1)
         {
-            if (note >= l->sw_lokey && note <= l->sw_hikey)
-                lr->last_key = note;
+            if (iter->note >= l->sw_lokey && iter->note <= l->sw_hikey)
+                lr->last_key = iter->note;
         }
-        if ((l->trigger == stm_first && !is_first) ||
-            (l->trigger == stm_legato && is_first) ||
-            (l->trigger == stm_release && !is_release)) // sw_last keyswitches are still added to the note-on list in RLL
+        if ((l->trigger == stm_first && !iter->is_first) ||
+            (l->trigger == stm_legato && iter->is_first) ||
+            (l->trigger == stm_release && !iter->is_release)) // sw_last keyswitches are still added to the note-on list in RLL
             continue;
         int ccval = -1;
-        if (note >= l->lokey && note <= l->hikey && 
-            vel >= l->lovel && vel <= l->hivel && 
-            ch >= l->lochan && ch <= l->hichan && 
-            random >= l->lorand && random < l->hirand && 
+        struct sampler_channel *c = iter->channel;
+        struct sampler_module *m = c->module;
+        if (iter->note >= l->lokey && iter->note <= l->hikey &&
+            iter->vel >= l->lovel && iter->vel <= l->hivel &&
+            c >= &m->channels[l->lochan - 1] && c <= &m->channels[l->hichan - 1] &&
+            iter->random >= l->lorand && iter->random < l->hirand &&
             c->pitchwheel >= l->lobend && c->pitchwheel < l->hibend &&
             c->last_chanaft >= l->lochanaft && c->last_chanaft <= l->hichanaft &&
             c->last_polyaft >= l->lopolyaft && c->last_polyaft <= l->hipolyaft &&
-            c->module->module.engine->master->tempo >= l->lobpm && c->module->module.engine->master->tempo < l->hibpm  &&
+            c->module->module.engine->master->tempo >= l->lobpm && c->module->module.engine->master->tempo < l->hibpm &&
             (!l->cc.is_active || (ccval = sampler_channel_getintcc(c, NULL, l->cc.cc_number), ccval >= l->cc.locc && ccval <= l->cc.hicc)))
         {
             if (!l->eff_use_keyswitch || 
@@ -80,11 +84,30 @@ GSList *sampler_program_get_next_layer(struct sampler_program *prg, struct sampl
                 if (lr->current_seq_position > l->seq_length)
                     lr->current_seq_position = 1;
                 if (play)
-                    return next_layer;
+                    return lr;
             }
         }
     }
     return NULL;
+}
+
+void sampler_rll_iterator_init(struct sampler_rll_iterator *iter, struct sampler_rll *rll, struct sampler_channel *c, int note, int vel, float random, gboolean is_first, gboolean is_release)
+{
+    iter->channel = c;
+    iter->note = note;
+    iter->vel = vel;
+    iter->random = random;
+    iter->is_first = is_first;
+    iter->is_release = is_release;
+
+    if (note >= rll->lokey && note <= rll->hikey)
+    {
+        assert(note >= 0 && note <= 127);
+        GSList **layers_by_range = is_release ? rll->release_layers_by_range : rll->layers_by_range;
+        iter->next_layer = layers_by_range[rll->ranges_by_key[note]];
+    }
+    else
+        iter->next_layer = NULL;
 }
 
 static gboolean return_layers(GSList *layers, const char *keyword, struct cbox_command_target *fb, GError **error)

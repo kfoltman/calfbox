@@ -229,16 +229,11 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
     if (!prg || !prg->rll || prg->deleting)
         return;
 
-    GSList **layers_by_range = is_release_trigger ? prg->rll->release_layers_by_range : prg->rll->layers_by_range;
-    GSList *first_layer = NULL;
-    if (note >= prg->rll->lokey && note <= prg->rll->hikey)
-    {
-        assert(note >= 0 && note <= 127);
-        first_layer = layers_by_range[prg->rll->ranges_by_key[note]];
-    }
+    struct sampler_rll_iterator iter;
+    sampler_rll_iterator_init(&iter, prg->rll, c, note, vel, random, is_first, is_release_trigger);
 
-    GSList *next_layer = first_layer ? sampler_program_get_next_layer(prg, c, first_layer, note, vel, random, is_first, is_release_trigger) : NULL;
-    if (!next_layer)
+    struct sampler_layer *layer = sampler_rll_iterator_next(&iter);
+    if (!layer)
     {
         if (!is_release_trigger)
             c->previous_note = note;
@@ -251,7 +246,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
     struct sampler_prevoice *free_prevoice = m->prevoices_free;
     int fvcount = 0, fpcount = 0;
     
-    while(next_layer && lcount < MAX_SAMPLER_VOICES + MAX_SAMPLER_PREVOICES)
+    while(layer && lcount < MAX_SAMPLER_VOICES + MAX_SAMPLER_PREVOICES)
     {
         if (free_voice)
         {
@@ -263,13 +258,12 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
             free_prevoice = free_prevoice->next;
             fpcount++;
         }
-        struct sampler_layer *layer = next_layer->data;
         assert(layer->runtime);
         if (layer->runtime->use_prevoice)
             delayed_layers[dlcount++] = layer->runtime;
         else
             layers[lcount++] = layer->runtime;
-        next_layer = sampler_program_get_next_layer(prg, c, g_slist_next(next_layer), note, vel, random, is_first, is_release_trigger);
+        layer = sampler_rll_iterator_next(&iter);
     }
 
     int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
