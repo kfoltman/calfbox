@@ -137,6 +137,12 @@ for i in range(len(params_to_test)):
     verify_region(r2, ["%s=%s" % (param, value1)], rest)
     g1.set_param(param, value2)
     verify_region(g1, ["%s=%s" % (param, value2)], [])
+
+    r3 = g1.new_child()
+    verify_region(r3, [], [param])
+    verify_region(r3, ["%s=%s" % (param, value2)], [], full=True)
+    r3.delete()
+
     verify_region(r2, ["%s=%s" % (param, value1)], rest)
     verify_region(r2, ["%s=%s" % (param, value1)], [], full=True)
     r2.unset_param(param)
