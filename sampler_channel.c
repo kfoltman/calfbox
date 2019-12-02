@@ -48,6 +48,16 @@ static inline void set_cc_float(struct sampler_channel *c, uint32_t cc, float va
     c->floatcc[cc] = value;
 }
 
+void sampler_channel_reset_keyswitches(struct sampler_channel *c)
+{
+    if (c->program && c->program->rll)
+    {
+        memset(c->keyswitch_state, 255, sizeof(c->keyswitch_state));
+        for (uint32_t i = 0; i < c->program->rll->keyswitch_group_count; ++i)
+            c->keyswitch_state[i] = c->program->rll->keyswitch_groups[i]->key_offsets[0];
+    }
+}
+
 void sampler_channel_init(struct sampler_channel *c, struct sampler_module *m)
 {
     c->module = m;
@@ -169,6 +179,7 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
             c->last_chanaft = 0;
             c->poly_pressure_mask = 0;
             c->last_polyaft = 0;
+            sampler_channel_reset_keyswitches(c);
             return;
     }
     if (cc < smsrc_perchan_count)
@@ -228,6 +239,16 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
     struct sampler_program *prg = c->program;
     if (!prg || !prg->rll || prg->deleting)
         return;
+
+    if (!is_release_trigger)
+    {
+        for (uint32_t i = 0; i < prg->rll->keyswitch_group_count; ++i)
+        {
+            const struct sampler_keyswitch_group *ks = prg->rll->keyswitch_groups[i];
+            if (note >= ks->lo && note <= ks->hi)
+                c->keyswitch_state[i] = ks->key_offsets[note - ks->lo];
+        }
+    }
 
     struct sampler_rll_iterator iter;
     sampler_rll_iterator_init(&iter, prg->rll, c, note, vel, random, is_first, is_release_trigger);
@@ -295,7 +316,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
 
 void sampler_channel_start_release_triggered_voices(struct sampler_channel *c, int note)
 {
-    if (c->program && c->program->rll && c->program->rll->layers_release)
+    if (c->program && c->program->rll && c->program->rll->has_release_layers)
     {
         if (c->prev_note_velocity[note])
         {
@@ -344,7 +365,7 @@ void sampler_channel_stop_sustained(struct sampler_channel *c)
         }
     }
     // Start release layers for the newly released keys
-    if (c->program && c->program->rll && c->program->rll->layers_release)
+    if (c->program && c->program->rll && c->program->rll->has_release_layers)
     {
         for (int i = 0; i < 128; i++)
         {
@@ -368,7 +389,7 @@ void sampler_channel_stop_sostenuto(struct sampler_channel *c)
         }
     }
     // Start release layers for the newly released keys
-    if (c->program && c->program->rll && c->program->rll->layers_release)
+    if (c->program && c->program->rll && c->program->rll->has_release_layers)
     {
         for (int i = 0; i < 128; i++)
         {
@@ -418,6 +439,8 @@ void sampler_channel_set_program_RT(struct sampler_channel *c, struct sampler_pr
     c->program = prg;
     if (prg)
     {
+        assert(prg->rll);
+        sampler_channel_reset_keyswitches(c);
         for(GSList *p = prg->ctrl_init_list; p; p = p->next)
         {
             union sampler_ctrlinit_union u;

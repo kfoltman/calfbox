@@ -49,6 +49,8 @@ struct sampler_prevoice;
 
 #define GET_RT_FROM_sampler_channel(channel) ((channel)->module->module.rt)
 
+#define MAX_KEYSWITCH_GROUPS 16
+
 struct sampler_channel
 {
     struct sampler_module *module;
@@ -69,6 +71,7 @@ struct sampler_channel
     uint8_t intcc[smsrc_perchan_count];
     float floatcc[smsrc_perchan_count];
     uint8_t last_polyaft, last_chanaft;
+    uint8_t keyswitch_state[MAX_KEYSWITCH_GROUPS];
 };
 
 struct sampler_lfo
@@ -202,6 +205,7 @@ extern void sampler_channel_capture_sostenuto(struct sampler_channel *c);
 extern void sampler_channel_release_groups(struct sampler_channel *c, int note, int exgroups[MAX_RELEASED_GROUPS], int exgroupcount);
 extern void sampler_channel_stop_all(struct sampler_channel *c);
 extern void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val);
+extern void sampler_channel_reset_keyswitches(struct sampler_channel *c);
 
 extern void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel, int *exgroups, int *pexgroupcount);
 extern void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft);

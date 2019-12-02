@@ -918,7 +918,6 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     ld->prevoice_nifs = NULL;
 
     ld->eff_use_keyswitch = 0;
-    l->last_key = -1;
     if (!parent)
     {
         // Systemwide default instead?
@@ -1228,7 +1227,6 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)
 {
-    l->last_key = l->data.sw_lokey;
     l->current_seq_position = l->data.seq_position;
 }
 

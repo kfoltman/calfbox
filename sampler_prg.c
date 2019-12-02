@@ -34,7 +34,8 @@ CBOX_CLASS_DEFINITION_ROOT(sampler_program)
 
 struct sampler_layer *sampler_rll_iterator_next(struct sampler_rll_iterator *iter)
 {
-    for(;iter->next_layer;)
+retry:
+    while(iter->next_layer)
     {
         struct sampler_layer *lr = iter->next_layer->data;
         struct sampler_layer_data *l = lr->runtime;
@@ -51,11 +52,6 @@ struct sampler_layer *sampler_rll_iterator_next(struct sampler_rll_iterator *ite
                 continue;
         }
 
-        if (l->sw_last != -1)
-        {
-            if (iter->note >= l->sw_lokey && iter->note <= l->sw_hikey)
-                lr->last_key = iter->note;
-        }
         if ((l->trigger == stm_first && !iter->is_first) ||
             (l->trigger == stm_legato && iter->is_first) ||
             (l->trigger == stm_release && !iter->is_release)) // sw_last keyswitches are still added to the note-on list in RLL
@@ -74,8 +70,7 @@ struct sampler_layer *sampler_rll_iterator_next(struct sampler_rll_iterator *ite
             (!l->cc.is_active || (ccval = sampler_channel_getintcc(c, NULL, l->cc.cc_number), ccval >= l->cc.locc && ccval <= l->cc.hicc)))
         {
             if (!l->eff_use_keyswitch || 
-                ((l->sw_last == -1 || l->sw_last == lr->last_key) &&
-                 (l->sw_down == -1 || (c->switchmask[l->sw_down >> 5] & (1 << (l->sw_down & 31)))) &&
+                ((l->sw_down == -1 || (c->switchmask[l->sw_down >> 5] & (1 << (l->sw_down & 31)))) &&
                  (l->sw_up == -1 || !(c->switchmask[l->sw_up >> 5] & (1 << (l->sw_up & 31)))) &&
                  (l->sw_previous == -1 || l->sw_previous == c->previous_note)))
             {
@@ -88,6 +83,22 @@ struct sampler_layer *sampler_rll_iterator_next(struct sampler_rll_iterator *ite
             }
         }
     }
+    while(iter->next_keyswitch_index < iter->rll->keyswitch_group_count &&
+        iter->next_keyswitch_index < MAX_KEYSWITCH_GROUPS)
+    {
+        struct sampler_rll *rll = iter->rll;
+        uint32_t ks_group = iter->next_keyswitch_index++;
+
+        uint8_t ks_state = iter->channel->keyswitch_state[ks_group];
+        if (ks_state == 255) // nothing defined for this switch state
+            continue;
+        GSList **layers_by_range = iter->is_release ? rll->release_layers_by_range : rll->layers_by_range;
+        layers_by_range += (rll->keyswitch_groups[ks_group]->group_offset + ks_state) * rll->layers_by_range_count;
+        iter->next_layer = layers_by_range[rll->ranges_by_key[iter->note]];
+
+        if (iter->next_layer)
+            goto retry;
+    }
     return NULL;
 }
 
@@ -99,12 +110,17 @@ void sampler_rll_iterator_init(struct sampler_rll_iterator *iter, struct sampler
     iter->random = random;
     iter->is_first = is_first;
     iter->is_release = is_release;
+    iter->rll = rll;
+    iter->next_keyswitch_index = 0;
 
     if (note >= rll->lokey && note <= rll->hikey)
     {
         assert(note >= 0 && note <= 127);
         GSList **layers_by_range = is_release ? rll->release_layers_by_range : rll->layers_by_range;
-        iter->next_layer = layers_by_range[rll->ranges_by_key[note]];
+        if (layers_by_range)
+            iter->next_layer = layers_by_range[rll->ranges_by_key[note]];
+        else
+            iter->next_layer = NULL;
     }
     else
         iter->next_layer = NULL;

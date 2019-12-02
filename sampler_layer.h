@@ -548,7 +548,7 @@ struct sampler_layer
     struct sampler_program *parent_program;
     struct sampler_layer *parent, *default_child;
 
-    int last_key, current_seq_position;
+    int current_seq_position;
     
     GHashTable *unknown_keys;
     GHashTable *child_layers;

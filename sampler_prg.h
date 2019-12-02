@@ -29,17 +29,26 @@ CBOX_EXTERN_CLASS(sampler_program)
 
 #define MAX_MIDI_CURVES 32
 
+struct sampler_keyswitch_group
+{
+    uint8_t lo, hi, num_used;
+    uint32_t group_offset;
+    uint8_t key_offsets[];
+};
+
 // Runtime layer lists; in future, I might something more clever, like a tree
 struct sampler_rll
 {
-    GSList *layers; // of sampler_layer
-    GSList *layers_release; // of sampler_layer
     GSList *layers_oncc;
     uint32_t cc_trigger_bitmask[4]; // one bit per CC
     uint8_t lokey, hikey;
     uint8_t ranges_by_key[128];
     uint32_t layers_by_range_count;
     GSList **layers_by_range, **release_layers_by_range;
+    struct sampler_keyswitch_group **keyswitch_groups;
+    uint32_t keyswitch_group_count;
+    uint32_t keyswitch_key_count;
+    gboolean has_release_layers;
 };
 
 struct sampler_rll_iterator
@@ -49,6 +58,8 @@ struct sampler_rll_iterator
     float random;
     gboolean is_first, is_release;
     GSList *next_layer;
+    struct sampler_rll *rll;
+    uint32_t next_keyswitch_index;
 };
 
 struct sampler_ctrlinit

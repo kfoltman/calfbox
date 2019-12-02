@@ -414,6 +414,51 @@ REGION_LOGIC_TEST_SETUP(switches2,
     "<region>sw_lokey=16 sw_hikey=19 sw_down=17 lokey=32 hikey=35 sample=*saw"
 );
 
+struct region_logic_test_setup_step steps_switches3[] = {
+    MIDI_DATA_STEP("\x90\x12\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 1),
+    MIDI_DATA_STEP("\x90\x10\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 2),
+    MIDI_DATA_STEP("\x90\x11\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 3),
+    MIDI_DATA_STEP("\x90\x10\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 2),
+    MIDI_DATA_STEP("\x90\x0F\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 2),
+    MIDI_DATA_STEP("\x90\x14\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 2),
+    MIDI_DATA_STEP("\x90\x12\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 1),
+
+    MIDI_DATA_STEP("\x90\x09\x7F", 0),
+    MIDI_DATA_STEP("\x90\x12\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 2),
+    MIDI_DATA_STEP("\x90\x10\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 3),
+    MIDI_DATA_STEP("\x90\x11\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 4),
+    MIDI_DATA_STEP("\x90\x10\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 3),
+    MIDI_DATA_STEP("\x90\x0F\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 3),
+    MIDI_DATA_STEP("\x90\x14\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 3),
+    MIDI_DATA_STEP("\x90\x12\x7F", 0),
+    MIDI_DATA_STEP("\x90\x20\x7F", 2),
+
+    MIDI_DATA_STEP("\xB0\x79\x7F", 0), // reset all controllers
+    MIDI_DATA_STEP("\x90\x20\x7F", 1),
+    MIDI_DATA_END,
+};
+
+REGION_LOGIC_TEST_SETUP(switches3,
+    "<region>lokey=32 hikey=35 sample=*saw"
+    "<region>sw_lokey=8 sw_hikey=9 sw_last=9 lokey=32 hikey=35 sample=*saw"
+    "<region>sw_lokey=16 sw_hikey=19 sw_last=16 lokey=32 hikey=35 sample=*saw"
+    "<region>sw_lokey=16 sw_hikey=19 sw_last=17 lokey=32 hikey=35 sample=*saw"
+    "<region>sw_lokey=16 sw_hikey=19 sw_last=17 lokey=32 hikey=35 sample=*saw"
+);
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void test_assert_failed(struct test_env *env, const char *file, int line, const char *check)
@@ -456,6 +501,7 @@ struct test_info {
     { "test_sampler_note_region_logic/firstlegato", test_sampler_note_region_logic, &setup_firstlegato },
     { "test_sampler_note_region_logic/switches", test_sampler_note_region_logic, &setup_switches },
     { "test_sampler_note_region_logic/switches2", test_sampler_note_region_logic, &setup_switches2 },
+    { "test_sampler_note_region_logic/switches3", test_sampler_note_region_logic, &setup_switches3 },
 };
 
 int main(int argc, char *argv[])
