@@ -183,6 +183,7 @@ extern int cbox_song_playback_tmi_from_ppqn(struct cbox_song_playback *spb, uint
 extern int cbox_song_playback_tmi_from_samples(struct cbox_song_playback *spb, uint32_t time_samples);
 struct cbox_midi_pattern_playback *cbox_song_playback_get_pattern(struct cbox_song_playback *spb, struct cbox_midi_pattern *pattern);
 extern void cbox_song_playback_apply_old_state(struct cbox_song_playback *spb);
+uint32_t cbox_song_playback_correct_for_looping(struct cbox_song_playback *spb, uint32_t abs_samples);
 extern void cbox_song_playback_destroy(struct cbox_song_playback *spb);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -194,7 +194,10 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
     
     // Combine various sources of events (song, non-RT thread, JACK input)
     if (engine->spb)
+    {
+        engine->frame_start_song_pos = engine->spb->song_pos_samples;
         cbox_song_playback_render(engine->spb, &engine->midibuf_song, nframes);
+    }
     
     for (uint32_t i = 0; i < engine->scene_count; i++)
         cbox_scene_render(engine->scenes[i], nframes, output_buffers, output_channels);
@@ -315,6 +318,16 @@ void cbox_engine_update_song_playback(struct cbox_engine *engine)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+uint32_t cbox_engine_current_pos_samples(struct cbox_engine *engine)
+{
+    uint32_t pos = engine->frame_start_song_pos + engine->song_pos_offset;
+    if (engine->spb && engine->spb->loop_start_ppqn < engine->spb->loop_end_ppqn)
+        pos = cbox_song_playback_correct_for_looping(engine->spb, pos);
+    return pos;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 void cbox_engine_update_input_connections(struct cbox_engine *engine)
 {
     for (uint32_t i = 0; i < engine->scene_count; i++)
@@ -386,6 +399,7 @@ gboolean cbox_engine_on_transport_sync(struct cbox_engine *engine, enum cbox_tra
         {
             cbox_song_playback_seek_samples(engine->spb, frame);
         }
+        engine->frame_start_song_pos = frame;
         return TRUE;
     }
     if (state == ts_rolling)
@@ -397,6 +411,8 @@ gboolean cbox_engine_on_transport_sync(struct cbox_engine *engine, enum cbox_tra
         {
             cbox_song_playback_seek_samples(engine->spb, frame);
         }
+        else
+            engine->frame_start_song_pos = frame;
         engine->master->state = CMTS_ROLLING;
         return TRUE;
     }

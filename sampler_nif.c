@@ -20,6 +20,23 @@ void sampler_nif_addrandomdelay(struct sampler_noteinitfunc *nif, struct sampler
     pv->delay_computed += nif->param * rand() * (1.0 / RAND_MAX);
 }
 
+void sampler_nif_syncbeats(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv)
+{
+    if (nif->param > 0)
+    {
+        pv->sync_beats = nif->param;
+        double cur_beat = sampler_get_current_beat(pv->channel->module);
+        pv->sync_initial_time = cur_beat;
+        double cur_rel_beat = fmod(cur_beat, pv->sync_beats);
+        double bar_start = cur_beat - cur_rel_beat;
+        if (pv->layer_data->sync_offset <= cur_rel_beat) // trigger in next bar
+            pv->sync_trigger_time = bar_start + pv->sync_beats + pv->layer_data->sync_offset;
+        else // trigger in the same bar
+            pv->sync_trigger_time = bar_start + pv->layer_data->sync_offset;
+        // printf("cur_beat %f trigger %f offset %f\n", cur_beat, pv->sync_trigger_time, pv->layer_data->sync_offset);
+    }
+}
+
 void sampler_nif_vel2pitch(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
     v->pitch_shift += nif->param * v->vel * (1.0 / 127.0);

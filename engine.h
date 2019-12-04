@@ -45,6 +45,8 @@ struct cbox_engine
     struct cbox_midi_appsink appsink;
 
     int spb_lock, spb_retry;
+
+    uint32_t frame_start_song_pos, song_pos_offset; // samples
 };
 
 // These use an RT command internally
@@ -62,6 +64,7 @@ extern void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, 
 extern gboolean cbox_engine_on_transport_sync(struct cbox_engine *engine, enum cbox_transport_state state, uint32_t frame);
 extern void cbox_engine_on_tempo_sync(struct cbox_engine *engine, double beats_per_minute);
 extern struct cbox_midi_merger *cbox_engine_get_midi_output(struct cbox_engine *engine, struct cbox_uuid *uuid);
+extern uint32_t cbox_engine_current_pos_samples(struct cbox_engine *engine);
 
 extern int cbox_engine_get_sample_rate(struct cbox_engine *engine);
 extern int cbox_engine_get_buffer_size(struct cbox_engine *engine);

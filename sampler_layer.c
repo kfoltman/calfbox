@@ -364,6 +364,7 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_VOICE_NIF("offset_veltrack", sampler_nif_vel2offset, 0)
     FIELD_VOICE_NIF("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
     FIELD_PREVOICE_NIF("delay_random", sampler_nif_addrandomdelay, 0)
+    FIELD_PREVOICE_NIF("sync_beats", sampler_nif_syncbeats, 0)
     FIELD_PREVOICE_CC_NIF("delay_cc#", sampler_nif_cc2delay, 0)
     FIELD_VOICE_CC_NIF("reloffset_cc#", sampler_nif_cc2reloffset, 0)
     FIELD_VOICE_CC_NIF("offset_cc#", sampler_nif_cc2offset, 0)

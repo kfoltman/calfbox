@@ -689,7 +689,8 @@ void cbox_scene_render(struct cbox_scene *scene, uint32_t nframes, float *output
             outputs[i] = channels[i];
         
         for (i = 0; i < nframes; i += CBOX_BLOCK_SIZE)
-        {            
+        {
+            scene->engine->song_pos_offset = i;
             if (i >= highwatermark)
             {
                 while(cur_event < event_count)

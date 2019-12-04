@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config-api.h"
 #include "dspmath.h"
+#include "engine.h"
 #include "errors.h"
 #include "midi.h"
 #include "module.h"
@@ -540,6 +541,14 @@ gboolean sampler_select_program(struct sampler_module *m, int channel, const gch
     }
     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Preset not found: %s", preset);
     return FALSE;
+}
+
+double sampler_get_current_beat(struct sampler_module *m)
+{
+    uint32_t song_pos_samples = cbox_engine_current_pos_samples(m->module.engine);
+    double tempo_bpm = m->module.engine->master->tempo;
+    double song_pos_sec = song_pos_samples * 1.0 / m->module.srate;
+    return song_pos_sec * tempo_bpm / 60;
 }
 
 MODULE_CREATE_FUNCTION(sampler)

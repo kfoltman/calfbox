@@ -350,6 +350,7 @@ typedef int midi_note_t;
     MACRO(midi_note_t, sw_previous, -1) \
     MACRO(int, seq_position, 1) \
     MACRO(int, seq_length, 1) \
+    MACRO(float, sync_offset, 0) \
     MACRO(int, effect1bus, 1) \
     MACRO(int, effect2bus, 2) \
     MACRO(float, effect1, 0) \
@@ -581,8 +582,9 @@ extern void sampler_nif_cc2offset(struct sampler_noteinitfunc *nif, struct sampl
 extern void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 extern void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v);
 
-extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
-extern void sampler_nif_addrandomdelay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *v);
+extern void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv);
+extern void sampler_nif_addrandomdelay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv);
+extern void sampler_nif_syncbeats(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv);
 
 extern void sampler_midi_curve_init(struct sampler_midi_curve *curve);
 extern void sampler_midi_curve_interpolate(const struct sampler_midi_curve *curve, float dest[128], float def_start, float def_end, gboolean is_quadratic);

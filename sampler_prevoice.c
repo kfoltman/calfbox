@@ -16,6 +16,9 @@ void sampler_prevoice_start(struct sampler_prevoice *pv, struct sampler_channel 
     pv->vel = vel;
     pv->age = 0;
     pv->delay_computed = 0.f;
+    pv->sync_beats = -1;
+    pv->sync_initial_time = -1;
+    pv->sync_trigger_time = -1;
 
     GSList *nif = pv->layer_data->prevoice_nifs;
     while(nif)
@@ -52,6 +55,28 @@ void sampler_prevoice_unlink(struct sampler_prevoice **pv, struct sampler_prevoi
 int sampler_prevoice_process(struct sampler_prevoice *pv, struct sampler_module *m)
 {
     struct sampler_layer_data *layer_data = pv->layer_data;
+    if (pv->sync_beats != -1)
+    {
+        double cur_beat = sampler_get_current_beat(m);
+
+        if (cur_beat < pv->sync_initial_time - 0.001 || cur_beat >= pv->sync_trigger_time + 1)
+        {
+            gboolean backward_jump = cur_beat < pv->sync_initial_time;
+            // printf("Recalc: time %f, initial %f, delta %f, trigger %f\n", cur_beat, pv->sync_initial_time, cur_beat - pv->sync_initial_time, pv->sync_trigger_time);
+            // Recalculate after seek/looping etc
+            pv->sync_initial_time = cur_beat;
+            double cur_rel_beat = fmod(cur_beat, pv->sync_beats);
+            double bar_start = cur_beat - cur_rel_beat;
+            if (pv->layer_data->sync_offset <= cur_rel_beat && !backward_jump) // trigger in next bar
+                pv->sync_trigger_time = bar_start + pv->sync_beats + pv->layer_data->sync_offset;
+            else // trigger in the same bar
+                pv->sync_trigger_time = bar_start + pv->layer_data->sync_offset;
+        }
+        if (cur_beat < pv->sync_trigger_time)
+            return 0;
+        // Let the other logic (note delay etc.) take over
+        pv->sync_beats = -1;
+    }
     pv->age += CBOX_BLOCK_SIZE;
     if (pv->age >= (layer_data->delay + pv->delay_computed) * m->module.srate)
         return 1;

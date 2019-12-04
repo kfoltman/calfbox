@@ -874,6 +874,22 @@ struct cbox_midi_pattern_playback *cbox_song_playback_get_pattern(struct cbox_so
     return mppb;
 }
 
+uint32_t cbox_song_playback_correct_for_looping(struct cbox_song_playback *spb, uint32_t abs_samples)
+{
+    struct cbox_engine *engine = spb->engine;
+    // This is rather expensive, the start/end of the loop expressed in samples should be cached.
+    uint32_t loop_end_samples = cbox_master_ppqn_to_samples(engine->master, spb->loop_end_ppqn);
+    if (abs_samples >= loop_end_samples) {
+        // Correct for looping
+        uint32_t loop_start_samples = cbox_master_ppqn_to_samples(engine->master, spb->loop_start_ppqn);
+        if (loop_start_samples < loop_end_samples) {
+            uint32_t loop_length = loop_end_samples - loop_start_samples;
+            abs_samples = loop_start_samples + (abs_samples - loop_start_samples) % loop_length;
+        }
+    }
+    return abs_samples;
+}
+
 void cbox_song_playback_destroy(struct cbox_song_playback *spb)
 {
     cbox_midi_merger_close(&spb->track_merger, spb->engine->rt);
@@ -902,15 +918,7 @@ uint32_t cbox_song_time_mapper_map_time(struct cbox_time_mapper *tmap, uint32_t 
     if (rel_samples < 0 || rel_samples >= 1048576)
         return (uint32_t)-1;
     uint32_t abs_samples = engine->spb->song_pos_samples + rel_samples;
-    uint32_t loop_end_samples = cbox_master_ppqn_to_samples(engine->master, engine->spb->loop_end_ppqn);
-    if (abs_samples >= loop_end_samples) {
-        // Correct for looping
-        uint32_t loop_start_samples = cbox_master_ppqn_to_samples(engine->master, engine->spb->loop_start_ppqn);
-        if (loop_start_samples < loop_end_samples) {
-            uint32_t loop_length = loop_end_samples - loop_start_samples;
-            abs_samples = loop_start_samples + (abs_samples - loop_start_samples) % loop_length;
-        }
-    }
+    abs_samples = cbox_song_playback_correct_for_looping(engine->spb, abs_samples);
     uint32_t abs_ppqn = cbox_master_samples_to_ppqn(engine->master, abs_samples);
     return abs_ppqn | 0x80000000;
 }
