@@ -31,7 +31,7 @@ CBOX_EXTERN_CLASS(sampler_program)
 
 struct sampler_keyswitch_group
 {
-    uint8_t lo, hi, num_used;
+    uint8_t lo, hi, num_used, def_value;
     uint32_t group_offset;
     uint8_t key_offsets[];
 };

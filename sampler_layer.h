@@ -348,6 +348,7 @@ typedef int midi_note_t;
     MACRO(midi_note_t, sw_down, -1) \
     MACRO(midi_note_t, sw_up, -1) \
     MACRO(midi_note_t, sw_previous, -1) \
+    MACRO(midi_note_t, sw_default, -1) \
     MACRO(int, seq_position, 1) \
     MACRO(int, seq_length, 1) \
     MACRO(float, sync_offset, 0) \

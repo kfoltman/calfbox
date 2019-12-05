@@ -54,7 +54,13 @@ void sampler_channel_reset_keyswitches(struct sampler_channel *c)
     {
         memset(c->keyswitch_state, 255, sizeof(c->keyswitch_state));
         for (uint32_t i = 0; i < c->program->rll->keyswitch_group_count; ++i)
-            c->keyswitch_state[i] = c->program->rll->keyswitch_groups[i]->key_offsets[0];
+        {
+            const struct sampler_keyswitch_group *ksg = c->program->rll->keyswitch_groups[i];
+            if (ksg->def_value == 255)
+                c->keyswitch_state[i] = ksg->key_offsets[0];
+            else
+                c->keyswitch_state[i] = ksg->key_offsets[ksg->def_value];
+        }
     }
 }
 

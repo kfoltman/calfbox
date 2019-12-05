@@ -53,12 +53,15 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
                 ks->lo = l->data.sw_lokey;
                 ks->hi = l->data.sw_hikey;
                 ks->num_used = 0;
+                ks->def_value = 255;
                 memset(ks->key_offsets, 255, width);
 
                 g_hash_table_insert(keyswitch_groups, (gpointer)key, ks);
                 g_ptr_array_add(keyswitch_group_array, ks);
                 keyswitch_group_count++;
             }
+            if (l->data.sw_default >= ks->lo && l->data.sw_default <= ks->hi && ks->def_value == 255)
+                ks->def_value = l->data.sw_default - ks->lo;
             if (ks->key_offsets[value] == 255)
             {
                 ks->key_offsets[value] = ks->num_used;
