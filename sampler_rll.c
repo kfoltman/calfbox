@@ -32,6 +32,7 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     GHashTable *keyswitch_groups = g_hash_table_new(g_direct_hash, g_direct_equal);
     uint32_t keyswitch_group_count = 0, keyswitch_key_count = 0;
     GPtrArray *keyswitch_group_array = g_ptr_array_new();
+    memset(rll->ranges_by_key, 255, sizeof(rll->ranges_by_key));
     rll->has_release_layers = FALSE;
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
@@ -73,6 +74,7 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     }
     rll->keyswitch_groups = (gpointer)g_ptr_array_free(keyswitch_group_array, FALSE);
     rll->keyswitch_group_count = keyswitch_group_count;
+    rll->keyswitch_key_count = keyswitch_key_count;
     uint32_t offset = 0;
     for (uint32_t i = 0; i < keyswitch_group_count; ++i)
     {

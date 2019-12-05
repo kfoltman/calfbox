@@ -92,12 +92,15 @@ retry:
         uint8_t ks_state = iter->channel->keyswitch_state[ks_group];
         if (ks_state == 255) // nothing defined for this switch state
             continue;
-        GSList **layers_by_range = iter->is_release ? rll->release_layers_by_range : rll->layers_by_range;
-        layers_by_range += (rll->keyswitch_groups[ks_group]->group_offset + ks_state) * rll->layers_by_range_count;
-        iter->next_layer = layers_by_range[rll->ranges_by_key[iter->note]];
-
-        if (iter->next_layer)
-            goto retry;
+        uint8_t key_range = rll->ranges_by_key[iter->note];
+        if (key_range != 255)
+        {
+            GSList **layers_by_range = iter->is_release ? rll->release_layers_by_range : rll->layers_by_range;
+            layers_by_range += (rll->keyswitch_groups[ks_group]->group_offset + ks_state) * rll->layers_by_range_count;
+            iter->next_layer = layers_by_range[key_range];
+            if (iter->next_layer)
+                goto retry;
+        }
     }
     return NULL;
 }
@@ -118,7 +121,11 @@ void sampler_rll_iterator_init(struct sampler_rll_iterator *iter, struct sampler
         assert(note >= 0 && note <= 127);
         GSList **layers_by_range = is_release ? rll->release_layers_by_range : rll->layers_by_range;
         if (layers_by_range)
-            iter->next_layer = layers_by_range[rll->ranges_by_key[note]];
+        {
+            uint8_t key_range = rll->ranges_by_key[note];
+            if (key_range != 255)
+                iter->next_layer = layers_by_range[key_range];
+        }
         else
             iter->next_layer = NULL;
     }
