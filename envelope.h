@@ -150,7 +150,7 @@ static inline void cbox_envelope_advance(struct cbox_envelope *env, int released
     if (pos >= 1 || (es->break_on_release && released))
     {
         int next_stage = released ? es->next_if_released : es->next_if_pressed;
-        if (!es->keep_last_value || (es->keep_last_value == 2 && !released) || next_stage == env->cur_stage)
+        if (!es->keep_last_value || pos >= 1 || (es->keep_last_value == 2 && !released) || next_stage == env->cur_stage)
             env->stage_start_value = es->end_value;
         else
             env->stage_start_value = env->cur_value;
