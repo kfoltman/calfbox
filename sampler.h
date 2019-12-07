@@ -291,7 +291,7 @@ static inline float sampler_channel_getcc_mod(struct sampler_channel *c, struct 
 {
     float val = (cc_no < 128) ? c->floatcc[cc_no] : sampler_channel_get_expensive_cc(c, v, NULL, cc_no);
     if (sm->step)
-        val = floorf(val * (sm->step + 1)) / sm->step;
+        val = floorf(0.9999f * val * (sm->step + 1)) / sm->step;
     if (sm->curve_id || c->program->interpolated_curves[0])
         val = sampler_program_get_curve_value(c->program, sm->curve_id, val);
     return val;
