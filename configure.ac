@@ -23,6 +23,7 @@ AC_HEADER_STDC
 
 # Set initial parameters
 PYTHON_ENABLED="yes"
+NCURSES_ENABLED="yes"
 JACK_ENABLED="yes"
 FLUIDSYNTH_ENABLED="yes"
 LIBSMF_ENABLED="yes"
@@ -37,6 +38,12 @@ AC_ARG_WITH(python,
 AC_HELP_STRING([--without-python],[disable Python embedding]),
   [if test "$withval" = "no"; then PYTHON_ENABLED="no"; fi],[])
 AC_MSG_RESULT($PYTHON_ENABLED)
+
+AC_MSG_CHECKING([whether to enable ncurses UI])
+AC_ARG_WITH(ncurses,
+AC_HELP_STRING([--without-ncurses],[disable ncurses ui]),
+  [if test "$withval" = "no"; then NCURSES_ENABLED="no"; fi],[])
+AC_MSG_RESULT($NCURSES_ENABLED)
 
 AC_MSG_CHECKING([whether to enable JACK I/O])
 AC_ARG_WITH(jack,
@@ -82,7 +89,9 @@ if test "$LIBUSB_ENABLED" = "yes"; then
     PKG_CHECK_MODULES(LIBUSB_DEPS, libusb-1.0 >= 1.0, true, AC_MSG_ERROR([libusb-1.0 is required]))
 fi
 PKG_CHECK_MODULES(LIBSNDFILE_DEPS, sndfile, true, AC_MSG_ERROR([libsndfile is required]))
-PKG_CHECK_MODULES(NCURSES_DEPS, ncurses, true, AC_MSG_ERROR([libncurses is required]))
+if test "$NCURSES_ENABLED" = "yes"; then
+    PKG_CHECK_MODULES(NCURSES_DEPS, ncurses, true, AC_MSG_ERROR([libncurses is required]))
+fi
 
 if test "$FLUIDSYNTH_ENABLED" = "yes"; then
     PKG_CHECK_MODULES(FLUIDSYNTH_DEPS, fluidsynth >= 1.0.8, true, AC_MSG_ERROR([fluidsynth 1.0.8 is required]))
@@ -105,6 +114,7 @@ fi
 
 # Generate Automake conditionals
 AM_CONDITIONAL(USE_PYTHON, test "$PYTHON_ENABLED" = "yes")
+AM_CONDITIONAL(USE_NCURSES, test "$NCURSES_ENABLED" = "yes")
 AM_CONDITIONAL(USE_JACK, test "$JACK_ENABLED" = "yes")
 AM_CONDITIONAL(USE_FLUIDSYNTH, test "$FLUIDSYNTH_ENABLED" = "yes")
 AM_CONDITIONAL(USE_LIBSMF, test "$LIBSMF_ENABLED" = "yes")
@@ -115,6 +125,9 @@ AM_CONDITIONAL(USE_NEON, test "$NEON_ENABLED" = "yes")
 # Generate config.h conditionals
 if test "$PYTHON_ENABLED" = "yes"; then
     AC_DEFINE(USE_PYTHON, 1, [Python will be included])
+fi
+if test "$NCURSES_ENABLED" = "yes"; then
+    AC_DEFINE(USE_NCURSES, 1, [ncurses will be included])
 fi
 if test "$JACK_ENABLED" = "yes"; then
     AC_DEFINE(USE_JACK, 1, [JACK I/O will be included])

@@ -19,6 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_UI_H
 #define CBOX_UI_H
 
+#include "config.h"
+
+#if USE_NCURSES
+
 struct cbox_ui_page
 {
     void *user_data;
@@ -30,5 +34,7 @@ struct cbox_ui_page
 extern void cbox_ui_start(void);
 extern int cbox_ui_run(struct cbox_ui_page *page);
 extern void cbox_ui_stop(void);
+
+#endif
 
 #endif

@@ -26,6 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <ncurses.h>
 #include <string.h>
 
+#if USE_NCURSES
+
 struct cbox_menu
 {
     GPtrArray *items;
@@ -282,3 +284,5 @@ void cbox_menu_page_destroy(struct cbox_menu_page *p)
 {
     free(p);
 }
+
+#endif

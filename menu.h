@@ -19,6 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_MENU_H
 #define CBOX_MENU_H
 
+#include "config.h"
+
+#if USE_NCURSES
+
 #include <ncurses.h>
 #include <stdint.h>
 
@@ -57,5 +61,7 @@ struct cbox_menu_page
 
 extern struct cbox_menu_page *cbox_menu_page_new(void);
 extern void cbox_menu_page_destroy(struct cbox_menu_page *st);
+
+#endif
 
 #endif

@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_MENUITEM_H
 #define CBOX_MENUITEM_H
 
+#if USE_NCURSES
+
 #include <glib.h>
 #include <ncurses.h>
 #include <stdint.h>
@@ -125,5 +127,7 @@ static inline struct cbox_menu_item *cbox_menu_item_new_ok(void)
 {
     return cbox_menu_item_new_menu("OK", NULL, NULL, 0);
 }
+
+#endif
 
 #endif

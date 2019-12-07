@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "menu.h"
+#if USE_NCURSES
 #include "menuitem.h"
+
 #include <malloc.h>
 #include <string.h>
 
@@ -297,3 +299,5 @@ void cbox_menu_item_destroy(struct cbox_menu_item *item)
 {
     item->item_class->destroy(item);
 }
+
+#endif

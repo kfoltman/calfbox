@@ -46,6 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <unistd.h>
 
+#if USE_NCURSES
+
 int cmd_quit(struct cbox_menu_item_command *item, void *context)
 {
     return 1;
@@ -461,3 +463,4 @@ struct cbox_menu *create_main_menu()
     return main_menu;
 }
 
+#endif

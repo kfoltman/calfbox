@@ -43,7 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib.h>
 #include <getopt.h>
 #include <math.h>
+#if USE_NCURSES
 #include <ncurses.h>
+#endif
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -83,7 +85,9 @@ void print_help(char *progname)
         "Options:\n"
         " -h | --help               Show this help text\n"
         " -m | --metronome          Create a simple metronome pattern\n"
+#if USE_NCURSES
         " -n | --no-ui              Do not start the user interface\n"
+#endif
         " -p | --play               Start pattern playback (default for -d/-D)\n"
         " -P | --no-play            Don't start pattern playback\n"
         " -N | --no-io <rate>       Use off-line processing instead of JACK I/O\n"
@@ -163,6 +167,8 @@ void cbox_script_run(const char *name)
 
 #endif
 
+#if USE_NCURSES
+
 static int (*old_menu_on_idle)(struct cbox_ui_page *page);
 
 static int on_idle_with_ui_poll(struct cbox_ui_page *page)
@@ -195,6 +201,22 @@ void run_ui()
     cbox_menu_destroy(main_menu);
 }
 
+#endif
+
+void run_no_ui()
+{
+    printf("Ready. Press ENTER to exit.\n");
+    fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) | O_NONBLOCK);
+    do {
+        int ch = getchar();
+        if (ch == 10 || (ch == -1 && errno != EWOULDBLOCK))
+            break;
+        usleep(100000);
+        cbox_app_on_idle(NULL, NULL);
+    } while(1);
+    fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) &~ O_NONBLOCK);
+}
+
 int main(int argc, char *argv[])
 {
     struct cbox_open_params params;
@@ -215,7 +237,9 @@ int main(int argc, char *argv[])
     int bpb = 0;
     float tempo = 0;
     GError *error = NULL;
+#if USE_NCURSES
     gboolean no_ui = FALSE;
+#endif
     gboolean no_io = FALSE;
     int play_immediately = 0;
     int no_io_srate = 0;
@@ -260,7 +284,9 @@ int main(int argc, char *argv[])
                 metronome = 1;
                 break;
             case 'n':
+#if USE_NCURSES
                 no_ui = TRUE;
+#endif
                 break;
             case 'N':
                 no_io = TRUE;
@@ -382,21 +408,14 @@ int main(int argc, char *argv[])
         cbox_script_run(script_name);
     else
 #endif
+#if USE_NCURSES
     if (!no_ui)
         run_ui();
     else
-    {
-        printf("Ready. Press ENTER to exit.\n");
-        fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) | O_NONBLOCK);
-        do {
-            int ch = getchar();
-            if (ch == 10 || (ch == -1 && errno != EWOULDBLOCK))
-                break;
-            usleep(100000);
-            cbox_app_on_idle(NULL, NULL);
-        } while(1);
-        fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) &~ O_NONBLOCK);
-    }
+        run_no_ui();
+#else
+    run_no_ui();
+#endif
     cbox_rt_stop(app.rt);
     if (!no_io)
         cbox_io_close(&app.io);

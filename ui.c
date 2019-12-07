@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "ui.h"
 
+#if USE_NCURSES
+
 #include <assert.h>
 #include <stdio.h>
 #include <ncurses.h>
@@ -60,3 +62,4 @@ void cbox_ui_stop()
     endwin();    
 }
 
+#endif
