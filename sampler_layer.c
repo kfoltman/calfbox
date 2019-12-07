@@ -497,6 +497,9 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_ALIAS("bendup", "bend_up")
     FIELD_ALIAS("benddown", "bend_down")
     FIELD_ALIAS("offby", "off_by")
+    FIELD_ALIAS("offset_oncc#", "offset_cc#")
+    FIELD_ALIAS("reloffset_oncc#", "reloffset_cc#")
+    FIELD_ALIAS("delay_oncc#", "delay_cc#")
 
     { "genericmod_#_#_#_#", -1, slpt_generic_modulation, 0, 0, NULL, NULL },
 };
