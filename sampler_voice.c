@@ -527,7 +527,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             {
                 float value = 0.f;
                 if (sm->src < smsrc_pernote_offset)
-                    value = sampler_channel_getcc(c, v, sm->src);
+                    value = sampler_channel_getcc_mod(c, v, sm->src, sm);
                 uint32_t param = sm->dest - smdest_eg_stage_start;
                 if (value * sm->amount != 0)
                     cbox_envelope_modify_dahdsr(&v->cc_envs[(param >> 4)], param & 0x0F, value * sm->amount, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
