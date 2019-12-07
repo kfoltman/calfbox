@@ -41,13 +41,12 @@ void sampler_layer_data_dump_modulations(struct sampler_layer_data *l)
     while(p)
     {
         struct sampler_modulation *sm = p->data;
-        if (sm->has_value)
-            printf("%d x %d -> %d : %f\n", sm->src, sm->src2, sm->dest, sm->amount);
+        printf("%d x %d -> %d : %f : %d\n", sm->src, sm->src2, sm->dest, sm->amount, sm->curve_id);
         p = g_slist_next(p);
     }
 }
 
-static void sampler_layer_data_set_modulation(struct sampler_layer_data *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags, gboolean propagating_defaults)
+static struct sampler_modulation *sampler_layer_data_find_modulation(struct sampler_layer_data *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, GSList **link_ptr)
 {
     GSList *p = l->modulations;
     while(p)
@@ -55,70 +54,111 @@ static void sampler_layer_data_set_modulation(struct sampler_layer_data *l, enum
         struct sampler_modulation *sm = p->data;
         if (sm->src == src && sm->src2 == src2 && sm->dest == dest)
         {
-            // do not overwrite locally set value with defaults
-            if (propagating_defaults && sm->has_value)
-                return;
-            sm->amount = amount;
-            sm->flags = flags;
-            sm->has_value = !propagating_defaults;
-            return;
+            if (link_ptr)
+                *link_ptr = p;
+            return sm;
         }
         p = g_slist_next(p);
     }
-    struct sampler_modulation *sm = g_malloc0(sizeof(struct sampler_modulation));
+    return NULL;
+}
+
+static struct sampler_modulation *sampler_layer_data_add_modulation(struct sampler_layer_data *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest)
+{
+    struct sampler_modulation *sm = sampler_layer_data_find_modulation(l, src, src2, dest, NULL);
+    if (sm)
+        return sm;
+    sm = g_malloc0(sizeof(struct sampler_modulation));
     sm->src = src;
     sm->src2 = src2;
     sm->dest = dest;
-    sm->amount = amount;
-    sm->flags = flags;
-    sm->has_value = !propagating_defaults;
+    sm->amount = 0;
+    sm->curve_id = 0;
+    sm->has_amount = FALSE;
+    sm->has_curve = FALSE;
     l->modulations = g_slist_prepend(l->modulations, sm);
+    return sm;
 }
 
-static void sampler_layer_data_unset_modulation(struct sampler_layer_data *l, struct sampler_layer_data *parent_data, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, gboolean remove_propagated)
+static inline gboolean is_null_modulation(const struct sampler_modulation *sm)
 {
-    GSList *p = l->modulations;
-    while(p)
+    return !sm->amount && !sm->curve_id && !sm->has_amount && !sm->has_curve;
+}
+
+static inline gboolean is_null_values_modulation(const struct sampler_modulation *sm)
+{
+    return !sm->amount && !sm->curve_id;
+}
+
+void sampler_layer_propagate_modulation(struct sampler_layer *l, const struct sampler_modulation *srcm, gboolean starting)
+{
+    if (!starting)
     {
-        struct sampler_modulation *sm = p->data;
-        if (sm->src == src && sm->src2 == src2 && sm->dest == dest && sm->has_value == !remove_propagated)
-        {
-            if (!remove_propagated && parent_data) {
-                // Try to copy over from parent
-                GSList *q = parent_data->modulations;
-                while(q)
-                {
-                    struct sampler_modulation *psm = q->data;
-                    if (psm->src == src && psm->src2 == src2 && psm->dest == dest && psm->has_value)
-                    {
-                        memcpy(sm, psm, sizeof(*sm));
-                        sm->has_value = FALSE;
-                        return;
-                    }
-                    q = g_slist_next(q);
-                }
-            }
-            // No parent value, just delete
-            l->modulations = g_slist_delete_link(l->modulations, p);
-            return;
-        }
-        p = g_slist_next(p);
+        struct sampler_modulation *dstm = sampler_layer_data_add_modulation(&l->data, srcm->src, srcm->src2, srcm->dest);
+        if (!dstm->has_amount)
+            dstm->amount = srcm->amount;
+        if (!dstm->has_curve)
+            dstm->curve_id = srcm->curve_id;
     }
-#if 0
-    printf("modulation not found\n");
-    printf("Looking for: %d x %d -> %d\n", src, src2, dest);
-    sampler_layer_data_dump_modulations(l);
-#endif
+
+    if (l->child_layers) {
+        GHashTableIter iter;
+        g_hash_table_iter_init(&iter, l->child_layers);
+        gpointer key, value;
+        while(g_hash_table_iter_next(&iter, &key, &value))
+        {
+            struct sampler_layer *child = value;
+            sampler_layer_propagate_modulation(child, srcm, FALSE);
+        }
+    }
 }
 
-void sampler_layer_set_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount, int flags)
+void sampler_layer_set_modulation_amount(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, float amount)
 {
-    sampler_layer_data_set_modulation(&l->data, src, src2, dest, amount, flags, FALSE);
+    struct sampler_modulation *dstm = sampler_layer_data_add_modulation(&l->data, src, src2, dest);
+    dstm->has_amount = TRUE;
+    dstm->amount = amount;
+    sampler_layer_propagate_modulation(l, dstm, TRUE);
 }
 
-void sampler_layer_unset_modulation(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, gboolean remove_propagated)
+void sampler_layer_set_modulation_curve(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, int curve)
 {
-    sampler_layer_data_unset_modulation(&l->data, (!remove_propagated && l->parent) ? &l->parent->data : NULL, src, src2, dest, remove_propagated);
+    struct sampler_modulation *dstm = sampler_layer_data_add_modulation(&l->data, src, src2, dest);
+    dstm->has_curve = TRUE;
+    dstm->curve_id = curve;
+    sampler_layer_propagate_modulation(l, dstm, TRUE);
+}
+
+static gboolean sampler_layer_data_unset_modulation(struct sampler_layer_data *l, struct sampler_layer_data *parent_data, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, gboolean remove_local, gboolean unset_amount, gboolean unset_curve)
+{
+    GSList *link = NULL;
+    struct sampler_modulation *sm = sampler_layer_data_find_modulation(l, src, src2, dest, &link);
+    if (!sm)
+        return FALSE;
+    struct sampler_modulation *psm = remove_local && parent_data != NULL ? sampler_layer_data_find_modulation(parent_data, src, src2, dest, NULL) : NULL;
+    if (unset_amount && sm->has_amount == remove_local)
+    {
+        sm->amount = psm ? psm->amount : 0;
+        if (remove_local)
+            sm->has_amount = FALSE;
+    }
+    if (unset_curve && sm->has_curve == remove_local)
+    {
+        sm->curve_id = psm ? psm->curve_id : 0;
+        if (remove_local)
+            sm->has_curve = FALSE;
+    }
+    // Delete if it's all default values and it's not overriding anything
+    if (is_null_modulation(sm))
+        l->modulations = g_slist_delete_link(l->modulations, link);
+
+    return TRUE;
+}
+
+static void sampler_layer_unset_modulation(struct sampler_layer*l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, gboolean remove_local, gboolean unset_amount, gboolean unset_curve)
+{
+    if (!sampler_layer_data_unset_modulation(&l->data, l->parent ? &l->parent->data : NULL, src, src2, dest, remove_local, unset_amount, unset_curve))
+        return;
 
     if (l->child_layers) {
         // Also recursively remove propagated copies from child layers, if any
@@ -128,9 +168,19 @@ void sampler_layer_unset_modulation(struct sampler_layer *l, enum sampler_modsrc
         while(g_hash_table_iter_next(&iter, &key, &value))
         {
             struct sampler_layer *child = value;
-            sampler_layer_unset_modulation(child, src, src2, dest, TRUE);
+            sampler_layer_unset_modulation(child, src, src2, dest, FALSE, unset_amount, unset_curve);
         }
     }
+}
+
+void sampler_layer_unset_modulation_amount(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, gboolean remove_local)
+{
+    sampler_layer_unset_modulation(l, src, src2, dest, remove_local, TRUE, FALSE);
+}
+
+void sampler_layer_unset_modulation_curve(struct sampler_layer *l, enum sampler_modsrc src, enum sampler_modsrc src2, enum sampler_moddest dest, gboolean remove_local)
+{
+    sampler_layer_unset_modulation(l, src, src2, dest, remove_local, FALSE, TRUE);
 }
 
 void sampler_layer_data_add_nif(struct sampler_layer_data *l, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant, float param, gboolean propagating_defaults)
@@ -234,6 +284,8 @@ enum sampler_layer_param_type
     slpt_amount, // src -> dest
     slpt_modulation, // src1 * src2 -> dest
     slpt_generic_modulation,
+    slpt_curvecc,
+    slpt_depth_curvecc,
     // note init functions
     slpt_voice_nif,
     slpt_prevoice_nif,
@@ -281,7 +333,13 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
 #define FIELD_AMOUNT(name, src, dest) \
     { name, -1, slpt_amount, 0, (smsrc_##src << 16) | smdest_##dest, NULL, NULL },
 #define FIELD_AMOUNT_CC(name, dest) \
-    { name, -1, slpt_amountcc, 0, smdest_##dest, NULL, NULL },
+    { name "cc#", -1, slpt_amountcc, 0, smdest_##dest, NULL, NULL }, \
+    { name "_oncc#", -1, slpt_amountcc, 0, smdest_##dest, NULL, NULL }, \
+    { name "_curvecc#", -1, slpt_curvecc, 0, smdest_##dest, NULL, NULL },
+#define FIELD_AMOUNT_CC_(name, dest) \
+    { name "_cc#", -1, slpt_amountcc, 0, smdest_##dest, NULL, NULL }, \
+    { name "_oncc#", -1, slpt_amountcc, 0, smdest_##dest, NULL, NULL }, \
+    { name "_curvecc#", -1, slpt_curvecc, 0, smdest_##dest, NULL, NULL },
 #define FIELD_VOICE_NIF(name, nif, variant) \
     { name, -1, slpt_voice_nif, 0, variant, nif, NULL },
 #define FIELD_PREVOICE_NIF(name, nif, variant) \
@@ -300,8 +358,7 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
 #define PROC_SUBSTRUCT_FIELD_DESCRIPTOR_DAHDSR(name, index, def_value, parent, parent_name, parent_index, parent_struct) \
     { #parent_name "_" #name, offsetof(struct sampler_layer_data, parent) + offsetof(struct parent_struct, name), slpt_float, def_value, parent_index * 100 + index, NULL, sampler_layer_data_##parent##_set_has_##name }, \
     FIELD_VOICE_NIF(#parent_name "_vel2" #name, sampler_nif_vel2env, (parent_index << 4) + snif_env_##name) \
-    FIELD_AMOUNT_CC(#parent_name "_" #name "cc#", ampeg_stage + (parent_index << 4) + snif_env_##name) \
-    FIELD_AMOUNT_CC(#parent_name "_" #name "_oncc#", ampeg_stage + (parent_index << 4) + snif_env_##name)
+    FIELD_AMOUNT_CC(#parent_name "_" #name, ampeg_stage + (parent_index << 4) + snif_env_##name) \
 
 #define PROC_FIELD_DESCRIPTOR(type, name, default_value) \
     { #name, LOFS(name), slpt_##type, default_value, 0, NULL, sampler_layer_data_set_has_##name },
@@ -318,6 +375,8 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
     DAHDSR_FIELDS(PROC_SUBSTRUCT_FIELD_DESCRIPTOR_DAHDSR, field, name, index, cbox_dahdsr) \
     FIELD_AMOUNT(#name "_depth", name, from_##name) \
     { #name "_depthcc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
+    { #name "_depth_oncc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
+    { #name "_depth_curvecc#", -1, slpt_depth_curvecc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
     { #name "_vel2depth", -1, slpt_modulation, 0, (smsrc_##name << 8) | (smsrc_vel << 20) | (smdest_from_##name), NULL, NULL },
 
 #define PROC_FIELD_DESCRIPTOR_lfo(field, name, index) \
@@ -325,16 +384,18 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
     FIELD_AMOUNT(#name "_depth", name, from_##name) \
     FIELD_AMOUNT(#name "_freqpolyaft", polyaft, name##_freq) \
     FIELD_AMOUNT(#name "_freqchanaft", chanaft, name##_freq) \
-    FIELD_AMOUNT_CC(#name "_freqcc#", name##_freq) \
+    FIELD_AMOUNT_CC(#name "_freq", name##_freq) \
     { #name "_depthpolyaft", -1, slpt_modulation, 0, (smsrc_##name << 8) | (smsrc_polyaft << 20) | (smdest_from_##name), NULL, NULL }, \
     { #name "_depthchanaft", -1, slpt_modulation, 0, (smsrc_##name << 8) | (smsrc_chanaft << 20) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depthcc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL },
+    { #name "_depthcc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
+    { #name "_depth_oncc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
+    { #name "_depth_curvecc#", -1, slpt_depth_curvecc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL },
 
 #define PROC_FIELD_DESCRIPTOR_eq(field, name, index) \
     EQ_FIELDS(PROC_SUBSTRUCT_FIELD_DESCRIPTOR, field, name, index, sampler_eq_params) \
-    FIELD_AMOUNT_CC(#name "_freqcc#", name##_freq) \
-    FIELD_AMOUNT_CC(#name "_bwcc#", name##_bw) \
-    FIELD_AMOUNT_CC(#name "_gaincc#", name##_gain)
+    FIELD_AMOUNT_CC(#name "_freq", name##_freq) \
+    FIELD_AMOUNT_CC(#name "_bw", name##_bw) \
+    FIELD_AMOUNT_CC(#name "_gain", name##_gain)
 
 #define PROC_FIELD_DESCRIPTOR_ccrange(field, parname) \
     { #parname "locc#", LOFS(field), slpt_ccrange, 0, 0, NULL, sampler_layer_data_set_has_##field##_lo }, \
@@ -348,14 +409,13 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_AMOUNT("cutoff_polyaft", polyaft, cutoff)
     FIELD_AMOUNT("resonance_polyaft", polyaft, resonance)
 
-    FIELD_AMOUNT_CC("gain_cc#", gain)
-    FIELD_AMOUNT_CC("cutoff_cc#", cutoff)
-    FIELD_AMOUNT_CC("resonance_cc#", resonance)
-    FIELD_AMOUNT_CC("pitch_cc#", pitch)
-    FIELD_AMOUNT_CC("tune_oncc#", pitch)
-    FIELD_AMOUNT_CC("tonectl_cc#", tonectl)
-    FIELD_AMOUNT_CC("pan_cc#", pan)
-    FIELD_AMOUNT_CC("pan_oncc#", pan)
+    FIELD_AMOUNT_CC_("gain", gain)
+    FIELD_AMOUNT_CC_("cutoff", cutoff)
+    FIELD_AMOUNT_CC_("resonance", resonance)
+    FIELD_AMOUNT_CC_("pitch", pitch)
+    FIELD_AMOUNT_CC_("tune", pitch)
+    FIELD_AMOUNT_CC_("tonectl", tonectl)
+    FIELD_AMOUNT_CC_("pan", pan)
 
     FIELD_VOICE_NIF("amp_random", sampler_nif_addrandom, 0)
     FIELD_VOICE_NIF("fil_random", sampler_nif_addrandom, 1)
@@ -531,24 +591,35 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
         case slpt_depthcc:
             VERIFY_FLOAT_VALUE;
             cc = args[0];
-            sampler_layer_set_modulation(l, (e->extra_int >> 16), cc, (e->extra_int & 0xFFFF), fvalue, 0);
+            sampler_layer_set_modulation_amount(l, (e->extra_int >> 16), cc, (e->extra_int & 0xFFFF), fvalue);
+            return TRUE;
+        case slpt_depth_curvecc:
+            VERIFY_FLOAT_VALUE;
+            cc = args[0];
+            sampler_layer_set_modulation_curve(l, (e->extra_int >> 16), cc, (e->extra_int & 0xFFFF), (int)fvalue);
             return TRUE;
         case slpt_amountcc:
             VERIFY_FLOAT_VALUE;
             cc = args[0];
-            sampler_layer_set_modulation(l, cc, smsrc_none, (e->extra_int & 0xFFFF), fvalue, 0);
+            sampler_layer_set_modulation_amount(l, cc, smsrc_none, (e->extra_int & 0xFFFF), fvalue);
+            return TRUE;
+        case slpt_curvecc:
+            VERIFY_FLOAT_VALUE;
+            cc = args[0];
+            sampler_layer_set_modulation_curve(l, cc, smsrc_none, (e->extra_int & 0xFFFF), (int)fvalue);
             return TRUE;
         case slpt_amount:
             VERIFY_FLOAT_VALUE;
-            sampler_layer_set_modulation(l, (e->extra_int >> 16), smsrc_none, (e->extra_int & 0xFFFF), fvalue, 0);
+            sampler_layer_set_modulation_amount(l, (e->extra_int >> 16), smsrc_none, (e->extra_int & 0xFFFF), fvalue);
             return TRUE;
         case slpt_modulation:
             VERIFY_FLOAT_VALUE;
-            sampler_layer_set_modulation(l, (e->extra_int >> 8) & 0xFFF, (e->extra_int >> 20), (e->extra_int & 0xFF), fvalue, 0);
+            sampler_layer_set_modulation_amount(l, (e->extra_int >> 8) & 0xFFF, (e->extra_int >> 20), (e->extra_int & 0xFF), fvalue);
             return TRUE;
         case slpt_generic_modulation:
             VERIFY_FLOAT_VALUE;
-            sampler_layer_set_modulation(l, args[0], args[1], args[2], fvalue, args[3]);
+            sampler_layer_set_modulation_amount(l, args[0], args[1], args[2], fvalue);
+            sampler_layer_set_modulation_curve(l, args[0], args[1], args[2], args[3]);
             return TRUE;
         case slpt_voice_nif:
             VERIFY_FLOAT_VALUE;
@@ -641,17 +712,25 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
         }
         case slpt_depthcc:
             cc = args[0];
-            sampler_layer_unset_modulation(l, (e->extra_int >> 16), cc, (e->extra_int & 0xFFFF), FALSE);
+            sampler_layer_unset_modulation_amount(l, (e->extra_int >> 16), cc, (e->extra_int & 0xFFFF), TRUE);
+            return TRUE;
+        case slpt_depth_curvecc:
+            cc = args[0];
+            sampler_layer_unset_modulation_curve(l, (e->extra_int >> 16), cc, (e->extra_int & 0xFFFF), TRUE);
             return TRUE;
         case slpt_amountcc:
             cc = args[0];
-            sampler_layer_unset_modulation(l, cc, smsrc_none, (e->extra_int & 0xFFFF), FALSE);
+            sampler_layer_unset_modulation_amount(l, cc, smsrc_none, (e->extra_int & 0xFFFF), TRUE);
+            return TRUE;
+        case slpt_curvecc:
+            cc = args[0];
+            sampler_layer_unset_modulation_curve(l, cc, smsrc_none, (e->extra_int & 0xFFFF), TRUE);
             return TRUE;
         case slpt_amount:
-            sampler_layer_unset_modulation(l, (e->extra_int >> 16), smsrc_none, (e->extra_int & 0xFFFF), FALSE);
+            sampler_layer_unset_modulation_amount(l, (e->extra_int >> 16), smsrc_none, (e->extra_int & 0xFFFF), TRUE);
             return TRUE;
         case slpt_modulation:
-            sampler_layer_unset_modulation(l, (e->extra_int >> 8) & 0xFFF, (e->extra_int >> 20), (e->extra_int & 0xFF), FALSE);
+            sampler_layer_unset_modulation_amount(l, (e->extra_int >> 8) & 0xFFF, (e->extra_int >> 20), (e->extra_int & 0xFF), TRUE);
             return TRUE;
         case slpt_voice_nif:
             sampler_layer_remove_nif(l, e->extra_ptr, NULL, e->extra_int, FALSE);
@@ -668,7 +747,7 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             sampler_layer_remove_nif(l, NULL, e->extra_ptr, cc + (e->extra_int << 8), FALSE);
             return TRUE;
         case slpt_generic_modulation:
-            sampler_layer_unset_modulation(l, args[0], args[1], args[2], FALSE);
+            sampler_layer_unset_modulation_amount(l, args[0], args[1], args[2], TRUE);
             return TRUE;
         case slpt_invalid:
         case slpt_reserved:
@@ -922,9 +1001,11 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     if (!parent)
     {
         // Systemwide default instead?
-        sampler_layer_set_modulation(l, 74, smsrc_none, smdest_cutoff, 9600, 2);
-        sampler_layer_set_modulation(l, 71, smsrc_none, smdest_resonance, 12, 2);
-        sampler_layer_set_modulation(l, smsrc_pitchlfo, 1, smdest_pitch, 100, 0);
+        sampler_layer_set_modulation_amount(l, 74, smsrc_none, smdest_cutoff, 9600);
+        // sampler_layer_set_modulation_curve(l, 74, smsrc_none, smdest_cutoff, 1);
+        sampler_layer_set_modulation_amount(l, 71, smsrc_none, smdest_resonance, 12);
+        // sampler_layer_set_modulation_curve(l, 71, smsrc_none, smdest_cutoff, 1);
+        sampler_layer_set_modulation_amount(l, smsrc_pitchlfo, 1, smdest_pitch, 100);
     }
     l->runtime = NULL;
     l->unknown_keys = NULL;
@@ -988,7 +1069,8 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
         struct sampler_modulation *srcm = mod->data;
         struct sampler_modulation *dstm = g_malloc(sizeof(struct sampler_modulation));
         memcpy(dstm, srcm, sizeof(struct sampler_modulation));
-        dstm->has_value = copy_hasattr ? srcm->has_value : FALSE;
+        dstm->has_amount = copy_hasattr ? srcm->has_amount : FALSE;
+        dstm->has_curve = copy_hasattr ? srcm->has_curve : FALSE;
         mod->data = dstm;
     }
     dst->voice_nifs = clone_nifs(src->voice_nifs, copy_hasattr);
@@ -1046,12 +1128,6 @@ static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct 
         {
             struct sampler_noteinitfunc *nif = mod->data;
             sampler_layer_data_add_nif(l, nif->notefunc_voice, nif->notefunc_prevoice, nif->variant, nif->param, TRUE);
-        }
-        // set modulations used by parent
-        for(GSList *mod = parent->modulations; mod; mod = mod->next)
-        {
-            struct sampler_modulation *srcm = mod->data;
-            sampler_layer_data_set_modulation(l, srcm->src, srcm->src2, srcm->dest, srcm->amount, srcm->flags, TRUE);
         }
     }
 }
@@ -1423,87 +1499,115 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     for(GSList *mod = l->modulations; mod; mod = mod->next)
     {
         struct sampler_modulation *md = mod->data;
-        if (!md->has_value && !show_inherited)
-            continue;
-        g_ascii_dtostr(floatbuf, floatbufsize, md->amount);
-
-        if (md->src2 == smsrc_none)
+        gboolean is_egcc = md->dest >= smdest_eg_stage_start && md->dest <= smdest_eg_stage_end;
+        gboolean is_lfofreq = md->dest >= smdest_pitchlfo_freq && md->dest <= smdest_eq3_gain;
+        if (md->has_curve || show_inherited)
         {
-            gboolean is_egcc = md->dest >= smdest_eg_stage_start && md->dest <= smdest_eg_stage_end;
-            gboolean is_lfofreq = md->dest >= smdest_pitchlfo_freq && md->dest <= smdest_eq3_gain;
+            g_ascii_dtostr(floatbuf, floatbufsize, md->curve_id);
             if (is_egcc)
             {
                 uint32_t param = md->dest - smdest_eg_stage_start;
-                g_string_append_printf(outstr, " %seg_%scc%d=%s", addrandom_variants[(param >> 4) & 3], env_stages[param & 15], md->src, floatbuf);
-                continue;
+                g_string_append_printf(outstr, " %seg_%s_curvecc%d=%s", addrandom_variants[(param >> 4) & 3], env_stages[param & 15], md->src, floatbuf);
             }
-            if (md->src < smsrc_perchan_count)
+            else if (md->src < smsrc_perchan_count)
             {
-                // Inconsistency: cutoff_cc5 but amplfo_freqcc5
-                if (is_lfofreq)
-                    g_string_append_printf(outstr, " %scc%d=%s", moddest_names[md->dest], md->src, floatbuf);
-                else
-                    g_string_append_printf(outstr, " %s_cc%d=%s", moddest_names[md->dest], md->src, floatbuf);
-                continue;
+                g_string_append_printf(outstr, " %s_curvecc%d=%s", moddest_names[md->dest], md->src, floatbuf);
             }
-            if (md->src < smsrc_perchan_count + sizeof(modsrc_names) / sizeof(modsrc_names[0]))
+            else if ((md->src == smsrc_amplfo && md->dest == smdest_gain) ||
+                (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
+                (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
             {
-                if ((md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
-                    (md->src == smsrc_pitchenv && md->dest == smdest_pitch) ||
-                    (md->src == smsrc_amplfo && md->dest == smdest_gain) ||
-                    (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
-                    (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
-                    g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
-                else if (is_lfofreq)
-                    g_string_append_printf(outstr, " %s%s=%s", moddest_names[md->dest], modsrc_names[md->src - smsrc_perchan_count], floatbuf);
-                else
-                    g_string_append_printf(outstr, " %s_%s=%s", moddest_names[md->dest], modsrc_names[md->src - smsrc_perchan_count], floatbuf);
-                continue;
+                if (md->src2 < 120)
+                    g_string_append_printf(outstr, " %s_depth_curvecc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
+            }
+            else if ((md->src == smsrc_ampenv && md->dest == smdest_gain) ||
+                (md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
+                (md->src == smsrc_pitchenv && md->dest == smdest_pitch))
+            {
+                if (md->src2 < 120)
+                    g_string_append_printf(outstr, " %s_depth_curvecc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
             }
         }
-        if ((md->src == smsrc_amplfo && md->dest == smdest_gain) ||
-            (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
-            (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
+        if (md->has_amount || show_inherited)
         {
-            switch(md->src2)
+            g_ascii_dtostr(floatbuf, floatbufsize, md->amount);
+
+            if (md->src2 == smsrc_none)
             {
-            case smsrc_chanaft:
-            case smsrc_polyaft:
-                g_string_append_printf(outstr, " %s_depth%s=%s", modsrc_names[md->src - smsrc_perchan_count], modsrc_names[md->src2 - smsrc_perchan_count], floatbuf);
-                continue;
-            case smsrc_none:
-                g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
-                continue;
-            default:
+                if (is_egcc)
+                {
+                    uint32_t param = md->dest - smdest_eg_stage_start;
+                    g_string_append_printf(outstr, " %seg_%scc%d=%s", addrandom_variants[(param >> 4) & 3], env_stages[param & 15], md->src, floatbuf);
+                    continue;
+                }
+                if (md->src < smsrc_perchan_count)
+                {
+                    // Inconsistency: cutoff_cc5 but amplfo_freqcc5
+                    if (is_lfofreq)
+                        g_string_append_printf(outstr, " %scc%d=%s", moddest_names[md->dest], md->src, floatbuf);
+                    else
+                        g_string_append_printf(outstr, " %s_cc%d=%s", moddest_names[md->dest], md->src, floatbuf);
+                    continue;
+                }
+                if (md->src < smsrc_perchan_count + sizeof(modsrc_names) / sizeof(modsrc_names[0]))
+                {
+                    if ((md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
+                        (md->src == smsrc_pitchenv && md->dest == smdest_pitch) ||
+                        (md->src == smsrc_amplfo && md->dest == smdest_gain) ||
+                        (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
+                        (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
+                        g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
+                    else if (is_lfofreq)
+                        g_string_append_printf(outstr, " %s%s=%s", moddest_names[md->dest], modsrc_names[md->src - smsrc_perchan_count], floatbuf);
+                    else
+                        g_string_append_printf(outstr, " %s_%s=%s", moddest_names[md->dest], modsrc_names[md->src - smsrc_perchan_count], floatbuf);
+                    continue;
+                }
+            }
+            if ((md->src == smsrc_amplfo && md->dest == smdest_gain) ||
+                (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
+                (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
+            {
+                switch(md->src2)
+                {
+                case smsrc_chanaft:
+                case smsrc_polyaft:
+                    g_string_append_printf(outstr, " %s_depth%s=%s", modsrc_names[md->src - smsrc_perchan_count], modsrc_names[md->src2 - smsrc_perchan_count], floatbuf);
+                    continue;
+                case smsrc_none:
+                    g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
+                    continue;
+                default:
+                    if (md->src2 < 120)
+                    {
+                        g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
+                        continue;
+                    }
+                    break;
+                }
+            }
+            if ((md->src == smsrc_ampenv && md->dest == smdest_gain) ||
+                (md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
+                (md->src == smsrc_pitchenv && md->dest == smdest_pitch))
+            {
+                if (md->src2 == smsrc_vel)
+                {
+                    g_string_append_printf(outstr, " %s_vel2depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
+                    continue;
+                }
+                if (md->src2 == smsrc_none)
+                {
+                    g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
+                    continue;
+                }
                 if (md->src2 < 120)
                 {
                     g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
                     continue;
                 }
-                break;
             }
+            g_string_append_printf(outstr, " genericmod_%d_%d_%d_%d=%s", md->src, md->src2, md->dest, md->curve_id, floatbuf);
         }
-        if ((md->src == smsrc_ampenv && md->dest == smdest_gain) ||
-            (md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
-            (md->src == smsrc_pitchenv && md->dest == smdest_pitch))
-        {
-            if (md->src2 == smsrc_vel)
-            {
-                g_string_append_printf(outstr, " %s_vel2depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
-                continue;
-            }
-            if (md->src2 == smsrc_none)
-            {
-                g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
-                continue;
-            }
-            if (md->src2 < 120)
-            {
-                g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
-                continue;
-            }
-        }
-        g_string_append_printf(outstr, " genericmod_%d_%d_%d_%d=%s", md->src, md->src2, md->dest, md->flags, floatbuf);
     }
 
     if (lr->unknown_keys)

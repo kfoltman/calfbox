@@ -639,12 +639,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     while(mod)
     {
         struct sampler_modulation *sm = mod->data;
+        uint32_t flags = sm->curve_id; // XXXKF implement curve handling
         float value = 0.f, value2 = 1.f;
         if (sm->src < smsrc_pernote_offset)
             value = sampler_channel_getcc(c, v, sm->src);
         else
             value = modsrcs[sm->src - smsrc_pernote_offset];
-        value = modoffset[sm->flags & 3] + value * modscale[sm->flags & 3];
+        value = modoffset[flags & 3] + value * modscale[flags & 3];
 
         if (sm->src2 != smsrc_none)
         {
@@ -653,7 +654,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             else
                 value2 = modsrcs[sm->src2 - smsrc_pernote_offset];
             
-            value2 = modoffset[(sm->flags & 12) >> 2] + value2 * modscale[(sm->flags & 12) >> 2];
+            value2 = modoffset[(flags & 12) >> 2] + value2 * modscale[(flags & 12) >> 2];
             value *= value2;
         }
         if (sm->dest < 32)

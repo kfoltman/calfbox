@@ -240,8 +240,9 @@ struct sampler_modulation
     enum sampler_modsrc src2;
     enum sampler_moddest dest;
     float amount;
-    int flags:31;
-    unsigned int has_value:1;
+    unsigned int curve_id:12;
+    unsigned int has_amount:1;
+    unsigned int has_curve:1;
 };
 
 typedef void (*SamplerNoteInitFunc)(struct sampler_noteinitfunc *nif, struct sampler_voice *voice);
