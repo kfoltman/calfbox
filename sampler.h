@@ -264,15 +264,17 @@ static inline float sampler_program_get_curve_value(struct sampler_program *prog
             case 0:
                 break;
             case 1:
+            case 3:
                 // slightly fake bipolar, so that both 63 and 64 are 'neutral' (needs to be somewhat symmetric)
-                val = (val < 64.f/127.f) ? -(63.f - 127 * val) / 63.f : (127 * val - 64) / 63.f;
+                if (val < 63.f/127.f)
+                    val = (curve_id == 3 ? -1 : 1) * -(63.f - 127 * val) / 63.f;
+                else if (val <= 64.f/127.f)
+                    val = 0;
+                else
+                    val = (curve_id == 3 ? -1 : 1) * (127 * val - 64) / 63.f;
                 break;
             case 2:
                 val = 1 - val; break;
-            case 3:
-                // inverse of curve 1
-                val = -((val < 64.f/127.f) ? -(63.f - 127 * val) / 63.f : (127 * val - 64) / 63.f);
-                break;
             case 4:
                 val = val * val;
                 break; // maybe, or maybe it's inverted?

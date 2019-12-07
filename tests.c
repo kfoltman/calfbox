@@ -156,6 +156,38 @@ void test_sampler_midicurve2(struct test_env *env)
         actual = sampler_program_get_curve_value(prg, 9, i / 127.0);
         test_assert(fabs(actual - expected) < 0.001);
     }
+
+#define VERIFY_BUILTIN_CURVE(curve, point, expected) \
+    test_assert(fabs(sampler_program_get_curve_value(prg, curve, point) - expected) < 0.001)
+
+    VERIFY_BUILTIN_CURVE(0, 0.f, 0.f);
+    VERIFY_BUILTIN_CURVE(0, 0.5f, 0.5f);
+    VERIFY_BUILTIN_CURVE(0, 1.0f, 1.0f);
+
+    VERIFY_BUILTIN_CURVE(1, 0.0f, -1.0f);
+    VERIFY_BUILTIN_CURVE(1, 63.f/127.f, 0.0f);
+    VERIFY_BUILTIN_CURVE(1, 0.5f, 0.0f);
+    VERIFY_BUILTIN_CURVE(1, 64.f/127.f, 0.0f);
+    VERIFY_BUILTIN_CURVE(1, 1.0f, 1.0f);
+
+    VERIFY_BUILTIN_CURVE(2, 0.f, 1.f);
+    VERIFY_BUILTIN_CURVE(2, 0.5f, 0.5f);
+    VERIFY_BUILTIN_CURVE(2, 1.0f, 0.f);
+
+    VERIFY_BUILTIN_CURVE(3, 0.0f, 1.0f);
+    VERIFY_BUILTIN_CURVE(3, 63.f/127.f, 0.0f);
+    VERIFY_BUILTIN_CURVE(3, 0.5f, 0.0f);
+    VERIFY_BUILTIN_CURVE(3, 64.f/127.f, 0.0f);
+    VERIFY_BUILTIN_CURVE(3, 1.0f, -1.0f);
+
+    VERIFY_BUILTIN_CURVE(4, 0.0f, 0.0f);
+    VERIFY_BUILTIN_CURVE(4, 0.5f, 0.25f);
+    VERIFY_BUILTIN_CURVE(4, 1.0f, 1.0f);
+
+    VERIFY_BUILTIN_CURVE(5, 0.0f, 0.0f);
+    VERIFY_BUILTIN_CURVE(5, 0.25f, 0.5f);
+    VERIFY_BUILTIN_CURVE(5, 1.0f, 1.0f);
+
     sampler_unselect_program(m, prg);
     CBOX_DELETE(prg);
     CBOX_DELETE(&m->module);
