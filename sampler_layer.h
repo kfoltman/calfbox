@@ -203,6 +203,7 @@ enum sampler_moddest
     smdest_resonance,
     smdest_tonectl,
     smdest_pan,
+    smdest_amplitude,
     smdest_pitchlfo_freq,
     smdest_fillfo_freq,
     smdest_amplfo_freq,
@@ -310,6 +311,7 @@ typedef int midi_note_t;
     MACRO##_enum(sampler_loop_mode, loop_mode, slm_unknown) \
     MACRO##_enum(sampler_trigger, trigger, stm_attack) \
     MACRO##_dBamp(float, volume, 0) \
+    MACRO(float, amplitude, 100) \
     MACRO(float, pan, 0) \
     MACRO(float, position, 0) \
     MACRO(float, width, 100) \

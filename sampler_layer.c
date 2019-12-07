@@ -475,6 +475,7 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_AMOUNT_CC_("tune", pitch)
     FIELD_AMOUNT_CC_("tonectl", tonectl)
     FIELD_AMOUNT_CC_("pan", pan)
+    FIELD_AMOUNT_CC_("amplitude", amplitude)
 
     FIELD_VOICE_NIF("amp_random", sampler_nif_addrandom, 0)
     FIELD_VOICE_NIF("fil_random", sampler_nif_addrandom, 1)
@@ -1537,7 +1538,7 @@ gboolean sampler_layer_unapply_param(struct sampler_layer *layer, const char *ke
 static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
 static const char *env_stages[] = { "delay", "attack", "hold", "decay", "sustain", "release", "start" };
 static const char *modsrc_names[] = { "vel", "chanaft", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
-static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pan", "pitchlfo_freq", "fillfo_freq", "amplfo_freq",
+static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pan", "amplitude", "pitchlfo_freq", "fillfo_freq", "amplfo_freq",
     "eq1_freq", "eq1_bw", "eq1_gain",
     "eq2_freq", "eq2_bw", "eq2_gain",
     "eq3_freq", "eq3_bw", "eq3_gain",
