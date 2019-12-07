@@ -35,6 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "ui.h"
 #include "wavebank.h"
 
+#if USE_NCURSES
+
 #include <assert.h>
 #include <glib.h>
 #include <glob.h>
@@ -45,8 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
-
-#if USE_NCURSES
 
 int cmd_quit(struct cbox_menu_item_command *item, void *context)
 {

@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "menuitem.h"
 #include "ui.h"
 
+#if USE_NCURSES
+
 #include <assert.h>
 #include <glib.h>
 #include <malloc.h>
 #include <ncurses.h>
 #include <string.h>
-
-#if USE_NCURSES
 
 struct cbox_menu
 {
