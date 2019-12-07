@@ -237,6 +237,64 @@ static inline float sampler_channel_getcc(struct sampler_channel *c, struct samp
     return sampler_channel_get_expensive_cc(c, v, NULL, cc_no);
 }
 
+static inline float sampler_program_get_curve_value(struct sampler_program *program, uint32_t curve_id, float val)
+{
+    if (val < 0)
+        val = 0;
+    if (val > 1)
+        val = 1;
+    if (curve_id < MAX_MIDI_CURVES && program->interpolated_curves[curve_id])
+    {
+        float *curve = program->interpolated_curves[curve_id];
+        int vint = floorf(val * 127);
+        // Linear interpolation if within bounds
+        if (vint < 127)
+        {
+            float vfrac = val * 127 - vint;
+            val = curve[vint] + (curve[vint + 1] - curve[vint]) * vfrac;
+        }
+        else
+            val = curve[vint];
+    }
+    else
+    {
+        // possibly wrong implementation of built in curves
+        switch(curve_id)
+        {
+            case 0:
+                break;
+            case 1:
+                // slightly fake bipolar, so that both 63 and 64 are 'neutral' (needs to be somewhat symmetric)
+                val = (val < 64.f/127.f) ? -(63.f - 127 * val) / 63.f : (127 * val - 64) / 63.f;
+                break;
+            case 2:
+                val = 1 - val; break;
+            case 3:
+                // inverse of curve 1
+                val = -((val < 64.f/127.f) ? -(63.f - 127 * val) / 63.f : (127 * val - 64) / 63.f);
+                break;
+            case 4:
+                val = val * val;
+                break; // maybe, or maybe it's inverted?
+            case 5: val = sqrtf(val);
+                break; // maybe
+            case 6: val = sqrtf(1-val);
+                break; // maybe
+        }
+    }
+    return val;
+}
+
+static inline float sampler_channel_getcc_mod(struct sampler_channel *c, struct sampler_voice *v, int cc_no, struct sampler_modulation *sm)
+{
+    float val = (cc_no < 128) ? c->floatcc[cc_no] : sampler_channel_get_expensive_cc(c, v, NULL, cc_no);
+    if (sm->step)
+        val = floorf(val * (sm->step + 1)) / sm->step;
+    if (sm->curve_id || c->program->interpolated_curves[0])
+        val = sampler_program_get_curve_value(c->program, sm->curve_id, val);
+    return val;
+}
+
 static inline int sampler_channel_getintcc(struct sampler_channel *c, struct sampler_voice *v, int cc_no)
 {
     if (cc_no < 128)

@@ -576,9 +576,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->layer_changed = FALSE;
     }
 
-    static const int modoffset[4] = {0, -1, -1, 1 };
-    static const int modscale[4] = {1, 1, 2, -2 };
-
     float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + velscl * l->pitch_veltrack + l->tune + l->transpose * 100 + v->pitch_shift;
     float modsrcs[smsrc_pernote_count];
     modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * velscl;
@@ -639,22 +636,19 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     while(mod)
     {
         struct sampler_modulation *sm = mod->data;
-        uint32_t flags = sm->curve_id; // XXXKF implement curve handling
         float value = 0.f, value2 = 1.f;
         if (sm->src < smsrc_pernote_offset)
-            value = sampler_channel_getcc(c, v, sm->src);
+            value = sampler_channel_getcc_mod(c, v, sm->src, sm);
         else
             value = modsrcs[sm->src - smsrc_pernote_offset];
-        value = modoffset[flags & 3] + value * modscale[flags & 3];
 
         if (sm->src2 != smsrc_none)
         {
             if (sm->src2 < smsrc_pernote_offset)
-                value2 = sampler_channel_getcc(c, v, sm->src2);
+                value2 = sampler_channel_getcc_mod(c, v, sm->src2, sm);
             else
                 value2 = modsrcs[sm->src2 - smsrc_pernote_offset];
             
-            value2 = modoffset[(flags & 12) >> 2] + value2 * modscale[(flags & 12) >> 2];
             value *= value2;
         }
         if (sm->dest < 32)

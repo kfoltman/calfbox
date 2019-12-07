@@ -96,6 +96,73 @@ void test_sampler_setup(struct test_env *env)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void test_sampler_midicurve(struct test_env *env)
+{
+    struct sampler_midi_curve curve;
+    float values[128];
+    for (int i = 0; i < 128; ++i)
+    {
+        curve.values[i] = SAMPLER_CURVE_GAP;
+        values[i] = -100;
+    }
+    curve.values[0] = 0;
+    curve.values[64] = 0;
+    curve.values[127] = 1;
+    // Linear
+    sampler_midi_curve_interpolate(&curve, values, 0, 1, FALSE);
+    for (int i = 0; i < 128; ++i)
+    {
+        float expected = i < 64 ? 0 : (i - 64) / 63.0;
+        test_assert(fabs(values[i] - expected) < 0.001);
+    }
+    // Quadratic
+    sampler_midi_curve_interpolate(&curve, values, 0, 1, TRUE);
+    for (int i = 0; i < 128; ++i)
+    {
+        float expected = i < 64 ? 0 : (i - 64) / 63.0;
+        expected = expected * expected;
+        test_assert(fabs(values[i] - expected) < 0.001);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void test_sampler_midicurve2(struct test_env *env)
+{
+    struct sampler_module *m = create_sampler_instance(env, "test_setup", "smp1");
+    struct sampler_program *prg = load_sfz_into_sampler(env, m,
+        "<curve> curve_index=8 v0=-1 v32=0 v96=0 v127=1\n"
+        "<curve> curve_index=9 v32=0\n"
+    );
+    for (int i = 0; i < 128; ++i)
+    {
+        float expected, actual;
+        if (i < 32)
+            expected = (-1 + (i / 32.0));
+        else if (i <= 96)
+            expected = 0;
+        else
+            expected = (i - 96) * 1.f / (127 - 96);
+        actual = sampler_program_get_curve_value(prg, 8, i / 127.0);
+        test_assert(fabs(actual - expected) < 0.001);
+
+        // Test interpolation
+        expected = 0.25f * actual + 0.75f * sampler_program_get_curve_value(prg, 8, (i + 1) / 127.0);
+        actual = sampler_program_get_curve_value(prg, 8, (i + 0.75) / 127.0);
+        test_assert(fabs(actual - expected) < 0.001);
+
+        // Another curve
+        expected = i < 32 ? 0 : (i - 32) * 1.f / (127 - 32);
+        actual = sampler_program_get_curve_value(prg, 9, i / 127.0);
+        test_assert(fabs(actual - expected) < 0.001);
+    }
+    sampler_unselect_program(m, prg);
+    CBOX_DELETE(prg);
+    CBOX_DELETE(&m->module);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void test_sampler_note_basic(struct test_env *env)
 {
     struct sampler_module *m = create_sampler_instance(env, "test_setup", "smp1");
@@ -516,6 +583,8 @@ struct test_info {
     void *arg;
 } tests[] = {
     { "test_sampler_setup", test_sampler_setup },
+    { "test_sampler_midicurve", test_sampler_midicurve },
+    { "test_sampler_midicurve2", test_sampler_midicurve2 },
     { "test_sampler_note_basic", test_sampler_note_basic },
     { "test_sampler_note_region_logic/key", test_sampler_note_region_logic, &setup_lokeyhikey },
     { "test_sampler_note_region_logic/key2", test_sampler_note_region_logic, &setup_lokeyhikey2 },
