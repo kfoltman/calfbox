@@ -122,6 +122,13 @@ struct sampler_prevoice
     float delay_computed;
 };
 
+struct sampler_filter
+{
+    struct cbox_biquadf_coeffs filter_coeffs, filter_coeffs_extra;
+    struct cbox_biquadf_coeffs *second_filter;
+    struct cbox_biquadf_state filter_left[3], filter_right[3];
+};
+
 struct sampler_voice
 {
     struct sampler_voice *prev, *next;
@@ -139,9 +146,7 @@ struct sampler_voice
     float pitch_shift;
     float cutoff_shift;
     float gain_shift, gain_fromvel;
-    struct cbox_biquadf_state filter_left, filter_right;
-    struct cbox_biquadf_state filter_left2, filter_right2;
-    struct cbox_biquadf_coeffs filter_coeffs, filter_coeffs_extra;
+    struct sampler_filter filter;
     struct cbox_onepolef_state onepole_left, onepole_right;
     struct cbox_onepolef_coeffs onepole_coeffs;
     struct sampler_channel *channel;

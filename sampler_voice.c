@@ -118,18 +118,19 @@ static inline float lfo_run(struct sampler_lfo *lfo)
 
 static gboolean is_tail_finished(struct sampler_voice *v)
 {
-    if (v->layer->cutoff == -1)
+    if (!v->layer->eff_num_stages)
         return TRUE;
     double eps = 1.0 / 65536.0;
-    if (cbox_biquadf_is_audible(&v->filter_left, eps))
+    if (cbox_biquadf_is_audible(&v->filter.filter_left[0], eps))
         return FALSE;
-    if (cbox_biquadf_is_audible(&v->filter_right, eps))
+    if (cbox_biquadf_is_audible(&v->filter.filter_right[0], eps))
         return FALSE;
-    if (sampler_layer_data_is_4pole(v->layer))
+    int num_stages = v->layer->eff_num_stages;
+    if (num_stages > 1)
     {
-        if (cbox_biquadf_is_audible(&v->filter_left2, eps))
+        if (cbox_biquadf_is_audible(&v->filter.filter_left[num_stages - 1], eps))
             return FALSE;
-        if (cbox_biquadf_is_audible(&v->filter_right2, eps))
+        if (cbox_biquadf_is_audible(&v->filter.filter_right[num_stages - 1], eps))
             return FALSE;
     }
     
@@ -370,10 +371,11 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     lfo_init(&v->filter_lfo, &l->filter_lfo, m->module.srate, m->module.srate_inv);
     lfo_init(&v->pitch_lfo, &l->pitch_lfo, m->module.srate, m->module.srate_inv);
     
-    cbox_biquadf_reset(&v->filter_left);
-    cbox_biquadf_reset(&v->filter_right);
-    cbox_biquadf_reset(&v->filter_left2);
-    cbox_biquadf_reset(&v->filter_right2);
+    for (int i = 0; i < 3; ++i)
+    {
+        cbox_biquadf_reset(&v->filter.filter_left[i]);
+        cbox_biquadf_reset(&v->filter.filter_right[i]);
+    }
     cbox_onepolef_reset(&v->onepole_left);
     cbox_onepolef_reset(&v->onepole_right);
     // set gain later (it's a less expensive operation)
@@ -494,6 +496,62 @@ static inline void lfo_update_xdelta(struct sampler_module *m, struct sampler_lf
         lfo->xdelta = 0;
     else
         lfo->xdelta = (uint32_t)(moddests[dest] * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE * m->module.srate_inv);
+}
+
+static inline void sampler_filter_process_control(struct sampler_filter *f, enum sampler_filter_type fil_type, float logcutoff, float resonance_linearized, const struct cbox_sincos *sincos_base)
+{
+    f->second_filter = &f->filter_coeffs;
+
+    if (logcutoff < 0)
+        logcutoff = 0;
+    if (logcutoff > 12798)
+        logcutoff = 12798;
+    //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
+    float resonance = resonance_linearized;
+    if (resonance < 0.7f)
+        resonance = 0.7f;
+    if (resonance > 32.f)
+        resonance = 32.f;
+    const struct cbox_sincos *sincos = &sincos_base[(int)logcutoff];
+    switch(fil_type)
+    {
+    case sft_lp24hybrid:
+        cbox_biquadf_set_lp_rbj_lookup(&f->filter_coeffs, sincos, resonance * resonance);
+        cbox_biquadf_set_1plp_lookup(&f->filter_coeffs_extra, sincos, 1);
+        f->second_filter = &f->filter_coeffs_extra;
+        break;
+    case sft_lp12:
+    case sft_lp24:
+    case sft_lp36:
+        cbox_biquadf_set_lp_rbj_lookup(&f->filter_coeffs, sincos, resonance);
+        break;
+    case sft_hp12:
+    case sft_hp24:
+        cbox_biquadf_set_hp_rbj_lookup(&f->filter_coeffs, sincos, resonance);
+        break;
+    case sft_bp6:
+    case sft_bp12:
+        cbox_biquadf_set_bp_rbj_lookup(&f->filter_coeffs, sincos, resonance);
+        break;
+    case sft_lp6:
+    case sft_lp12nr:
+    case sft_lp24nr:
+        cbox_biquadf_set_1plp_lookup(&f->filter_coeffs, sincos, fil_type != sft_lp6);
+        break;
+    case sft_hp6:
+    case sft_hp12nr:
+    case sft_hp24nr:
+        cbox_biquadf_set_1php_lookup(&f->filter_coeffs, sincos, fil_type != sft_hp6);
+        break;
+    default:
+        assert(0);
+    }
+}
+
+static inline void sampler_filter_process_audio(struct sampler_filter *f, int num_stages, float *leftright)
+{
+    for (int i = 0; i < num_stages; ++i)
+        cbox_biquadf_process_stereo(&f->filter_left[i], &f->filter_right[i], i ? f->second_filter : &f->filter_coeffs, leftright);
 }
 
 void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs)
@@ -829,58 +887,14 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         pan = 1.f;
     v->gen.lgain = gain * (1.f - pan)  / 32768.f;
     v->gen.rgain = gain * pan / 32768.f;
-    struct cbox_biquadf_coeffs *second_filter = &v->filter_coeffs;
-    gboolean is4p = sampler_layer_data_is_4pole(v->layer);
-    if (l->cutoff != -1.f)
+
+    if (l->cutoff != -1)
     {
-        float logcutoff = l->logcutoff + moddests[smdest_cutoff];
-        if (logcutoff < 0)
-            logcutoff = 0;
-        if (logcutoff > 12798)
-            logcutoff = 12798;
-        //float resonance = v->resonance*pow(32.0,c->cc[71]/maxv);
-        float resonance = l->resonance_linearized;
-        if (modmask & (1 << smdest_resonance))
-            resonance *= dB2gain((is4p ? 0.5 : 1) * moddests[smdest_resonance]);
-        if (resonance < 0.7f)
-            resonance = 0.7f;
-        if (resonance > 32.f)
-            resonance = 32.f;
-        const struct cbox_sincos *sincos = &m->sincos[(int)logcutoff];
-        switch(l->fil_type)
-        {
-        case sft_lp24hybrid:
-            cbox_biquadf_set_lp_rbj_lookup(&v->filter_coeffs, sincos, resonance * resonance);
-            cbox_biquadf_set_1plp_lookup(&v->filter_coeffs_extra, sincos, 1);
-            second_filter = &v->filter_coeffs_extra;
-            break;
-            
-        case sft_lp12:
-        case sft_lp24:
-            cbox_biquadf_set_lp_rbj_lookup(&v->filter_coeffs, sincos, resonance);
-            break;
-        case sft_hp12:
-        case sft_hp24:
-            cbox_biquadf_set_hp_rbj_lookup(&v->filter_coeffs, sincos, resonance);
-            break;
-        case sft_bp6:
-        case sft_bp12:
-            cbox_biquadf_set_bp_rbj_lookup(&v->filter_coeffs, sincos, resonance);
-            break;
-        case sft_lp6:
-        case sft_lp12nr:
-        case sft_lp24nr:
-            cbox_biquadf_set_1plp_lookup(&v->filter_coeffs, sincos, l->fil_type != sft_lp6);
-            break;
-        case sft_hp6:
-        case sft_hp12nr:
-        case sft_hp24nr:
-            cbox_biquadf_set_1php_lookup(&v->filter_coeffs, sincos, l->fil_type != sft_hp6);
-            break;
-        default:
-            assert(0);
-        }
+        static const float gain_for_num_stages[] = { 1, 1, 0.5, 0.33f };
+        float mod_resonance = (modmask & (1 << smdest_resonance)) ? dB2gain(gain_for_num_stages[l->eff_num_stages] * moddests[smdest_resonance]) : 1;
+        sampler_filter_process_control(&v->filter, l->fil_type, l->logcutoff + moddests[smdest_cutoff], l->resonance_scaled * mod_resonance, m->sincos);
     }
+
     if (__builtin_expect(l->tonectl_freq != 0, 0))
     {
         float ctl = l->tonectl + (modmask & (1 << smdest_tonectl) ? moddests[smdest_tonectl] : 0);
@@ -893,7 +907,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float leftright[2 * CBOX_BLOCK_SIZE];
         
     uint32_t samples = 0;
-
 
     if (v->current_pipe)
     {
@@ -930,16 +943,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     for (int i = 2 * samples; i < 2 * CBOX_BLOCK_SIZE; i++)
         leftright[i] = 0.f;
+
     if (l->cutoff != -1)
-    {
-        cbox_biquadf_process_stereo(&v->filter_left, &v->filter_right, &v->filter_coeffs, leftright);
-        if (is4p)
-            cbox_biquadf_process_stereo(&v->filter_left2, &v->filter_right2, second_filter, leftright);
-    }
+        sampler_filter_process_audio(&v->filter, l->eff_num_stages, leftright);
+
     if (__builtin_expect(l->tonectl_freq != 0, 0))
-    {
         cbox_onepolef_process_stereo(&v->onepole_left, &v->onepole_right, &v->onepole_coeffs, leftright);
-    }
+
     if (__builtin_expect(l->eq_bitmask, 0))
     {
         for (int eq = 0; eq < 3; eq++)

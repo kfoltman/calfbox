@@ -1276,6 +1276,18 @@ void sampler_midi_curve_interpolate(const struct sampler_midi_curve *curve, floa
     }
 }
 
+static inline int sampler_filter_num_stages(float cutoff, enum sampler_filter_type fil_type)
+{
+    if (cutoff == -1)
+        return 0;
+    if (fil_type == sft_lp24hybrid || fil_type == sft_lp24 || fil_type == sft_lp24nr || fil_type == sft_hp24 || fil_type == sft_hp24nr || fil_type == sft_bp12)
+        return 2;
+    if (fil_type == sft_lp36)
+        return 3;
+    return 1;
+}
+
+
 // If veltrack > 0, then the default range goes from -84dB to 0dB
 // If veltrack == 0, then the default range is all 0dB
 // If veltrack < 0, then the default range goes from 0dB to -84dB
@@ -1380,10 +1392,6 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         else
             memset(l->scratch_loop + halfscratch, 0, halfscratch * sizeof(int16_t));
     }
-    if (sampler_layer_data_is_4pole(l))
-        l->resonance_scaled = sqrtf(l->resonance_linearized / 0.707f) * 0.5f;
-    else
-        l->resonance_scaled = l->resonance_linearized;
     if (l->cutoff < 20)
         l->logcutoff = -1;
     else
@@ -1401,6 +1409,14 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     }
 
     l->use_prevoice = (l->delay || l->prevoice_nifs);
+    l->eff_num_stages = sampler_filter_num_stages(l->cutoff, l->fil_type);
+
+    if (l->eff_num_stages == 3)
+        l->resonance_scaled = pow(l->resonance_linearized, 1.f / 3.f);
+    else if (l->eff_num_stages == 2)
+        l->resonance_scaled = sqrtf(l->resonance_linearized);
+    else
+        l->resonance_scaled = l->resonance_linearized;
 }
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)
