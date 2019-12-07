@@ -136,6 +136,8 @@ params_to_test = [
     'fileg_start_curvecc1', 'fileg_delay_curvecc1', 'fileg_attack_curvecc1', 'fileg_hold_curvecc1', 'fileg_decay_curvecc1', 'fileg_sustain_curvecc1', 'fileg_release_curvecc1',
     'fileg_start_smoothcc1', 'fileg_delay_smoothcc1', 'fileg_attack_smoothcc1', 'fileg_hold_smoothcc1', 'fileg_decay_smoothcc1', 'fileg_sustain_smoothcc1', 'fileg_release_smoothcc1',
     'fileg_start_stepcc1', 'fileg_delay_stepcc1', 'fileg_attack_stepcc1', 'fileg_hold_stepcc1', 'fileg_decay_stepcc1', 'fileg_sustain_stepcc1', 'fileg_release_stepcc1',
+    'cutoff2', 'resonance2', 'fileg_depth2', 'fileg_depth2cc1', 'fileg_depth2_stepcc1',
+    'fillfo_depth2', 'fillfo_depth2cc1', 'fillfo_depth2_stepcc1',
     'amp_velcurve_5', 'amp_velcurve_127',
     'locc5', 'hicc5',
     'on_locc8', 'on_hicc8',

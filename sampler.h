@@ -144,9 +144,9 @@ struct sampler_voice
     int off_by;
     int age;
     float pitch_shift;
-    float cutoff_shift;
+    float cutoff_shift, cutoff2_shift;
     float gain_shift, gain_fromvel;
-    struct sampler_filter filter;
+    struct sampler_filter filter, filter2;
     struct cbox_onepolef_state onepole_left, onepole_right;
     struct cbox_onepolef_coeffs onepole_coeffs;
     struct sampler_channel *channel;

@@ -426,14 +426,17 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
 #define PROC_FIELD_DESCRIPTOR_midicurve(name) \
     { #name "_#", LOFS(name), slpt_midicurve, 0, 0, (void *)sampler_layer_data_set_has_##name, NULL },
 
+#define FIELD_DEPTHCC_SET(name, dest, attrib) \
+    { #name attrib "cc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (dest), NULL, NULL }, \
+    { #name attrib "_oncc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (dest), NULL, NULL }, \
+    { #name attrib "_curvecc#", -1, slpt_depth_curvecc, 0, (smsrc_##name << 16) | (dest), NULL, NULL }, \
+    { #name attrib "_smoothcc#", -1, slpt_depth_smoothcc, 0, (smsrc_##name << 16) | (dest), NULL, NULL }, \
+    { #name attrib "_stepcc#", -1, slpt_depth_stepcc, 0, (smsrc_##name << 16) | (dest), NULL, NULL },
+
 #define PROC_FIELD_DESCRIPTOR_dahdsr(field, name, index) \
     DAHDSR_FIELDS(PROC_SUBSTRUCT_FIELD_DESCRIPTOR_DAHDSR, field, name, index, cbox_dahdsr) \
     FIELD_AMOUNT(#name "_depth", name, from_##name) \
-    { #name "_depthcc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depth_oncc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depth_curvecc#", -1, slpt_depth_curvecc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depth_smoothcc#", -1, slpt_depth_smoothcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depth_stepcc#", -1, slpt_depth_stepcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
+    FIELD_DEPTHCC_SET(name, smdest_from_##name, "_depth") \
     { #name "_vel2depth", -1, slpt_modulation, 0, (smsrc_##name << 8) | (smsrc_vel << 20) | (smdest_from_##name), NULL, NULL },
 
 #define PROC_FIELD_DESCRIPTOR_lfo(field, name, index) \
@@ -444,11 +447,7 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
     FIELD_AMOUNT_CC(#name "_freq", name##_freq) \
     { #name "_depthpolyaft", -1, slpt_modulation, 0, (smsrc_##name << 8) | (smsrc_polyaft << 20) | (smdest_from_##name), NULL, NULL }, \
     { #name "_depthchanaft", -1, slpt_modulation, 0, (smsrc_##name << 8) | (smsrc_chanaft << 20) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depthcc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depth_oncc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depth_curvecc#", -1, slpt_depth_curvecc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depth_smoothcc#", -1, slpt_depth_smoothcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depth_stepcc#", -1, slpt_depth_stepcc, 0, (smsrc_##name << 16) | (smdest_from_##name), NULL, NULL },
+    FIELD_DEPTHCC_SET(name, smdest_from_##name, "_depth")
 
 #define PROC_FIELD_DESCRIPTOR_eq(field, name, index) \
     EQ_FIELDS(PROC_SUBSTRUCT_FIELD_DESCRIPTOR, field, name, index, sampler_eq_params) \
@@ -468,9 +467,24 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_AMOUNT("cutoff_polyaft", polyaft, cutoff)
     FIELD_AMOUNT("resonance_polyaft", polyaft, resonance)
 
+    FIELD_AMOUNT("fileg_depth2", fileg, cutoff2)
+    FIELD_DEPTHCC_SET(fileg, smdest_cutoff2, "_depth2")
+    { "fileg_vel2depth2", -1, slpt_modulation, 0, (smsrc_fileg << 8) | (smsrc_vel << 20) | (smdest_cutoff2), NULL, NULL },
+    FIELD_AMOUNT("fillfo_depth2", fillfo, cutoff2)
+    { "fillfo_depthpolyaft", -1, slpt_modulation, 0, (smsrc_fillfo << 8) | (smsrc_polyaft << 20) | (smdest_cutoff2), NULL, NULL }, \
+    { "fillfo_depthchanaft", -1, slpt_modulation, 0, (smsrc_fillfo << 8) | (smsrc_chanaft << 20) | (smdest_cutoff2), NULL, NULL }, \
+    FIELD_DEPTHCC_SET(fillfo, smdest_cutoff2, "_depth2")
+
+    FIELD_AMOUNT("cutoff2_chanaft", chanaft, cutoff2)
+    FIELD_AMOUNT("resonance2_chanaft", chanaft, resonance2)
+    FIELD_AMOUNT("cutoff2_polyaft", polyaft, cutoff2)
+    FIELD_AMOUNT("resonance2_polyaft", polyaft, resonance2)
+
     FIELD_AMOUNT_CC_("gain", gain)
     FIELD_AMOUNT_CC_("cutoff", cutoff)
     FIELD_AMOUNT_CC_("resonance", resonance)
+    FIELD_AMOUNT_CC_("cutoff2", cutoff2)
+    FIELD_AMOUNT_CC_("resonance2", resonance2)
     FIELD_AMOUNT_CC_("pitch", pitch)
     FIELD_AMOUNT_CC_("tune", pitch)
     FIELD_AMOUNT_CC_("tonectl", tonectl)
@@ -1396,7 +1410,12 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         l->logcutoff = -1;
     else
         l->logcutoff = 1200.0 * log(l->cutoff / 440.0) / log(2) + 5700.0;
-    
+
+    if (l->cutoff2 < 20)
+        l->logcutoff2 = -1;
+    else
+        l->logcutoff2 = 1200.0 * log(l->cutoff2 / 440.0) / log(2) + 5700.0;
+
     l->eq_bitmask = ((l->eq1.gain != 0 || l->eq1.vel2gain != 0) ? 1 : 0)
         | ((l->eq2.gain != 0 || l->eq2.vel2gain != 0) ? 2 : 0)
         | ((l->eq3.gain != 0 || l->eq3.vel2gain != 0) ? 4 : 0);
@@ -1410,13 +1429,10 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
 
     l->use_prevoice = (l->delay || l->prevoice_nifs);
     l->eff_num_stages = sampler_filter_num_stages(l->cutoff, l->fil_type);
+    l->eff_num_stages2 = sampler_filter_num_stages(l->cutoff2, l->fil2_type);
 
-    if (l->eff_num_stages == 3)
-        l->resonance_scaled = pow(l->resonance_linearized, 1.f / 3.f);
-    else if (l->eff_num_stages == 2)
-        l->resonance_scaled = sqrtf(l->resonance_linearized);
-    else
-        l->resonance_scaled = l->resonance_linearized;
+    l->resonance_scaled = pow(l->resonance_linearized, 1.f / l->eff_num_stages);
+    l->resonance2_scaled = pow(l->resonance2_linearized, 1.f / l->eff_num_stages2);
 }
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)
@@ -1557,7 +1573,7 @@ gboolean sampler_layer_unapply_param(struct sampler_layer *layer, const char *ke
 static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
 static const char *env_stages[] = { "delay", "attack", "hold", "decay", "sustain", "release", "start" };
 static const char *modsrc_names[] = { "vel", "chanaft", "polyaft", "pitch", "pitcheg", "fileg", "ampeg", "pitchlfo", "fillfo", "amplfo", "" };
-static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pan", "amplitude", "pitchlfo_freq", "fillfo_freq", "amplfo_freq",
+static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "tonectl", "pan", "amplitude", "cutoff2", "resonance2", "pitchlfo_freq", "fillfo_freq", "amplfo_freq",
     "eq1_freq", "eq1_bw", "eq1_gain",
     "eq2_freq", "eq2_bw", "eq2_gain",
     "eq3_freq", "eq3_bw", "eq3_gain",
@@ -1588,6 +1604,14 @@ static void mod_cc_attrib_to_string(GString *outstr, const char *attrib, const s
         if (md->src2 < 120)
             g_string_append_printf(outstr, " %s_depth%s%d=%s", modsrc_names[md->src - smsrc_perchan_count], attrib, md->src2, floatbuf);
     }
+    else if ((md->src == smsrc_filenv && md->dest == smdest_cutoff2) ||
+        (md->src == smsrc_fillfo && md->dest == smdest_cutoff2))
+    {
+        if (md->src2 < 120)
+            g_string_append_printf(outstr, " %s_depth2%s%d=%s", modsrc_names[md->src - smsrc_perchan_count], attrib, md->src2, floatbuf);
+    }
+    else
+        assert(md->src2 >= 120);
 }
 
 gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited)
@@ -1690,6 +1714,9 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                         (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
                         (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
                         g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
+                    else if ((md->src == smsrc_filenv && md->dest == smdest_cutoff2) ||
+                        (md->src == smsrc_fillfo && md->dest == smdest_cutoff2))
+                        g_string_append_printf(outstr, " %s_depth2=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
                     else if (is_lfofreq)
                         g_string_append_printf(outstr, " %s%s=%s", moddest_names[md->dest], modsrc_names[md->src - smsrc_perchan_count], floatbuf);
                     else
@@ -1736,6 +1763,29 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                 if (md->src2 < 120)
                 {
                     g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
+                    continue;
+                }
+            }
+            if (md->src == smsrc_filenv && md->dest == smdest_cutoff2)
+            {
+                if (md->src2 == smsrc_vel)
+                {
+                    g_string_append_printf(outstr, " %s_vel2depth2=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
+                    continue;
+                }
+                assert(md->src2 != smsrc_none);
+                if (md->src2 < 120)
+                {
+                    g_string_append_printf(outstr, " %s_depth2cc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
+                    continue;
+                }
+            }
+            if (md->src == smsrc_fillfo && md->dest == smdest_cutoff2)
+            {
+                assert(md->src2 != smsrc_none);
+                if (md->src2 < 120)
+                {
+                    g_string_append_printf(outstr, " %s_depth2cc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
                     continue;
                 }
             }

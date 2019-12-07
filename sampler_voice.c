@@ -337,6 +337,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     v->pitch_env.shape = &l->pitch_env_shape;
     
     v->cutoff_shift = vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack;
+    v->cutoff2_shift = vel * l->fil2_veltrack / 127.0 + (note - l->fil2_keycenter) * l->fil2_keytrack;
     v->loop_mode = l->eff_loop_mode;
     v->off_by = l->off_by;
     v->reloffset = l->reloffset;
@@ -375,6 +376,8 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     {
         cbox_biquadf_reset(&v->filter.filter_left[i]);
         cbox_biquadf_reset(&v->filter.filter_right[i]);
+        cbox_biquadf_reset(&v->filter2.filter_left[i]);
+        cbox_biquadf_reset(&v->filter2.filter_right[i]);
     }
     cbox_onepolef_reset(&v->onepole_left);
     cbox_onepolef_reset(&v->onepole_right);
@@ -554,6 +557,8 @@ static inline void sampler_filter_process_audio(struct sampler_filter *f, int nu
         cbox_biquadf_process_stereo(&f->filter_left[i], &f->filter_right[i], i ? f->second_filter : &f->filter_coeffs, leftright);
 }
 
+static const float gain_for_num_stages[] = { 1, 1, 0.5, 0.33f };
+
 void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs)
 {
     struct sampler_layer_data *l = v->layer;
@@ -660,8 +665,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float moddests[smdestcount];
     moddests[smdest_pitch] = pitch;
     moddests[smdest_cutoff] = v->cutoff_shift;
+    moddests[smdest_cutoff2] = v->cutoff2_shift;
     // These are always set
-    uint32_t modmask = (1 << smdest_pitch) | (1 << smdest_cutoff);
+    uint32_t modmask = (1 << smdest_pitch) | (1 << smdest_cutoff) | (1 << smdest_cutoff2);
 #if 0
     // Those are lazy-initialized using modmask.
     moddests[smdest_gain] = 0;
@@ -890,9 +896,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
 
     if (l->cutoff != -1)
     {
-        static const float gain_for_num_stages[] = { 1, 1, 0.5, 0.33f };
         float mod_resonance = (modmask & (1 << smdest_resonance)) ? dB2gain(gain_for_num_stages[l->eff_num_stages] * moddests[smdest_resonance]) : 1;
         sampler_filter_process_control(&v->filter, l->fil_type, l->logcutoff + moddests[smdest_cutoff], l->resonance_scaled * mod_resonance, m->sincos);
+    }
+    if (l->cutoff2 != -1)
+    {
+        float mod_resonance = (modmask & (1 << smdest_resonance2)) ? dB2gain(gain_for_num_stages[l->eff_num_stages2] * moddests[smdest_resonance2]) : 1;
+        sampler_filter_process_control(&v->filter2, l->fil2_type, l->logcutoff2 + moddests[smdest_cutoff2], l->resonance2_scaled * mod_resonance, m->sincos);
     }
 
     if (__builtin_expect(l->tonectl_freq != 0, 0))
@@ -946,6 +956,8 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
 
     if (l->cutoff != -1)
         sampler_filter_process_audio(&v->filter, l->eff_num_stages, leftright);
+    if (l->cutoff2 != -1)
+        sampler_filter_process_audio(&v->filter2, l->eff_num_stages2, leftright);
 
     if (__builtin_expect(l->tonectl_freq != 0, 0))
         cbox_onepolef_process_stereo(&v->onepole_left, &v->onepole_right, &v->onepole_coeffs, leftright);

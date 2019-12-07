@@ -206,6 +206,8 @@ enum sampler_moddest
     smdest_tonectl,
     smdest_pan,
     smdest_amplitude,
+    smdest_cutoff2,
+    smdest_resonance2,
     smdest_pitchlfo_freq,
     smdest_fillfo_freq,
     smdest_amplfo_freq,
@@ -330,9 +332,12 @@ typedef int midi_note_t;
     MACRO(int, pitch_keytrack, 100) \
     MACRO(midi_note_t, fil_keycenter, 60) \
     MACRO(int, fil_keytrack, 0) \
+    MACRO(midi_note_t, fil2_keycenter, 60) \
+    MACRO(int, fil2_keytrack, 0) \
     MACRO(midi_note_t, amp_keycenter, 60) \
     MACRO(int, amp_keytrack, 0) \
     MACRO(int, fil_veltrack, 0) \
+    MACRO(int, fil2_veltrack, 0) \
     MACRO(int, amp_veltrack, 100) \
     MACRO(int, pitch_veltrack, 0) \
     MACRO(int, lovel, 0) \
@@ -347,10 +352,13 @@ typedef int midi_note_t;
     MACRO(float, hibpm, NO_HI_BPM_VALUE) \
     MACRO(int, velcurve_quadratic, 1) \
     MACRO##_enum(sampler_filter_type, fil_type, sft_lp12) \
+    MACRO##_enum(sampler_filter_type, fil2_type, sft_lp12) \
     MACRO##_enum(sampler_off_mode, off_mode, som_unknown) \
     MACRO##_enum(sampler_vel_mode, vel_mode, svm_current) \
     MACRO(float, cutoff, -1) \
     MACRO##_dBamp(float, resonance, 0) \
+    MACRO(float, cutoff2, -1) \
+    MACRO##_dBamp(float, resonance2, 0) \
     MACRO(midi_note_t, sw_lokey, 0) \
     MACRO(midi_note_t, sw_hikey, 127) \
     MACRO(midi_note_t, sw_last, -1) \
@@ -541,12 +549,12 @@ struct sampler_layer_data
     struct cbox_waveform *eff_waveform;
     int16_t scratch_loop[2 * MAX_INTERPOLATION_ORDER * 2];
     int16_t scratch_end[2 * MAX_INTERPOLATION_ORDER * 2];
-    float resonance_scaled;
-    float logcutoff;
+    float resonance_scaled, resonance2_scaled;
+    float logcutoff, logcutoff2;
     uint32_t eq_bitmask, mod_bitmask;
     gboolean eff_use_xfcc;
     gboolean use_prevoice;
-    int eff_num_stages;
+    int eff_num_stages, eff_num_stages2;
 };
 
 struct sampler_layer
