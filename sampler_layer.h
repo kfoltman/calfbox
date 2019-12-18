@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // arbitrary value that doesn't collide with a useful range
 #define SAMPLER_CURVE_GAP -100000
 #define NO_HI_BPM_VALUE 10000
+#define CC_COUNT 128
+#define EXT_CC_COUNT 143
 
 struct sampler_program;
 struct sampler_voice;

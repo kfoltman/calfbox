@@ -90,10 +90,11 @@ void sampler_create_voice_from_prevoice(struct sampler_module *m, struct sampler
 {
     if (!m->voices_free)
         return;
-    int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
-    sampler_voice_start(m->voices_free, pv->channel, pv->layer_data, pv->note, pv->vel, exgroups, &exgroupcount);
-    if (exgroupcount)
-        sampler_channel_release_groups(pv->channel, pv->note, exgroups, exgroupcount);
+    struct sampler_released_groups exgroups;
+    sampler_released_groups_init(&exgroups);
+    sampler_voice_start(m->voices_free, pv->channel, pv->layer_data, pv->note, pv->vel, &exgroups);
+    if (exgroups.low_groups || exgroups.group_count)
+        sampler_channel_release_groups(pv->channel, pv->note, &exgroups);
 }
 
 void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)

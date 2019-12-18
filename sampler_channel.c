@@ -133,9 +133,10 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
                     struct sampler_voice *v = m->voices_free;
                     if (!v)
                         break;
-                    int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
-                    sampler_voice_start(v, c, layer->runtime, layer->runtime->pitch_keycenter, 127, exgroups, &exgroupcount);
-                    sampler_channel_release_groups(c, -1, exgroups, exgroupcount);
+                    struct sampler_released_groups exgroups;
+                    sampler_released_groups_init(&exgroups);
+                    sampler_voice_start(v, c, layer->runtime, layer->runtime->pitch_keycenter, 127, &exgroups);
+                    sampler_channel_release_groups(c, -1, &exgroups);
                 }
             }
         }
@@ -192,26 +193,19 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
         set_cc_int(c, cc, val);
 }
 
-void sampler_channel_release_groups(struct sampler_channel *c, int note, int exgroups[MAX_RELEASED_GROUPS], int exgroupcount)
+void sampler_channel_release_groups(struct sampler_channel *c, int note, struct sampler_released_groups *exgroups)
 {
-    if (exgroupcount)
+    if (exgroups->group_count || exgroups->low_groups)
     {
         FOREACH_VOICE(c->voices_running, v)
         {
-            for (int j = 0; j < exgroupcount; j++)
+            if (v->off_by && v->note != note)
             {
-                if (v->off_by == exgroups[j] && v->note != note)
+                if (sampler_released_groups_check(exgroups, v->off_by))
                 {
+                    v->released = 1;
                     if (v->layer->off_mode == som_fast)
-                    {
-                        v->released = 1;
                         cbox_envelope_go_to(&v->amp_env, 15);
-                    }
-                    else
-                    {
-                        v->released = 1;
-                    }
-                    break;
                 }
             }
         }
@@ -293,7 +287,8 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
         layer = sampler_rll_iterator_next(&iter);
     }
 
-    int exgroups[MAX_RELEASED_GROUPS], exgroupcount = 0;
+    struct sampler_released_groups exgroups;
+    sampler_released_groups_init(&exgroups);
     // If running out of polyphony, do not start the note if all the regions cannot be played
     if (lcount <= fvcount && dlcount <= fpcount)
     {
@@ -304,7 +299,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
         {
             struct sampler_layer_data *l = layers[i];
             int velc = (!is_first && l->vel_mode == svm_previous) ? c->first_note_vel : vel;
-            sampler_voice_start(m->voices_free, c, l, note, velc, exgroups, &exgroupcount);
+            sampler_voice_start(m->voices_free, c, l, note, velc, &exgroups);
         }
         for (int i = 0; i < dlcount; ++i)
         {
@@ -317,7 +312,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
         c->previous_note = note;
     if (is_first)
         c->first_note_vel = vel;
-    sampler_channel_release_groups(c, note, exgroups, exgroupcount);
+    sampler_channel_release_groups(c, note, &exgroups);
 }
 
 void sampler_channel_start_release_triggered_voices(struct sampler_channel *c, int note)

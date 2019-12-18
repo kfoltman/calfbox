@@ -259,7 +259,7 @@ void sampler_voice_activate(struct sampler_voice *v, enum sampler_player_type mo
     sampler_voice_link(&v->channel->voices_running, v);
 }
 
-void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel, int *exgroups, int *pexgroupcount)
+void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel, struct sampler_released_groups *exgroupdata)
 {
     struct sampler_module *m = c->module;
     sampler_gen_reset(&v->gen);
@@ -352,21 +352,9 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
         v->send2bus = 0;
     v->send1gain = l->effect1 * 0.01;
     v->send2gain = l->effect2 * 0.01;
-    if (l->group >= 1 && *pexgroupcount < MAX_RELEASED_GROUPS)
+    if (l->group >= 1)
     {
-        gboolean found = FALSE;
-        for (int j = 0; j < *pexgroupcount; j++)
-        {
-            if (exgroups[j] == l->group)
-            {
-                found = TRUE;
-                break;
-            }
-        }
-        if (!found)
-        {
-            exgroups[(*pexgroupcount)++] = l->group;
-        }
+        sampler_released_groups_add(exgroupdata, l->group);
     }
     lfo_init(&v->amp_lfo, &l->amp_lfo, m->module.srate, m->module.srate_inv);
     lfo_init(&v->filter_lfo, &l->filter_lfo, m->module.srate, m->module.srate_inv);

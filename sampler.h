@@ -189,7 +189,46 @@ struct sampler_module
     struct cbox_sincos sincos[12800];
 };
 
-#define MAX_RELEASED_GROUPS 4
+#define MAX_RELEASED_GROUPS 16
+
+struct sampler_released_groups
+{
+    // Groups 1-32 use a bitmask
+    uint32_t low_groups;
+    int group_count;
+    int groups[MAX_RELEASED_GROUPS];
+};
+
+static inline void sampler_released_groups_init(struct sampler_released_groups *groups)
+{
+    groups->low_groups = 0;
+    groups->group_count = 0;
+}
+
+static inline gboolean sampler_released_groups_check(struct sampler_released_groups *groups, int group)
+{
+    if (group <= 32)
+        return (groups->low_groups >> (group - 1)) & 1;
+    for (int j = 0; j < groups->group_count; j++)
+    {
+        if (groups->groups[j] == group)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static inline void sampler_released_groups_add(struct sampler_released_groups *groups, int group)
+{
+    if (group <= 32)
+    {
+        groups->low_groups |= (1 << (group - 1));
+        return;
+    }
+    if (groups->group_count >= MAX_RELEASED_GROUPS)
+        return;
+    if (!sampler_released_groups_check(groups, group))
+        groups->groups[groups->group_count++] = group;
+}
 
 extern GQuark cbox_sampler_error_quark(void);
 
@@ -209,12 +248,12 @@ extern void sampler_channel_program_change(struct sampler_channel *c, int progra
 extern void sampler_channel_stop_sustained(struct sampler_channel *c);
 extern void sampler_channel_stop_sostenuto(struct sampler_channel *c);
 extern void sampler_channel_capture_sostenuto(struct sampler_channel *c);
-extern void sampler_channel_release_groups(struct sampler_channel *c, int note, int exgroups[MAX_RELEASED_GROUPS], int exgroupcount);
+extern void sampler_channel_release_groups(struct sampler_channel *c, int note, struct sampler_released_groups *exgroups);
 extern void sampler_channel_stop_all(struct sampler_channel *c);
 extern void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val);
 extern void sampler_channel_reset_keyswitches(struct sampler_channel *c);
 
-extern void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel, int *exgroups, int *pexgroupcount);
+extern void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel, struct sampler_released_groups *exgroups);
 extern void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft);
 extern void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs);
 extern void sampler_voice_link(struct sampler_voice **pv, struct sampler_voice *v);

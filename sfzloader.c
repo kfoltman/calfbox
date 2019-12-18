@@ -196,7 +196,7 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
         {
             int ctrl = atoi(key + 6);
             int val = atoi(value);
-            if (ctrl >= 0 && ctrl <= 119 && val >=0 && val <= 127)
+            if (ctrl >= 0 && ctrl < CC_COUNT && val >=0 && val <= 127)
                 sampler_program_add_controller_init(ls->program, ctrl, val);
             else
                 g_warning("Invalid CC initialisation: %s=%s", key, value);

@@ -1594,24 +1594,24 @@ static void mod_cc_attrib_to_string(GString *outstr, const char *attrib, const s
         (md->src == smsrc_fillfo && md->dest == smdest_cutoff) ||
         (md->src == smsrc_pitchlfo && md->dest == smdest_pitch))
     {
-        if (md->src2 < 120)
+        if (md->src2 < EXT_CC_COUNT)
             g_string_append_printf(outstr, " %s_depth%s%d=%s", modsrc_names[md->src - smsrc_perchan_count], attrib, md->src2, floatbuf);
     }
     else if ((md->src == smsrc_ampenv && md->dest == smdest_gain) ||
         (md->src == smsrc_filenv && md->dest == smdest_cutoff) ||
         (md->src == smsrc_pitchenv && md->dest == smdest_pitch))
     {
-        if (md->src2 < 120)
+        if (md->src2 < EXT_CC_COUNT)
             g_string_append_printf(outstr, " %s_depth%s%d=%s", modsrc_names[md->src - smsrc_perchan_count], attrib, md->src2, floatbuf);
     }
     else if ((md->src == smsrc_filenv && md->dest == smdest_cutoff2) ||
         (md->src == smsrc_fillfo && md->dest == smdest_cutoff2))
     {
-        if (md->src2 < 120)
+        if (md->src2 < EXT_CC_COUNT)
             g_string_append_printf(outstr, " %s_depth2%s%d=%s", modsrc_names[md->src - smsrc_perchan_count], attrib, md->src2, floatbuf);
     }
     else
-        assert(md->src2 >= 120);
+        assert(md->src2 >= EXT_CC_COUNT);
 }
 
 gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited)
@@ -1738,7 +1738,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                     g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
                     continue;
                 default:
-                    if (md->src2 < 120)
+                    if (md->src2 < EXT_CC_COUNT)
                     {
                         g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
                         continue;
@@ -1760,7 +1760,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                     g_string_append_printf(outstr, " %s_depth=%s", modsrc_names[md->src - smsrc_perchan_count], floatbuf);
                     continue;
                 }
-                if (md->src2 < 120)
+                if (md->src2 < EXT_CC_COUNT)
                 {
                     g_string_append_printf(outstr, " %s_depthcc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
                     continue;
@@ -1774,7 +1774,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                     continue;
                 }
                 assert(md->src2 != smsrc_none);
-                if (md->src2 < 120)
+                if (md->src2 < EXT_CC_COUNT)
                 {
                     g_string_append_printf(outstr, " %s_depth2cc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
                     continue;
@@ -1783,7 +1783,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
             if (md->src == smsrc_fillfo && md->dest == smdest_cutoff2)
             {
                 assert(md->src2 != smsrc_none);
-                if (md->src2 < 120)
+                if (md->src2 < EXT_CC_COUNT)
                 {
                     g_string_append_printf(outstr, " %s_depth2cc%d=%s", modsrc_names[md->src - smsrc_perchan_count], md->src2, floatbuf);
                     continue;
