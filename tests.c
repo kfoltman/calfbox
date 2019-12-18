@@ -412,6 +412,70 @@ REGION_LOGIC_TEST_SETUP(cc,
     "<region>locc16=32 hicc16=33 sample=*saw"
 );
 
+struct region_logic_test_setup_step steps_cc2[] = {
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x10\x1F", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x10\x20", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x11\x41", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 1),
+    MIDI_DATA_STEP("\xB0\x10\x21", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 1),
+    MIDI_DATA_STEP("\xB0\x10\x22", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x10\x21", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 1),
+    MIDI_DATA_STEP("\xB0\x11\x42", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x11\x41", 0),
+    MIDI_DATA_STEP("\xB0\x10\x22", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x11\x3F", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x10\x22", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_END,
+};
+
+REGION_LOGIC_TEST_SETUP(cc2,
+    "<region>locc16=32 hicc16=33 locc17=64 hicc17=65 sample=*saw"
+);
+
+struct region_logic_test_setup_step steps_cc3[] = { // CC16 <= 33, CC17 >= 64
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x10\x1F", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x10\x20", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x11\x41", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 1),
+    MIDI_DATA_STEP("\xB0\x11\x71", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 1),
+    MIDI_DATA_STEP("\xB0\x10\x21", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 1),
+    MIDI_DATA_STEP("\xB0\x10\x22", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x10\x21", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 1),
+    MIDI_DATA_STEP("\xB0\x10\x1F", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 1),
+    MIDI_DATA_STEP("\xB0\x11\x42", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 1),
+    MIDI_DATA_STEP("\xB0\x11\x41", 0),
+    MIDI_DATA_STEP("\xB0\x10\x22", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x11\x3F", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_STEP("\xB0\x10\x22", 0),
+    MIDI_DATA_STEP("\x90\x20\x20", 0),
+    MIDI_DATA_END,
+};
+
+REGION_LOGIC_TEST_SETUP(cc3,
+    "<region>hicc16=33 locc17=64 sample=*saw"
+);
+
 struct region_logic_test_setup_step steps_oncc[] = {
     MIDI_DATA_STEP("\xB0\x10\x1F", 0),
     MIDI_DATA_STEP("\xB0\x10\x20", 1),
@@ -625,6 +689,8 @@ struct test_info {
     { "test_sampler_note_region_logic/chanaft", test_sampler_note_region_logic, &setup_chanaft },
     { "test_sampler_note_region_logic/polyaft", test_sampler_note_region_logic, &setup_polyaft },
     { "test_sampler_note_region_logic/cc", test_sampler_note_region_logic, &setup_cc },
+    { "test_sampler_note_region_logic/cc2", test_sampler_note_region_logic, &setup_cc2 },
+    { "test_sampler_note_region_logic/cc3", test_sampler_note_region_logic, &setup_cc3 },
     { "test_sampler_note_region_logic/oncc", test_sampler_note_region_logic, &setup_oncc },
     { "test_sampler_note_region_logic/release", test_sampler_note_region_logic, &setup_release },
     { "test_sampler_note_region_logic/firstlegato", test_sampler_note_region_logic, &setup_firstlegato },

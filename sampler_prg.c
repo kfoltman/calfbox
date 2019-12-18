@@ -56,7 +56,6 @@ retry:
             (l->trigger == stm_legato && iter->is_first) ||
             (l->trigger == stm_release && !iter->is_release)) // sw_last keyswitches are still added to the note-on list in RLL
             continue;
-        int ccval = -1;
         struct sampler_channel *c = iter->channel;
         struct sampler_module *m = c->module;
         if (iter->note >= l->lokey && iter->note <= l->hikey &&
@@ -67,7 +66,7 @@ retry:
             c->last_chanaft >= l->lochanaft && c->last_chanaft <= l->hichanaft &&
             c->last_polyaft >= l->lopolyaft && c->last_polyaft <= l->hipolyaft &&
             c->module->module.engine->master->tempo >= l->lobpm && c->module->module.engine->master->tempo < l->hibpm &&
-            (!l->cc.is_active || (ccval = sampler_channel_getintcc(c, NULL, l->cc.cc_number), ccval >= l->cc.locc && ccval <= l->cc.hicc)))
+            sampler_cc_range_is_in(l->cc, c))
         {
             if (!l->eff_use_keyswitch || 
                 ((l->sw_down == -1 || (c->switchmask[l->sw_down >> 5] & (1 << (l->sw_down & 31)))) &&

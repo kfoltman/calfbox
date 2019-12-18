@@ -126,9 +126,20 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
                 // transition between in-range and out-of-range.
                 gboolean compatible_oncc_behaviour = TRUE;
 
-                if (layer->runtime->on_cc.cc_number == cc &&
-                    (val >= layer->runtime->on_cc.locc && val <= layer->runtime->on_cc.hicc) &&
-                    (compatible_oncc_behaviour || !(old_value >= layer->runtime->on_cc.locc && old_value <= layer->runtime->on_cc.hicc)))
+                struct sampler_cc_range *on_cc = layer->runtime->on_cc;
+                gboolean trigger = FALSE;
+                while(on_cc)
+                {
+                    if (on_cc->cc_number == cc &&
+                        (val >= on_cc->locc && val <= on_cc->hicc) &&
+                        (compatible_oncc_behaviour || !(old_value >= on_cc->locc && old_value <= on_cc->hicc)))
+                    {
+                        trigger = TRUE;
+                        break;
+                    }
+                    on_cc = on_cc->next;
+                }
+                if(trigger)
                 {
                     struct sampler_voice *v = m->voices_free;
                     if (!v)

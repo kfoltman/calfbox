@@ -356,6 +356,13 @@ struct sampler_layer_param_entry
     void (*set_has_value)(struct sampler_layer_data *, gboolean);
 };
 
+struct sampler_cc_range *sampler_cc_range_find_cc(struct sampler_cc_range *range, int cc_no)
+{
+    while(range && range->cc_number != cc_no)
+        range = range->next;
+    return range;
+}
+
 #define PROC_SUBSTRUCT_FIELD_SETHASFUNC(name, index, def_value, parent) \
     static void sampler_layer_data_##parent##_set_has_##name(struct sampler_layer_data *l, gboolean value) { l->has_##parent.name = value; }
 
@@ -374,8 +381,8 @@ struct sampler_layer_param_entry
 #define PROC_FIELD_SETHASFUNC_eq(field, name, default_value) \
     EQ_FIELDS(PROC_SUBSTRUCT_FIELD_SETHASFUNC, field)
 #define PROC_FIELD_SETHASFUNC_ccrange(name, parname) \
-    static void sampler_layer_data_set_has_##name##_lo(struct sampler_layer_data *l, gboolean value) { l->name.has_locc = value; } \
-    static void sampler_layer_data_set_has_##name##_hi(struct sampler_layer_data *l, gboolean value) { l->name.has_hicc = value; }
+    static void sampler_layer_data_set_has_##name##_lo(struct sampler_layer_data *l, uint32_t cc_no, gboolean value) { struct sampler_cc_range *range = sampler_cc_range_find_cc(l->name, cc_no); if (range) range->has_locc = value; } \
+    static void sampler_layer_data_set_has_##name##_hi(struct sampler_layer_data *l, uint32_t cc_no, gboolean value) { struct sampler_cc_range *range = sampler_cc_range_find_cc(l->name, cc_no); if (range) range->has_hicc = value; }
 #define PROC_FIELD_SETHASFUNC_midicurve(name) \
     static void sampler_layer_data_set_has_##name(struct sampler_layer_data *l, uint32_t index, gboolean value) { l->name.has_values[index] = value; }
 
@@ -456,8 +463,8 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
     FIELD_AMOUNT_CC(#name "_gain", name##_gain)
 
 #define PROC_FIELD_DESCRIPTOR_ccrange(field, parname) \
-    { #parname "locc#", LOFS(field), slpt_ccrange, 0, 0, NULL, sampler_layer_data_set_has_##field##_lo }, \
-    { #parname "hicc#", LOFS(field), slpt_ccrange, 127, 1, NULL, sampler_layer_data_set_has_##field##_hi },
+    { #parname "locc#", LOFS(field), slpt_ccrange, 0, 0, NULL, (void *)sampler_layer_data_set_has_##field##_lo }, \
+    { #parname "hicc#", LOFS(field), slpt_ccrange, 127, 1, NULL, (void *)sampler_layer_data_set_has_##field##_hi },
 
 struct sampler_layer_param_entry sampler_layer_params[] = {
     SAMPLER_FIXED_FIELDS(PROC_FIELD_DESCRIPTOR)
@@ -649,20 +656,25 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "'%s' is not a correct control change value for %s", value, e->name);
                 return FALSE;
             }
-            struct sampler_cc_range *range = p;
-            if (!range->has_locc && !range->has_hicc)
-                range->cc_number = cc;
-            else if (range->cc_number != cc)
+            struct sampler_cc_range **range_ptr = p;
+            struct sampler_cc_range *range = *range_ptr;
+            while(range && range->cc_number != cc)
+                range = range->next;
+            if (!range)
             {
-                //g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Conflicting controller number for %s (%d vs previously used %d)", e->name, cc, (int)range->cc_number);
-                //return FALSE;
+                // XXXKF clone from parent?
+                range = g_malloc0(sizeof(struct sampler_cc_range));
+                range->next = *range_ptr;
+                range->cc_number = cc;
+                range->locc = 0;
+                range->hicc = 127;
+                *range_ptr = range;
             }
             switch(e->extra_int) {
-                case 0: range->locc = number; range->is_active = 1; break;
-                case 1: range->hicc = number; range->is_active = 1; break;
+                case 0: range->locc = number; range->has_locc = 1; break;
+                case 1: range->hicc = number; range->has_hicc = 1; break;
                 default: assert(0);
             }
-            e->set_has_value(&l->data, 1);
             return TRUE;
         }
         case slpt_depthcc:
@@ -791,20 +803,28 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             }
         case slpt_ccrange:
         {
-            struct sampler_cc_range *range = p, *prange = pp;
+            struct sampler_cc_range **range_ptr = p, **prange_ptr = pp;
+            struct sampler_cc_range *range = *range_ptr, *prange = prange_ptr ? *prange_ptr : NULL;
             cc = args[0];
-            if ((range->has_locc || range->has_hicc) && range->cc_number != cc)
+            while(range && range->cc_number != cc)
+                range = range->next;
+            while(prange && prange->cc_number != cc)
+                prange = prange->next;
+            if (!range)
             {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Conflicting controller number for %s (%d vs previously used %d)", e->name, cc, (int)range->cc_number);
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Controller number %d not used for %s", cc, e->name);
                 return FALSE;
             }
 
             switch(e->extra_int) {
-                case 0: range->locc = prange ? prange->locc : (uint8_t)e->def_value; range->is_active = range->has_hicc || (prange ? prange->is_active : 0); break;
-                case 1: range->hicc = prange ? prange->hicc : (uint8_t)e->def_value; range->is_active = range->has_locc || (prange ? prange->is_active : 0); break;
+                case 0: range->locc = prange ? prange->locc : (uint8_t)e->def_value; range->has_locc = 0; break;
+                case 1: range->hicc = prange ? prange->hicc : (uint8_t)e->def_value; range->has_hicc = 0; break;
                 default: assert(0);
             }
-            e->set_has_value(&l->data, 0);
+            if (!range->has_locc && !range->has_hicc && !prange)
+            {
+                // XXXKF delete (and propagate to children?)
+            }
             return TRUE;
         }
         case slpt_depthcc:
@@ -1070,12 +1090,7 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
     EQ_FIELDS(PROC_SUBSTRUCT_RESET_FIELD, name, ld); \
     EQ_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, ld)
 #define PROC_FIELDS_INITIALISER_ccrange(name, parname) \
-    ld->name.locc = 0; \
-    ld->name.hicc = 127; \
-    ld->name.cc_number = 0; \
-    ld->name.has_locc = 0; \
-    ld->name.has_hicc = 0; \
-    ld->name.is_active = 0;
+    ld->name = NULL;
 
 CBOX_CLASS_DEFINITION_ROOT(sampler_layer)
 
@@ -1152,12 +1167,21 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
         if (!copy_hasattr) \
             EQ_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst)
 #define PROC_FIELDS_CLONE_ccrange(name, parname) \
-    dst->name.locc = src->name.locc; \
-    dst->name.hicc = src->name.hicc; \
-    dst->name.cc_number = src->name.cc_number; \
-    dst->name.is_active = src->name.is_active; \
-    dst->name.has_locc = copy_hasattr ? src->name.has_locc : FALSE; \
-    dst->name.has_hicc = copy_hasattr ? src->name.has_hicc : FALSE;
+    sampler_cc_range_clone(&dst->name, src->name, copy_hasattr);
+
+void sampler_cc_range_clone(struct sampler_cc_range **dest, struct sampler_cc_range *src, gboolean copy_hasattr)
+{
+    while(src)
+    {
+        struct sampler_cc_range *range = g_malloc0(sizeof(struct sampler_cc_range));
+        memcpy(range, src, sizeof(struct sampler_cc_range));
+        range->has_locc = copy_hasattr ? src->has_locc : FALSE;
+        range->has_hicc = copy_hasattr ? src->has_hicc : FALSE;
+        range->next = *dest;
+        *dest = range;
+        src = src->next;
+    }
+}
 
 static GSList *clone_nifs(GSList *nifs, gboolean copy_hasattr)
 {
@@ -1195,6 +1219,33 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
         cbox_waveform_ref(dst->eff_waveform);
 }
 
+void sampler_cc_range_cloneparent(struct sampler_cc_range **dest, struct sampler_cc_range *src)
+{
+    while(src)
+    {
+        struct sampler_cc_range *iter = *dest;
+        while(iter && iter->cc_number != src->cc_number)
+            iter = iter->next;
+        if (iter)
+        {
+            if (!iter->has_locc)
+                iter->locc = src->locc;
+            if (!iter->has_hicc)
+                iter->hicc = src->hicc;
+        }
+        else
+        {
+            struct sampler_cc_range *range = g_malloc0(sizeof(struct sampler_cc_range));
+            memcpy(range, src, sizeof(struct sampler_cc_range));
+            range->has_locc = 0;
+            range->has_hicc = 0;
+            range->next = *dest;
+            *dest = range;
+        }
+        src = src->next;
+    }
+}
+
 #define PROC_FIELDS_CLONEPARENT(type, name, def_value) \
     if (!l->has_##name) \
         l->name = parent ? parent->name : def_value;
@@ -1218,14 +1269,7 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
 #define PROC_FIELDS_CLONEPARENT_eq(name, parname, index) \
         EQ_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
 #define PROC_FIELDS_CLONEPARENT_ccrange(name, parname) \
-    if (!l->name.has_locc) \
-        l->name.locc = parent ? parent->name.locc : 0; \
-    if (!l->name.has_hicc) \
-        l->name.hicc = parent ? parent->name.hicc : 127; \
-    if (!l->name.has_locc && !l->name.has_hicc) {\
-        l->name.is_active = parent ? parent->name.is_active : 0; \
-        l->name.cc_number = parent ? parent->name.cc_number : -1; \
-    }
+    sampler_cc_range_cloneparent(&l->name, parent->name);
 
 static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct sampler_layer_data *parent)
 {
@@ -1360,8 +1404,8 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         (l->lochanaft == 0 && l->hichanaft == 127) &&
         (l->lopolyaft == 0 && l->hipolyaft == 127) &&
         (l->lobpm == 0 && l->hibpm == NO_HI_BPM_VALUE) &&
-        !l->cc.is_active && !l->eff_use_keyswitch;
-    l->eff_use_xfcc = l->xfin_cc.is_active || l->xfout_cc.is_active;
+        !l->cc && !l->eff_use_keyswitch;
+    l->eff_use_xfcc = l->xfin_cc || l->xfout_cc;
     l->eff_freq = (l->eff_waveform && l->eff_waveform->info.samplerate) ? l->eff_waveform->info.samplerate : 44100;
     l->eff_loop_mode = l->loop_mode;
     if (l->loop_mode == slm_unknown)
@@ -1565,10 +1609,16 @@ gboolean sampler_layer_unapply_param(struct sampler_layer *layer, const char *ke
 #define PROC_FIELDS_TO_FILEPTR_eq(name, parname, index) \
     EQ_FIELDS(ENV_PARAM_OUTPUT, l->name, name, parname)
 #define PROC_FIELDS_TO_FILEPTR_ccrange(name, parname) \
-    if (show_inherited || l->name.has_locc) \
-        g_string_append_printf(outstr, " " #parname "locc%d=%d", l->name.cc_number, l->name.locc); \
-    if (show_inherited || l->name.has_hicc) \
-        g_string_append_printf(outstr, " " #parname "hicc%d=%d", l->name.cc_number, l->name.hicc);
+    { \
+        struct sampler_cc_range *range = l->name; \
+        while (range) { \
+            if (show_inherited || range->has_locc) \
+                g_string_append_printf(outstr, " " #parname "locc%d=%d", range->cc_number, range->locc); \
+            if (show_inherited || range->has_hicc) \
+                g_string_append_printf(outstr, " " #parname "hicc%d=%d", range->cc_number, range->hicc); \
+            range = range->next; \
+        } \
+    }
 
 static const char *addrandom_variants[] = { "amp", "fil", "pitch" };
 static const char *env_stages[] = { "delay", "attack", "hold", "decay", "sustain", "release", "start" };
@@ -1813,8 +1863,22 @@ void sampler_layer_dump(struct sampler_layer *l, FILE *f)
     fprintf(f, "%s\n", str);
 }
 
+void sampler_cc_range_destroy(struct sampler_cc_range *range)
+{
+    while(range)
+    {
+        struct sampler_cc_range *next = range->next;
+        g_free(range);
+        range = next;
+    }
+}
+
 void sampler_layer_data_close(struct sampler_layer_data *l)
 {
+    sampler_cc_range_destroy(l->cc);
+    sampler_cc_range_destroy(l->on_cc);
+    sampler_cc_range_destroy(l->xfin_cc);
+    sampler_cc_range_destroy(l->xfout_cc);
     g_slist_free_full(l->voice_nifs, g_free);
     g_slist_free_full(l->prevoice_nifs, g_free);
     g_slist_free_full(l->modulations, g_free);

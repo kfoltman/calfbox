@@ -132,11 +132,16 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
             ks_offset = ks->group_offset + rel_offset;
         }
 
-        if (l->data.on_cc.is_active)
+        struct sampler_cc_range *oncc = l->data.on_cc;
+        if (oncc)
         {
-            int cc = l->data.on_cc.cc_number;
             rll->layers_oncc = g_slist_prepend(rll->layers_oncc, l);
-            rll->cc_trigger_bitmask[cc >> 5] |= 1 << (cc & 31);
+            while(oncc)
+            {
+                int cc = oncc->cc_number;
+                rll->cc_trigger_bitmask[cc >> 5] |= 1 << (cc & 31);
+                oncc = oncc->next;
+            }
         }
         if (l->data.trigger == stm_release)
             add_layers(rll, rll->release_layers_by_range + ks_offset * range_count, l, l->data.lokey, l->data.hikey);

@@ -476,7 +476,7 @@ struct sampler_cc_range
     uint8_t cc_number;
     uint8_t has_locc:1;
     uint8_t has_hicc:1;
-    uint8_t is_active:1;
+    struct sampler_cc_range *next;
 };
 
 struct sampler_midi_curve
@@ -503,7 +503,7 @@ struct sampler_midi_curve
 #define PROC_FIELDS_TO_STRUCT_eq(name, parname, index) \
     struct sampler_eq_params name;
 #define PROC_FIELDS_TO_STRUCT_ccrange(name, parname) \
-    struct sampler_cc_range name;
+    struct sampler_cc_range *name;
 #define PROC_FIELDS_TO_STRUCT_midicurve(name) \
     struct sampler_midi_curve name; \
     float eff_##name[128];

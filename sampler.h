@@ -361,6 +361,18 @@ static inline float sampler_channel_get_poly_pressure(struct sampler_channel *c,
     return (c->poly_pressure_mask & (1 << (note >> 2))) ? c->poly_pressure[note] * (1.f / 127.f) : 0;;
 }
 
+static inline gboolean sampler_cc_range_is_in(const struct sampler_cc_range *range, struct sampler_channel *c)
+{
+    while(range)
+    {
+        int ccval = sampler_channel_getintcc(c, NULL, range->cc_number);
+        if (ccval < range->locc || ccval > range->hicc)
+            return FALSE;
+        range = range->next;
+    }
+    return TRUE;
+}
+
 #define FOREACH_VOICE(var, p) \
     for (struct sampler_voice *p = (var), *p##_next = NULL; p && (p##_next = p->next, TRUE); p = p##_next)
 #define FOREACH_PREVOICE(var, p) \
