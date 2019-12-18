@@ -717,7 +717,17 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         }
         if (sm->dest < 32)
         {
-            if (!(modmask & (1 << sm->dest))) // first value
+            if (sm->dest == smdest_amplitude)
+            {
+                if (!(modmask & (1 << sm->dest))) // first value
+                {
+                    moddests[sm->dest] = value * sm->amount;
+                    modmask |= (1 << sm->dest);
+                }
+                else
+                    moddests[sm->dest] *= value * sm->amount;
+            }
+            else if (!(modmask & (1 << sm->dest))) // first value
             {
                 moddests[sm->dest] = value * sm->amount;
                 modmask |= (1 << sm->dest);
@@ -880,7 +890,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
 
     float amplitude = l->amplitude;
     if ((modmask & (1 << smdest_amplitude)))
-        amplitude += moddests[smdest_amplitude];
+        amplitude *= moddests[smdest_amplitude];
 
     gain *= amplitude * (1.0 / 100.0);
     // http://drealm.info/sfz/plj-sfz.xhtml#amp "The overall gain must remain in the range -144 to 6 decibels."
