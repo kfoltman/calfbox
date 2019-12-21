@@ -1391,6 +1391,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
             l->eff_waveform = NULL;
         if (oldwf)
             cbox_waveform_unref(oldwf);
+        l->eff_is_silent = !l->sample || !strcmp(l->sample, "*silence");
         l->sample_changed = FALSE;
     }
     
@@ -1471,7 +1472,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
             l->mod_bitmask |= slmb_ampeg_cc << ((mval->dest >> 4) & 3);
     }
 
-    l->use_prevoice = (l->delay || l->prevoice_nifs);
+    l->eff_use_prevoice = (l->delay || l->prevoice_nifs);
     l->eff_num_stages = sampler_filter_num_stages(l->cutoff, l->fil_type);
     l->eff_num_stages2 = sampler_filter_num_stages(l->cutoff2, l->fil2_type);
 

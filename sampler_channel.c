@@ -273,7 +273,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
     }
     struct sampler_layer_data *layers[MAX_SAMPLER_VOICES];
     struct sampler_layer_data *delayed_layers[MAX_SAMPLER_PREVOICES];
-    int lcount = 0, dlcount = 0;
+    int lcount = 0, dlcount = 0, slcount = 0;
     struct sampler_voice *free_voice = m->voices_free;
     struct sampler_prevoice *free_prevoice = m->prevoices_free;
     int fvcount = 0, fpcount = 0;
@@ -291,17 +291,22 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
             fpcount++;
         }
         assert(layer->runtime);
-        if (layer->runtime->use_prevoice)
+        if (layer->runtime->eff_use_prevoice)
             delayed_layers[dlcount++] = layer->runtime;
         else
+        {
             layers[lcount++] = layer->runtime;
+            if (layer->runtime->eff_is_silent)
+                slcount++;
+        }
         layer = sampler_rll_iterator_next(&iter);
     }
 
     struct sampler_released_groups exgroups;
     sampler_released_groups_init(&exgroups);
     // If running out of polyphony, do not start the note if all the regions cannot be played
-    if (lcount <= fvcount && dlcount <= fpcount)
+    // (silent notes don't count into polyphony)
+    if (lcount <= slcount + fvcount && dlcount <= fpcount)
     {
         // this might perhaps be optimized by mapping the group identifiers to flat-array indexes
         // but I'm not going to do that until someone gives me an SFZ worth doing that work ;)
@@ -309,8 +314,13 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
         for (int i = 0; i < lcount; ++i)
         {
             struct sampler_layer_data *l = layers[i];
-            int velc = (!is_first && l->vel_mode == svm_previous) ? c->first_note_vel : vel;
-            sampler_voice_start(m->voices_free, c, l, note, velc, &exgroups);
+            if (l->eff_is_silent)
+                sampler_voice_start_silent(l, &exgroups);
+            else
+            {
+                int velc = (!is_first && l->vel_mode == svm_previous) ? c->first_note_vel : vel;
+                sampler_voice_start(m->voices_free, c, l, note, velc, &exgroups);
+            }
         }
         for (int i = 0; i < dlcount; ++i)
         {

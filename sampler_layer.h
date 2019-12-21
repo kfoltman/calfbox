@@ -545,8 +545,11 @@ struct sampler_layer_data
 
     // computed values:
     float eff_freq;
-    gboolean eff_use_keyswitch;
-    gboolean eff_use_simple_trigger_logic;
+    gboolean eff_use_keyswitch:1;
+    gboolean eff_use_simple_trigger_logic:1;
+    gboolean eff_use_xfcc:1;
+    gboolean eff_use_prevoice:1;
+    gboolean eff_is_silent:1;
     enum sampler_loop_mode eff_loop_mode;
     struct cbox_waveform *eff_waveform;
     int16_t scratch_loop[2 * MAX_INTERPOLATION_ORDER * 2];
@@ -554,8 +557,6 @@ struct sampler_layer_data
     float resonance_scaled, resonance2_scaled;
     float logcutoff, logcutoff2;
     uint32_t eq_bitmask, mod_bitmask;
-    gboolean eff_use_xfcc;
-    gboolean use_prevoice;
     int eff_num_stages, eff_num_stages2;
 };
 

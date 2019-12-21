@@ -143,7 +143,9 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
     }
     m->active_voices = vcount;
     m->active_prevoices = pvcount;
-    if (vcount - vrel > m->max_voices)
+    if(vcount - vrel > m->max_voices + 1)
+        sampler_steal_voice(m);
+    if(vcount - vrel > m->max_voices)
         sampler_steal_voice(m);
     m->serial_no++;
     m->current_time += CBOX_BLOCK_SIZE;

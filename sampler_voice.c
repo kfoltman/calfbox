@@ -259,6 +259,12 @@ void sampler_voice_activate(struct sampler_voice *v, enum sampler_player_type mo
     sampler_voice_link(&v->channel->voices_running, v);
 }
 
+void sampler_voice_start_silent(struct sampler_layer_data *l, struct sampler_released_groups *exgroupdata)
+{
+    if (l->group >= 1)
+        sampler_released_groups_add(exgroupdata, l->group);
+}
+
 void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel, struct sampler_released_groups *exgroupdata)
 {
     struct sampler_module *m = c->module;
@@ -641,15 +647,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     modsrcs[smsrc_fillfo - smsrc_pernote_offset] = lfo_run(&v->filter_lfo);
     modsrcs[smsrc_pitchlfo - smsrc_pernote_offset] = lfo_run(&v->pitch_lfo);
 
-    if (__builtin_expect(v->amp_env.cur_stage < 0, 0))
-    {
-        if (__builtin_expect(is_tail_finished(v), 0))
-        {
-            sampler_voice_inactivate(v, TRUE);
-            return;
-        }
-    }
-    
     float moddests[smdestcount];
     moddests[smdest_pitch] = pitch;
     moddests[smdest_cutoff] = v->cutoff_shift;
@@ -752,6 +749,14 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     cbox_envelope_advance(&v->pitch_env, v->released, pitcheg_shape);
     cbox_envelope_advance(&v->filter_env, v->released, fileg_shape);
     cbox_envelope_advance(&v->amp_env, v->released, ampeg_shape);
+    if (__builtin_expect(v->amp_env.cur_stage < 0, 0))
+    {
+        if (__builtin_expect(is_tail_finished(v), 0))
+        {
+            sampler_voice_inactivate(v, TRUE);
+            return;
+        }
+    }
     
     double maxv = 127 << 7;
     double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;

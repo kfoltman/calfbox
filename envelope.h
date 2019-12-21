@@ -117,6 +117,8 @@ static inline float cbox_envelope_get_value(struct cbox_envelope *env, const str
 
 static inline void cbox_envelope_update_shape_after_modify(struct cbox_envelope *env, struct cbox_envelope_shape *shape, double sr)
 {
+    if (env->cur_stage < 0)
+        return;
     struct cbox_envstage *es = &shape->stages[env->cur_stage];
     if (es->time != env->orig_time)
     {

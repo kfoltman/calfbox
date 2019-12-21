@@ -254,6 +254,7 @@ extern void sampler_channel_process_cc(struct sampler_channel *c, int cc, int va
 extern void sampler_channel_reset_keyswitches(struct sampler_channel *c);
 
 extern void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, struct sampler_layer_data *l, int note, int vel, struct sampler_released_groups *exgroups);
+extern void sampler_voice_start_silent(struct sampler_layer_data *l, struct sampler_released_groups *exgroups);
 extern void sampler_voice_release(struct sampler_voice *v, gboolean is_polyaft);
 extern void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs);
 extern void sampler_voice_link(struct sampler_voice **pv, struct sampler_voice *v);
