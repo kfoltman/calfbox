@@ -100,7 +100,7 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_FIND)
     d->value.has_name = FALSE;
 
 #define SAMPLER_COLL_FUNC_ADD(sname) \
-static struct sname *sname##_add(GSList **list_ptr, const struct sampler_modulation_key *key) \
+static struct sname *sname##_add(GSList **list_ptr, const struct sname##_key *key) \
 { \
     struct sname *d = sname##_find(*list_ptr, key, NULL); \
     if (d) \
@@ -156,14 +156,14 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_ISNULL)
     SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_SETTER, sname, cname, cfname)
 
 #define SAMPLER_COLL_FUNC_PROPAGATE_SET(sname) \
-    void sname##_propagate_set(struct sampler_layer *l, uint32_t offset, const struct sampler_modulation *srcm, gboolean starting) \
+    void sname##_propagate_set(struct sampler_layer *l, uint32_t offset, const struct sname *srcm, gboolean starting) \
     { \
         if (!starting) \
         { \
             void *vl = &l->data; \
             GSList **l = (vl + offset); \
             gboolean changed = FALSE; \
-            struct sampler_modulation *dstm = sname##_add(l, &srcm->key); \
+            struct sname *dstm = sname##_add(l, &srcm->key); \
             SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_PROPAGATE) \
             if (!changed) \
                 return; \
