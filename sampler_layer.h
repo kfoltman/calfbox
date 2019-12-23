@@ -260,23 +260,33 @@ struct sampler_modulation_value
     unsigned int has_step:1;
 };
 
-struct sampler_modulation
-{
-    struct sampler_modulation_key key;
-    struct sampler_modulation_value value;
-};
+#define SAMPLER_COLL_FIELD_LIST_sampler_modulation(MACRO, ...) \
+    MACRO(amount, has_amount, float, 0, ## __VA_ARGS__) \
+    MACRO(curve_id, has_curve, uint32_t, 0, ## __VA_ARGS__) \
+    MACRO(smooth, has_smooth, float, 0, ## __VA_ARGS__) \
+    MACRO(step, has_step, float, 0, ## __VA_ARGS__)
+
+#define SAMPLER_COLL_CHAIN_LIST_sampler_modulation(MACRO, ...) \
+    MACRO(modulations, modulation, ## __VA_ARGS__)
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
 
 typedef void (*SamplerNoteInitFunc)(struct sampler_noteinitfunc *nif, struct sampler_voice *voice);
 typedef void (*SamplerNoteInitFunc2)(struct sampler_noteinitfunc *nif, struct sampler_prevoice *prevoice);
 
-struct sampler_noteinitfunc
+struct sampler_noteinitfunc_key
 {
-    SamplerNoteInitFunc notefunc_voice;
-    SamplerNoteInitFunc2 notefunc_prevoice;
-    int variant:31;
+    union {
+        SamplerNoteInitFunc notefunc_voice;
+        SamplerNoteInitFunc2 notefunc_prevoice;
+    };
+    int variant;
+};
+
+struct sampler_noteinitfunc_value
+{
+    float value;
     unsigned int has_value:1;
-    float param;
-    // XXXKF no destructor for now - might not be necessary
 };
 
 enum sampler_noteinitfunc_envelope_variant
@@ -289,6 +299,30 @@ enum sampler_noteinitfunc_envelope_variant
     snif_env_release = 5,
     snif_env_start = 6,
 };
+
+#define SAMPLER_COLL_FIELD_LIST_sampler_noteinitfunc(MACRO, ...) \
+    MACRO(value, has_value, float, 0, ## __VA_ARGS__) \
+
+#define SAMPLER_COLL_CHAIN_LIST_sampler_noteinitfunc(MACRO, ...) \
+    MACRO(voice_nifs, voice_nif, ## __VA_ARGS__) \
+    MACRO(prevoice_nifs, prevoice_nif, ## __VA_ARGS__)
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+#define SAMPLER_COLL_LIST(MACRO) \
+    MACRO(sampler_modulation) \
+    MACRO(sampler_noteinitfunc) \
+
+#define SAMPLER_COLL_DEFINITION(sname) \
+    struct sname \
+    { \
+        struct sname##_key key; \
+        struct sname##_value value; \
+    };
+
+SAMPLER_COLL_LIST(SAMPLER_COLL_DEFINITION)
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct sampler_lfo_params
 {

@@ -384,7 +384,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     while(nif)
     {
         struct sampler_noteinitfunc *p = nif->data;
-        p->notefunc_voice(p, v);
+        p->key.notefunc_voice(p, v);
         nif = nif->next;
     }
     if (v->gain_shift)

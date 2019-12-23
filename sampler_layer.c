@@ -35,15 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <locale.h>
 
-#define SAMPLER_COLL_FIELD_LIST_sampler_modulation(MACRO, ...) \
-    MACRO(amount, has_amount, float, 0, ## __VA_ARGS__) \
-    MACRO(curve_id, has_curve, uint32_t, 0, ## __VA_ARGS__) \
-    MACRO(smooth, has_smooth, float, 0, ## __VA_ARGS__) \
-    MACRO(step, has_step, float, 0, ## __VA_ARGS__)
-
-#define SAMPLER_COLL_CHAIN_LIST_sampler_modulation(MACRO, ...) \
-    MACRO(modulations, modulation, ## __VA_ARGS__)
-
 static inline gboolean sampler_modulation_key_equal(const struct sampler_modulation_key *k1, const struct sampler_modulation_key *k2)
 {
     return (k1->src == k2->src && k1->src2 == k2->src2 && k1->dest == k2->dest);
@@ -56,8 +47,15 @@ static inline void sampler_modulation_dump_one(const struct sampler_modulation *
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define SAMPLER_COLL_LIST(MACRO) \
-    MACRO(sampler_modulation)
+static inline gboolean sampler_noteinitfunc_key_equal(const struct sampler_noteinitfunc_key *k1, const struct sampler_noteinitfunc_key *k2)
+{
+    return (k1->notefunc_voice == k2->notefunc_voice && k1->variant == k2->variant);
+}
+
+static inline void sampler_noteinitfunc_dump_one(const struct sampler_noteinitfunc *sm)
+{
+    printf("%p(%d) = %f\n", sm->key.notefunc_voice, sm->key.variant, sm->value.value);
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -264,90 +262,6 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_PROPAGATE_UNSET)
     }
 
 SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_CLONE)
-
-//////////////////////////////////////////////////////////////////////////////////////////////////
-
-void sampler_layer_data_add_nif(struct sampler_layer_data *l, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant, float param, gboolean propagating_defaults)
-{
-    assert(!(notefunc_voice && notefunc_prevoice));
-    GSList **list = notefunc_voice ? &l->voice_nifs : &l->prevoice_nifs;
-    GSList *p = *list;
-    while(p)
-    {
-        struct sampler_noteinitfunc *nif = p->data;
-        if (nif->notefunc_voice == notefunc_voice && nif->notefunc_prevoice == notefunc_prevoice && nif->variant == variant)
-        {
-            // do not overwrite locally set value with defaults
-            if (propagating_defaults && nif->has_value)
-                return;
-            nif->param = param;
-            nif->has_value = !propagating_defaults;
-            return;
-        }
-        p = g_slist_next(p);
-    }
-    struct sampler_noteinitfunc *nif = malloc(sizeof(struct sampler_noteinitfunc));
-    nif->notefunc_voice = notefunc_voice;
-    nif->notefunc_prevoice = notefunc_prevoice;
-    nif->variant = variant;
-    nif->param = param;
-    nif->has_value = !propagating_defaults;
-    *list = g_slist_prepend(*list, nif);
-}
-
-void sampler_layer_data_remove_nif(struct sampler_layer_data *l, struct sampler_layer_data *parent_data, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant, gboolean remove_propagated)
-{
-    assert(!(notefunc_voice && notefunc_prevoice));
-    GSList **list = notefunc_voice ? &l->voice_nifs : &l->prevoice_nifs;
-    GSList *p = *list;
-    while(p)
-    {
-        struct sampler_noteinitfunc *nif = p->data;
-        if (nif->notefunc_voice == notefunc_voice && nif->notefunc_prevoice == notefunc_prevoice && nif->variant == variant && nif->has_value == !remove_propagated)
-        {
-            if (!remove_propagated && parent_data) {
-                // Try to copy over from parent
-                GSList *q = notefunc_voice ? parent_data->voice_nifs : parent_data->prevoice_nifs;
-                while(q)
-                {
-                    struct sampler_noteinitfunc *pnif = q->data;
-                    if (pnif->notefunc_voice == notefunc_voice && pnif->notefunc_prevoice == notefunc_prevoice && pnif->variant == variant && pnif->has_value)
-                    {
-                        memcpy(nif, pnif, sizeof(*pnif));
-                        nif->has_value = FALSE;
-                        return;
-                    }
-                    q = g_slist_next(q);
-                }
-            }
-            *list = g_slist_delete_link(*list, p);
-            return;
-        }
-        p = g_slist_next(p);
-    }
-}
-
-void sampler_layer_add_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant, float param)
-{
-    sampler_layer_data_add_nif(&l->data, notefunc_voice, notefunc_prevoice, variant, param, FALSE);
-}
-
-void sampler_layer_remove_nif(struct sampler_layer *l, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant, gboolean remove_propagated)
-{
-    sampler_layer_data_remove_nif(&l->data, !remove_propagated && l->parent ? &l->parent->data : NULL, notefunc_voice, notefunc_prevoice, variant, remove_propagated);
-
-    if (l->child_layers) {
-        // Also recursively remove propagated copies from child layers, if any
-        GHashTableIter iter;
-        g_hash_table_iter_init(&iter, l->child_layers);
-        gpointer lkey, lvalue;
-        while(g_hash_table_iter_next(&iter, &lkey, &lvalue))
-        {
-            struct sampler_layer *child = lvalue;
-            sampler_layer_remove_nif(child, notefunc_voice, notefunc_prevoice, variant, TRUE);
-        }
-    }
-}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -771,21 +685,21 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
             return TRUE;
         case slpt_voice_nif:
             VERIFY_FLOAT_VALUE;
-            sampler_layer_add_nif(l, e->extra_ptr, NULL, e->extra_int, fvalue);
+            sampler_layer_set_voice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = e->extra_int }, fvalue);
             return TRUE;
         case slpt_prevoice_nif:
             VERIFY_FLOAT_VALUE;
-            sampler_layer_add_nif(l, NULL, e->extra_ptr, e->extra_int, fvalue);
+            sampler_layer_set_prevoice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = e->extra_int }, fvalue);
             return TRUE;
         case slpt_voice_cc_nif:
             VERIFY_FLOAT_VALUE;
             cc = args[0];
-            sampler_layer_add_nif(l, e->extra_ptr, NULL, cc + (e->extra_int << 8), fvalue);
+            sampler_layer_set_voice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, fvalue);
             return TRUE;
         case slpt_prevoice_cc_nif:
             VERIFY_FLOAT_VALUE;
             cc = args[0];
-            sampler_layer_add_nif(l, NULL, e->extra_ptr, cc + (e->extra_int << 8), fvalue);
+            sampler_layer_set_prevoice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, fvalue);
             return TRUE;
         case slpt_reserved:
         case slpt_invalid:
@@ -905,18 +819,18 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             sampler_layer_unset_modulation_amount(l, &(struct sampler_modulation_key){(e->extra_int >> 8) & 0xFFF, (e->extra_int >> 20), (e->extra_int & 0xFF)}, TRUE);
             return TRUE;
         case slpt_voice_nif:
-            sampler_layer_remove_nif(l, e->extra_ptr, NULL, e->extra_int, FALSE);
+            sampler_layer_unset_voice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = e->extra_int }, TRUE);
             return TRUE;
         case slpt_prevoice_nif:
-            sampler_layer_remove_nif(l, NULL, e->extra_ptr, e->extra_int, FALSE);
+            sampler_layer_unset_prevoice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = e->extra_int }, TRUE);
             return TRUE;
         case slpt_voice_cc_nif:
             cc = args[0];
-            sampler_layer_remove_nif(l, e->extra_ptr, NULL, cc + (e->extra_int << 8), FALSE);
+            sampler_layer_unset_voice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
             return TRUE;
         case slpt_prevoice_cc_nif:
             cc = args[0];
-            sampler_layer_remove_nif(l, NULL, e->extra_ptr, cc + (e->extra_int << 8), FALSE);
+            sampler_layer_unset_prevoice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
             return TRUE;
         case slpt_generic_modulation:
             sampler_layer_unset_modulation_amount(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, TRUE);
@@ -1223,26 +1137,12 @@ void sampler_cc_range_clone(struct sampler_cc_range **dest, struct sampler_cc_ra
     }
 }
 
-static GSList *clone_nifs(GSList *nifs, gboolean copy_hasattr)
-{
-    nifs = g_slist_copy(nifs);
-    for(GSList *nif = nifs; nif; nif = nif->next)
-    {
-        struct sampler_noteinitfunc *dstn = g_malloc(sizeof(struct sampler_noteinitfunc));
-        struct sampler_noteinitfunc *srcn = nif->data;
-        memcpy(dstn, srcn, sizeof(struct sampler_noteinitfunc));
-        dstn->has_value = copy_hasattr ? srcn->has_value : FALSE;
-        nif->data = dstn;
-    }
-    return nifs;
-}
-
 void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampler_layer_data *src, gboolean copy_hasattr)
 {
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_CLONE)
     dst->modulations = sampler_modulation_clone(src->modulations, copy_hasattr);
-    dst->voice_nifs = clone_nifs(src->voice_nifs, copy_hasattr);
-    dst->prevoice_nifs = clone_nifs(src->prevoice_nifs, copy_hasattr);
+    dst->voice_nifs = sampler_noteinitfunc_clone(src->voice_nifs, copy_hasattr);
+    dst->prevoice_nifs = sampler_noteinitfunc_clone(src->prevoice_nifs, copy_hasattr);
     dst->eff_waveform = src->eff_waveform;
     if (dst->eff_waveform)
         cbox_waveform_ref(dst->eff_waveform);
@@ -1303,21 +1203,8 @@ void sampler_cc_range_cloneparent(struct sampler_cc_range **dest, struct sampler
 static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct sampler_layer_data *parent)
 {
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_CLONEPARENT)
-    // XXXKF: add handling for velcurve
-    if (parent)
-    {
-        // set NIFs used by parent
-        for(GSList *mod = parent->voice_nifs; mod; mod = mod->next)
-        {
-            struct sampler_noteinitfunc *nif = mod->data;
-            sampler_layer_data_add_nif(l, nif->notefunc_voice, nif->notefunc_prevoice, nif->variant, nif->param, TRUE);
-        }
-        for(GSList *mod = parent->prevoice_nifs; mod; mod = mod->next)
-        {
-            struct sampler_noteinitfunc *nif = mod->data;
-            sampler_layer_data_add_nif(l, nif->notefunc_voice, nif->notefunc_prevoice, nif->variant, nif->param, TRUE);
-        }
-    }
+    // XXXKF: add handling for velcurve (XXXKF comment out of date - this is
+    // already done in PROC_FIELDS_CLONEPARENT_midicurve, I believe)
 }
 
 void sampler_midi_curve_init(struct sampler_midi_curve *curve)
@@ -1708,41 +1595,41 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     for(GSList *nif = l->voice_nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;
-        if (!nd->has_value && !show_inherited)
+        if (!nd->value.has_value && !show_inherited)
             continue;
         #define PROC_ENVSTAGE_NAME(name, index, def_value) #name, 
         static const char *env_stages[] = { DAHDSR_FIELDS(PROC_ENVSTAGE_NAME) "start" };
-        int v = nd->variant;
-        g_ascii_dtostr(floatbuf, floatbufsize, nd->param);
+        uint32_t v = nd->key.variant;
+        g_ascii_dtostr(floatbuf, floatbufsize, nd->value.value);
         
-        if (nd->notefunc_voice == sampler_nif_addrandom && v >= 0 && v <= 2)
-            g_string_append_printf(outstr, " %s_random=%s", addrandom_variants[nd->variant], floatbuf);
-        else if (nd->notefunc_voice == sampler_nif_vel2pitch)
+        if (nd->key.notefunc_voice == sampler_nif_addrandom && v >= 0 && v <= 2)
+            g_string_append_printf(outstr, " %s_random=%s", addrandom_variants[v], floatbuf);
+        else if (nd->key.notefunc_voice == sampler_nif_vel2pitch)
             g_string_append_printf(outstr, " pitch_veltrack=%s", floatbuf);
-        else if (nd->notefunc_voice == sampler_nif_vel2reloffset)
+        else if (nd->key.notefunc_voice == sampler_nif_vel2reloffset)
             g_string_append_printf(outstr, " reloffset_veltrack=%s", floatbuf);
-        else if (nd->notefunc_voice == sampler_nif_cc2reloffset)
-            g_string_append_printf(outstr, " reloffset_cc%d=%s", nd->variant, floatbuf);
-        else if (nd->notefunc_voice == sampler_nif_vel2offset)
+        else if (nd->key.notefunc_voice == sampler_nif_cc2reloffset)
+            g_string_append_printf(outstr, " reloffset_cc%d=%s", v, floatbuf);
+        else if (nd->key.notefunc_voice == sampler_nif_vel2offset)
             g_string_append_printf(outstr, " offset_veltrack=%s", floatbuf);
-        else if (nd->notefunc_voice == sampler_nif_cc2offset)
-            g_string_append_printf(outstr, " offset_cc%d=%s", nd->variant, floatbuf);
-        else if (nd->notefunc_voice == sampler_nif_vel2env && (v & 15) >= snif_env_delay && (v & 15) <= snif_env_start && ((v >> 4) & 3) < 3)
-            g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[nd->variant >> 4], env_stages[1 + (v & 15)], floatbuf);
+        else if (nd->key.notefunc_voice == sampler_nif_cc2offset)
+            g_string_append_printf(outstr, " offset_cc%d=%s", v, floatbuf);
+        else if (nd->key.notefunc_voice == sampler_nif_vel2env && (v & 15) >= snif_env_delay && (v & 15) <= snif_env_start && ((v >> 4) & 3) < 3)
+            g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[v >> 4], env_stages[1 + (v & 15)], floatbuf);
         else
             assert(0); // unknown NIF
     }
     for(GSList *nif = l->prevoice_nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;
-        if (!nd->has_value && !show_inherited)
+        if (!nd->value.has_value && !show_inherited)
             continue;
-        int v = nd->variant;
-        g_ascii_dtostr(floatbuf, floatbufsize, nd->param);
+        int v = nd->key.variant;
+        g_ascii_dtostr(floatbuf, floatbufsize, nd->value.value);
 
-        if (nd->notefunc_prevoice == sampler_nif_cc2delay)
+        if (nd->key.notefunc_prevoice == sampler_nif_cc2delay)
             g_string_append_printf(outstr, " delay_cc%d=%s", v, floatbuf);
-        else if (nd->notefunc_prevoice == sampler_nif_addrandomdelay)
+        else if (nd->key.notefunc_prevoice == sampler_nif_addrandomdelay)
             g_string_append_printf(outstr, " delay_random=%s", floatbuf);
         else
             assert(0); // unknown NIF

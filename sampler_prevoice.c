@@ -24,7 +24,7 @@ void sampler_prevoice_start(struct sampler_prevoice *pv, struct sampler_channel 
     while(nif)
     {
         struct sampler_noteinitfunc *p = nif->data;
-        p->notefunc_prevoice(p, pv);
+        p->key.notefunc_prevoice(p, pv);
         nif = nif->next;
     }
     sampler_prevoice_unlink(&channel->module->prevoices_free, pv);
