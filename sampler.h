@@ -335,10 +335,10 @@ static inline float sampler_program_get_curve_value(struct sampler_program *prog
 static inline float sampler_channel_getcc_mod(struct sampler_channel *c, struct sampler_voice *v, int cc_no, struct sampler_modulation *sm)
 {
     float val = (cc_no < 128) ? c->floatcc[cc_no] : sampler_channel_get_expensive_cc(c, v, NULL, cc_no);
-    if (sm->step)
-        val = floorf(0.9999f * val * (sm->step + 1)) / sm->step;
-    if (sm->curve_id || c->program->interpolated_curves[0])
-        val = sampler_program_get_curve_value(c->program, sm->curve_id, val);
+    if (sm->value.step)
+        val = floorf(0.9999f * val * (sm->value.step + 1)) / sm->value.step;
+    if (sm->value.curve_id || c->program->interpolated_curves[0])
+        val = sampler_program_get_curve_value(c->program, sm->value.curve_id, val);
     return val;
 }
 

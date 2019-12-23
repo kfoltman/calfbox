@@ -241,11 +241,15 @@ enum sampler_moddest
     smdest_eg_stage_end = 0xAF,
 };
 
-struct sampler_modulation
+struct sampler_modulation_key
 {
     enum sampler_modsrc src;
     enum sampler_modsrc src2;
     enum sampler_moddest dest;
+};
+
+struct sampler_modulation_value
+{
     float amount;
     float smooth;
     float step;
@@ -254,6 +258,12 @@ struct sampler_modulation
     unsigned int has_curve:1;
     unsigned int has_smooth:1;
     unsigned int has_step:1;
+};
+
+struct sampler_modulation
+{
+    struct sampler_modulation_key key;
+    struct sampler_modulation_value value;
 };
 
 typedef void (*SamplerNoteInitFunc)(struct sampler_noteinitfunc *nif, struct sampler_voice *voice);
@@ -549,6 +559,8 @@ struct sampler_layer_data
     gboolean eff_use_simple_trigger_logic:1;
     gboolean eff_use_xfcc:1;
     gboolean eff_use_prevoice:1;
+    gboolean eff_use_channel_mixer:1;
+    gboolean eff_use_filter_mods:1;
     gboolean eff_is_silent:1;
     enum sampler_loop_mode eff_loop_mode;
     struct cbox_waveform *eff_waveform;

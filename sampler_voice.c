@@ -551,6 +551,41 @@ static inline void sampler_filter_process_audio(struct sampler_filter *f, int nu
         cbox_biquadf_process_stereo(&f->filter_left[i], &f->filter_right[i], i ? f->second_filter : &f->filter_coeffs, leftright);
 }
 
+static inline void do_channel_mixing(float *leftright, uint32_t numsamples, float position, float width)
+{
+    float crossmix = (100.0 - width) * 0.005f;
+    float amtleft = position > 0 ? 1 - 0.01 * position : 1;
+    float amtright = position < 0 ? 1 - 0.01 * -position : 1;
+    if (amtleft < 0)
+        amtleft = 0;
+    if (amtright < 0)
+        amtright = 0;
+    for (uint32_t i = 0; i < 2 * numsamples; i += 2) {
+        float left = leftright[i], right = leftright[i + 1];
+        float newleft = left + crossmix * (right - left);
+        float newright = right + crossmix * (left - right);
+        leftright[i] = newleft * amtleft;
+        leftright[i + 1] = newright * amtright;
+    }
+}
+
+static inline uint32_t sampler_gen_sample_playback_with_pipe(struct sampler_gen *gen, float *leftright, struct cbox_prefetch_pipe *current_pipe)
+{
+    if (!current_pipe)
+        return sampler_gen_sample_playback(gen, leftright, (uint32_t)-1);
+
+    uint32_t limit = cbox_prefetch_pipe_get_remaining(current_pipe);
+    if (limit <= 4)
+    {
+        gen->mode = spt_inactive;
+        return 0;
+    }
+    uint32_t samples = sampler_gen_sample_playback(gen, leftright, limit - 4);
+    cbox_prefetch_pipe_consumed(current_pipe, gen->consumed);
+    gen->consumed = 0;
+    return samples;
+}
+
 static const float gain_for_num_stages[] = { 1, 1, 0.5, 0.33f };
 
 void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs)
@@ -580,14 +615,14 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         {
             // Simplified modulations for EG stages (CCs only)
             struct sampler_modulation *sm = mod->data;
-            if (sm->dest >= smdest_eg_stage_start && sm->dest <= smdest_eg_stage_end)
+            if (sm->key.dest >= smdest_eg_stage_start && sm->key.dest <= smdest_eg_stage_end)
             {
                 float value = 0.f;
-                if (sm->src < smsrc_pernote_offset)
-                    value = sampler_channel_getcc_mod(c, v, sm->src, sm);
-                uint32_t param = sm->dest - smdest_eg_stage_start;
-                if (value * sm->amount != 0)
-                    cbox_envelope_modify_dahdsr(&v->cc_envs[(param >> 4)], param & 0x0F, value * sm->amount, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
+                if (sm->key.src < smsrc_pernote_offset)
+                    value = sampler_channel_getcc_mod(c, v, sm->key.src, sm);
+                uint32_t param = sm->key.dest - smdest_eg_stage_start;
+                if (value * sm->value.amount != 0)
+                    cbox_envelope_modify_dahdsr(&v->cc_envs[(param >> 4)], param & 0x0F, value * sm->value.amount, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
             }
             mod = g_slist_next(mod);
         }
@@ -640,11 +675,11 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     modsrcs[smsrc_chanaft - smsrc_pernote_offset] = c->last_chanaft * (1.f / 127.f);
     modsrcs[smsrc_polyaft - smsrc_pernote_offset] = sampler_channel_get_poly_pressure(c, v->note);
     modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->pitch_env, pitcheg_shape) * 0.01f;
-    modsrcs[smsrc_filenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->filter_env, fileg_shape) * 0.01f;
+    modsrcs[smsrc_filenv - smsrc_pernote_offset] = l->eff_use_filter_mods ? cbox_envelope_get_value(&v->filter_env, fileg_shape) * 0.01f : 0;
     modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->amp_env, ampeg_shape) * 0.01f;
 
     modsrcs[smsrc_amplfo - smsrc_pernote_offset] = lfo_run(&v->amp_lfo);
-    modsrcs[smsrc_fillfo - smsrc_pernote_offset] = lfo_run(&v->filter_lfo);
+    modsrcs[smsrc_fillfo - smsrc_pernote_offset] = l->eff_use_filter_mods ? lfo_run(&v->filter_lfo) : 0;
     modsrcs[smsrc_pitchlfo - smsrc_pernote_offset] = lfo_run(&v->pitch_lfo);
 
     float moddests[smdestcount];
@@ -685,45 +720,49 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     while(mod)
     {
         struct sampler_modulation *sm = mod->data;
+        enum sampler_modsrc src = sm->key.src;
+        enum sampler_modsrc src2 = sm->key.src2;
+        enum sampler_moddest dest = sm->key.dest;
         float value = 0.f, value2 = 1.f;
-        if (sm->src < smsrc_pernote_offset)
-            value = sampler_channel_getcc_mod(c, v, sm->src, sm);
+        if (src < smsrc_pernote_offset)
+            value = sampler_channel_getcc_mod(c, v, src, sm);
         else
-            value = modsrcs[sm->src - smsrc_pernote_offset];
+            value = modsrcs[src - smsrc_pernote_offset];
 
-        if (sm->src2 != smsrc_none)
+        if (src2 != smsrc_none)
         {
-            if (sm->src2 < smsrc_pernote_offset)
-                value2 = sampler_channel_getcc_mod(c, v, sm->src2, sm);
+            if (src2 < smsrc_pernote_offset)
+                value2 = sampler_channel_getcc_mod(c, v, src2, sm);
             else
-                value2 = modsrcs[sm->src2 - smsrc_pernote_offset];
+                value2 = modsrcs[src2 - smsrc_pernote_offset];
             
             value *= value2;
         }
-        if (sm->dest < 32)
+        if (dest < 32)
         {
-            if (sm->dest == smdest_amplitude)
+            if (dest == smdest_amplitude)
             {
-                if (!(modmask & (1 << sm->dest))) // first value
+                if (!(modmask & (1 << dest))) // first value
                 {
-                    moddests[sm->dest] = value * sm->amount;
-                    modmask |= (1 << sm->dest);
+                    moddests[dest] = value * sm->value.amount;
+                    modmask |= (1 << dest);
                 }
                 else
-                    moddests[sm->dest] *= value * sm->amount;
+                    moddests[dest] *= value * sm->value.amount;
             }
-            else if (!(modmask & (1 << sm->dest))) // first value
+            else if (!(modmask & (1 << dest))) // first value
             {
-                moddests[sm->dest] = value * sm->amount;
-                modmask |= (1 << sm->dest);
+                moddests[dest] = value * sm->value.amount;
+                modmask |= (1 << dest);
             }
             else
-                moddests[sm->dest] += value * sm->amount;
+                moddests[dest] += value * sm->value.amount;
         }
         mod = g_slist_next(mod);
     }
     lfo_update_xdelta(m, &v->pitch_lfo, modmask, smdest_pitchlfo_freq, moddests);
-    lfo_update_xdelta(m, &v->filter_lfo, modmask, smdest_fillfo_freq, moddests);
+    if (l->eff_use_filter_mods)
+        lfo_update_xdelta(m, &v->filter_lfo, modmask, smdest_fillfo_freq, moddests);
     lfo_update_xdelta(m, &v->amp_lfo, modmask, smdest_amplfo_freq, moddests);
     recalc_eq_mask |= modmask;
 
@@ -747,7 +786,8 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         RECALC_EQ_IF(3)
     }
     cbox_envelope_advance(&v->pitch_env, v->released, pitcheg_shape);
-    cbox_envelope_advance(&v->filter_env, v->released, fileg_shape);
+    if (l->eff_use_filter_mods)
+        cbox_envelope_advance(&v->filter_env, v->released, fileg_shape);
     cbox_envelope_advance(&v->amp_env, v->released, ampeg_shape);
     if (__builtin_expect(v->amp_env.cur_stage < 0, 0))
     {
@@ -917,44 +957,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         else
             cbox_onepolef_set_highshelf_setgain(&v->onepole_coeffs, 1.0);
     }
-    
+
+    // Audio processing starts here
     float leftright[2 * CBOX_BLOCK_SIZE];
         
-    uint32_t samples = 0;
-
-    if (v->current_pipe)
-    {
-        uint32_t limit = cbox_prefetch_pipe_get_remaining(v->current_pipe);
-        if (limit <= 4)
-            v->gen.mode = spt_inactive;
-        else
-        {
-            samples = sampler_gen_sample_playback(&v->gen, leftright, limit - 4);
-            cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.consumed);
-            v->gen.consumed = 0;
-        }
-    }
-    else
-    {
-        samples = sampler_gen_sample_playback(&v->gen, leftright, (uint32_t)-1);
-    }
-
-    if (l->position != 0 || l->width != 100) {
-        float crossmix = (100.0 - l->width) * 0.005f;
-        float amtleft = l->position > 0 ? 1 - 0.01 * l->position : 1;
-        float amtright = l->position < 0 ? 1 - 0.01 * -l->position : 1;
-        if (amtleft < 0)
-            amtleft = 0;
-        if (amtright < 0)
-            amtright = 0;
-        for (uint32_t i = 0; i < 2 * samples; i += 2) {
-            float left = leftright[i], right = leftright[i + 1];
-            float newleft = left + crossmix * (right - left);
-            float newright = right + crossmix * (left - right);
-            leftright[i] = newleft * amtleft;
-            leftright[i + 1] = newright * amtright;
-        }
-    }
+    uint32_t samples = sampler_gen_sample_playback_with_pipe(&v->gen, leftright, v->current_pipe);
+    if (l->eff_use_channel_mixer)
+        do_channel_mixing(leftright, samples, l->position, l->width);
     for (int i = 2 * samples; i < 2 * CBOX_BLOCK_SIZE; i++)
         leftright[i] = 0.f;
 
