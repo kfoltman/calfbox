@@ -35,199 +35,237 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <locale.h>
 
-void sampler_layer_data_dump_modulations(struct sampler_layer_data *l)
+#define SAMPLER_COLL_FIELD_LIST_sampler_modulation(MACRO, ...) \
+    MACRO(amount, has_amount, float, 0, ## __VA_ARGS__) \
+    MACRO(curve_id, has_curve, uint32_t, 0, ## __VA_ARGS__) \
+    MACRO(smooth, has_smooth, float, 0, ## __VA_ARGS__) \
+    MACRO(step, has_step, float, 0, ## __VA_ARGS__)
+
+#define SAMPLER_COLL_CHAIN_LIST_sampler_modulation(MACRO, ...) \
+    MACRO(modulations, modulation, ## __VA_ARGS__)
+
+static inline gboolean sampler_modulation_key_equal(const struct sampler_modulation_key *k1, const struct sampler_modulation_key *k2)
 {
-    GSList *p = l->modulations;
-    while(p)
-    {
-        struct sampler_modulation *sm = p->data;
-        printf("%d x %d -> %d : %f : %d\n", sm->key.src, sm->key.src2, sm->key.dest, sm->value.amount, sm->value.curve_id);
-        p = g_slist_next(p);
-    }
+    return (k1->src == k2->src && k1->src2 == k2->src2 && k1->dest == k2->dest);
 }
 
-static struct sampler_modulation *sampler_layer_data_find_modulation(struct sampler_layer_data *l, const struct sampler_modulation_key *key, GSList **link_ptr)
+static inline void sampler_modulation_dump_one(const struct sampler_modulation *sm)
 {
-    GSList *p = l->modulations;
-    while(p)
-    {
-        struct sampler_modulation *sm = p->data;
-        struct sampler_modulation_key *sk = &sm->key;
-        if (sk->src == key->src && sk->src2 == key->src2 && sk->dest == key->dest)
-        {
-            if (link_ptr)
-                *link_ptr = p;
-            return sm;
-        }
-        p = g_slist_next(p);
-    }
-    return NULL;
+    printf("%d x %d -> %d : %f : %d\n", sm->key.src, sm->key.src2, sm->key.dest, sm->value.amount, sm->value.curve_id);
 }
 
-static struct sampler_modulation *sampler_layer_data_add_modulation(struct sampler_layer_data *l, const struct sampler_modulation_key *key)
-{
-    struct sampler_modulation *sm = sampler_layer_data_find_modulation(l, key, NULL);
-    if (sm)
-        return sm;
-    sm = g_malloc0(sizeof(struct sampler_modulation));
-    sm->key = *key;
-    sm->value.amount = 0;
-    sm->value.curve_id = 0;
-    sm->value.smooth = 0;
-    sm->value.step = 0;
-    sm->value.has_amount = FALSE;
-    sm->value.has_curve = FALSE;
-    sm->value.has_smooth = FALSE;
-    sm->value.has_step = FALSE;
-    l->modulations = g_slist_prepend(l->modulations, sm);
-    return sm;
-}
+//////////////////////////////////////////////////////////////////////////////////////////////////
 
-static inline gboolean is_null_modulation(const struct sampler_modulation_value *sm)
-{
-    return !sm->amount && !sm->curve_id && !sm->smooth && !sm->step &&
-        !sm->has_amount && !sm->has_curve && !sm->has_smooth && !sm->has_step;
-}
+#define SAMPLER_COLL_LIST(MACRO) \
+    MACRO(sampler_modulation)
 
-static inline gboolean is_null_values_modulation(const struct sampler_modulation_value *sm)
-{
-    return !sm->amount && !sm->curve_id && !sm->smooth && !sm->step;
-}
+//////////////////////////////////////////////////////////////////////////////////////////////////
 
-void sampler_layer_propagate_modulation(struct sampler_layer *l, const struct sampler_modulation *srcm, gboolean starting)
-{
-    if (!starting)
-    {
-        struct sampler_modulation *dstm = sampler_layer_data_add_modulation(&l->data, &srcm->key);
-        if (!dstm->value.has_amount)
-            dstm->value.amount = srcm->value.amount;
-        if (!dstm->value.has_curve)
-            dstm->value.curve_id = srcm->value.curve_id;
-        if (!dstm->value.has_smooth)
-            dstm->value.smooth = srcm->value.smooth;
-        if (!dstm->value.has_step)
-            dstm->value.step = srcm->value.step;
+#define SAMPLER_COLL_FUNC_DUMP(sname) \
+    void sname##_dump(const GSList *p) \
+    { \
+        while(p) \
+        { \
+            const struct sname *d = p->data; \
+            sname##_dump_one(d); \
+            p = g_slist_next(p); \
+        } \
     }
 
-    if (l->child_layers) {
-        GHashTableIter iter;
-        g_hash_table_iter_init(&iter, l->child_layers);
-        gpointer key, value;
-        while(g_hash_table_iter_next(&iter, &key, &value))
-        {
-            struct sampler_layer *child = value;
-            sampler_layer_propagate_modulation(child, srcm, FALSE);
-        }
+SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_DUMP)
+
+#define SAMPLER_COLL_FUNC_FIND(sname) \
+    static struct sname *sname##_find(GSList *list, const struct sname##_key *key, GSList **link_ptr) \
+    { \
+        GSList *p = list; \
+        while(p) \
+        { \
+            struct sname *d = p->data; \
+            struct sname##_key *dkey = &d->key; \
+            if (sname##_key_equal(dkey, key)) \
+            { \
+                if (link_ptr) \
+                    *link_ptr = p; \
+                return d; \
+            } \
+            p = g_slist_next(p); \
+        } \
+        return NULL; \
     }
+
+SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_FIND)
+
+#define SAMPLER_COLL_FIELD_INIT(name, has_name, type, init_value) \
+    d->value.name = init_value; \
+    d->value.has_name = FALSE;
+
+#define SAMPLER_COLL_FUNC_ADD(sname) \
+static struct sname *sname##_add(GSList **list_ptr, const struct sampler_modulation_key *key) \
+{ \
+    struct sname *d = sname##_find(*list_ptr, key, NULL); \
+    if (d) \
+        return d; \
+    d = g_malloc0(sizeof(struct sname)); \
+    d->key = *key; \
+    SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_INIT)\
+    *list_ptr = g_slist_prepend(*list_ptr, d); \
+    return d; \
 }
 
-void sampler_layer_set_modulation_amount(struct sampler_layer *l, const struct sampler_modulation_key *key, float amount)
-{
-    struct sampler_modulation *dstm = sampler_layer_data_add_modulation(&l->data, key);
-    dstm->value.has_amount = TRUE;
-    dstm->value.amount = amount;
-    sampler_layer_propagate_modulation(l, dstm, TRUE);
-}
+SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_ADD)
 
-void sampler_layer_set_modulation_curve(struct sampler_layer *l, const struct sampler_modulation_key *key, int curve)
-{
-    struct sampler_modulation *dstm = sampler_layer_data_add_modulation(&l->data, key);
-    dstm->value.has_curve = TRUE;
-    dstm->value.curve_id = curve;
-    sampler_layer_propagate_modulation(l, dstm, TRUE);
-}
-
-void sampler_layer_set_modulation_smooth(struct sampler_layer *l, const struct sampler_modulation_key *key, float amount)
-{
-    struct sampler_modulation *dstm = sampler_layer_data_add_modulation(&l->data, key);
-    dstm->value.has_smooth = TRUE;
-    dstm->value.smooth = amount;
-    sampler_layer_propagate_modulation(l, dstm, TRUE);
-}
-
-void sampler_layer_set_modulation_step(struct sampler_layer *l, const struct sampler_modulation_key *key, float amount)
-{
-    struct sampler_modulation *dstm = sampler_layer_data_add_modulation(&l->data, key);
-    dstm->value.has_step = TRUE;
-    dstm->value.step = amount;
-    sampler_layer_propagate_modulation(l, dstm, TRUE);
-}
-
-static gboolean sampler_layer_data_unset_modulation(struct sampler_layer_data *l, struct sampler_layer_data *parent_data, const struct sampler_modulation_key *key, gboolean remove_local, gboolean unset_amount, gboolean unset_curve, gboolean unset_smooth, gboolean unset_step)
-{
-    GSList *link = NULL;
-    struct sampler_modulation *sm = sampler_layer_data_find_modulation(l, key, &link);
-    if (!sm)
+#define SAMPLER_COLL_FIELD_ISNULL(name, has_name, type, init_value) \
+    if (d->name != init_value || d->has_name) \
         return FALSE;
-    struct sampler_modulation *psm = remove_local && parent_data != NULL ? sampler_layer_data_find_modulation(parent_data, key, NULL) : NULL;
-    if (unset_amount && sm->value.has_amount == remove_local)
-    {
-        sm->value.amount = psm ? psm->value.amount : 0;
-        if (remove_local)
-            sm->value.has_amount = FALSE;
+#define SAMPLER_COLL_FIELD_ISNULLVALUE(name, has_name, type, init_value) \
+    if (d->name != init_value) \
+        return FALSE;
+
+#define SAMPLER_COLL_FUNC_ISNULL(sname) \
+    static inline gboolean sname##_is_null(const struct sname##_value *d) \
+    { \
+        SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_ISNULL) \
+        return TRUE; \
+    } \
+    static inline gboolean sname##_is_null_value(const struct sname##_value *d) \
+    { \
+        SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_ISNULLVALUE) \
+        return TRUE; \
     }
-    if (unset_curve && sm->value.has_curve == remove_local)
-    {
-        sm->value.curve_id = psm ? psm->value.curve_id : 0;
-        if (remove_local)
-            sm->value.has_curve = FALSE;
+
+SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_ISNULL)
+
+#define SAMPLER_COLL_FIELD_PROPAGATE(name, has_name, type, init_value) \
+    if (!dstm->value.has_name && dstm->value.name != srcm->value.name) \
+    { \
+        dstm->value.name = srcm->value.name;\
+        changed = TRUE; \
     }
-    if (unset_smooth && sm->value.has_smooth == remove_local)
-    {
-        sm->value.smooth = psm ? psm->value.smooth : 0;
-        if (remove_local)
-            sm->value.has_smooth = FALSE;
+
+// sampler_layer_set_modulation_amount etc.
+#define SAMPLER_COLL_FIELD_SETTER(name, has_name, type, init_value, sname, cname, cfname) \
+    void sampler_layer_set_##cname##_##name(struct sampler_layer *l, const struct sname##_key *key, type value) \
+    { \
+        struct sname *dstm = sname##_add(&l->data.cfname, key); \
+        dstm->value.has_name = TRUE; \
+        dstm->value.name = value; \
+        sname##_propagate_set(l, offsetof(struct sampler_layer_data, cfname), dstm, TRUE); \
     }
-    if (unset_step && sm->value.has_step == remove_local)
-    {
-        sm->value.step = psm ? psm->value.step : 0;
-        if (remove_local)
-            sm->value.has_step = FALSE;
+
+#define SAMPLER_COLL_CHAIN_SETTERS(cfname, cname, sname) \
+    SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_SETTER, sname, cname, cfname)
+
+#define SAMPLER_COLL_FUNC_PROPAGATE_SET(sname) \
+    void sname##_propagate_set(struct sampler_layer *l, uint32_t offset, const struct sampler_modulation *srcm, gboolean starting) \
+    { \
+        if (!starting) \
+        { \
+            void *vl = &l->data; \
+            GSList **l = (vl + offset); \
+            gboolean changed = FALSE; \
+            struct sampler_modulation *dstm = sname##_add(l, &srcm->key); \
+            SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_PROPAGATE) \
+            if (!changed) \
+                return; \
+        } \
+        if (l->child_layers) { \
+            /* Propagate to children */ \
+            GHashTableIter iter; \
+            g_hash_table_iter_init(&iter, l->child_layers); \
+            gpointer key, value; \
+            while(g_hash_table_iter_next(&iter, &key, &value)) \
+            { \
+                struct sampler_layer *child = value; \
+                sname##_propagate_set(child, offset, srcm, FALSE); \
+            } \
+        } \
+    } \
+    SAMPLER_COLL_CHAIN_LIST_##sname(SAMPLER_COLL_CHAIN_SETTERS, sname)
+
+SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_PROPAGATE_SET)
+
+#define SAMPLER_COLL_FIELD_UNSET(name, has_name, type, init_value, sname) \
+    if ((unset_mask & (1 << sname##_key_field_##name)) && d->value.has_name == remove_local) \
+    { \
+        d->value.name = parent ? parent->value.name : init_value; \
+        if (remove_local) \
+            d->value.has_name = FALSE; \
+    } \
+
+#define SAMPLER_COLL_FIELD_KEY_ENUM_VALUE(name, has_name, type, init_value, sname) \
+    sname##_key_field_##name,
+
+#define SAMPLER_COLL_FIELD_UNSETTER(name, has_name, type, init_value, sname, cname, cfname) \
+    void sampler_layer_unset_##cname##_##name(struct sampler_layer *l, const struct sname##_key *key, gboolean remove_local) \
+    { \
+        sname##_propagate_unset(l, offsetof(struct sampler_layer_data, cfname), key, remove_local, 1 << sname##_key_field_##name); \
     }
-    // Delete if it's all default values and it's not overriding anything
-    if (is_null_modulation(&sm->value))
-        l->modulations = g_slist_delete_link(l->modulations, link);
+#define SAMPLER_COLL_CHAIN_UNSETTERS(cfname, cname, sname) \
+    SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_UNSETTER, sname, cname, cfname)
 
-    return TRUE;
-}
+#define SAMPLER_COLL_FUNC_PROPAGATE_UNSET(sname) \
+    enum {  \
+        SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_KEY_ENUM_VALUE, sname) \
+    }; \
+    static gboolean sname##_unset(GSList **list_ptr, GSList *parent_list, const struct sname##_key *key, gboolean remove_local, uint32_t unset_mask) \
+    { \
+        GSList *link = NULL; \
+        struct sname *d = sname##_find(*list_ptr, key, &link); \
+        if (!d) \
+            return FALSE; \
+        struct sname *parent = remove_local && parent_list != NULL ? sname##_find(parent_list, key, NULL) : NULL; \
+        SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_UNSET, sname) \
+        /* Delete if it's all default values and it's not overriding anything */ \
+        if (sname##_is_null(&d->value)) \
+            *list_ptr = g_slist_delete_link(*list_ptr, link); \
+        return TRUE; \
+    } \
+    static void sname##_propagate_unset(struct sampler_layer *l, uint32_t offset, const struct sname##_key *key, gboolean remove_local, uint32_t unset_mask) \
+    { \
+        void *vl = &l->data, *vp = l->parent ? &l->parent->data : NULL; \
+        GSList **list_ptr = vl + offset; \
+        GSList **parent_list_ptr = vp ? vp + offset : NULL; \
+        if (!sname##_unset(list_ptr, *parent_list_ptr, key, remove_local, unset_mask)) \
+            return; \
+        \
+        if (l->child_layers) { \
+            /* Also recursively remove propagated copies from child layers, if any */ \
+            GHashTableIter iter; \
+            g_hash_table_iter_init(&iter, l->child_layers); \
+            gpointer lkey, lvalue; \
+            while(g_hash_table_iter_next(&iter, &lkey, &lvalue)) \
+            { \
+                struct sampler_layer *child = lvalue; \
+                sname##_propagate_unset(child, offset, key, FALSE, unset_mask); \
+            } \
+        } \
+    } \
+    SAMPLER_COLL_CHAIN_LIST_##sname(SAMPLER_COLL_CHAIN_UNSETTERS, sname)
 
-static void sampler_layer_unset_modulation(struct sampler_layer*l, const struct sampler_modulation_key *key, gboolean remove_local, gboolean unset_amount, gboolean unset_curve, gboolean unset_smooth, gboolean unset_step)
-{
-    if (!sampler_layer_data_unset_modulation(&l->data, l->parent ? &l->parent->data : NULL, key, remove_local, unset_amount, unset_curve, unset_smooth, unset_step))
-        return;
+SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_PROPAGATE_UNSET)
 
-    if (l->child_layers) {
-        // Also recursively remove propagated copies from child layers, if any
-        GHashTableIter iter;
-        g_hash_table_iter_init(&iter, l->child_layers);
-        gpointer lkey, lvalue;
-        while(g_hash_table_iter_next(&iter, &lkey, &lvalue))
-        {
-            struct sampler_layer *child = lvalue;
-            sampler_layer_unset_modulation(child, key, FALSE, unset_amount, unset_curve, unset_smooth, unset_step);
-        }
+#define SAMPLER_COLL_FIELD_ZEROHASATTR(name, has_name, type, init_value) \
+    dstv->value.has_name = FALSE;
+#define SAMPLER_COLL_FUNC_CLONE(sname) \
+    static GSList *sname##_clone(GSList *src, gboolean copy_hasattr) \
+    { \
+        GSList *dst = g_slist_copy(src); \
+        for(GSList *d = dst; d; d = d->next) \
+        { \
+            const struct sname *srcv = d->data; \
+            struct sname *dstv = g_malloc(sizeof(struct sname)); \
+            memcpy(dstv, srcv, sizeof(struct sname)); \
+            if (!copy_hasattr) { \
+                SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_ZEROHASATTR) \
+            } \
+            d->data = dstv; \
+        } \
+        return dst; \
     }
-}
 
-void sampler_layer_unset_modulation_amount(struct sampler_layer *l, const struct sampler_modulation_key *key, gboolean remove_local)
-{
-    sampler_layer_unset_modulation(l, key, remove_local, TRUE, FALSE, FALSE, FALSE);
-}
+SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_CLONE)
 
-void sampler_layer_unset_modulation_curve(struct sampler_layer *l, const struct sampler_modulation_key *key, gboolean remove_local)
-{
-    sampler_layer_unset_modulation(l, key, remove_local, FALSE, TRUE, FALSE, FALSE);
-}
-
-void sampler_layer_unset_modulation_smooth(struct sampler_layer *l, const struct sampler_modulation_key *key, gboolean remove_local)
-{
-    sampler_layer_unset_modulation(l, key, remove_local, FALSE, FALSE, TRUE, FALSE);
-}
-
-void sampler_layer_unset_modulation_step(struct sampler_layer *l, const struct sampler_modulation_key *key, gboolean remove_local)
-{
-    sampler_layer_unset_modulation(l, key, remove_local, FALSE, FALSE, FALSE, TRUE);
-}
+//////////////////////////////////////////////////////////////////////////////////////////////////
 
 void sampler_layer_data_add_nif(struct sampler_layer_data *l, SamplerNoteInitFunc notefunc_voice, SamplerNoteInitFunc2 notefunc_prevoice, int variant, float param, gboolean propagating_defaults)
 {
@@ -310,6 +348,8 @@ void sampler_layer_remove_nif(struct sampler_layer *l, SamplerNoteInitFunc notef
         }
     }
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum sampler_layer_param_type
 {
@@ -684,7 +724,7 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
         case slpt_depth_curvecc:
             VERIFY_FLOAT_VALUE;
             cc = args[0];
-            sampler_layer_set_modulation_curve(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, (int)fvalue);
+            sampler_layer_set_modulation_curve_id(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, (int)fvalue);
             return TRUE;
         case slpt_depth_smoothcc:
             VERIFY_FLOAT_VALUE;
@@ -704,7 +744,7 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
         case slpt_curvecc:
             VERIFY_FLOAT_VALUE;
             cc = args[0];
-            sampler_layer_set_modulation_curve(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, (int)fvalue);
+            sampler_layer_set_modulation_curve_id(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, (int)fvalue);
             return TRUE;
         case slpt_smoothcc:
             VERIFY_FLOAT_VALUE;
@@ -727,7 +767,7 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
         case slpt_generic_modulation:
             VERIFY_FLOAT_VALUE;
             sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, fvalue);
-            sampler_layer_set_modulation_curve(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, (int)args[3]);
+            sampler_layer_set_modulation_curve_id(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, (int)args[3]);
             return TRUE;
         case slpt_voice_nif:
             VERIFY_FLOAT_VALUE;
@@ -832,7 +872,7 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             return TRUE;
         case slpt_depth_curvecc:
             cc = args[0];
-            sampler_layer_unset_modulation_curve(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, TRUE);
+            sampler_layer_unset_modulation_curve_id(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, TRUE);
             return TRUE;
         case slpt_depth_smoothcc:
             cc = args[0];
@@ -848,7 +888,7 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             return TRUE;
         case slpt_curvecc:
             cc = args[0];
-            sampler_layer_unset_modulation_curve(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, TRUE);
+            sampler_layer_unset_modulation_curve_id(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, TRUE);
             return TRUE;
         case slpt_smoothcc:
             cc = args[0];
@@ -880,7 +920,7 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             return TRUE;
         case slpt_generic_modulation:
             sampler_layer_unset_modulation_amount(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, TRUE);
-            sampler_layer_unset_modulation_curve(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, TRUE);
+            sampler_layer_unset_modulation_curve_id(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, TRUE);
             return TRUE;
         case slpt_invalid:
         case slpt_reserved:
@@ -1130,9 +1170,9 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     {
         // Systemwide default instead?
         sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){74, smsrc_none, smdest_cutoff}, 9600);
-        sampler_layer_set_modulation_curve(l, &(struct sampler_modulation_key){74, smsrc_none, smdest_cutoff}, 1);
+        sampler_layer_set_modulation_curve_id(l, &(struct sampler_modulation_key){74, smsrc_none, smdest_cutoff}, 1);
         sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){71, smsrc_none, smdest_resonance}, 12);
-        sampler_layer_set_modulation_curve(l, &(struct sampler_modulation_key){71, smsrc_none, smdest_resonance}, 1);
+        sampler_layer_set_modulation_curve_id(l, &(struct sampler_modulation_key){71, smsrc_none, smdest_resonance}, 1);
         sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){smsrc_pitchlfo, 1, smdest_pitch}, 100);
     }
     l->runtime = NULL;
@@ -1200,18 +1240,7 @@ static GSList *clone_nifs(GSList *nifs, gboolean copy_hasattr)
 void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampler_layer_data *src, gboolean copy_hasattr)
 {
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_CLONE)
-    dst->modulations = g_slist_copy(src->modulations);
-    for(GSList *mod = dst->modulations; mod; mod = mod->next)
-    {
-        struct sampler_modulation *srcm = mod->data;
-        struct sampler_modulation *dstm = g_malloc(sizeof(struct sampler_modulation));
-        memcpy(dstm, srcm, sizeof(struct sampler_modulation));
-        dstm->value.has_amount = copy_hasattr ? srcm->value.has_amount : FALSE;
-        dstm->value.has_curve = copy_hasattr ? srcm->value.has_curve : FALSE;
-        dstm->value.has_smooth = copy_hasattr ? srcm->value.has_smooth : FALSE;
-        dstm->value.has_step = copy_hasattr ? srcm->value.has_step : FALSE;
-        mod->data = dstm;
-    }
+    dst->modulations = sampler_modulation_clone(src->modulations, copy_hasattr);
     dst->voice_nifs = clone_nifs(src->voice_nifs, copy_hasattr);
     dst->prevoice_nifs = clone_nifs(src->prevoice_nifs, copy_hasattr);
     dst->eff_waveform = src->eff_waveform;
