@@ -332,13 +332,13 @@ static inline float sampler_program_get_curve_value(struct sampler_program *prog
     return val;
 }
 
-static inline float sampler_channel_getcc_mod(struct sampler_channel *c, struct sampler_voice *v, int cc_no, struct sampler_modulation *sm)
+static inline float sampler_channel_getcc_mod(struct sampler_channel *c, struct sampler_voice *v, int cc_no, int curve_id, float step)
 {
     float val = (cc_no < 128) ? c->floatcc[cc_no] : sampler_channel_get_expensive_cc(c, v, NULL, cc_no);
-    if (sm->value.step)
-        val = floorf(0.9999f * val * (sm->value.step + 1)) / sm->value.step;
-    if (sm->value.curve_id || c->program->interpolated_curves[0])
-        val = sampler_program_get_curve_value(c->program, sm->value.curve_id, val);
+    if (step)
+        val = floorf(0.9999f * val * (step + 1)) / step;
+    if (curve_id || c->program->interpolated_curves[0])
+        val = sampler_program_get_curve_value(c->program, curve_id, val);
     return val;
 }
 
@@ -349,11 +349,14 @@ static inline int sampler_channel_getintcc(struct sampler_channel *c, struct sam
     return (int)127 * (sampler_channel_get_expensive_cc(c, v, NULL, cc_no));
 }
 
-static inline float sampler_channel_getcc_prevoice(struct sampler_channel *c, struct sampler_prevoice *pv, int cc_no)
+static inline float sampler_channel_getcc_prevoice(struct sampler_channel *c, struct sampler_prevoice *pv, int cc_no, int curve_id, float step)
 {
-    if (cc_no < 128)
-        return c->floatcc[cc_no];
-    return sampler_channel_get_expensive_cc(c, NULL, pv, cc_no);
+    float val = (cc_no < 128) ? c->floatcc[cc_no] : sampler_channel_get_expensive_cc(c, NULL, pv, cc_no);
+    if (step)
+        val = floorf(0.9999f * val * (step + 1)) / step;
+    if (curve_id || c->program->interpolated_curves[0])
+        val = sampler_program_get_curve_value(c->program, curve_id, val);
+    return val;
 }
 
 static inline float sampler_channel_get_poly_pressure(struct sampler_channel *c, uint8_t note)

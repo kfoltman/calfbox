@@ -295,6 +295,10 @@ enum sampler_layer_param_type
     slpt_prevoice_nif,
     slpt_voice_cc_nif,
     slpt_prevoice_cc_nif,
+    slpt_voice_curvecc_nif,
+    slpt_prevoice_curvecc_nif,
+    slpt_voice_stepcc_nif,
+    slpt_prevoice_stepcc_nif,
     slpt_reserved,
 };
 
@@ -363,6 +367,14 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
     { name, -1, slpt_voice_cc_nif, 0, variant, nif, NULL },
 #define FIELD_PREVOICE_CC_NIF(name, nif, variant) \
     { name, -1, slpt_prevoice_cc_nif, 0, variant, nif, NULL },
+#define FIELD_VOICE_CURVECC_NIF(name, nif, variant) \
+    { name, -1, slpt_voice_curvecc_nif, 0, variant, nif, NULL },
+#define FIELD_PREVOICE_CURVECC_NIF(name, nif, variant) \
+    { name, -1, slpt_prevoice_curvecc_nif, 0, variant, nif, NULL },
+#define FIELD_VOICE_STEPCC_NIF(name, nif, variant) \
+    { name, -1, slpt_voice_stepcc_nif, 0, variant, nif, NULL },
+#define FIELD_PREVOICE_STEPCC_NIF(name, nif, variant) \
+    { name, -1, slpt_prevoice_stepcc_nif, 0, variant, nif, NULL },
 #define FIELD_ALIAS(alias, name) \
     { alias, -1, slpt_alias, 0, 0, name, NULL },
 
@@ -431,8 +443,8 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_DEPTHCC_SET(fileg, smdest_cutoff2, "_depth2")
     { "fileg_vel2depth2", -1, slpt_modulation, 0, (smsrc_fileg << 8) | (smsrc_vel << 20) | (smdest_cutoff2), NULL, NULL },
     FIELD_AMOUNT("fillfo_depth2", fillfo, cutoff2)
-    { "fillfo_depthpolyaft", -1, slpt_modulation, 0, (smsrc_fillfo << 8) | (smsrc_polyaft << 20) | (smdest_cutoff2), NULL, NULL }, \
-    { "fillfo_depthchanaft", -1, slpt_modulation, 0, (smsrc_fillfo << 8) | (smsrc_chanaft << 20) | (smdest_cutoff2), NULL, NULL }, \
+    { "fillfo_depth2polyaft", -1, slpt_modulation, 0, (smsrc_fillfo << 8) | (smsrc_polyaft << 20) | (smdest_cutoff2), NULL, NULL }, \
+    { "fillfo_depth2chanaft", -1, slpt_modulation, 0, (smsrc_fillfo << 8) | (smsrc_chanaft << 20) | (smdest_cutoff2), NULL, NULL }, \
     FIELD_DEPTHCC_SET(fillfo, smdest_cutoff2, "_depth2")
 
     FIELD_AMOUNT("cutoff2_chanaft", chanaft, cutoff2)
@@ -460,8 +472,14 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_PREVOICE_NIF("delay_random", sampler_nif_addrandomdelay, 0)
     FIELD_PREVOICE_NIF("sync_beats", sampler_nif_syncbeats, 0)
     FIELD_PREVOICE_CC_NIF("delay_cc#", sampler_nif_cc2delay, 0)
+    FIELD_PREVOICE_CURVECC_NIF("delay_curvecc#", sampler_nif_cc2delay, 0)
+    FIELD_PREVOICE_STEPCC_NIF("delay_stepcc#", sampler_nif_cc2delay, 0)
     FIELD_VOICE_CC_NIF("reloffset_cc#", sampler_nif_cc2reloffset, 0)
+    FIELD_VOICE_CURVECC_NIF("reloffset_curvecc#", sampler_nif_cc2reloffset, 0)
+    FIELD_VOICE_STEPCC_NIF("reloffset_stepcc#", sampler_nif_cc2reloffset, 0)
     FIELD_VOICE_CC_NIF("offset_cc#", sampler_nif_cc2offset, 0)
+    FIELD_VOICE_CURVECC_NIF("offset_curvecc#", sampler_nif_cc2offset, 0)
+    FIELD_VOICE_STEPCC_NIF("offset_stepcc#", sampler_nif_cc2offset, 0)
 
     FIELD_ALIAS("hilev", "hivel")
     FIELD_ALIAS("lolev", "lovel")
@@ -701,6 +719,26 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
             cc = args[0];
             sampler_layer_set_prevoice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, fvalue);
             return TRUE;
+        case slpt_voice_curvecc_nif:
+            VERIFY_FLOAT_VALUE;
+            cc = args[0];
+            sampler_layer_set_voice_nif_curve_id(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, (int)fvalue);
+            return TRUE;
+        case slpt_prevoice_curvecc_nif:
+            VERIFY_FLOAT_VALUE;
+            cc = args[0];
+            sampler_layer_set_prevoice_nif_curve_id(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, (int)fvalue);
+            return TRUE;
+        case slpt_voice_stepcc_nif:
+            VERIFY_FLOAT_VALUE;
+            cc = args[0];
+            sampler_layer_set_voice_nif_step(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, fvalue);
+            return TRUE;
+        case slpt_prevoice_stepcc_nif:
+            VERIFY_FLOAT_VALUE;
+            cc = args[0];
+            sampler_layer_set_prevoice_nif_step(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, fvalue);
+            return TRUE;
         case slpt_reserved:
         case slpt_invalid:
         case slpt_alias:
@@ -831,6 +869,22 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
         case slpt_prevoice_cc_nif:
             cc = args[0];
             sampler_layer_unset_prevoice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
+            return TRUE;
+        case slpt_voice_curvecc_nif:
+            cc = args[0];
+            sampler_layer_unset_voice_nif_curve_id(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
+            return TRUE;
+        case slpt_prevoice_curvecc_nif:
+            cc = args[0];
+            sampler_layer_unset_prevoice_nif_curve_id(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
+            return TRUE;
+        case slpt_voice_stepcc_nif:
+            cc = args[0];
+            sampler_layer_unset_voice_nif_step(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
+            return TRUE;
+        case slpt_prevoice_stepcc_nif:
+            cc = args[0];
+            sampler_layer_unset_prevoice_nif_step(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
             return TRUE;
         case slpt_generic_modulation:
             sampler_layer_unset_modulation_amount(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, TRUE);
@@ -1583,6 +1637,22 @@ static void mod_cc_attrib_to_string(GString *outstr, const char *attrib, const s
         assert(md->src2 >= EXT_CC_COUNT);
 }
 
+static void nif_attrib_to_string(GString *outstr, const char *attrib, const struct sampler_noteinitfunc *nd, const char *floatbuf)
+{
+    int v = nd->key.variant;
+    if (nd->value.value)
+        g_string_append_printf(outstr, " %s_cc%d=%s", attrib, v, floatbuf);
+    if (nd->value.curve_id)
+        g_string_append_printf(outstr, " %s_curvecc%d=%d", attrib, v, nd->value.curve_id);
+    if (nd->value.step)
+    {
+        char floatbuf2[G_ASCII_DTOSTR_BUF_SIZE];
+        int floatbufsize = G_ASCII_DTOSTR_BUF_SIZE;
+        g_ascii_dtostr(floatbuf2, floatbufsize, nd->value.step);
+        g_string_append_printf(outstr, " %s_stepcc%d=%s", attrib, v, floatbuf2);
+    }
+}
+
 gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited)
 {
     struct sampler_layer_data *l = &lr->data;
@@ -1595,7 +1665,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     for(GSList *nif = l->voice_nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;
-        if (!nd->value.has_value && !show_inherited)
+        if (!nd->value.has_value && !nd->value.has_curve && !nd->value.has_step && !show_inherited)
             continue;
         #define PROC_ENVSTAGE_NAME(name, index, def_value) #name, 
         static const char *env_stages[] = { DAHDSR_FIELDS(PROC_ENVSTAGE_NAME) "start" };
@@ -1609,11 +1679,11 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         else if (nd->key.notefunc_voice == sampler_nif_vel2reloffset)
             g_string_append_printf(outstr, " reloffset_veltrack=%s", floatbuf);
         else if (nd->key.notefunc_voice == sampler_nif_cc2reloffset)
-            g_string_append_printf(outstr, " reloffset_cc%d=%s", v, floatbuf);
+            nif_attrib_to_string(outstr, "reloffset", nd, floatbuf);
         else if (nd->key.notefunc_voice == sampler_nif_vel2offset)
             g_string_append_printf(outstr, " offset_veltrack=%s", floatbuf);
         else if (nd->key.notefunc_voice == sampler_nif_cc2offset)
-            g_string_append_printf(outstr, " offset_cc%d=%s", v, floatbuf);
+            nif_attrib_to_string(outstr, "offset", nd, floatbuf);
         else if (nd->key.notefunc_voice == sampler_nif_vel2env && (v & 15) >= snif_env_delay && (v & 15) <= snif_env_start && ((v >> 4) & 3) < 3)
             g_string_append_printf(outstr, " %seg_vel2%s=%s", addrandom_variants[v >> 4], env_stages[1 + (v & 15)], floatbuf);
         else
@@ -1622,13 +1692,12 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     for(GSList *nif = l->prevoice_nifs; nif; nif = nif->next)
     {
         struct sampler_noteinitfunc *nd = nif->data;
-        if (!nd->value.has_value && !show_inherited)
+        if (!nd->value.has_value && !nd->value.has_curve && !nd->value.has_step && !show_inherited)
             continue;
-        int v = nd->key.variant;
         g_ascii_dtostr(floatbuf, floatbufsize, nd->value.value);
 
         if (nd->key.notefunc_prevoice == sampler_nif_cc2delay)
-            g_string_append_printf(outstr, " delay_cc%d=%s", v, floatbuf);
+            nif_attrib_to_string(outstr, "delay", nd, floatbuf);
         else if (nd->key.notefunc_prevoice == sampler_nif_addrandomdelay)
             g_string_append_printf(outstr, " delay_random=%s", floatbuf);
         else

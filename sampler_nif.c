@@ -12,7 +12,8 @@
 
 void sampler_nif_cc2delay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv)
 {
-    pv->delay_computed += nif->value.value * sampler_channel_getcc_prevoice(pv->channel, pv, nif->key.variant);
+    float cc = sampler_channel_getcc_prevoice(pv->channel, pv, nif->key.variant, nif->value.curve_id, nif->value.step);
+    pv->delay_computed += nif->value.value * cc;
 }
 
 void sampler_nif_addrandomdelay(struct sampler_noteinitfunc *nif, struct sampler_prevoice *pv)
@@ -49,7 +50,7 @@ void sampler_nif_vel2offset(struct sampler_noteinitfunc *nif, struct sampler_voi
 
 void sampler_nif_cc2offset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
-    v->offset += nif->value.value * sampler_channel_getcc(v->channel, v, nif->key.variant);
+    v->offset += nif->value.value * sampler_channel_getcc_mod(v->channel, v, nif->key.variant, nif->value.curve_id, nif->value.step);
 }
 
 void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
@@ -59,7 +60,7 @@ void sampler_nif_vel2reloffset(struct sampler_noteinitfunc *nif, struct sampler_
 
 void sampler_nif_cc2reloffset(struct sampler_noteinitfunc *nif, struct sampler_voice *v)
 {
-    v->reloffset += nif->value.value * sampler_channel_getcc(v->channel, v, nif->key.variant);
+    v->reloffset += nif->value.value * sampler_channel_getcc_mod(v->channel, v, nif->key.variant, nif->value.curve_id, nif->value.step);
 }
 
 void sampler_nif_addrandom(struct sampler_noteinitfunc *nif, struct sampler_voice *v)

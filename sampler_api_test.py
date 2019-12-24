@@ -109,6 +109,8 @@ params_to_test = [
     'amp_random', 'fil_random', 'pitch_random', 'delay_random',
     'pitch_veltrack', 'reloffset_veltrack', 'offset_veltrack',
     'delay_cc5', 'delay_cc10', 'reloffset_cc5', 'reloffset_cc10', 'offset_cc5', 'offset_cc10',
+    'delay_curvecc8', 'reloffset_curvecc5', 'offset_curvecc10',
+    'delay_stepcc8', 'reloffset_stepcc5', 'offset_stepcc10',
     'cutoff_cc1', "resonance_cc1", 'pitch_cc1', 'tonectl_cc1', 'gain_cc1', 'amplitude_cc1',
     'cutoff_oncc2', "resonance_oncc2", 'pitch_oncc2', 'tonectl_oncc2', 'gain_oncc2', 'amplitude_oncc2',
     'cutoff_curvecc1', 'resonance_curvecc5', 'pitch_curvecc10', 'amplitude_curvecc10',

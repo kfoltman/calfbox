@@ -286,7 +286,11 @@ struct sampler_noteinitfunc_key
 struct sampler_noteinitfunc_value
 {
     float value;
+    uint32_t curve_id;
+    float step;
     unsigned int has_value:1;
+    unsigned int has_curve:1;
+    unsigned int has_step:1;
 };
 
 enum sampler_noteinitfunc_envelope_variant
@@ -302,6 +306,8 @@ enum sampler_noteinitfunc_envelope_variant
 
 #define SAMPLER_COLL_FIELD_LIST_sampler_noteinitfunc(MACRO, ...) \
     MACRO(value, has_value, float, 0, ## __VA_ARGS__) \
+    MACRO(curve_id, has_curve, int, 0, ## __VA_ARGS__) \
+    MACRO(step, has_step, float, 0, ## __VA_ARGS__)
 
 #define SAMPLER_COLL_CHAIN_LIST_sampler_noteinitfunc(MACRO, ...) \
     MACRO(voice_nifs, voice_nif, ## __VA_ARGS__) \

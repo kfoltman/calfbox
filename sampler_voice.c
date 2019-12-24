@@ -619,7 +619,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             {
                 float value = 0.f;
                 if (sm->key.src < smsrc_pernote_offset)
-                    value = sampler_channel_getcc_mod(c, v, sm->key.src, sm);
+                    value = sampler_channel_getcc_mod(c, v, sm->key.src, sm->value.curve_id, sm->value.step);
                 uint32_t param = sm->key.dest - smdest_eg_stage_start;
                 if (value * sm->value.amount != 0)
                     cbox_envelope_modify_dahdsr(&v->cc_envs[(param >> 4)], param & 0x0F, value * sm->value.amount, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
@@ -725,14 +725,14 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         enum sampler_moddest dest = sm->key.dest;
         float value = 0.f, value2 = 1.f;
         if (src < smsrc_pernote_offset)
-            value = sampler_channel_getcc_mod(c, v, src, sm);
+            value = sampler_channel_getcc_mod(c, v, src, sm->value.curve_id, sm->value.step);
         else
             value = modsrcs[src - smsrc_pernote_offset];
 
         if (src2 != smsrc_none)
         {
             if (src2 < smsrc_pernote_offset)
-                value2 = sampler_channel_getcc_mod(c, v, src2, sm);
+                value2 = sampler_channel_getcc_mod(c, v, src2, sm->value.curve_id, sm->value.step);
             else
                 value2 = modsrcs[src2 - smsrc_pernote_offset];
             
