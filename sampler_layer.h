@@ -418,7 +418,6 @@ typedef int midi_note_t;
     MACRO(int, fil_veltrack, 0) \
     MACRO(int, fil2_veltrack, 0) \
     MACRO(int, amp_veltrack, 100) \
-    MACRO(int, pitch_veltrack, 0) \
     MACRO(int, lovel, 0) \
     MACRO(int, hivel, 127) \
     MACRO(int, lobend, -8192) \
@@ -527,9 +526,6 @@ typedef int midi_note_t;
 #define PROC_SUBSTRUCT_CLONE(name, index, def_value, param, dst, src) \
     dst->param.name = src->param.name; \
     dst->has_##param.name = src->has_##param.name;
-#define PROC_SUBSTRUCT_CLONEPARENT(name, index, def_value, param, l) \
-    if (!l->has_##param.name) \
-        l->param.name = parent ? parent->param.name : def_value;
 
 struct sampler_dahdsr_has_fields
 {
@@ -572,8 +568,7 @@ struct sampler_midi_curve
 #define PROC_FIELDS_TO_STRUCT_ccrange(name, parname) \
     struct sampler_cc_range *name;
 #define PROC_FIELDS_TO_STRUCT_midicurve(name) \
-    struct sampler_midi_curve name; \
-    float eff_##name[128];
+    struct sampler_midi_curve name;
 
 #define PROC_HAS_FIELD(type, name, def_value) \
     unsigned int has_##name:1;
@@ -602,15 +597,12 @@ enum sampler_layer_mod_bitmasks
     slmb_pitcheg_cc = 0x04,
 };
 
-struct sampler_layer_data
+struct sampler_layer_computed
 {
-    SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
-    SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)    
-
-    struct sampler_modulation *modulations;
-    struct sampler_noteinitfunc *voice_nifs, *prevoice_nifs;
-
     // computed values:
+    struct cbox_waveform *eff_waveform;
+    enum sampler_loop_mode eff_loop_mode;
+    uint32_t eff_loop_start, eff_loop_end;
     float eff_freq;
     gboolean eff_use_keyswitch:1;
     gboolean eff_use_simple_trigger_logic:1;
@@ -619,14 +611,25 @@ struct sampler_layer_data
     gboolean eff_use_channel_mixer:1;
     gboolean eff_use_filter_mods:1;
     gboolean eff_is_silent:1;
-    enum sampler_loop_mode eff_loop_mode;
-    struct cbox_waveform *eff_waveform;
     int16_t scratch_loop[2 * MAX_INTERPOLATION_ORDER * 2];
     int16_t scratch_end[2 * MAX_INTERPOLATION_ORDER * 2];
     float resonance_scaled, resonance2_scaled;
     float logcutoff, logcutoff2;
     uint32_t eq_bitmask, mod_bitmask;
     int eff_num_stages, eff_num_stages2;
+
+    float eff_amp_velcurve[128];
+};
+
+struct sampler_layer_data
+{
+    SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
+    SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)
+
+    struct sampler_modulation *modulations;
+    struct sampler_noteinitfunc *voice_nifs, *prevoice_nifs;
+
+    struct sampler_layer_computed computed;
 };
 
 struct sampler_layer

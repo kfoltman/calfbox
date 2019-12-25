@@ -66,7 +66,7 @@ static inline gboolean sampler_cc_range_key_equal(const struct sampler_cc_range_
 
 static inline void sampler_cc_range_dump_one(const struct sampler_cc_range *ccrange)
 {
-    printf("CC%d in [%d, %d]\n", (int)ccrange->key.cc_number, (int)ccrange->value.locc, (int)ccrange->value.hicc);
+    printf("CC%d in [%c%d, %c%d]\n", (int)ccrange->key.cc_number, ccrange->value.has_locc ? '!' : '.', (int)ccrange->value.locc, ccrange->value.has_hicc ? '!' : '.', (int)ccrange->value.hicc);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -131,7 +131,8 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_ADD)
 #define SAMPLER_COLL_FUNC_DESTROY(sname) \
 static void sname##s_destroy(struct sname *list_ptr) \
 { \
-    while(list_ptr) { \
+    while(list_ptr) \
+    { \
         struct sname *p = list_ptr->next; \
         g_free(list_ptr); \
         list_ptr = p; \
@@ -143,103 +144,59 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_DESTROY)
 #define SAMPLER_COLL_FIELD_ISNULL(name, has_name, type, init_value) \
     if (d->name != init_value || d->has_name) \
         return FALSE;
-#define SAMPLER_COLL_FIELD_ISNULLVALUE(name, has_name, type, init_value) \
-    if (d->name != init_value) \
-        return FALSE;
 
 #define SAMPLER_COLL_FUNC_ISNULL(sname) \
     static inline gboolean sname##_is_null(const struct sname##_value *d) \
     { \
         SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_ISNULL) \
         return TRUE; \
-    } \
-    static inline gboolean sname##_is_null_value(const struct sname##_value *d) \
-    { \
-        SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_ISNULLVALUE) \
-        return TRUE; \
     }
 
 SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_ISNULL)
 
-#define SAMPLER_COLL_FIELD_PROPAGATE(name, has_name, type, init_value) \
-    if (!dstm->value.has_name && dstm->value.name != srcm->value.name) \
+// sampler_modulation_set_amount etc.
+#define SAMPLER_COLL_FIELD_SETTER(name, has_name, type, init_value, sname) \
+    struct sname *sname##_set_##name##_by_offset(struct sampler_layer *l, uint32_t offset, const struct sname##_key *key, gboolean set_local_value, type value) \
     { \
-        dstm->value.name = srcm->value.name;\
-        changed = TRUE; \
-    }
-
-// sampler_layer_set_modulation_amount etc.
-#define SAMPLER_COLL_FIELD_SETTER(name, has_name, type, init_value, sname, cname, cfname) \
-    void sampler_layer_set_##cname##_##name(struct sampler_layer *l, const struct sname##_key *key, type value) \
-    { \
-        struct sname *dstm = sname##_add(&l->data.cfname, key); \
-        dstm->value.has_name = TRUE; \
+        void *vl = &l->data; \
+        struct sname **list_ptr = vl + offset; \
+        struct sname *dstm = sname##_add(list_ptr, key); \
+        if (!set_local_value && dstm->value.has_name) \
+            return dstm; \
+        dstm->value.has_name = set_local_value; \
         dstm->value.name = value; \
-        sname##_propagate_set(l, offsetof(struct sampler_layer_data, cfname), dstm, TRUE); \
+        return dstm; \
     }
 
-#define SAMPLER_COLL_CHAIN_SETTERS(cfname, cname, sname) \
-    SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_SETTER, sname, cname, cfname)
+#define SAMPLER_COLL_FUNC_SETTERS(sname) \
+    SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_SETTER, sname)
 
-#define SAMPLER_COLL_FUNC_PROPAGATE_SET(sname) \
-    void sname##_propagate_set(struct sampler_layer *l, uint32_t offset, const struct sname *srcm, gboolean starting) \
-    { \
-        if (!starting) \
-        { \
-            void *vl = &l->data; \
-            struct sname **l = (vl + offset); \
-            gboolean changed = FALSE; \
-            struct sname *dstm = sname##_add(l, &srcm->key); \
-            SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_PROPAGATE) \
-            if (!changed) \
-                return; \
-        } \
-        if (l->child_layers) { \
-            /* Propagate to children */ \
-            GHashTableIter iter; \
-            g_hash_table_iter_init(&iter, l->child_layers); \
-            gpointer key, value; \
-            while(g_hash_table_iter_next(&iter, &key, &value)) \
-            { \
-                struct sampler_layer *child = value; \
-                sname##_propagate_set(child, offset, srcm, FALSE); \
-            } \
-        } \
-    } \
-    SAMPLER_COLL_CHAIN_LIST_##sname(SAMPLER_COLL_CHAIN_SETTERS, sname)
-
-SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_PROPAGATE_SET)
+SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_SETTERS)
 
 #define SAMPLER_COLL_FIELD_UNSET(name, has_name, type, init_value, sname) \
-    if ((unset_mask & (1 << sname##_key_field_##name)) && d->value.has_name == remove_local) \
+    if ((unset_mask & (1 << sname##_value_field_##name)) && d->value.has_name == remove_local) \
     { \
         d->value.name = parent ? parent->value.name : init_value; \
-        if (remove_local) \
-            d->value.has_name = FALSE; \
+        d->value.has_name = FALSE; \
     } \
 
 #define SAMPLER_COLL_FIELD_KEY_ENUM_VALUE(name, has_name, type, init_value, sname) \
-    sname##_key_field_##name,
+    sname##_value_field_##name,
 
-#define SAMPLER_COLL_FIELD_UNSETTER(name, has_name, type, init_value, sname, cname, cfname) \
-    void sampler_layer_unset_##cname##_##name(struct sampler_layer *l, const struct sname##_key *key, gboolean remove_local) \
-    { \
-        sname##_propagate_unset(l, offsetof(struct sampler_layer_data, cfname), key, remove_local, 1 << sname##_key_field_##name); \
-    }
-#define SAMPLER_COLL_CHAIN_UNSETTERS(cfname, cname, sname) \
-    SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_UNSETTER, sname, cname, cfname)
-
-#define SAMPLER_COLL_FUNC_PROPAGATE_UNSET(sname) \
+#define SAMPLER_COLL_FUNC_UNSET(sname) \
     enum {  \
         SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_KEY_ENUM_VALUE, sname) \
     }; \
-    static gboolean sname##_unset(struct sname **list_ptr, struct sname *parent_list, const struct sname##_key *key, gboolean remove_local, uint32_t unset_mask) \
+    static gboolean sname##_unset_by_offset(struct sampler_layer *l, uint32_t offset, const struct sname##_key *key, gboolean remove_local, uint32_t unset_mask) \
     { \
+        void *vl = &l->data, *vp = l->parent ? &l->parent->data : NULL; \
+        struct sname **list_ptr = vl + offset; \
+        struct sname **parent_list_ptr = vp ? vp + offset : NULL; \
         struct sname **link_ptr = NULL; \
         struct sname *d = sname##_find2(list_ptr, key, &link_ptr); \
         if (!d) \
             return FALSE; \
-        struct sname *parent = remove_local && parent_list != NULL ? sname##_find(parent_list, key) : NULL; \
+        struct sname *parent = remove_local && *parent_list_ptr != NULL ? sname##_find(*parent_list_ptr, key) : NULL; \
         SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_UNSET, sname) \
         /* Delete if it's all default values and it's not overriding anything */ \
         if (sname##_is_null(&d->value)) {\
@@ -247,31 +204,9 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_PROPAGATE_SET)
             g_free(d); \
         } \
         return TRUE; \
-    } \
-    static gboolean sname##_propagate_unset(struct sampler_layer *l, uint32_t offset, const struct sname##_key *key, gboolean remove_local, uint32_t unset_mask) \
-    { \
-        void *vl = &l->data, *vp = l->parent ? &l->parent->data : NULL; \
-        struct sname **list_ptr = vl + offset; \
-        struct sname **parent_list_ptr = vp ? vp + offset : NULL; \
-        if (!sname##_unset(list_ptr, *parent_list_ptr, key, remove_local, unset_mask)) \
-            return FALSE; \
-        \
-        if (l->child_layers) { \
-            /* Also recursively remove propagated copies from child layers, if any */ \
-            GHashTableIter iter; \
-            g_hash_table_iter_init(&iter, l->child_layers); \
-            gpointer lkey, lvalue; \
-            while(g_hash_table_iter_next(&iter, &lkey, &lvalue)) \
-            { \
-                struct sampler_layer *child = lvalue; \
-                sname##_propagate_unset(child, offset, key, FALSE, unset_mask); \
-            } \
-        } \
-        return TRUE; \
-    } \
-    SAMPLER_COLL_CHAIN_LIST_##sname(SAMPLER_COLL_CHAIN_UNSETTERS, sname)
+    }
 
-SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_PROPAGATE_UNSET)
+SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_UNSET)
 
 #define SAMPLER_COLL_FIELD_ZEROHASATTR(name, has_name, type, init_value) \
     dstv->value.has_name = FALSE;
@@ -283,7 +218,8 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_PROPAGATE_UNSET)
         { \
             struct sname *dstv = g_malloc(sizeof(struct sname)); \
             memcpy(dstv, srcv, sizeof(struct sname)); \
-            if (!copy_hasattr) { \
+            if (!copy_hasattr) \
+            { \
                 SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_ZEROHASATTR) \
             } \
             *last = dstv; \
@@ -311,26 +247,14 @@ enum sampler_layer_param_type
     slpt_midicurve,
     slpt_ccrange,
     // modulation matrix
-    slpt_depthcc, // src * CC -> dest
-    slpt_amountcc, // CC -> dest
-    slpt_amount, // src -> dest
-    slpt_modulation, // src1 * src2 -> dest
+    slpt_mod_amount, // src (or CC) * src2 (or CC) -> dest
+    slpt_mod_curveid,
+    slpt_mod_smooth,
+    slpt_mod_step,
     slpt_generic_modulation,
-    slpt_curvecc,
-    slpt_smoothcc,
-    slpt_stepcc,
-    slpt_depth_curvecc,
-    slpt_depth_smoothcc,
-    slpt_depth_stepcc,
     // note init functions
     slpt_voice_nif,
     slpt_prevoice_nif,
-    slpt_voice_cc_nif,
-    slpt_prevoice_cc_nif,
-    slpt_voice_curvecc_nif,
-    slpt_prevoice_curvecc_nif,
-    slpt_voice_stepcc_nif,
-    slpt_prevoice_stepcc_nif,
     slpt_reserved,
 };
 
@@ -340,22 +264,31 @@ struct sampler_layer_param_entry
     size_t offset;
     enum sampler_layer_param_type type;
     double def_value;
-    uint32_t extra_int;
+    uint64_t extra_int;
     void *extra_ptr;
     void (*set_has_value)(struct sampler_layer_data *, gboolean);
+    gboolean (*get_has_value)(struct sampler_layer_data *);
 };
 
+#define MODSRC_CC 0xFFF
+#define smsrc_CC MODSRC_CC
+
+#define ENCODE_MOD(src, src2, dst) ((((uint32_t)(src) & 0xFFFU) | (((uint32_t)(src2) & 0xFFFU) << 12U) | ((uint32_t)(dst) << 24U)))
+
 #define PROC_SUBSTRUCT_FIELD_SETHASFUNC(name, index, def_value, parent) \
-    static void sampler_layer_data_##parent##_set_has_##name(struct sampler_layer_data *l, gboolean value) { l->has_##parent.name = value; }
+    static void sampler_layer_data_##parent##_set_has_##name(struct sampler_layer_data *l, gboolean value) { l->has_##parent.name = value; } \
+    static gboolean sampler_layer_data_##parent##_get_has_##name(struct sampler_layer_data *l) { return l->has_##parent.name; }
 
 #define PROC_FIELD_SETHASFUNC(type, name, default_value) \
-    static void sampler_layer_data_set_has_##name(struct sampler_layer_data *l, gboolean value) { l->has_##name = value; }
+    static void sampler_layer_data_set_has_##name(struct sampler_layer_data *l, gboolean value) { l->has_##name = value; } \
+    static gboolean sampler_layer_data_get_has_##name(struct sampler_layer_data *l) { return l->has_##name; }
 #define PROC_FIELD_SETHASFUNC_string(name) \
-    static void sampler_layer_data_set_has_##name(struct sampler_layer_data *l, gboolean value) { l->has_##name = value; }
+    static void sampler_layer_data_set_has_##name(struct sampler_layer_data *l, gboolean value) { l->has_##name = value; } \
+    static gboolean sampler_layer_data_get_has_##name(struct sampler_layer_data *l) { return l->has_##name; }
 #define PROC_FIELD_SETHASFUNC_dBamp(type, name, default_value) \
-    static void sampler_layer_data_set_has_##name(struct sampler_layer_data *l, gboolean value) { l->has_##name = value; }
+    PROC_FIELD_SETHASFUNC(type, name, default_value)
 #define PROC_FIELD_SETHASFUNC_enum(type, name, default_value) \
-    static void sampler_layer_data_set_has_##name(struct sampler_layer_data *l, gboolean value) { l->has_##name = value; }
+    PROC_FIELD_SETHASFUNC(type, name, default_value)
 #define PROC_FIELD_SETHASFUNC_dahdsr(field, name, default_value) \
     DAHDSR_FIELDS(PROC_SUBSTRUCT_FIELD_SETHASFUNC, field)
 #define PROC_FIELD_SETHASFUNC_lfo(field, name, default_value) \
@@ -364,85 +297,80 @@ struct sampler_layer_param_entry
     EQ_FIELDS(PROC_SUBSTRUCT_FIELD_SETHASFUNC, field)
 #define PROC_FIELD_SETHASFUNC_ccrange(name, parname)
 #define PROC_FIELD_SETHASFUNC_midicurve(name) \
-    static void sampler_layer_data_set_has_##name(struct sampler_layer_data *l, uint32_t index, gboolean value) { l->name.has_values[index] = value; }
+    static gboolean sampler_layer_data_set_get_has_##name(struct sampler_layer_data *l, uint32_t index, int value) \
+    { \
+        if (value != -1) \
+            l->name.has_values[index] = value; \
+        return l->name.has_values[index]; \
+    }
 
 SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
 
-#define FIELD_AMOUNT(name, src, dest) \
-    { name, -1, slpt_amount, 0, (smsrc_##src << 16) | smdest_##dest, NULL, NULL },
-#define FIELD_AMOUNT_CC(name, dest) \
-    { name "cc#", -1, slpt_amountcc, 0, smdest_##dest, NULL, NULL }, \
-    { name "_oncc#", -1, slpt_amountcc, 0, smdest_##dest, NULL, NULL }, \
-    { name "_curvecc#", -1, slpt_curvecc, 0, smdest_##dest, NULL, NULL }, \
-    { name "_smoothcc#", -1, slpt_smoothcc, 0, smdest_##dest, NULL, NULL }, \
-    { name "_stepcc#", -1, slpt_stepcc, 0, smdest_##dest, NULL, NULL },
-#define FIELD_AMOUNT_CC_(name, dest) \
-    { name "_cc#", -1, slpt_amountcc, 0, smdest_##dest, NULL, NULL }, \
-    { name "_oncc#", -1, slpt_amountcc, 0, smdest_##dest, NULL, NULL }, \
-    { name "_curvecc#", -1, slpt_curvecc, 0, smdest_##dest, NULL, NULL }, \
-    { name "_smoothcc#", -1, slpt_smoothcc, 0, smdest_##dest, NULL, NULL }, \
-    { name "_stepcc#", -1, slpt_stepcc, 0, smdest_##dest, NULL, NULL },
-#define FIELD_VOICE_NIF(name, nif, variant) \
-    { name, -1, slpt_voice_nif, 0, variant, nif, NULL },
-#define FIELD_PREVOICE_NIF(name, nif, variant) \
-    { name, -1, slpt_prevoice_nif, 0, variant, nif, NULL },
-#define FIELD_VOICE_CC_NIF(name, nif, variant) \
-    { name, -1, slpt_voice_cc_nif, 0, variant, nif, NULL },
-#define FIELD_PREVOICE_CC_NIF(name, nif, variant) \
-    { name, -1, slpt_prevoice_cc_nif, 0, variant, nif, NULL },
-#define FIELD_VOICE_CURVECC_NIF(name, nif, variant) \
-    { name, -1, slpt_voice_curvecc_nif, 0, variant, nif, NULL },
-#define FIELD_PREVOICE_CURVECC_NIF(name, nif, variant) \
-    { name, -1, slpt_prevoice_curvecc_nif, 0, variant, nif, NULL },
-#define FIELD_VOICE_STEPCC_NIF(name, nif, variant) \
-    { name, -1, slpt_voice_stepcc_nif, 0, variant, nif, NULL },
-#define FIELD_PREVOICE_STEPCC_NIF(name, nif, variant) \
-    { name, -1, slpt_prevoice_stepcc_nif, 0, variant, nif, NULL },
-#define FIELD_ALIAS(alias, name) \
-    { alias, -1, slpt_alias, 0, 0, name, NULL },
-
 #define LOFS(field) offsetof(struct sampler_layer_data, field)
+
+#define FIELD_MOD(name, param, src, src2, dest) \
+    { name, LOFS(modulations), slpt_mod_##param, 0, ENCODE_MOD(smsrc_##src, smsrc_##src2, smdest_##dest), NULL, NULL, NULL },
+#define FIELD_AMOUNT(name, src, dest) \
+    FIELD_MOD(name, amount, src, none, dest)
+#define FIELD_AMOUNT_CC(name, dest) \
+    FIELD_ALIAS(name "cc#", name "_oncc#") \
+    FIELD_MOD(name "_oncc#", amount, CC, none, dest) \
+    FIELD_MOD(name "_curvecc#", curveid, CC, none, dest) \
+    FIELD_MOD(name "_smoothcc#", smooth, CC, none, dest) \
+    FIELD_MOD(name "_stepcc#", step, CC, none, dest)
+#define FIELD_AMOUNT_CC_(name, dest) \
+    FIELD_ALIAS(name "_cc#", name "_oncc#") \
+    FIELD_MOD(name "_oncc#", amount, CC, none, dest) \
+    FIELD_MOD(name "_curvecc#", curveid, CC, none, dest) \
+    FIELD_MOD(name "_smoothcc#", smooth, CC, none, dest) \
+    FIELD_MOD(name "_stepcc#", step, CC, none, dest)
+#define FIELD_VOICE_NIF(name, nif, variant) \
+    { name, LOFS(voice_nifs), slpt_voice_nif, 0, variant, nif, NULL, NULL },
+#define FIELD_PREVOICE_NIF(name, nif, variant) \
+    { name, LOFS(prevoice_nifs), slpt_prevoice_nif, 0, variant, nif, NULL, NULL },
+#define FIELD_ALIAS(alias, name) \
+    { alias, -1, slpt_alias, 0, 0, name, NULL, NULL },
+
 #define PROC_SUBSTRUCT_FIELD_DESCRIPTOR(name, index, def_value, parent, parent_name, parent_index, parent_struct) \
-    { #parent_name "_" #name, offsetof(struct sampler_layer_data, parent) + offsetof(struct parent_struct, name), slpt_float, def_value, parent_index * 100 + index, NULL, sampler_layer_data_##parent##_set_has_##name }, \
+    { #parent_name "_" #name, offsetof(struct sampler_layer_data, parent) + offsetof(struct parent_struct, name), slpt_float, def_value, parent_index * 100 + index, NULL, sampler_layer_data_##parent##_set_has_##name, sampler_layer_data_##parent##_get_has_##name }, \
 
 #define PROC_SUBSTRUCT_FIELD_DESCRIPTOR_DAHDSR(name, index, def_value, parent, parent_name, parent_index, parent_struct) \
-    { #parent_name "_" #name, offsetof(struct sampler_layer_data, parent) + offsetof(struct parent_struct, name), slpt_float, def_value, parent_index * 100 + index, NULL, sampler_layer_data_##parent##_set_has_##name }, \
+    { #parent_name "_" #name, offsetof(struct sampler_layer_data, parent) + offsetof(struct parent_struct, name), slpt_float, def_value, parent_index * 100 + index, NULL, sampler_layer_data_##parent##_set_has_##name, sampler_layer_data_##parent##_get_has_##name }, \
     FIELD_VOICE_NIF(#parent_name "_vel2" #name, sampler_nif_vel2env, (parent_index << 4) + snif_env_##name) \
     FIELD_AMOUNT_CC(#parent_name "_" #name, ampeg_stage + (parent_index << 4) + snif_env_##name) \
 
 #define PROC_FIELD_DESCRIPTOR(type, name, default_value) \
-    { #name, LOFS(name), slpt_##type, default_value, 0, NULL, sampler_layer_data_set_has_##name },
+    { #name, LOFS(name), slpt_##type, default_value, 0, NULL, sampler_layer_data_set_has_##name, sampler_layer_data_get_has_##name },
 #define PROC_FIELD_DESCRIPTOR_dBamp(type, name, default_value) \
-    { #name, LOFS(name), slpt_##type, default_value, 0, NULL, sampler_layer_data_set_has_##name },
+    { #name, LOFS(name), slpt_##type, default_value, 0, NULL, sampler_layer_data_set_has_##name, sampler_layer_data_get_has_##name },
 #define PROC_FIELD_DESCRIPTOR_string(name) \
-    { #name, LOFS(name), slpt_string, 0, LOFS(name##_changed), NULL, sampler_layer_data_set_has_##name },
+    { #name, LOFS(name), slpt_string, 0, LOFS(name##_changed), NULL, sampler_layer_data_set_has_##name, sampler_layer_data_get_has_##name },
 #define PROC_FIELD_DESCRIPTOR_enum(enumtype, name, default_value) \
-    { #name, LOFS(name), slpt_enum, (double)(enum enumtype)default_value, 0, enumtype##_from_string, sampler_layer_data_set_has_##name },
+    { #name, LOFS(name), slpt_enum, (double)(enum enumtype)default_value, 0, enumtype##_from_string, sampler_layer_data_set_has_##name, sampler_layer_data_get_has_##name },
 #define PROC_FIELD_DESCRIPTOR_midicurve(name) \
-    { #name "_#", LOFS(name), slpt_midicurve, 0, 0, (void *)sampler_layer_data_set_has_##name, NULL },
+    { #name "_#", LOFS(name), slpt_midicurve, 0, 0, (void *)sampler_layer_data_set_get_has_##name, NULL, NULL },
 
-#define FIELD_DEPTHCC_SET(name, dest, attrib) \
-    { #name attrib "cc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (dest), NULL, NULL }, \
-    { #name attrib "_oncc#", -1, slpt_depthcc, 0, (smsrc_##name << 16) | (dest), NULL, NULL }, \
-    { #name attrib "_curvecc#", -1, slpt_depth_curvecc, 0, (smsrc_##name << 16) | (dest), NULL, NULL }, \
-    { #name attrib "_smoothcc#", -1, slpt_depth_smoothcc, 0, (smsrc_##name << 16) | (dest), NULL, NULL }, \
-    { #name attrib "_stepcc#", -1, slpt_depth_stepcc, 0, (smsrc_##name << 16) | (dest), NULL, NULL },
+#define FIELD_DEPTH_SET(name, dest, attrib) \
+    FIELD_ALIAS(#name attrib "cc#", #name attrib "_oncc#") \
+    FIELD_MOD(#name attrib "_oncc#", amount, name, CC, dest) \
+    FIELD_MOD(#name attrib "_curvecc#", curveid, name, CC, dest) \
+    FIELD_MOD(#name attrib "_smoothcc#", smooth, name, CC, dest) \
+    FIELD_MOD(#name attrib "_stepcc#", step, name, CC, dest) \
+    FIELD_MOD(#name attrib "polyaft", amount, name, polyaft, dest) \
+    FIELD_MOD(#name attrib "chanaft", amount, name, chanaft, dest) \
+    FIELD_MOD(#name attrib, amount, name, none, dest) \
 
 #define PROC_FIELD_DESCRIPTOR_dahdsr(field, name, index) \
     DAHDSR_FIELDS(PROC_SUBSTRUCT_FIELD_DESCRIPTOR_DAHDSR, field, name, index, cbox_dahdsr) \
-    FIELD_AMOUNT(#name "_depth", name, from_##name) \
-    FIELD_DEPTHCC_SET(name, smdest_from_##name, "_depth") \
-    { #name "_vel2depth", -1, slpt_modulation, 0, (smsrc_##name << 8) | (smsrc_vel << 20) | (smdest_from_##name), NULL, NULL },
+    FIELD_DEPTH_SET(name, from_##name, "_depth") \
+    FIELD_MOD(#name "_vel2depth", amount, name, vel, from_##name)
 
 #define PROC_FIELD_DESCRIPTOR_lfo(field, name, index) \
     LFO_FIELDS(PROC_SUBSTRUCT_FIELD_DESCRIPTOR, field, name, index, sampler_lfo_params) \
-    FIELD_AMOUNT(#name "_depth", name, from_##name) \
     FIELD_AMOUNT(#name "_freqpolyaft", polyaft, name##_freq) \
     FIELD_AMOUNT(#name "_freqchanaft", chanaft, name##_freq) \
     FIELD_AMOUNT_CC(#name "_freq", name##_freq) \
-    { #name "_depthpolyaft", -1, slpt_modulation, 0, (smsrc_##name << 8) | (smsrc_polyaft << 20) | (smdest_from_##name), NULL, NULL }, \
-    { #name "_depthchanaft", -1, slpt_modulation, 0, (smsrc_##name << 8) | (smsrc_chanaft << 20) | (smdest_from_##name), NULL, NULL }, \
-    FIELD_DEPTHCC_SET(name, smdest_from_##name, "_depth")
+    FIELD_DEPTH_SET(name, from_##name, "_depth")
 
 #define PROC_FIELD_DESCRIPTOR_eq(field, name, index) \
     EQ_FIELDS(PROC_SUBSTRUCT_FIELD_DESCRIPTOR, field, name, index, sampler_eq_params) \
@@ -451,8 +379,13 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
     FIELD_AMOUNT_CC(#name "_gain", name##_gain)
 
 #define PROC_FIELD_DESCRIPTOR_ccrange(field, parname) \
-    { #parname "locc#", LOFS(field), slpt_ccrange, 0, 0, NULL, NULL }, \
-    { #parname "hicc#", LOFS(field), slpt_ccrange, 127, 1, NULL, NULL },
+    { #parname "locc#", LOFS(field), slpt_ccrange, 0, 0, NULL, NULL, NULL }, \
+    { #parname "hicc#", LOFS(field), slpt_ccrange, 127, 1, NULL, NULL, NULL },
+
+#define NIF_VARIANT_CC 0x01000000
+#define NIF_VARIANT_CURVECC 0x02000000
+#define NIF_VARIANT_STEPCC 0x03000000
+#define NIF_VARIANT_MASK 0xFF000000
 
 struct sampler_layer_param_entry sampler_layer_params[] = {
     SAMPLER_FIXED_FIELDS(PROC_FIELD_DESCRIPTOR)
@@ -462,13 +395,10 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_AMOUNT("cutoff_polyaft", polyaft, cutoff)
     FIELD_AMOUNT("resonance_polyaft", polyaft, resonance)
 
-    FIELD_AMOUNT("fileg_depth2", fileg, cutoff2)
-    FIELD_DEPTHCC_SET(fileg, smdest_cutoff2, "_depth2")
-    { "fileg_vel2depth2", -1, slpt_modulation, 0, (smsrc_fileg << 8) | (smsrc_vel << 20) | (smdest_cutoff2), NULL, NULL },
-    FIELD_AMOUNT("fillfo_depth2", fillfo, cutoff2)
-    { "fillfo_depth2polyaft", -1, slpt_modulation, 0, (smsrc_fillfo << 8) | (smsrc_polyaft << 20) | (smdest_cutoff2), NULL, NULL }, \
-    { "fillfo_depth2chanaft", -1, slpt_modulation, 0, (smsrc_fillfo << 8) | (smsrc_chanaft << 20) | (smdest_cutoff2), NULL, NULL }, \
-    FIELD_DEPTHCC_SET(fillfo, smdest_cutoff2, "_depth2")
+    FIELD_DEPTH_SET(fileg, cutoff2, "_depth2")
+    FIELD_MOD("fileg_vel2depth2", amount, fileg, vel, cutoff2)
+
+    FIELD_DEPTH_SET(fillfo, cutoff2, "_depth2")
 
     FIELD_AMOUNT("cutoff2_chanaft", chanaft, cutoff2)
     FIELD_AMOUNT("resonance2_chanaft", chanaft, resonance2)
@@ -494,15 +424,15 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_VOICE_NIF("reloffset_veltrack", sampler_nif_vel2reloffset, 0)
     FIELD_PREVOICE_NIF("delay_random", sampler_nif_addrandomdelay, 0)
     FIELD_PREVOICE_NIF("sync_beats", sampler_nif_syncbeats, 0)
-    FIELD_PREVOICE_CC_NIF("delay_cc#", sampler_nif_cc2delay, 0)
-    FIELD_PREVOICE_CURVECC_NIF("delay_curvecc#", sampler_nif_cc2delay, 0)
-    FIELD_PREVOICE_STEPCC_NIF("delay_stepcc#", sampler_nif_cc2delay, 0)
-    FIELD_VOICE_CC_NIF("reloffset_cc#", sampler_nif_cc2reloffset, 0)
-    FIELD_VOICE_CURVECC_NIF("reloffset_curvecc#", sampler_nif_cc2reloffset, 0)
-    FIELD_VOICE_STEPCC_NIF("reloffset_stepcc#", sampler_nif_cc2reloffset, 0)
-    FIELD_VOICE_CC_NIF("offset_cc#", sampler_nif_cc2offset, 0)
-    FIELD_VOICE_CURVECC_NIF("offset_curvecc#", sampler_nif_cc2offset, 0)
-    FIELD_VOICE_STEPCC_NIF("offset_stepcc#", sampler_nif_cc2offset, 0)
+    FIELD_PREVOICE_NIF("delay_cc#", sampler_nif_cc2delay, NIF_VARIANT_CC)
+    FIELD_PREVOICE_NIF("delay_curvecc#", sampler_nif_cc2delay, NIF_VARIANT_CURVECC)
+    FIELD_PREVOICE_NIF("delay_stepcc#", sampler_nif_cc2delay, NIF_VARIANT_STEPCC)
+    FIELD_VOICE_NIF("reloffset_cc#", sampler_nif_cc2reloffset, NIF_VARIANT_CC)
+    FIELD_VOICE_NIF("reloffset_curvecc#", sampler_nif_cc2reloffset, NIF_VARIANT_CURVECC)
+    FIELD_VOICE_NIF("reloffset_stepcc#", sampler_nif_cc2reloffset, NIF_VARIANT_STEPCC)
+    FIELD_VOICE_NIF("offset_cc#", sampler_nif_cc2offset, NIF_VARIANT_CC)
+    FIELD_VOICE_NIF("offset_curvecc#", sampler_nif_cc2offset, NIF_VARIANT_CURVECC)
+    FIELD_VOICE_NIF("offset_stepcc#", sampler_nif_cc2offset, NIF_VARIANT_STEPCC)
 
     FIELD_ALIAS("hilev", "hivel")
     FIELD_ALIAS("lolev", "lovel")
@@ -516,7 +446,7 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_ALIAS("reloffset_oncc#", "reloffset_cc#")
     FIELD_ALIAS("delay_oncc#", "delay_cc#")
 
-    { "genericmod_#_#_#_#", -1, slpt_generic_modulation, 0, 0, NULL, NULL },
+    { "genericmod_#_#_#_#", -1, slpt_generic_modulation, 0, 0, NULL, NULL, NULL },
 };
 #define NPARAMS (sizeof(sampler_layer_params) / sizeof(sampler_layer_params[0]))
 
@@ -542,17 +472,208 @@ void sampler_layer_prepare_params(void)
             assert(found);
             e->extra_ptr = found;
         }
+        if (i)
+        {
+            struct sampler_layer_param_entry *prev_e = &sampler_layer_params[i - 1];
+            if (!strcmp(e->name, prev_e->name))
+            {
+                printf("Duplicate parameter %s\n", e->name);
+                assert(FALSE);
+            }
+        }
     }
+}
+
+// This only works for setting. Unsetting is slightly different.
+static gboolean override_logic(gboolean is_equal, gboolean has_value, gboolean set_local_value)
+{
+    if (!set_local_value && has_value) // Do not override locally set values
+        return FALSE;
+    // Override if a value or a inherited value is replaced with a local setting.
+    return (!is_equal) || (set_local_value != has_value);
+}
+
+static inline void nif_key_decode(uint64_t extra_int, void *extra_ptr, const uint32_t *args, struct sampler_noteinitfunc_key *nif_key)
+{
+    uint32_t variant = extra_int &~ NIF_VARIANT_MASK;
+    nif_key->notefunc_voice = extra_ptr;
+    if (extra_int & NIF_VARIANT_MASK)
+    {
+        int cc = args[0] & 255;
+        variant = cc + (variant << 8);
+    }
+    nif_key->variant = variant;
+}
+
+static inline void mod_key_decode(uint64_t extra_int, const uint32_t *args, struct sampler_modulation_key *mod_key)
+{
+    uint32_t modsrc = (extra_int & 0xFFF);
+    uint32_t modsrc2 = ((extra_int >> 12) & 0xFFF);
+    if (modsrc == MODSRC_CC)
+        modsrc = args[0];
+    if (modsrc2 == MODSRC_CC)
+        modsrc2 = args[0];
+    mod_key->src = modsrc;
+    mod_key->src2 = modsrc2;
+    mod_key->dest = ((extra_int >> 24) & 0xFF);
+}
+
+#define OVERRIDE_LOGIC(type) override_logic(!memcmp(p, data_ptr, sizeof(type)), e->get_has_value(&l->data), set_local_value)
+
+#define CAST_FLOAT_VALUE fvalue = *(double *)data_ptr
+
+gboolean sampler_layer_param_entry_set_from_ptr(const struct sampler_layer_param_entry *e, struct sampler_layer *l, gboolean set_local_value, const void *data_ptr, const uint32_t *args, GError **error)
+{
+    void *p = ((uint8_t *)&l->data) + e->offset;
+    uint32_t cc = 0;
+    double fvalue = 0;
+    struct sampler_modulation_key mod_key = {0, 0, 0};
+    struct sampler_noteinitfunc_key nif_key = {{NULL}, 0};
+
+    switch(e->type)
+    {
+        case slpt_midi_note_t:
+            if (!OVERRIDE_LOGIC(midi_note_t))
+                return TRUE;
+            memcpy(p, data_ptr, sizeof(midi_note_t));
+            break;
+        case slpt_int:
+            if (!OVERRIDE_LOGIC(int))
+                return TRUE;
+            memcpy(p, data_ptr, sizeof(int));
+            break;
+        case slpt_enum:
+        case slpt_uint32_t:
+            if (!OVERRIDE_LOGIC(uint32_t))
+                return TRUE;
+            memcpy(p, data_ptr, sizeof(uint32_t));
+            break;
+        case slpt_string:
+            {
+                char **pc = p;
+                gboolean str_differs = (!*pc != !data_ptr) || strcmp(*pc, data_ptr);
+                if (!override_logic(!str_differs, e->get_has_value(&l->data), set_local_value))
+                    return TRUE;
+                if (str_differs)
+                {
+                    free(*pc);
+                    *pc = g_strdup(data_ptr);
+                    gboolean *changed_ptr = (gboolean *)(((uint8_t *)&l->data) + e->extra_int);
+                    *changed_ptr = 1;
+                }
+            }
+            break;
+        case slpt_float:
+        case slpt_dBamp:
+            fvalue = *(double *)data_ptr;
+            if (!override_logic((float)fvalue == *(float *)p, e->get_has_value(&l->data), set_local_value))
+                return TRUE;
+            *(float *)p = fvalue;
+            break;
+        case slpt_midicurve:
+            CAST_FLOAT_VALUE;
+            if (args[0] >= 0 && args[0] <= 127)
+            {
+                gboolean (*setgethasfunc)(struct sampler_layer_data *, uint32_t, int) = e->extra_ptr;
+                float *dst = &((struct sampler_midi_curve *)p)->values[args[0]];
+                if (!override_logic(*dst == fvalue, setgethasfunc(&l->data, args[0], -1), set_local_value))
+                    return TRUE;
+                *dst = fvalue;
+                setgethasfunc(&l->data, args[0], set_local_value);
+            }
+            else
+            {
+                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Curve entry index (%u) is out of range for %s", (unsigned)args[0], e->name);
+                return FALSE;
+            }
+            break;
+        case slpt_ccrange:
+        {
+            int number = *(int *)data_ptr;
+            cc = args[0];
+            switch(e->extra_int) {
+                case 0:
+                    sampler_cc_range_set_locc_by_offset(l, e->offset, &(struct sampler_cc_range_key){cc}, set_local_value, number);
+                    break;
+                case 1:
+                    sampler_cc_range_set_hicc_by_offset(l, e->offset, &(struct sampler_cc_range_key){cc}, set_local_value, number);
+                    break;
+                default: assert(0);
+            }
+            break;
+        }
+        case slpt_mod_amount:
+            CAST_FLOAT_VALUE;
+            mod_key_decode(e->extra_int, args, &mod_key);
+            sampler_modulation_set_amount_by_offset(l, e->offset, &mod_key, set_local_value, fvalue);
+            break;
+        case slpt_mod_curveid:
+            CAST_FLOAT_VALUE;
+            mod_key_decode(e->extra_int, args, &mod_key);
+            sampler_modulation_set_curve_id_by_offset(l, e->offset, &mod_key, set_local_value, (int)fvalue);
+            break;
+        case slpt_mod_smooth:
+            CAST_FLOAT_VALUE;
+            mod_key_decode(e->extra_int, args, &mod_key);
+            sampler_modulation_set_smooth_by_offset(l, e->offset, &mod_key, set_local_value, fvalue);
+            break;
+        case slpt_mod_step:
+            CAST_FLOAT_VALUE;
+            mod_key_decode(e->extra_int, args, &mod_key);
+            sampler_modulation_set_step_by_offset(l, e->offset, &mod_key, set_local_value, fvalue);
+            break;
+        case slpt_generic_modulation:
+            CAST_FLOAT_VALUE;
+            sampler_modulation_set_amount_by_offset(l, e->offset, &(struct sampler_modulation_key){args[0], args[1], args[2]}, set_local_value, fvalue);
+            sampler_modulation_set_curve_id_by_offset(l, e->offset, &(struct sampler_modulation_key){args[0], args[1], args[2]}, set_local_value, (int)args[3]);
+            break;
+        case slpt_voice_nif:
+        case slpt_prevoice_nif:
+            CAST_FLOAT_VALUE;
+            nif_key_decode(e->extra_int, e->extra_ptr, args, &nif_key);
+            switch(e->extra_int & NIF_VARIANT_MASK)
+            {
+            case 0:
+            case NIF_VARIANT_CC:
+                sampler_noteinitfunc_set_value_by_offset(l, e->offset, &nif_key, set_local_value, fvalue);
+                break;
+            case NIF_VARIANT_CURVECC:
+                sampler_noteinitfunc_set_curve_id_by_offset(l, e->offset, &nif_key, set_local_value, (int)fvalue);
+                break;
+            case NIF_VARIANT_STEPCC:
+                sampler_noteinitfunc_set_step_by_offset(l, e->offset, &nif_key, set_local_value, fvalue);
+                break;
+            }
+            break;
+        case slpt_reserved:
+        case slpt_invalid:
+        case slpt_alias:
+            printf("Unhandled parameter type of parameter %s\n", e->name);
+            assert(0);
+            return FALSE;
+    }
+    if (e->set_has_value)
+        e->set_has_value(&l->data, set_local_value);
+    if (l->child_layers) {
+        /* Propagate to children */
+        GHashTableIter iter;
+        g_hash_table_iter_init(&iter, l->child_layers);
+        gpointer key, value;
+        while(g_hash_table_iter_next(&iter, &key, &value))
+        {
+            struct sampler_layer *child = value;
+            if (!sampler_layer_param_entry_set_from_ptr(e, child, FALSE, data_ptr, args, error))
+                return FALSE;
+        }
+    }
+    return TRUE;
 }
 
 #define VERIFY_FLOAT_VALUE do { if (!atof_C_verify(e->name, value, &fvalue, error)) return FALSE; } while(0)
 
-gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_param_entry *e, struct sampler_layer *l, const char *value, const uint32_t *args, GError **error)
+gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_param_entry *e, struct sampler_layer *l, gboolean set_local_value, const char *value, const uint32_t *args, GError **error)
 {
-    void *p = ((uint8_t *)&l->data) + e->offset;
-    uint32_t cc;
     double fvalue;
-
     switch(e->type)
     {
         case slpt_midi_note_t:
@@ -563,9 +684,7 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "'%s' is not a valid note name for %s", value, e->name);
                 return FALSE;
             }
-            *((midi_note_t *)p) = note;
-            e->set_has_value(&l->data, 1);
-            return TRUE;
+            return sampler_layer_param_entry_set_from_ptr(e, l, set_local_value, &note, args, error);
         }
         case slpt_int:
         {
@@ -577,21 +696,19 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "'%s' is not a correct integer value for %s", value, e->name);
                 return FALSE;
             }
-            *(int *)p = number;
-            e->set_has_value(&l->data, 1);
-            return TRUE;
+            return sampler_layer_param_entry_set_from_ptr(e, l, set_local_value, &number, args, error);
         }
         case slpt_enum:
         {
             gboolean (*func)(const char *, uint32_t *value);
             func = e->extra_ptr;
-            if (!func(value, (uint32_t *)p))
+            uint32_t data = 0;
+            if (!func(value, &data))
             {
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "'%s' is not a correct value for %s", value, e->name);
                 return FALSE;
             }
-            e->set_has_value(&l->data, 1);
-            return TRUE;
+            return sampler_layer_param_entry_set_from_ptr(e, l, set_local_value, &data, args, error);
         }
         case slpt_uint32_t:
         {
@@ -603,45 +720,12 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "'%s' is not a correct unsigned integer value for %s", value, e->name);
                 return FALSE;
             }
-            *(uint32_t *)p = number;
-            e->set_has_value(&l->data, 1);
-            return TRUE;
+            return sampler_layer_param_entry_set_from_ptr(e, l, set_local_value, &number, args, error);
         }
-        case slpt_float:
-        case slpt_dBamp:
-            VERIFY_FLOAT_VALUE;
-            *((float *)p) = fvalue;
-            e->set_has_value(&l->data, 1);
-            return TRUE;
         case slpt_string:
-            {
-                char **pc = p;
-                if (*pc && !strcmp(*pc, value))
-                    return TRUE; // no change
-                free(*pc);
-                *pc = g_strdup(value);
-                e->set_has_value(&l->data, 1);
-                gboolean *changed_ptr = (gboolean *)(((uint8_t *)&l->data) + e->extra_int);
-                *changed_ptr = 1;
-            }
-            return TRUE;
-        case slpt_midicurve:
-            VERIFY_FLOAT_VALUE;
-            if (args[0] >= 0 && args[0] <= 127)
-            {
-                ((struct sampler_midi_curve *)p)->values[args[0]] = fvalue;
-                void (*sethasfunc)(struct sampler_layer_data *, uint32_t, gboolean value) = e->extra_ptr;
-                sethasfunc(&l->data, args[0], 1);
-            }
-            else
-            {
-                g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Curve entry index (%u) is out of range for %s", (unsigned)args[0], e->name);
-                return FALSE;
-            }
-            return TRUE;
+            return sampler_layer_param_entry_set_from_ptr(e, l, set_local_value, value, args, error);
         case slpt_ccrange:
         {
-            cc = args[0];
             char *endptr;
             errno = 0;
             int number = strtol(value, &endptr, 10);
@@ -650,126 +734,30 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "'%s' is not a correct control change value for %s", value, e->name);
                 return FALSE;
             }
-            struct sampler_cc_range *range = sampler_cc_range_add((struct sampler_cc_range **)p, &(struct sampler_cc_range_key){cc});
-            switch(e->extra_int) {
-                case 0: range->value.locc = number; range->value.has_locc = 1; break;
-                case 1: range->value.hicc = number; range->value.has_hicc = 1; break;
-                default: assert(0);
-            }
-            sampler_cc_range_propagate_set(l, e->offset, range, TRUE);
-            return TRUE;
+            return sampler_layer_param_entry_set_from_ptr(e, l, set_local_value, &number, args, error);
         }
-        case slpt_depthcc:
+        case slpt_float:
+        case slpt_dBamp:
+        default:
             VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, fvalue);
-            return TRUE;
-        case slpt_depth_curvecc:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_modulation_curve_id(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, (int)fvalue);
-            return TRUE;
-        case slpt_depth_smoothcc:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_modulation_smooth(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, fvalue);
-            return TRUE;
-        case slpt_depth_stepcc:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_modulation_step(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, fvalue);
-            return TRUE;
-        case slpt_amountcc:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, fvalue);
-            return TRUE;
-        case slpt_curvecc:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_modulation_curve_id(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, (int)fvalue);
-            return TRUE;
-        case slpt_smoothcc:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_modulation_smooth(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, fvalue);
-            return TRUE;
-        case slpt_stepcc:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_modulation_step(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, fvalue);
-            return TRUE;
-        case slpt_amount:
-            VERIFY_FLOAT_VALUE;
-            sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){(e->extra_int >> 16), smsrc_none, (e->extra_int & 0xFFFF)}, fvalue);
-            return TRUE;
-        case slpt_modulation:
-            VERIFY_FLOAT_VALUE;
-            sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){(e->extra_int >> 8) & 0xFFF, (e->extra_int >> 20), (e->extra_int & 0xFF)}, fvalue);
-            return TRUE;
-        case slpt_generic_modulation:
-            VERIFY_FLOAT_VALUE;
-            sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, fvalue);
-            sampler_layer_set_modulation_curve_id(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, (int)args[3]);
-            return TRUE;
-        case slpt_voice_nif:
-            VERIFY_FLOAT_VALUE;
-            sampler_layer_set_voice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = e->extra_int }, fvalue);
-            return TRUE;
-        case slpt_prevoice_nif:
-            VERIFY_FLOAT_VALUE;
-            sampler_layer_set_prevoice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = e->extra_int }, fvalue);
-            return TRUE;
-        case slpt_voice_cc_nif:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_voice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, fvalue);
-            return TRUE;
-        case slpt_prevoice_cc_nif:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_prevoice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, fvalue);
-            return TRUE;
-        case slpt_voice_curvecc_nif:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_voice_nif_curve_id(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, (int)fvalue);
-            return TRUE;
-        case slpt_prevoice_curvecc_nif:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_prevoice_nif_curve_id(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, (int)fvalue);
-            return TRUE;
-        case slpt_voice_stepcc_nif:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_voice_nif_step(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, fvalue);
-            return TRUE;
-        case slpt_prevoice_stepcc_nif:
-            VERIFY_FLOAT_VALUE;
-            cc = args[0];
-            sampler_layer_set_prevoice_nif_step(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8) }, fvalue);
-            return TRUE;
-        case slpt_reserved:
-        case slpt_invalid:
-        case slpt_alias:
-            break;
+            return sampler_layer_param_entry_set_from_ptr(e, l, set_local_value, &fvalue, args, error);
     }
-    printf("Unhandled parameter type of parameter %s\n", e->name);
-    assert(0);
-    return FALSE;
 }
 
 #define COPY_NUM_FROM_PARENT(case_value, type) \
     case case_value: \
+        if (!unset_local_value && e->get_has_value(&l->data)) \
+            return TRUE; \
         *(type *)p = pp ? *(type *)pp : (type)e->def_value; \
         e->set_has_value(&l->data, 0); \
-        return TRUE;
-gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry *e, struct sampler_layer *l, const uint32_t *args, GError **error)
+        break;
+gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry *e, struct sampler_layer *l, gboolean unset_local_value, const uint32_t *args, GError **error)
 {
     void *p = ((uint8_t *)&l->data) + e->offset;
     void *pp = l->parent ? ((uint8_t *)&l->parent->data) + e->offset : NULL;
     uint32_t cc;
+    struct sampler_modulation_key mod_key = {0, 0, 0};
+    struct sampler_noteinitfunc_key nif_key = {{NULL}, 0};
 
     switch(e->type)
     {
@@ -781,6 +769,8 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
         COPY_NUM_FROM_PARENT(slpt_dBamp, float)
         case slpt_string:
             {
+                if (!unset_local_value && e->get_has_value(&l->data))
+                    return TRUE;
                 char **pc = p;
                 free(*pc);
                 *pc = pp ? g_strdup(*(const char **)pp) : NULL;
@@ -793,10 +783,12 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             if (args[0] >= 0 && args[0] <= 127)
             {
                 struct sampler_midi_curve *curve = p, *parent_curve = pp;
-                curve->values[args[0]] = parent_curve ? parent_curve->values[args[0]] : -1;
-                void (*sethasfunc)(struct sampler_layer_data *, uint32_t, gboolean value) = e->extra_ptr;
-                sethasfunc(&l->data, args[0], 0);
-                return TRUE;
+                gboolean (*setgethasfunc)(struct sampler_layer_data *, uint32_t, gboolean value) = e->extra_ptr;
+                if (setgethasfunc(&l->data, args[0], -1) && !unset_local_value)
+                    return TRUE;
+                curve->values[args[0]] = parent_curve ? parent_curve->values[args[0]] : SAMPLER_CURVE_GAP;
+                setgethasfunc(&l->data, args[0], 0);
+                break;
             }
             else
             {
@@ -804,95 +796,76 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
                 return FALSE;
             }
         case slpt_ccrange:
-        {
             cc = args[0];
-            if (!sampler_cc_range_propagate_unset(l, e->offset, &(struct sampler_cc_range_key){cc}, TRUE, 1 << e->extra_int))
+            if (!sampler_cc_range_unset_by_offset(l, e->offset, &(struct sampler_cc_range_key){cc}, unset_local_value, 1 << e->extra_int))
             {
+                if (!unset_local_value)
+                    return TRUE;
                 g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Controller number %d not used for %s", cc, e->name);
                 return FALSE;
             }
-            return TRUE;
-        }
-        case slpt_depthcc:
-            cc = args[0];
-            sampler_layer_unset_modulation_amount(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, TRUE);
-            return TRUE;
-        case slpt_depth_curvecc:
-            cc = args[0];
-            sampler_layer_unset_modulation_curve_id(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, TRUE);
-            return TRUE;
-        case slpt_depth_smoothcc:
-            cc = args[0];
-            sampler_layer_unset_modulation_smooth(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, TRUE);
-            return TRUE;
-        case slpt_depth_stepcc:
-            cc = args[0];
-            sampler_layer_unset_modulation_step(l, &(struct sampler_modulation_key){(e->extra_int >> 16), cc, (e->extra_int & 0xFFFF)}, TRUE);
-            return TRUE;
-        case slpt_amountcc:
-            cc = args[0];
-            sampler_layer_unset_modulation_amount(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, TRUE);
-            return TRUE;
-        case slpt_curvecc:
-            cc = args[0];
-            sampler_layer_unset_modulation_curve_id(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, TRUE);
-            return TRUE;
-        case slpt_smoothcc:
-            cc = args[0];
-            sampler_layer_unset_modulation_smooth(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, TRUE);
-            return TRUE;
-        case slpt_stepcc:
-            cc = args[0];
-            sampler_layer_unset_modulation_step(l, &(struct sampler_modulation_key){cc, smsrc_none, (e->extra_int & 0xFFFF)}, TRUE);
-            return TRUE;
-        case slpt_amount:
-            sampler_layer_unset_modulation_amount(l, &(struct sampler_modulation_key){(e->extra_int >> 16), smsrc_none, (e->extra_int & 0xFFFF)}, TRUE);
-            return TRUE;
-        case slpt_modulation:
-            sampler_layer_unset_modulation_amount(l, &(struct sampler_modulation_key){(e->extra_int >> 8) & 0xFFF, (e->extra_int >> 20), (e->extra_int & 0xFF)}, TRUE);
-            return TRUE;
-        case slpt_voice_nif:
-            sampler_layer_unset_voice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = e->extra_int }, TRUE);
-            return TRUE;
-        case slpt_prevoice_nif:
-            sampler_layer_unset_prevoice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = e->extra_int }, TRUE);
-            return TRUE;
-        case slpt_voice_cc_nif:
-            cc = args[0];
-            sampler_layer_unset_voice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
-            return TRUE;
-        case slpt_prevoice_cc_nif:
-            cc = args[0];
-            sampler_layer_unset_prevoice_nif_value(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
-            return TRUE;
-        case slpt_voice_curvecc_nif:
-            cc = args[0];
-            sampler_layer_unset_voice_nif_curve_id(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
-            return TRUE;
-        case slpt_prevoice_curvecc_nif:
-            cc = args[0];
-            sampler_layer_unset_prevoice_nif_curve_id(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
-            return TRUE;
-        case slpt_voice_stepcc_nif:
-            cc = args[0];
-            sampler_layer_unset_voice_nif_step(l, &(struct sampler_noteinitfunc_key){ .notefunc_voice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
-            return TRUE;
-        case slpt_prevoice_stepcc_nif:
-            cc = args[0];
-            sampler_layer_unset_prevoice_nif_step(l, &(struct sampler_noteinitfunc_key){ .notefunc_prevoice = e->extra_ptr, .variant = cc + (e->extra_int << 8)}, TRUE);
-            return TRUE;
+            break;
+        case slpt_mod_amount:
+            mod_key_decode(e->extra_int, args, &mod_key);
+            sampler_modulation_unset_by_offset(l, e->offset, &mod_key, unset_local_value, 1 << sampler_modulation_value_field_amount);
+            break;
+        case slpt_mod_curveid:
+            mod_key_decode(e->extra_int, args, &mod_key);
+            sampler_modulation_unset_by_offset(l, e->offset, &mod_key, unset_local_value, 1 << sampler_modulation_value_field_curve_id);
+            break;
+        case slpt_mod_smooth:
+            mod_key_decode(e->extra_int, args, &mod_key);
+            sampler_modulation_unset_by_offset(l, e->offset, &mod_key, unset_local_value, 1 << sampler_modulation_value_field_smooth);
+            break;
+        case slpt_mod_step:
+            mod_key_decode(e->extra_int, args, &mod_key);
+            sampler_modulation_unset_by_offset(l, e->offset, &mod_key, unset_local_value, 1 << sampler_modulation_value_field_step);
+            break;
         case slpt_generic_modulation:
-            sampler_layer_unset_modulation_amount(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, TRUE);
-            sampler_layer_unset_modulation_curve_id(l, &(struct sampler_modulation_key){args[0], args[1], args[2]}, TRUE);
-            return TRUE;
+            mod_key = (struct sampler_modulation_key){args[0], args[1], args[2]};
+            sampler_modulation_unset_by_offset(l, e->offset, &mod_key, unset_local_value, (1 << sampler_modulation_value_field_amount) | (1 << sampler_modulation_value_field_curve_id));
+            break;
+        case slpt_voice_nif:
+        case slpt_prevoice_nif:
+        {
+            nif_key_decode(e->extra_int, e->extra_ptr, args, &nif_key);
+            static const uint32_t value_fields[] = {
+                sampler_noteinitfunc_value_field_value, sampler_noteinitfunc_value_field_value,
+                sampler_noteinitfunc_value_field_curve_id, sampler_noteinitfunc_value_field_step,
+            };
+            if (!sampler_noteinitfunc_unset_by_offset(l, e->offset, &nif_key, unset_local_value, 1 << value_fields[e->extra_int >> 24]))
+            {
+                if (!unset_local_value)
+                    return TRUE;
+                if (e->extra_int & NIF_VARIANT_MASK)
+                    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Controller number %d not used for %s", args[0], e->name);
+                else
+                    g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "%s not set", e->name);
+                return FALSE;
+            }
+            break;
+        }
         case slpt_invalid:
         case slpt_reserved:
         case slpt_alias:
-            break;
+        default:
+            printf("Unhandled parameter type of parameter %s\n", e->name);
+            assert(0);
+            return FALSE;
     }
-    printf("Unhandled parameter type of parameter %s\n", e->name);
-    assert(0);
-    return FALSE;
+    if (l->child_layers) {
+        /* Propagate to children */
+        GHashTableIter iter;
+        g_hash_table_iter_init(&iter, l->child_layers);
+        gpointer key, value;
+        while(g_hash_table_iter_next(&iter, &key, &value))
+        {
+            struct sampler_layer *child = value;
+            if (!sampler_layer_param_entry_unset(e, child, FALSE, args, error))
+                return FALSE;
+        }
+    }
+    return TRUE;
 }
 #undef COPY_NUM_FROM_PARENT
 
@@ -967,7 +940,7 @@ int sampler_layer_apply_fixed_param(struct sampler_layer *l, const char *key, co
     uint32_t args[10];
     const struct sampler_layer_param_entry *e = sampler_layer_param_find(key, args);
     if (e)
-        return sampler_layer_param_entry_set_from_string(e, l, value, args, error);
+        return sampler_layer_param_entry_set_from_string(e, l, TRUE, value, args, error);
     else
         return -1;
 }
@@ -977,7 +950,7 @@ int sampler_layer_unapply_fixed_param(struct sampler_layer *l, const char *key, 
     uint32_t args[10];
     const struct sampler_layer_param_entry *e = sampler_layer_param_find(key, args);
     if (e)
-        return sampler_layer_param_entry_unset(e, l, args, error);
+        return sampler_layer_param_entry_unset(e, l, TRUE, args, error);
     else
         return -1;
 }
@@ -1122,21 +1095,22 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     struct sampler_layer_data *ld = &l->data;
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_INITIALISER)
 
-    ld->eff_waveform = NULL;
-    ld->eff_freq = 44100;
+    ld->computed.eff_waveform = NULL;
+    ld->computed.eff_freq = 44100;
     ld->modulations = NULL;
     ld->voice_nifs = NULL;
     ld->prevoice_nifs = NULL;
 
-    ld->eff_use_keyswitch = 0;
+    ld->computed.eff_use_keyswitch = 0;
     if (!parent)
     {
         // Systemwide default instead?
-        sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){74, smsrc_none, smdest_cutoff}, 9600);
-        sampler_layer_set_modulation_curve_id(l, &(struct sampler_modulation_key){74, smsrc_none, smdest_cutoff}, 1);
-        sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){71, smsrc_none, smdest_resonance}, 12);
-        sampler_layer_set_modulation_curve_id(l, &(struct sampler_modulation_key){71, smsrc_none, smdest_resonance}, 1);
-        sampler_layer_set_modulation_amount(l, &(struct sampler_modulation_key){smsrc_pitchlfo, 1, smdest_pitch}, 100);
+        uint32_t mod_offset = LOFS(modulations);
+        sampler_modulation_set_amount_by_offset(l, mod_offset, &(struct sampler_modulation_key){74, smsrc_none, smdest_cutoff}, TRUE, 9600);
+        sampler_modulation_set_curve_id_by_offset(l, mod_offset, &(struct sampler_modulation_key){74, smsrc_none, smdest_cutoff}, TRUE, 1);
+        sampler_modulation_set_amount_by_offset(l, mod_offset, &(struct sampler_modulation_key){71, smsrc_none, smdest_resonance}, TRUE, 12);
+        sampler_modulation_set_curve_id_by_offset(l, mod_offset, &(struct sampler_modulation_key){71, smsrc_none, smdest_resonance}, TRUE, 1);
+        sampler_modulation_set_amount_by_offset(l, mod_offset, &(struct sampler_modulation_key){smsrc_pitchlfo, 1, smdest_pitch}, TRUE, 100);
     }
     l->runtime = NULL;
     l->unknown_keys = NULL;
@@ -1178,40 +1152,9 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
     dst->modulations = sampler_modulation_clone(src->modulations, copy_hasattr);
     dst->voice_nifs = sampler_noteinitfunc_clone(src->voice_nifs, copy_hasattr);
     dst->prevoice_nifs = sampler_noteinitfunc_clone(src->prevoice_nifs, copy_hasattr);
-    dst->eff_waveform = src->eff_waveform;
-    if (dst->eff_waveform)
-        cbox_waveform_ref(dst->eff_waveform);
-}
-
-#define PROC_FIELDS_CLONEPARENT(type, name, def_value) \
-    if (!l->has_##name) \
-        l->name = parent ? parent->name : def_value;
-#define PROC_FIELDS_CLONEPARENT_string(name) \
-    if (!l->has_##name && (!l->name || !parent->name || strcmp(l->name, parent->name))) { \
-        g_free(l->name); \
-        l->name = parent && parent->name ? g_strdup(parent->name) : NULL; \
-        l->name##_changed = parent && parent->name##_changed; \
-    }
-// XXXKF use a better default
-#define PROC_FIELDS_CLONEPARENT_midicurve(name) \
-    for (uint32_t i = 0; i < 128; ++i) \
-        if (!l->name.has_values[i]) \
-            l->name.values[i] = parent ? parent->name.values[i] : SAMPLER_CURVE_GAP;
-#define PROC_FIELDS_CLONEPARENT_dBamp PROC_FIELDS_CLONEPARENT
-#define PROC_FIELDS_CLONEPARENT_enum PROC_FIELDS_CLONEPARENT
-#define PROC_FIELDS_CLONEPARENT_dahdsr(name, parname, index) \
-        DAHDSR_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
-#define PROC_FIELDS_CLONEPARENT_lfo(name, parname, index) \
-        LFO_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
-#define PROC_FIELDS_CLONEPARENT_eq(name, parname, index) \
-        EQ_FIELDS(PROC_SUBSTRUCT_CLONEPARENT, name, l)
-#define PROC_FIELDS_CLONEPARENT_ccrange(name, parname)
-
-static void sampler_layer_data_getdefaults(struct sampler_layer_data *l, struct sampler_layer_data *parent)
-{
-    SAMPLER_FIXED_FIELDS(PROC_FIELDS_CLONEPARENT)
-    // XXXKF: add handling for velcurve (XXXKF comment out of date - this is
-    // already done in PROC_FIELDS_CLONEPARENT_midicurve, I believe)
+    dst->computed.eff_waveform = src->computed.eff_waveform;
+    if (dst->computed.eff_waveform)
+        cbox_waveform_ref(dst->computed.eff_waveform);
 }
 
 void sampler_midi_curve_init(struct sampler_midi_curve *curve)
@@ -1279,7 +1222,7 @@ static inline int sampler_filter_num_stages(float cutoff, enum sampler_filter_ty
 #define PROC_FIELDS_FINALISER(type, name, def_value) 
 #define PROC_FIELDS_FINALISER_string(name)
 #define PROC_FIELDS_FINALISER_midicurve(name) \
-    sampler_midi_curve_interpolate(&l->name, l->eff_##name, START_VALUE_##name, END_VALUE_##name, IS_QUADRATIC_##name);
+    sampler_midi_curve_interpolate(&l->name, l->computed.eff_##name, START_VALUE_##name, END_VALUE_##name, IS_QUADRATIC_##name);
 #define PROC_FIELDS_FINALISER_enum(type, name, def_value) 
 #define PROC_FIELDS_FINALISER_dBamp(type, name, def_value) \
     l->name##_linearized = dB2gain(l->name);
@@ -1294,32 +1237,30 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     struct sampler_module *m = p->module;
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_FINALISER)
 
-    sampler_layer_data_getdefaults(l, parent);
-    
     // Handle change of sample in the parent group without override on region level
     if (parent && (l->sample_changed || parent->sample_changed))
     {
-        struct cbox_waveform *oldwf = l->eff_waveform;
+        struct cbox_waveform *oldwf = l->computed.eff_waveform;
         if (l->sample && *l->sample)
         {
             GError *error = NULL;
-            l->eff_waveform = cbox_wavebank_get_waveform(p->name, p->tarfile, p->sample_dir, l->sample, &error);
-            if (!l->eff_waveform)
+            l->computed.eff_waveform = cbox_wavebank_get_waveform(p->name, p->tarfile, p->sample_dir, l->sample, &error);
+            if (!l->computed.eff_waveform)
             {
                 g_warning("Cannot load waveform %s: %s", l->sample, error ? error->message : "unknown error");
                 g_error_free(error);
             }
         }
         else
-            l->eff_waveform = NULL;
+            l->computed.eff_waveform = NULL;
         if (oldwf)
             cbox_waveform_unref(oldwf);
-        l->eff_is_silent = !l->sample || !strcmp(l->sample, "*silence");
+        l->computed.eff_is_silent = !l->sample || !strcmp(l->sample, "*silence");
         l->sample_changed = FALSE;
     }
     
-    l->eff_use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
-    l->eff_use_simple_trigger_logic =
+    l->computed.eff_use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
+    l->computed.eff_use_simple_trigger_logic =
         (l->seq_length == 1 && l->seq_position == 1) &&
         (l->trigger != stm_first && l->trigger != stm_legato) &&
         (l->lochan == 1 && l->hichan == 16) &&
@@ -1328,30 +1269,31 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         (l->lochanaft == 0 && l->hichanaft == 127) &&
         (l->lopolyaft == 0 && l->hipolyaft == 127) &&
         (l->lobpm == 0 && l->hibpm == NO_HI_BPM_VALUE) &&
-        !l->cc && !l->eff_use_keyswitch;
-    l->eff_use_xfcc = l->xfin_cc || l->xfout_cc;
-    l->eff_use_channel_mixer = l->position != 0 || l->width != 100;
-    l->eff_freq = (l->eff_waveform && l->eff_waveform->info.samplerate) ? l->eff_waveform->info.samplerate : 44100;
-    l->eff_loop_mode = l->loop_mode;
-    l->eff_use_filter_mods = l->cutoff != -1 || l->cutoff2 != -1;
+        !l->cc && !l->computed.eff_use_keyswitch;
+    l->computed.eff_use_xfcc = l->xfin_cc || l->xfout_cc;
+    l->computed.eff_use_channel_mixer = l->position != 0 || l->width != 100;
+    l->computed.eff_freq = (l->computed.eff_waveform && l->computed.eff_waveform->info.samplerate) ? l->computed.eff_waveform->info.samplerate : 44100;
+    l->computed.eff_loop_mode = l->loop_mode;
+    l->computed.eff_use_filter_mods = l->cutoff != -1 || l->cutoff2 != -1;
     if (l->loop_mode == slm_unknown)
     {
-        if (l->eff_waveform && l->eff_waveform->has_loop)
-            l->eff_loop_mode = slm_loop_continuous;
+        if (l->computed.eff_waveform && l->computed.eff_waveform->has_loop)
+            l->computed.eff_loop_mode = slm_loop_continuous;
         else
-        if (l->eff_waveform)
-            l->eff_loop_mode = l->loop_end == 0 ? slm_no_loop : slm_loop_continuous;
+        if (l->computed.eff_waveform)
+            l->computed.eff_loop_mode = l->loop_end == 0 ? slm_no_loop : slm_loop_continuous;
     }
-    
-    if (l->eff_loop_mode == slm_one_shot || l->eff_loop_mode == slm_no_loop || l->eff_loop_mode == slm_one_shot_chokeable)
-        l->loop_start = SAMPLER_NO_LOOP;
 
-    if ((l->eff_loop_mode == slm_loop_continuous || l->eff_loop_mode == slm_loop_sustain) && l->loop_start == SAMPLER_NO_LOOP)
-        l->loop_start = 0;
-    if ((l->eff_loop_mode == slm_loop_continuous || l->eff_loop_mode == slm_loop_sustain) && l->loop_start == 0 && l->eff_waveform && l->eff_waveform->has_loop)
-        l->loop_start = l->eff_waveform->loop_start;
-    if (l->loop_end == 0 && l->eff_waveform != NULL)
-        l->loop_end = l->eff_waveform->has_loop ? l->eff_waveform->loop_end : l->eff_waveform->info.frames;
+    l->computed.eff_loop_start = l->loop_start;
+    l->computed.eff_loop_end = l->loop_end;
+    if (l->computed.eff_loop_mode == slm_one_shot || l->computed.eff_loop_mode == slm_no_loop || l->computed.eff_loop_mode == slm_one_shot_chokeable)
+        l->computed.eff_loop_start = SAMPLER_NO_LOOP;
+    if ((l->computed.eff_loop_mode == slm_loop_continuous || l->computed.eff_loop_mode == slm_loop_sustain) && l->computed.eff_loop_start == SAMPLER_NO_LOOP)
+        l->computed.eff_loop_start = 0;
+    if ((l->computed.eff_loop_mode == slm_loop_continuous || l->computed.eff_loop_mode == slm_loop_sustain) && l->computed.eff_loop_start == 0 && l->computed.eff_waveform && l->computed.eff_waveform->has_loop)
+        l->computed.eff_loop_start = l->computed.eff_waveform->loop_start;
+    if (l->loop_end == 0 && l->computed.eff_waveform != NULL)
+        l->computed.eff_loop_end = l->computed.eff_waveform->has_loop ? l->computed.eff_waveform->loop_end : l->computed.eff_waveform->info.frames;
 
     if (l->off_mode == som_unknown)
         l->off_mode = l->off_by != 0 ? som_fast : som_normal;
@@ -1364,45 +1306,45 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     // and 3 (N) frames at the start of the loop, and play it; in rare cases this will need to be
     // repeated twice if output write pointer is close to CBOX_BLOCK_SIZE or playback rate is very low,
     // but that's OK.
-    if (l->eff_waveform && l->eff_waveform->preloaded_frames == (size_t)l->eff_waveform->info.frames)
+    if (l->computed.eff_waveform && l->computed.eff_waveform->preloaded_frames == (size_t)l->computed.eff_waveform->info.frames)
     {
-        int shift = l->eff_waveform->info.channels == 2 ? 1 : 0;
+        int shift = l->computed.eff_waveform->info.channels == 2 ? 1 : 0;
         uint32_t halfscratch = MAX_INTERPOLATION_ORDER << shift;
-        memcpy(&l->scratch_loop[0], &l->eff_waveform->data[(l->loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
-        memcpy(&l->scratch_end[0], &l->eff_waveform->data[(l->loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
-        memset(l->scratch_end + halfscratch, 0, halfscratch * sizeof(int16_t));
-        if (l->loop_start != (uint32_t)-1)
-            memcpy(l->scratch_loop + halfscratch, &l->eff_waveform->data[l->loop_start << shift], halfscratch * sizeof(int16_t));
+        memcpy(&l->computed.scratch_loop[0], &l->computed.eff_waveform->data[(l->computed.eff_loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
+        memcpy(&l->computed.scratch_end[0], &l->computed.eff_waveform->data[(l->computed.eff_loop_end - MAX_INTERPOLATION_ORDER) << shift], halfscratch * sizeof(int16_t) );
+        memset(l->computed.scratch_end + halfscratch, 0, halfscratch * sizeof(int16_t));
+        if (l->computed.eff_loop_start != (uint32_t)-1)
+            memcpy(l->computed.scratch_loop + halfscratch, &l->computed.eff_waveform->data[l->computed.eff_loop_start << shift], halfscratch * sizeof(int16_t));
         else
-            memset(l->scratch_loop + halfscratch, 0, halfscratch * sizeof(int16_t));
+            memset(l->computed.scratch_loop + halfscratch, 0, halfscratch * sizeof(int16_t));
     }
     if (l->cutoff < 20)
-        l->logcutoff = -1;
+        l->computed.logcutoff = -1;
     else
-        l->logcutoff = 1200.0 * log(l->cutoff / 440.0) / log(2) + 5700.0;
+        l->computed.logcutoff = 1200.0 * log(l->cutoff / 440.0) / log(2) + 5700.0;
 
     if (l->cutoff2 < 20)
-        l->logcutoff2 = -1;
+        l->computed.logcutoff2 = -1;
     else
-        l->logcutoff2 = 1200.0 * log(l->cutoff2 / 440.0) / log(2) + 5700.0;
+        l->computed.logcutoff2 = 1200.0 * log(l->cutoff2 / 440.0) / log(2) + 5700.0;
 
-    l->eq_bitmask = ((l->eq1.gain != 0 || l->eq1.vel2gain != 0) ? 1 : 0)
+    l->computed.eq_bitmask = ((l->eq1.gain != 0 || l->eq1.vel2gain != 0) ? 1 : 0)
         | ((l->eq2.gain != 0 || l->eq2.vel2gain != 0) ? 2 : 0)
         | ((l->eq3.gain != 0 || l->eq3.vel2gain != 0) ? 4 : 0);
-    l->mod_bitmask = 0;
+    l->computed.mod_bitmask = 0;
     for(struct sampler_modulation *mod = l->modulations; mod; mod = mod->next)
     {
         const struct sampler_modulation_key *mk = &mod->key;
         if (mk->dest >= smdest_eg_stage_start && mk->dest <= smdest_eg_stage_end)
-            l->mod_bitmask |= slmb_ampeg_cc << ((mk->dest >> 4) & 3);
+            l->computed.mod_bitmask |= slmb_ampeg_cc << ((mk->dest >> 4) & 3);
     }
 
-    l->eff_use_prevoice = (l->delay || l->prevoice_nifs);
-    l->eff_num_stages = sampler_filter_num_stages(l->cutoff, l->fil_type);
-    l->eff_num_stages2 = sampler_filter_num_stages(l->cutoff2, l->fil2_type);
+    l->computed.eff_use_prevoice = (l->delay || l->prevoice_nifs);
+    l->computed.eff_num_stages = sampler_filter_num_stages(l->cutoff, l->fil_type);
+    l->computed.eff_num_stages2 = sampler_filter_num_stages(l->cutoff2, l->fil2_type);
 
-    l->resonance_scaled = pow(l->resonance_linearized, 1.f / l->eff_num_stages);
-    l->resonance2_scaled = pow(l->resonance2_linearized, 1.f / l->eff_num_stages2);
+    l->computed.resonance_scaled = pow(l->resonance_linearized, 1.f / l->computed.eff_num_stages);
+    l->computed.resonance2_scaled = pow(l->resonance2_linearized, 1.f / l->computed.eff_num_stages2);
 }
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)
@@ -1812,10 +1754,10 @@ void sampler_layer_data_close(struct sampler_layer_data *l)
     sampler_noteinitfuncs_destroy(l->voice_nifs);
     sampler_noteinitfuncs_destroy(l->prevoice_nifs);
     sampler_modulations_destroy(l->modulations);
-    if (l->eff_waveform)
+    if (l->computed.eff_waveform)
     {
-        cbox_waveform_unref(l->eff_waveform);
-        l->eff_waveform = NULL;
+        cbox_waveform_unref(l->computed.eff_waveform);
+        l->computed.eff_waveform = NULL;
     }
     g_free(l->sample);
 }

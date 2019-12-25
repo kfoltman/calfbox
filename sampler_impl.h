@@ -30,10 +30,15 @@ static inline int sfz_note_from_string(const char *note)
     int pos;
     int nn = tolower(note[0]);
     int nv;
-    if (nn >= '0' && nn <= '9')
-        return atoi(note);
+    if ((nn >= '0' && nn <= '9') || nn == '-')
+    {
+        int nv = atoi(note);
+        if (nv >= -1 && nv <= 127)
+            return nv;
+        return -2;
+    }
     if (nn < 'a' || nn > 'g')
-        return -1;
+        return -2;
     nv = semis[nn - 'a'];
 
     for (pos = 1; tolower(note[pos]) == 'b' || note[pos] == '#'; pos++)
@@ -44,7 +49,7 @@ static inline int sfz_note_from_string(const char *note)
         return nv + 12 * (1 + atoi(note + pos));
     }
 
-    return -1;
+    return -2;
 }
 
 static inline gboolean atof_C_verify(const char *key, const char *value, double *result, GError **error)

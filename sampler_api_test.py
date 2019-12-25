@@ -61,11 +61,13 @@ g1.set_param("volume", "-12")
 g1.set_param("fileg_depthcc14", "-5400")
 
 def check_exception(param, value, substr):
+    error = False
     try:
         g1.set_param(param, value)
-        assert False, "Exception with substring %s expected when setting %s to %s, none caught" % (substr, param, value)
     except Exception as e:
-        assert substr in str(e), "Exception with substring %s expected when setting %s to %s, caught another one: %s" % (substr, param, value, str(e))
+        error = True
+        assert substr in str(e), "Exception with substring '%s' expected when setting %s to %s, caught another one: %s" % (substr, param, value, str(e))
+    assert error, "Exception with substring '%s' expected when setting %s to %s, none caught" % (substr, param, value)
 
 check_exception("cutoff", "bla", "correct numeric value")
 check_exception("key", "bla", "valid note name")
@@ -74,9 +76,11 @@ check_exception("lochan", "10.5", "correct integer value")
 check_exception("offset", "bla", "correct unsigned integer value")
 check_exception("offset", "10.5", "correct unsigned integer value")
 check_exception("offset", "-1000", "correct unsigned integer value")
+
+# Make sure that multiple CC assignments work
 g1.set_param("locc5", "100")
-check_exception("locc8", "110", "Conflicting controller")
-check_exception("hicc8", "110", "Conflicting controller")
+g1.set_param("locc8", "100")
+g1.set_param("hicc8", "110")
 
 #g1.set_param("cutoff", "1000")
 #g1.set_param("fillfo_freq", "4")
@@ -88,6 +92,16 @@ r1.set_param("sample", "*saw")
 r1.set_param("transpose", "0")
 r1.set_param("tune", "5")
 r1.set_param("gain_cc17", "12")
+
+verify_region(g1, ["locc5=100", "locc8=100", "hicc8=110"], ['hicc5'])
+verify_region(r1, ["locc5=100", "locc8=100", "hicc8=110"], [], full=True)
+
+r1.set_param("hicc5", "120")
+r1.set_param("hicc8", "124")
+
+verify_region(g1, ["locc5=100", "locc8=100", "hicc8=110"], ['hicc5'])
+verify_region(g1, ["locc5=100", "hicc5=127", "locc8=100", "hicc8=110"], [], full=True)
+verify_region(r1, ["locc5=100", "hicc5=120", "locc8=100", "hicc8=124"], [], full=True)
 
 r2 = g1.new_child()
 r2.set_param("sample", "*sqr")
@@ -102,6 +116,21 @@ r2.unset_param("transpose")
 verify_region(r2, ["sample=*sqr"], ["transpose"])
 r2.unset_param("sample")
 verify_region(r2, [], ["transpose", "sample"])
+
+g1.unset_param("cutoff")
+g1.unset_param("resonance")
+g1.unset_param("fil_type")
+g1.unset_param("fileg_sustain")
+g1.unset_param("fileg_decay")
+g1.unset_param("fileg_depth")
+g1.unset_param("fileg_release")
+g1.unset_param("ampeg_release")
+g1.unset_param("amp_veltrack")
+g1.unset_param("volume")
+g1.unset_param("fileg_depthcc14")
+g1.unset_param("locc5")
+g1.unset_param("locc8")
+g1.unset_param("hicc8")
 
 params_to_test = [
     'lokey', 'hikey', 'lovel', 'hivel', 'key',
@@ -151,24 +180,57 @@ for i in range(len(params_to_test)):
     value1, value2 = "100", "80"
     if 'key' in param:
         value1, value2 = "e1", "g1"
+    # Verify that a setting is reported back
     r2.set_param(param, value1)
     verify_region(r2, ["%s=%s" % (param, value1)], rest)
-    g1.set_param(param, value2)
-    verify_region(g1, ["%s=%s" % (param, value2)], [])
 
+    # Verify that setting the same value in parent doesn't change the local 'has' flag
+    g1.set_param(param, value1)
+    verify_region(r2, ["%s=%s" % (param, value1)], rest)
+
+    # Verify that setting a different local value doesn't get overridden by parent
+    r2.set_param(param, value2)
+    verify_region(r2, ["%s=%s" % (param, value2)], rest)
+    # Write the original value
+    r2.set_param(param, value1)
+    verify_region(r2, ["%s=%s" % (param, value1)], rest)
+
+    # Delete the parent value, confirm the deletion doesn't propagate to child
+    g1.unset_param(param)
+    verify_region(r2, ["%s=%s" % (param, value1)], rest)
+    # Set a different value in the parent, confirm it doesn't affect the child
+    g1.set_param(param, value2)
+    verify_region(g1, ["%s=%s" % (param, value2)], rest)
+    verify_region(r2, ["%s=%s" % (param, value1)], rest)
+
+    # Check that the newly created child inherits the setting from the parent
     r3 = g1.new_child()
     verify_region(r3, [], [param])
     verify_region(r3, ["%s=%s" % (param, value2)], [], full=True)
     r3.delete()
 
-    verify_region(r2, ["%s=%s" % (param, value1)], rest)
+    # Verify that the original child still has the original value
     verify_region(r2, ["%s=%s" % (param, value1)], [], full=True)
+    # Delete the child value, make sure it disappears but the inherited
+    # value is still reported in the full listing
     r2.unset_param(param)
     verify_region(r2, [], params_to_test)
-    
     verify_region(r2, ["%s=%s" % (param, value2)], [], full=True)
+    # Delete the setting in the parent, make sure the inherited value in the
+    # child disappears too
     g1.unset_param(param)
     verify_region(r2, [], ["%s=%s" % (param, value2)], full=True)
+
+    master.set_param(param, value1)
+    verify_region(master, ["%s=%s" % (param, value1)], [])
+    verify_region(g1, [], params_to_test)
+    verify_region(g1, ["%s=%s" % (param, value1)], [], full=True)
+    verify_region(r2, [], params_to_test)
+    verify_region(r2, ["%s=%s" % (param, value1)], [], full=True)
+    master.unset_param(param)
+    verify_region(master, [], params_to_test)
+    verify_region(g1, [], params_to_test)
+    verify_region(r2, [], params_to_test)
     
     params_to_test = params_to_test[1:] + params_to_test[0:1]
 
@@ -189,7 +251,7 @@ for t in old_names:
         v1, v2 = "10", "20"
     else:
         old, new, v1, v2 = t
-    print ("Trying %s" % old)
+    print ("Trying alias: %s" % old)
     r1.set_param(old, v1)
     verify_region(r1, ["%s=%s" % (new, v1)], [old])
     r1.set_param(old, v2)

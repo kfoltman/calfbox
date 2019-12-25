@@ -291,12 +291,12 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
             fpcount++;
         }
         assert(layer->runtime);
-        if (layer->runtime->eff_use_prevoice)
+        if (layer->runtime->computed.eff_use_prevoice)
             delayed_layers[dlcount++] = layer->runtime;
         else
         {
             layers[lcount++] = layer->runtime;
-            if (layer->runtime->eff_is_silent)
+            if (layer->runtime->computed.eff_is_silent)
                 slcount++;
         }
         layer = sampler_rll_iterator_next(&iter);
@@ -314,7 +314,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
         for (int i = 0; i < lcount; ++i)
         {
             struct sampler_layer_data *l = layers[i];
-            if (l->eff_is_silent)
+            if (l->computed.eff_is_silent)
                 sampler_voice_start_silent(l, &exgroups);
             else
             {

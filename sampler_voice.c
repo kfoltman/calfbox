@@ -118,14 +118,14 @@ static inline float lfo_run(struct sampler_lfo *lfo)
 
 static gboolean is_tail_finished(struct sampler_voice *v)
 {
-    if (!v->layer->eff_num_stages)
+    if (!v->layer->computed.eff_num_stages)
         return TRUE;
     double eps = 1.0 / 65536.0;
     if (cbox_biquadf_is_audible(&v->filter.filter_left[0], eps))
         return FALSE;
     if (cbox_biquadf_is_audible(&v->filter.filter_right[0], eps))
         return FALSE;
-    int num_stages = v->layer->eff_num_stages;
+    int num_stages = v->layer->computed.eff_num_stages;
     if (num_stages > 1)
     {
         if (cbox_biquadf_is_audible(&v->filter.filter_left[num_stages - 1], eps))
@@ -280,18 +280,18 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
         if (age * l->rt_decay > 84)
             return;
     }
-    uint32_t end = l->eff_waveform->info.frames;
+    uint32_t end = l->computed.eff_waveform->info.frames;
     if (l->end != 0)
         end = (l->end == SAMPLER_NO_LOOP) ? 0 : l->end;
-    v->last_waveform = l->eff_waveform;
+    v->last_waveform = l->computed.eff_waveform;
     v->gen.cur_sample_end = end;
-    if (end > l->eff_waveform->info.frames)
-        end = l->eff_waveform->info.frames;
+    if (end > l->computed.eff_waveform->info.frames)
+        end = l->computed.eff_waveform->info.frames;
     
     assert(!v->current_pipe);
-    if (end > l->eff_waveform->preloaded_frames)
+    if (end > l->computed.eff_waveform->preloaded_frames)
     {
-        if (l->eff_loop_mode == slm_loop_continuous && l->loop_end < l->eff_waveform->preloaded_frames)
+        if (l->computed.eff_loop_mode == slm_loop_continuous && l->computed.eff_loop_end < l->computed.eff_waveform->preloaded_frames)
         {
             // Everything fits in prefetch, because loop ends in prefetch and post-loop part is not being played
         }
@@ -300,17 +300,17 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
             uint32_t loop_start = -1, loop_end = end;
             // If in loop mode, set the loop over the looped part... unless we're doing sustain-only loop on prefetch area only. Then
             // streaming will only cover the release part, and it shouldn't be looped.
-            if (l->eff_loop_mode == slm_loop_continuous || (l->eff_loop_mode == slm_loop_sustain && l->loop_end >= l->eff_waveform->preloaded_frames))
+            if (l->computed.eff_loop_mode == slm_loop_continuous || (l->computed.eff_loop_mode == slm_loop_sustain && l->computed.eff_loop_end >= l->computed.eff_waveform->preloaded_frames))
             {
-                loop_start = l->loop_start;
-                loop_end = l->loop_end;
+                loop_start = l->computed.eff_loop_start;
+                loop_end = l->computed.eff_loop_end;
             }
             // Those are initial values only, they will be adjusted in process function
-            v->current_pipe = cbox_prefetch_stack_pop(m->pipe_stack, l->eff_waveform, loop_start, loop_end, l->count);
+            v->current_pipe = cbox_prefetch_stack_pop(m->pipe_stack, l->computed.eff_waveform, loop_start, loop_end, l->count);
             if (!v->current_pipe)
             {
                 g_warning("Prefetch pipe pool exhausted, no streaming playback will be possible");
-                end = l->eff_waveform->preloaded_frames;
+                end = l->computed.eff_waveform->preloaded_frames;
                 v->gen.cur_sample_end = end;
             }
         }
@@ -321,7 +321,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
 
     v->gen.loop_overlap = l->loop_overlap;
     v->gen.loop_overlap_step = l->loop_overlap > 0 ? 1.0 / l->loop_overlap : 0;
-    v->gain_fromvel = l->eff_amp_velcurve[vel];
+    v->gain_fromvel = l->computed.eff_amp_velcurve[vel];
     v->gain_shift = (note - l->amp_keycenter) * l->amp_keytrack;
 
     v->gain_fromvel *= sfz_crossfade(note, l->xfin_lokey, l->xfin_hikey, l->xfout_lokey, l->xfout_hikey, l->xf_keycurve);
@@ -344,7 +344,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     
     v->cutoff_shift = vel * l->fil_veltrack / 127.0 + (note - l->fil_keycenter) * l->fil_keytrack;
     v->cutoff2_shift = vel * l->fil2_veltrack / 127.0 + (note - l->fil2_keycenter) * l->fil2_keytrack;
-    v->loop_mode = l->eff_loop_mode;
+    v->loop_mode = l->computed.eff_loop_mode;
     v->off_by = l->off_by;
     v->reloffset = l->reloffset;
     int auxes = (m->module.outputs - m->module.aux_offset) / 2;
@@ -389,7 +389,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     {
         // For streamed samples, allow only half the preload period worth of offset to avoid gaps
         // (maybe we can allow up to preload period minus one buffer size here?)
-        uint32_t maxend = v->current_pipe ? (l->eff_waveform->preloaded_frames >> 1) : l->eff_waveform->preloaded_frames;
+        uint32_t maxend = v->current_pipe ? (l->computed.eff_waveform->preloaded_frames >> 1) : l->computed.eff_waveform->preloaded_frames;
         int32_t pos = v->offset + v->reloffset * maxend * 0.01;
         if (pos < 0)
             pos = 0;
@@ -404,7 +404,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
 
     v->last_eq_bitmask = 0;
 
-    sampler_voice_activate(v, l->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16);
+    sampler_voice_activate(v, l->computed.eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16);
     
     uint32_t pos = v->offset;
     if (l->offset_random)
@@ -594,10 +594,10 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     const float velscl = v->vel * (1.f / 127.f);
 
     struct cbox_envelope_shape *pitcheg_shape = v->pitch_env.shape, *fileg_shape = v->filter_env.shape, *ampeg_shape = v->amp_env.shape;
-    if (__builtin_expect(l->mod_bitmask, 0))
+    if (__builtin_expect(l->computed.mod_bitmask, 0))
     {
         #define COPY_ORIG_SHAPE(envtype, envtype2, index) \
-            if (l->mod_bitmask & slmb_##envtype2##eg_cc) { \
+            if (l->computed.mod_bitmask & slmb_##envtype2##eg_cc) { \
                 memcpy(&v->cc_envs[index], envtype2##eg_shape, sizeof(struct cbox_envelope_shape)); \
                 envtype2##eg_shape = &v->cc_envs[index]; \
             }
@@ -619,7 +619,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             }
         }
         #define UPDATE_ENV_POSITION(envtype, envtype2) \
-            if (l->mod_bitmask & slmb_##envtype##eg_cc) \
+            if (l->computed.mod_bitmask & slmb_##envtype##eg_cc) \
                 cbox_envelope_update_shape_after_modify(&v->envtype2##_env, envtype##eg_shape, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
         UPDATE_ENV_POSITION(amp, amp)
         UPDATE_ENV_POSITION(fil, filter)
@@ -639,13 +639,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     if (__builtin_expect(v->layer_changed, 0))
     {
         v->last_level = -1;
-        if (v->last_waveform != v->layer->eff_waveform)
+        if (v->last_waveform != v->layer->computed.eff_waveform)
         {
-            v->last_waveform = v->layer->eff_waveform;
-            if (v->layer->eff_waveform)
+            v->last_waveform = v->layer->computed.eff_waveform;
+            if (v->layer->computed.eff_waveform)
             {
-                v->gen.mode = v->layer->eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
-                v->gen.cur_sample_end = v->layer->eff_waveform->info.frames;
+                v->gen.mode = v->layer->computed.eff_waveform->info.channels == 2 ? spt_stereo16 : spt_mono16;
+                v->gen.cur_sample_end = v->layer->computed.eff_waveform->info.frames;
             }
             else
             {
@@ -653,25 +653,25 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
                 return;
             }
         }
-        if (l->eq_bitmask & (1 << 0)) recalc_eq_mask |= RECALC_EQ_MASK_EQ1;
-        if (l->eq_bitmask & (1 << 1)) recalc_eq_mask |= RECALC_EQ_MASK_EQ2;
-        if (l->eq_bitmask & (1 << 2)) recalc_eq_mask |= RECALC_EQ_MASK_EQ3;
-        v->last_eq_bitmask = l->eq_bitmask;
+        if (l->computed.eq_bitmask & (1 << 0)) recalc_eq_mask |= RECALC_EQ_MASK_EQ1;
+        if (l->computed.eq_bitmask & (1 << 1)) recalc_eq_mask |= RECALC_EQ_MASK_EQ2;
+        if (l->computed.eq_bitmask & (1 << 2)) recalc_eq_mask |= RECALC_EQ_MASK_EQ3;
+        v->last_eq_bitmask = l->computed.eq_bitmask;
         v->layer_changed = FALSE;
     }
 
-    float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + velscl * l->pitch_veltrack + l->tune + l->transpose * 100 + v->pitch_shift;
+    float pitch = (v->note - l->pitch_keycenter) * l->pitch_keytrack + l->tune + l->transpose * 100 + v->pitch_shift;
     float modsrcs[smsrc_pernote_count];
     modsrcs[smsrc_vel - smsrc_pernote_offset] = v->vel * velscl;
     modsrcs[smsrc_pitch - smsrc_pernote_offset] = pitch * (1.f / 100.f);
     modsrcs[smsrc_chanaft - smsrc_pernote_offset] = c->last_chanaft * (1.f / 127.f);
     modsrcs[smsrc_polyaft - smsrc_pernote_offset] = sampler_channel_get_poly_pressure(c, v->note);
     modsrcs[smsrc_pitchenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->pitch_env, pitcheg_shape) * 0.01f;
-    modsrcs[smsrc_filenv - smsrc_pernote_offset] = l->eff_use_filter_mods ? cbox_envelope_get_value(&v->filter_env, fileg_shape) * 0.01f : 0;
+    modsrcs[smsrc_filenv - smsrc_pernote_offset] = l->computed.eff_use_filter_mods ? cbox_envelope_get_value(&v->filter_env, fileg_shape) * 0.01f : 0;
     modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->amp_env, ampeg_shape) * 0.01f;
 
     modsrcs[smsrc_amplfo - smsrc_pernote_offset] = lfo_run(&v->amp_lfo);
-    modsrcs[smsrc_fillfo - smsrc_pernote_offset] = l->eff_use_filter_mods ? lfo_run(&v->filter_lfo) : 0;
+    modsrcs[smsrc_fillfo - smsrc_pernote_offset] = l->computed.eff_use_filter_mods ? lfo_run(&v->filter_lfo) : 0;
     modsrcs[smsrc_pitchlfo - smsrc_pernote_offset] = lfo_run(&v->pitch_lfo);
 
     float moddests[smdestcount];
@@ -750,7 +750,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         }
     }
     lfo_update_xdelta(m, &v->pitch_lfo, modmask, smdest_pitchlfo_freq, moddests);
-    if (l->eff_use_filter_mods)
+    if (l->computed.eff_use_filter_mods)
         lfo_update_xdelta(m, &v->filter_lfo, modmask, smdest_fillfo_freq, moddests);
     lfo_update_xdelta(m, &v->amp_lfo, modmask, smdest_amplfo_freq, moddests);
     recalc_eq_mask |= modmask;
@@ -775,7 +775,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         RECALC_EQ_IF(3)
     }
     cbox_envelope_advance(&v->pitch_env, v->released, pitcheg_shape);
-    if (l->eff_use_filter_mods)
+    if (l->computed.eff_use_filter_mods)
         cbox_envelope_advance(&v->filter_env, v->released, fileg_shape);
     cbox_envelope_advance(&v->amp_env, v->released, ampeg_shape);
     if (__builtin_expect(v->amp_env.cur_stage < 0, 0))
@@ -788,7 +788,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     
     double maxv = 127 << 7;
-    double freq = l->eff_freq * cent2factor(moddests[smdest_pitch]) ;
+    double freq = l->computed.eff_freq * cent2factor(moddests[smdest_pitch]) ;
     uint64_t freq64 = (uint64_t)(freq * 65536.0 * 65536.0 * m->module.srate_inv);
 
     gboolean playing_sustain_loop = !v->released && v->loop_mode == slm_loop_sustain;
@@ -826,9 +826,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     }
     
     // XXXKF or maybe check for on-cc being in the on-cc range instead?
-    gboolean play_loop = v->layer->loop_end && (v->loop_mode == slm_loop_continuous || playing_sustain_loop) && !v->layer->on_cc;
-    loop_start = play_loop ? v->layer->loop_start : (v->layer->count ? 0 : (uint32_t)-1);
-    loop_end = play_loop ? v->layer->loop_end : v->gen.cur_sample_end;
+    gboolean play_loop = v->layer->computed.eff_loop_end && (v->loop_mode == slm_loop_continuous || playing_sustain_loop) && !v->layer->on_cc;
+    loop_start = play_loop ? v->layer->computed.eff_loop_start : (v->layer->count ? 0 : (uint32_t)-1);
+    loop_end = play_loop ? v->layer->computed.eff_loop_end : v->gen.cur_sample_end;
 
     if (v->current_pipe)
     {
@@ -860,7 +860,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         if (!bandlimited)
         {
             // Use pre-calculated join
-            v->gen.scratch = loop_start == (uint32_t)-1 ? v->layer->scratch_end : v->layer->scratch_loop;
+            v->gen.scratch = loop_start == (uint32_t)-1 ? v->layer->computed.scratch_end : v->layer->computed.scratch_loop;
         }
         else
         {
@@ -869,14 +869,14 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             // (i.e. partial loop or no loop) over bandlimited versions of the standard waveforms, and those are probably
             // not very useful anyway, as changing the loop removes the guarantee of the waveform being bandlimited and
             // may cause looping artifacts or introduce DC offset (e.g. if only a positive part of a sine wave is looped).
-            if (loop_start == 0 && loop_end == l->eff_waveform->info.frames)
-                v->gen.scratch = v->gen.sample_data + l->eff_waveform->info.frames - MAX_INTERPOLATION_ORDER;
+            if (loop_start == 0 && loop_end == l->computed.eff_waveform->info.frames)
+                v->gen.scratch = v->gen.sample_data + l->computed.eff_waveform->info.frames - MAX_INTERPOLATION_ORDER;
             else
             {
                 // Generate the join for the current wave level
                 // XXXKF this could be optimised further, by checking if waveform and loops are the same as the last
                 // time. However, this code is not likely to be used... ever, so optimising it is not the priority.
-                int shift = l->eff_waveform->info.channels == 2 ? 1 : 0;
+                int shift = l->computed.eff_waveform->info.channels == 2 ? 1 : 0;
                 uint32_t halfscratch = MAX_INTERPOLATION_ORDER << shift;
                 
                 v->gen.scratch = v->gen.scratch_bandlimited;
@@ -892,7 +892,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     if (l->timestretch)
     {
         v->gen.bigdelta = freq64;
-        v->gen.virtdelta = (uint64_t)(l->eff_freq * 65536.0 * 65536.0 * m->module.srate_inv);
+        v->gen.virtdelta = (uint64_t)(l->computed.eff_freq * 65536.0 * 65536.0 * m->module.srate_inv);
         v->gen.stretching_jump = l->timestretch_jump;
         v->gen.stretching_crossfade = l->timestretch_crossfade;
     }
@@ -902,7 +902,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         v->gen.virtdelta = freq64;
     }
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * c->channel_volume_cc * sampler_channel_addcc(c, 11) / (maxv * maxv);
-    if (l->eff_use_xfcc) {
+    if (l->computed.eff_use_xfcc) {
         for(struct sampler_cc_range *p = l->xfin_cc; p; p = p->next)
             gain *= sfz_crossfade2(c->intcc[p->key.cc_number], p->value.locc, p->value.hicc, 0, 1, l->xf_cccurve);
         for(struct sampler_cc_range *p = l->xfout_cc; p; p = p->next)
@@ -929,13 +929,13 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
 
     if (l->cutoff != -1)
     {
-        float mod_resonance = (modmask & (1 << smdest_resonance)) ? dB2gain(gain_for_num_stages[l->eff_num_stages] * moddests[smdest_resonance]) : 1;
-        sampler_filter_process_control(&v->filter, l->fil_type, l->logcutoff + moddests[smdest_cutoff], l->resonance_scaled * mod_resonance, m->sincos);
+        float mod_resonance = (modmask & (1 << smdest_resonance)) ? dB2gain(gain_for_num_stages[l->computed.eff_num_stages] * moddests[smdest_resonance]) : 1;
+        sampler_filter_process_control(&v->filter, l->fil_type, l->computed.logcutoff + moddests[smdest_cutoff], l->computed.resonance_scaled * mod_resonance, m->sincos);
     }
     if (l->cutoff2 != -1)
     {
-        float mod_resonance = (modmask & (1 << smdest_resonance2)) ? dB2gain(gain_for_num_stages[l->eff_num_stages2] * moddests[smdest_resonance2]) : 1;
-        sampler_filter_process_control(&v->filter2, l->fil2_type, l->logcutoff2 + moddests[smdest_cutoff2], l->resonance2_scaled * mod_resonance, m->sincos);
+        float mod_resonance = (modmask & (1 << smdest_resonance2)) ? dB2gain(gain_for_num_stages[l->computed.eff_num_stages2] * moddests[smdest_resonance2]) : 1;
+        sampler_filter_process_control(&v->filter2, l->fil2_type, l->computed.logcutoff2 + moddests[smdest_cutoff2], l->computed.resonance2_scaled * mod_resonance, m->sincos);
     }
 
     if (__builtin_expect(l->tonectl_freq != 0, 0))
@@ -951,24 +951,24 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float leftright[2 * CBOX_BLOCK_SIZE];
         
     uint32_t samples = sampler_gen_sample_playback_with_pipe(&v->gen, leftright, v->current_pipe);
-    if (l->eff_use_channel_mixer)
+    if (l->computed.eff_use_channel_mixer)
         do_channel_mixing(leftright, samples, l->position, l->width);
     for (int i = 2 * samples; i < 2 * CBOX_BLOCK_SIZE; i++)
         leftright[i] = 0.f;
 
     if (l->cutoff != -1)
-        sampler_filter_process_audio(&v->filter, l->eff_num_stages, leftright);
+        sampler_filter_process_audio(&v->filter, l->computed.eff_num_stages, leftright);
     if (l->cutoff2 != -1)
-        sampler_filter_process_audio(&v->filter2, l->eff_num_stages2, leftright);
+        sampler_filter_process_audio(&v->filter2, l->computed.eff_num_stages2, leftright);
 
     if (__builtin_expect(l->tonectl_freq != 0, 0))
         cbox_onepolef_process_stereo(&v->onepole_left, &v->onepole_right, &v->onepole_coeffs, leftright);
 
-    if (__builtin_expect(l->eq_bitmask, 0))
+    if (__builtin_expect(l->computed.eq_bitmask, 0))
     {
         for (int eq = 0; eq < 3; eq++)
         {
-            if (l->eq_bitmask & (1 << eq))
+            if (l->computed.eq_bitmask & (1 << eq))
             { 
                 cbox_biquadf_process_stereo(&v->eq_left[eq], &v->eq_right[eq], &v->eq_coeffs[eq], leftright);
             }

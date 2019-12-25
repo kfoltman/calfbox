@@ -40,10 +40,10 @@ retry:
         struct sampler_layer *lr = iter->next_layer->data;
         struct sampler_layer_data *l = lr->runtime;
         iter->next_layer = g_slist_next(iter->next_layer);
-        if (!l->eff_waveform)
+        if (!l->computed.eff_waveform)
             continue;
 
-        if (l->eff_use_simple_trigger_logic)
+        if (l->computed.eff_use_simple_trigger_logic)
         {
             if (iter->note >= l->lokey && iter->note <= l->hikey &&
                 iter->vel >= l->lovel && iter->vel <= l->hivel)
@@ -68,7 +68,7 @@ retry:
             c->module->module.engine->master->tempo >= l->lobpm && c->module->module.engine->master->tempo < l->hibpm &&
             sampler_cc_range_is_in(l->cc, c))
         {
-            if (!l->eff_use_keyswitch || 
+            if (!l->computed.eff_use_keyswitch ||
                 ((l->sw_down == -1 || (c->switchmask[l->sw_down >> 5] & (1 << (l->sw_down & 31)))) &&
                  (l->sw_up == -1 || !(c->switchmask[l->sw_up >> 5] & (1 << (l->sw_up & 31)))) &&
                  (l->sw_previous == -1 || l->sw_previous == c->previous_note)))
@@ -413,7 +413,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
                 else 
                 {
                     sampler_layer_update(l);
-                    if (!l->data.eff_waveform)
+                    if (!l->data.computed.eff_waveform)
                     {
                         g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
                         CBOX_DELETE((struct sampler_layer *)l);
@@ -442,7 +442,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         else 
         {
             sampler_layer_update(l);
-            if (!l->data.eff_waveform)
+            if (!l->data.computed.eff_waveform)
             {
                 g_warning("Sample layer '%s' does not have a waveform - skipping", layer_section);
                 CBOX_DELETE((struct sampler_layer *)l);
