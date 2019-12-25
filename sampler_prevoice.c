@@ -20,13 +20,8 @@ void sampler_prevoice_start(struct sampler_prevoice *pv, struct sampler_channel 
     pv->sync_initial_time = -1;
     pv->sync_trigger_time = -1;
 
-    GSList *nif = pv->layer_data->prevoice_nifs;
-    while(nif)
-    {
-        struct sampler_noteinitfunc *p = nif->data;
-        p->key.notefunc_prevoice(p, pv);
-        nif = nif->next;
-    }
+    for(struct sampler_noteinitfunc *nif = pv->layer_data->prevoice_nifs; nif; nif = nif->next)
+        nif->key.notefunc_prevoice(nif, pv);
     sampler_prevoice_unlink(&channel->module->prevoices_free, pv);
     sampler_prevoice_link(&channel->module->prevoices_running, pv);
 }

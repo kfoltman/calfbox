@@ -324,6 +324,7 @@ enum sampler_noteinitfunc_envelope_variant
     { \
         struct sname##_key key; \
         struct sname##_value value; \
+        struct sname *next; \
     };
 
 SAMPLER_COLL_LIST(SAMPLER_COLL_DEFINITION)
@@ -590,8 +591,8 @@ struct sampler_layer_data
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_STRUCT)
     SAMPLER_FIXED_FIELDS(PROC_HAS_FIELD)    
 
-    GSList *modulations;
-    GSList *voice_nifs, *prevoice_nifs;
+    struct sampler_modulation *modulations;
+    struct sampler_noteinitfunc *voice_nifs, *prevoice_nifs;
 
     // computed values:
     float eff_freq;

@@ -380,13 +380,8 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
         cbox_onepolef_set_highshelf_tonectl(&v->onepole_coeffs, l->tonectl_freq * M_PI * m->module.srate_inv, 1.0);
     
     v->offset = l->offset;
-    GSList *nif = v->layer->voice_nifs;
-    while(nif)
-    {
-        struct sampler_noteinitfunc *p = nif->data;
-        p->key.notefunc_voice(p, v);
-        nif = nif->next;
-    }
+    for(struct sampler_noteinitfunc *nif = v->layer->voice_nifs; nif; nif = nif->next)
+        nif->key.notefunc_voice(nif, v);
     if (v->gain_shift)
         v->gain_fromvel *= dB2gain(v->gain_shift);
 
@@ -610,11 +605,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         COPY_ORIG_SHAPE(filter, fil, 1)
         COPY_ORIG_SHAPE(pitch, pitch, 2)
 
-        GSList *mod = l->modulations;
-        while(mod)
+        for(struct sampler_modulation *sm = l->modulations; sm; sm = sm->next)
         {
             // Simplified modulations for EG stages (CCs only)
-            struct sampler_modulation *sm = mod->data;
             if (sm->key.dest >= smdest_eg_stage_start && sm->key.dest <= smdest_eg_stage_end)
             {
                 float value = 0.f;
@@ -624,7 +617,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
                 if (value * sm->value.amount != 0)
                     cbox_envelope_modify_dahdsr(&v->cc_envs[(param >> 4)], param & 0x0F, value * sm->value.amount, m->module.srate * 1.0 / CBOX_BLOCK_SIZE);
             }
-            mod = g_slist_next(mod);
         }
         #define UPDATE_ENV_POSITION(envtype, envtype2) \
             if (l->mod_bitmask & slmb_##envtype##eg_cc) \
@@ -697,7 +689,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     moddests[smdest_fillfo_freq] = 0;
     moddests[smdest_amplfo_freq] = 0;
 #endif
-    GSList *mod = l->modulations;
     if (__builtin_expect(l->trigger == stm_release, 0))
     {
         moddests[smdest_gain] = -v->age * l->rt_decay * m->module.srate_inv;
@@ -717,9 +708,8 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         moddests[smdest_pitch] += pw;
     }
     
-    while(mod)
+    for (struct sampler_modulation *sm = l->modulations; sm; sm = sm->next)
     {
-        struct sampler_modulation *sm = mod->data;
         enum sampler_modsrc src = sm->key.src;
         enum sampler_modsrc src2 = sm->key.src2;
         enum sampler_moddest dest = sm->key.dest;
@@ -758,7 +748,6 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             else
                 moddests[dest] += value * sm->value.amount;
         }
-        mod = g_slist_next(mod);
     }
     lfo_update_xdelta(m, &v->pitch_lfo, modmask, smdest_pitchlfo_freq, moddests);
     if (l->eff_use_filter_mods)

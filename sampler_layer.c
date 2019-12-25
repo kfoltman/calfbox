@@ -60,33 +60,36 @@ static inline void sampler_noteinitfunc_dump_one(const struct sampler_noteinitfu
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 #define SAMPLER_COLL_FUNC_DUMP(sname) \
-    void sname##_dump(const GSList *p) \
+    void sname##_dump(const struct sname *p) \
     { \
-        while(p) \
-        { \
-            const struct sname *d = p->data; \
-            sname##_dump_one(d); \
-            p = g_slist_next(p); \
-        } \
+        for(; p; p = p->next) \
+            sname##_dump_one(p); \
     }
 
 SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_DUMP)
 
 #define SAMPLER_COLL_FUNC_FIND(sname) \
-    static struct sname *sname##_find(GSList *list, const struct sname##_key *key, GSList **link_ptr) \
+    static struct sname *sname##_find(struct sname *list, const struct sname##_key *key) \
     { \
-        GSList *p = list; \
-        while(p) \
+        for(struct sname *p = list; p; p = p->next) \
         { \
-            struct sname *d = p->data; \
-            struct sname##_key *dkey = &d->key; \
+            struct sname##_key *dkey = &p->key; \
+            if (sname##_key_equal(dkey, key)) \
+                return p; \
+        } \
+        return NULL; \
+    } \
+    static struct sname *sname##_find2(struct sname **list_ptr, const struct sname##_key *key, struct sname ***link_ptr) \
+    { \
+        for(struct sname **pp = list_ptr; *pp; pp = &(*pp)->next) \
+        { \
+            struct sname##_key *dkey = &(*pp)->key; \
             if (sname##_key_equal(dkey, key)) \
             { \
                 if (link_ptr) \
-                    *link_ptr = p; \
-                return d; \
+                    *link_ptr = pp; \
+                return *pp; \
             } \
-            p = g_slist_next(p); \
         } \
         return NULL; \
     }
@@ -98,19 +101,32 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_FIND)
     d->value.has_name = FALSE;
 
 #define SAMPLER_COLL_FUNC_ADD(sname) \
-static struct sname *sname##_add(GSList **list_ptr, const struct sname##_key *key) \
+static struct sname *sname##_add(struct sname **list_ptr, const struct sname##_key *key) \
 { \
-    struct sname *d = sname##_find(*list_ptr, key, NULL); \
+    struct sname *d = sname##_find(*list_ptr, key); \
     if (d) \
         return d; \
     d = g_malloc0(sizeof(struct sname)); \
     d->key = *key; \
     SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_INIT)\
-    *list_ptr = g_slist_prepend(*list_ptr, d); \
+    d->next = *list_ptr; \
+    *list_ptr = d; \
     return d; \
 }
 
 SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_ADD)
+
+#define SAMPLER_COLL_FUNC_DESTROY(sname) \
+static void sname##s_destroy(struct sname *list_ptr) \
+{ \
+    while(list_ptr) { \
+        struct sname *p = list_ptr->next; \
+        g_free(list_ptr); \
+        list_ptr = p; \
+    } \
+}
+
+SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_DESTROY)
 
 #define SAMPLER_COLL_FIELD_ISNULL(name, has_name, type, init_value) \
     if (d->name != init_value || d->has_name) \
@@ -159,7 +175,7 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_ISNULL)
         if (!starting) \
         { \
             void *vl = &l->data; \
-            GSList **l = (vl + offset); \
+            struct sname **l = (vl + offset); \
             gboolean changed = FALSE; \
             struct sname *dstm = sname##_add(l, &srcm->key); \
             SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_PROPAGATE) \
@@ -205,24 +221,26 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_PROPAGATE_SET)
     enum {  \
         SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_KEY_ENUM_VALUE, sname) \
     }; \
-    static gboolean sname##_unset(GSList **list_ptr, GSList *parent_list, const struct sname##_key *key, gboolean remove_local, uint32_t unset_mask) \
+    static gboolean sname##_unset(struct sname **list_ptr, struct sname *parent_list, const struct sname##_key *key, gboolean remove_local, uint32_t unset_mask) \
     { \
-        GSList *link = NULL; \
-        struct sname *d = sname##_find(*list_ptr, key, &link); \
+        struct sname **link_ptr = NULL; \
+        struct sname *d = sname##_find2(list_ptr, key, &link_ptr); \
         if (!d) \
             return FALSE; \
-        struct sname *parent = remove_local && parent_list != NULL ? sname##_find(parent_list, key, NULL) : NULL; \
+        struct sname *parent = remove_local && parent_list != NULL ? sname##_find(parent_list, key) : NULL; \
         SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_UNSET, sname) \
         /* Delete if it's all default values and it's not overriding anything */ \
-        if (sname##_is_null(&d->value)) \
-            *list_ptr = g_slist_delete_link(*list_ptr, link); \
+        if (sname##_is_null(&d->value)) {\
+            *link_ptr = d->next; \
+            g_free(d); \
+        } \
         return TRUE; \
     } \
     static void sname##_propagate_unset(struct sampler_layer *l, uint32_t offset, const struct sname##_key *key, gboolean remove_local, uint32_t unset_mask) \
     { \
         void *vl = &l->data, *vp = l->parent ? &l->parent->data : NULL; \
-        GSList **list_ptr = vl + offset; \
-        GSList **parent_list_ptr = vp ? vp + offset : NULL; \
+        struct sname **list_ptr = vl + offset; \
+        struct sname **parent_list_ptr = vp ? vp + offset : NULL; \
         if (!sname##_unset(list_ptr, *parent_list_ptr, key, remove_local, unset_mask)) \
             return; \
         \
@@ -245,18 +263,19 @@ SAMPLER_COLL_LIST(SAMPLER_COLL_FUNC_PROPAGATE_UNSET)
 #define SAMPLER_COLL_FIELD_ZEROHASATTR(name, has_name, type, init_value) \
     dstv->value.has_name = FALSE;
 #define SAMPLER_COLL_FUNC_CLONE(sname) \
-    static GSList *sname##_clone(GSList *src, gboolean copy_hasattr) \
+    static struct sname *sname##_clone(struct sname *src, gboolean copy_hasattr) \
     { \
-        GSList *dst = g_slist_copy(src); \
-        for(GSList *d = dst; d; d = d->next) \
+        struct sname *dst = NULL, **last = &dst;\
+        for(const struct sname *srcv = src; srcv; srcv = srcv->next) \
         { \
-            const struct sname *srcv = d->data; \
             struct sname *dstv = g_malloc(sizeof(struct sname)); \
             memcpy(dstv, srcv, sizeof(struct sname)); \
             if (!copy_hasattr) { \
                 SAMPLER_COLL_FIELD_LIST_##sname(SAMPLER_COLL_FIELD_ZEROHASATTR) \
             } \
-            d->data = dstv; \
+            *last = dstv; \
+            dstv->next = NULL; \
+            last = &dstv->next; \
         } \
         return dst; \
     }
@@ -1437,9 +1456,9 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         | ((l->eq2.gain != 0 || l->eq2.vel2gain != 0) ? 2 : 0)
         | ((l->eq3.gain != 0 || l->eq3.vel2gain != 0) ? 4 : 0);
     l->mod_bitmask = 0;
-    for(GSList *mod = l->modulations; mod; mod = g_slist_next(mod))
+    for(struct sampler_modulation *mod = l->modulations; mod; mod = mod->next)
     {
-        const struct sampler_modulation_key *mk = &((const struct sampler_modulation *)mod->data)->key;
+        const struct sampler_modulation_key *mk = &mod->key;
         if (mk->dest >= smdest_eg_stage_start && mk->dest <= smdest_eg_stage_end)
             l->mod_bitmask |= slmb_ampeg_cc << ((mk->dest >> 4) & 3);
     }
@@ -1662,9 +1681,8 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     int floatbufsize = G_ASCII_DTOSTR_BUF_SIZE;
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
     
-    for(GSList *nif = l->voice_nifs; nif; nif = nif->next)
+    for(struct sampler_noteinitfunc *nd = l->voice_nifs; nd; nd = nd->next)
     {
-        struct sampler_noteinitfunc *nd = nif->data;
         if (!nd->value.has_value && !nd->value.has_curve && !nd->value.has_step && !show_inherited)
             continue;
         #define PROC_ENVSTAGE_NAME(name, index, def_value) #name, 
@@ -1689,9 +1707,8 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         else
             assert(0); // unknown NIF
     }
-    for(GSList *nif = l->prevoice_nifs; nif; nif = nif->next)
+    for(struct sampler_noteinitfunc *nd = l->prevoice_nifs; nd; nd = nd->next)
     {
-        struct sampler_noteinitfunc *nd = nif->data;
         if (!nd->value.has_value && !nd->value.has_curve && !nd->value.has_step && !show_inherited)
             continue;
         g_ascii_dtostr(floatbuf, floatbufsize, nd->value.value);
@@ -1703,9 +1720,8 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         else
             assert(0); // unknown NIF
     }
-    for(GSList *mod = l->modulations; mod; mod = mod->next)
+    for(struct sampler_modulation *md = l->modulations; md; md = md->next)
     {
-        struct sampler_modulation *md = mod->data;
         const struct sampler_modulation_key *mk = &md->key;
         const struct sampler_modulation_value *mv = &md->value;
         if (mv->has_curve || show_inherited)
@@ -1869,9 +1885,9 @@ void sampler_layer_data_close(struct sampler_layer_data *l)
     sampler_cc_range_destroy(l->on_cc);
     sampler_cc_range_destroy(l->xfin_cc);
     sampler_cc_range_destroy(l->xfout_cc);
-    g_slist_free_full(l->voice_nifs, g_free);
-    g_slist_free_full(l->prevoice_nifs, g_free);
-    g_slist_free_full(l->modulations, g_free);
+    sampler_noteinitfuncs_destroy(l->voice_nifs);
+    sampler_noteinitfuncs_destroy(l->prevoice_nifs);
+    sampler_modulations_destroy(l->modulations);
     if (l->eff_waveform)
     {
         cbox_waveform_unref(l->eff_waveform);
