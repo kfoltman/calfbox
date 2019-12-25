@@ -904,9 +904,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     float gain = modsrcs[smsrc_ampenv - smsrc_pernote_offset] * l->volume_linearized * v->gain_fromvel * c->channel_volume_cc * sampler_channel_addcc(c, 11) / (maxv * maxv);
     if (l->eff_use_xfcc) {
         for(struct sampler_cc_range *p = l->xfin_cc; p; p = p->next)
-            gain *= sfz_crossfade2(c->intcc[p->cc_number], p->locc, p->hicc, 0, 1, l->xf_cccurve);
+            gain *= sfz_crossfade2(c->intcc[p->key.cc_number], p->value.locc, p->value.hicc, 0, 1, l->xf_cccurve);
         for(struct sampler_cc_range *p = l->xfout_cc; p; p = p->next)
-            gain *= sfz_crossfade2(c->intcc[p->cc_number], p->locc, p->hicc, 1, 0, l->xf_cccurve);
+            gain *= sfz_crossfade2(c->intcc[p->key.cc_number], p->value.locc, p->value.hicc, 1, 0, l->xf_cccurve);
     }
     if ((modmask & (1 << smdest_gain)) && moddests[smdest_gain] != 0.f)
         gain *= dB2gain(moddests[smdest_gain]);

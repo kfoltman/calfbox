@@ -369,8 +369,8 @@ static inline gboolean sampler_cc_range_is_in(const struct sampler_cc_range *ran
 {
     while(range)
     {
-        int ccval = sampler_channel_getintcc(c, NULL, range->cc_number);
-        if (ccval < range->locc || ccval > range->hicc)
+        int ccval = sampler_channel_getintcc(c, NULL, range->key.cc_number);
+        if (ccval < range->value.locc || ccval > range->value.hicc)
             return FALSE;
         range = range->next;
     }

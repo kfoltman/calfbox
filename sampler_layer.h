@@ -315,9 +315,35 @@ enum sampler_noteinitfunc_envelope_variant
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct sampler_cc_range_key
+{
+    uint8_t cc_number;
+};
+
+struct sampler_cc_range_value
+{
+    uint8_t locc;
+    uint8_t hicc;
+    uint8_t has_locc:1;
+    uint8_t has_hicc:1;
+};
+
+#define SAMPLER_COLL_FIELD_LIST_sampler_cc_range(MACRO, ...) \
+    MACRO(locc, has_locc, uint8_t, 0, ## __VA_ARGS__) \
+    MACRO(hicc, has_hicc, uint8_t, 127, ## __VA_ARGS__)
+
+#define SAMPLER_COLL_CHAIN_LIST_sampler_cc_range(MACRO, ...) \
+    MACRO(on_cc, on_cc, ## __VA_ARGS__) \
+    MACRO(cc, cc, ## __VA_ARGS__) \
+    MACRO(xfin_cc, xfin_cc, ## __VA_ARGS__) \
+    MACRO(xfout_cc, xfout_cc, ## __VA_ARGS__)
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
 #define SAMPLER_COLL_LIST(MACRO) \
     MACRO(sampler_modulation) \
     MACRO(sampler_noteinitfunc) \
+    MACRO(sampler_cc_range) \
 
 #define SAMPLER_COLL_DEFINITION(sname) \
     struct sname \
@@ -518,16 +544,6 @@ struct sampler_lfo_has_fields
 struct sampler_eq_has_fields
 {
     EQ_FIELDS(PROC_SUBSTRUCT_HAS_FIELD, name)
-};
-
-struct sampler_cc_range
-{
-    uint8_t locc;
-    uint8_t hicc;
-    uint8_t cc_number;
-    uint8_t has_locc:1;
-    uint8_t has_hicc:1;
-    struct sampler_cc_range *next;
 };
 
 struct sampler_midi_curve

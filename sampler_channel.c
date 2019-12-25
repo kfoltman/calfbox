@@ -130,9 +130,9 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
                 gboolean trigger = FALSE;
                 while(on_cc)
                 {
-                    if (on_cc->cc_number == cc &&
-                        (val >= on_cc->locc && val <= on_cc->hicc) &&
-                        (compatible_oncc_behaviour || !(old_value >= on_cc->locc && old_value <= on_cc->hicc)))
+                    if (on_cc->key.cc_number == cc &&
+                        (val >= on_cc->value.locc && val <= on_cc->value.hicc) &&
+                        (compatible_oncc_behaviour || !(old_value >= on_cc->value.locc && old_value <= on_cc->value.hicc)))
                     {
                         trigger = TRUE;
                         break;

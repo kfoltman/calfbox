@@ -138,7 +138,7 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
             rll->layers_oncc = g_slist_prepend(rll->layers_oncc, l);
             while(oncc)
             {
-                int cc = oncc->cc_number;
+                int cc = oncc->key.cc_number;
                 rll->cc_trigger_bitmask[cc >> 5] |= 1 << (cc & 31);
                 oncc = oncc->next;
             }
