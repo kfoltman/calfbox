@@ -71,6 +71,24 @@ static inline void sampler_cc_range_dump_one(const struct sampler_cc_range *ccra
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
+static inline gboolean sampler_flex_lfo_key_equal(const struct sampler_flex_lfo_key *k1, const struct sampler_flex_lfo_key *k2)
+{
+    return k1->id == k2->id;
+}
+
+static inline void sampler_flex_lfo_dump_one(const struct sampler_flex_lfo *lfo)
+{
+    printf("LFO%d (freq %s %f, delay %s %f, fade %s %f, wave %s %d)\n",
+        (int)lfo->key.id,
+        lfo->value.has_freq ? "(local)" : "(inherited)", lfo->value.freq,
+        lfo->value.has_delay ? "(local)" : "(inherited)", lfo->value.delay,
+        lfo->value.has_fade ? "(local)" : "(inherited)", lfo->value.fade,
+        lfo->value.has_wave ? "(local)" : "(inherited)", lfo->value.wave
+    );
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
 #define SAMPLER_COLL_FUNC_DUMP(sname) \
     void sname##_dump(const struct sname *p) \
     { \
@@ -255,6 +273,7 @@ enum sampler_layer_param_type
     // note init functions
     slpt_voice_nif,
     slpt_prevoice_nif,
+    slpt_flex_lfo,
     slpt_reserved,
 };
 
@@ -382,6 +401,9 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
     { #parname "locc#", LOFS(field), slpt_ccrange, 0, 0, NULL, NULL, NULL }, \
     { #parname "hicc#", LOFS(field), slpt_ccrange, 127, 1, NULL, NULL, NULL },
 
+#define FIELD_FLEX_LFO(name, field) \
+    { name, LOFS(flex_lfos), slpt_flex_lfo, 0, sampler_flex_lfo_value_field_##field, NULL, NULL, NULL },
+
 #define NIF_VARIANT_CC 0x01000000
 #define NIF_VARIANT_CURVECC 0x02000000
 #define NIF_VARIANT_STEPCC 0x03000000
@@ -433,6 +455,11 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_VOICE_NIF("offset_cc#", sampler_nif_cc2offset, NIF_VARIANT_CC)
     FIELD_VOICE_NIF("offset_curvecc#", sampler_nif_cc2offset, NIF_VARIANT_CURVECC)
     FIELD_VOICE_NIF("offset_stepcc#", sampler_nif_cc2offset, NIF_VARIANT_STEPCC)
+
+    FIELD_FLEX_LFO("lfo#_freq", freq)
+    FIELD_FLEX_LFO("lfo#_delay", delay)
+    FIELD_FLEX_LFO("lfo#_fade", fade)
+    FIELD_FLEX_LFO("lfo#_wave", wave)
 
     FIELD_ALIAS("hilev", "hivel")
     FIELD_ALIAS("lolev", "lovel")
@@ -493,18 +520,6 @@ static gboolean override_logic(gboolean is_equal, gboolean has_value, gboolean s
     return (!is_equal) || (set_local_value != has_value);
 }
 
-static inline void nif_key_decode(uint64_t extra_int, void *extra_ptr, const uint32_t *args, struct sampler_noteinitfunc_key *nif_key)
-{
-    uint32_t variant = extra_int &~ NIF_VARIANT_MASK;
-    nif_key->notefunc_voice = extra_ptr;
-    if (extra_int & NIF_VARIANT_MASK)
-    {
-        int cc = args[0] & 255;
-        variant = cc + (variant << 8);
-    }
-    nif_key->variant = variant;
-}
-
 static inline void mod_key_decode(uint64_t extra_int, const uint32_t *args, struct sampler_modulation_key *mod_key)
 {
     uint32_t modsrc = (extra_int & 0xFFF);
@@ -518,6 +533,23 @@ static inline void mod_key_decode(uint64_t extra_int, const uint32_t *args, stru
     mod_key->dest = ((extra_int >> 24) & 0xFF);
 }
 
+static inline void nif_key_decode(uint64_t extra_int, void *extra_ptr, const uint32_t *args, struct sampler_noteinitfunc_key *nif_key)
+{
+    uint32_t variant = extra_int &~ NIF_VARIANT_MASK;
+    nif_key->notefunc_voice = extra_ptr;
+    if (extra_int & NIF_VARIANT_MASK)
+    {
+        int cc = args[0] & 255;
+        variant = cc + (variant << 8);
+    }
+    nif_key->variant = variant;
+}
+
+static inline void flex_lfo_key_decode(const uint32_t *args, struct sampler_flex_lfo_key *flex_lfo_key)
+{
+    flex_lfo_key->id = args[0];
+}
+
 #define OVERRIDE_LOGIC(type) override_logic(!memcmp(p, data_ptr, sizeof(type)), e->get_has_value(&l->data), set_local_value)
 
 #define CAST_FLOAT_VALUE fvalue = *(double *)data_ptr
@@ -529,6 +561,7 @@ gboolean sampler_layer_param_entry_set_from_ptr(const struct sampler_layer_param
     double fvalue = 0;
     struct sampler_modulation_key mod_key = {0, 0, 0};
     struct sampler_noteinitfunc_key nif_key = {{NULL}, 0};
+    struct sampler_flex_lfo_key flex_lfo_key = {0};
 
     switch(e->type)
     {
@@ -645,6 +678,25 @@ gboolean sampler_layer_param_entry_set_from_ptr(const struct sampler_layer_param
                 break;
             }
             break;
+        case slpt_flex_lfo:
+            CAST_FLOAT_VALUE;
+            flex_lfo_key_decode(args, &flex_lfo_key);
+            switch(e->extra_int)
+            {
+            case sampler_flex_lfo_value_field_freq:
+                sampler_flex_lfo_set_freq_by_offset(l, e->offset, &flex_lfo_key, set_local_value, fvalue);
+                break;
+            case sampler_flex_lfo_value_field_delay:
+                sampler_flex_lfo_set_delay_by_offset(l, e->offset, &flex_lfo_key, set_local_value, fvalue);
+                break;
+            case sampler_flex_lfo_value_field_fade:
+                sampler_flex_lfo_set_fade_by_offset(l, e->offset, &flex_lfo_key, set_local_value, fvalue);
+                break;
+            case sampler_flex_lfo_value_field_wave:
+                sampler_flex_lfo_set_wave_by_offset(l, e->offset, &flex_lfo_key, set_local_value, (int)fvalue);
+                break;
+            }
+            break;
         case slpt_reserved:
         case slpt_invalid:
         case slpt_alias:
@@ -758,6 +810,7 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
     uint32_t cc;
     struct sampler_modulation_key mod_key = {0, 0, 0};
     struct sampler_noteinitfunc_key nif_key = {{NULL}, 0};
+    struct sampler_flex_lfo_key flex_lfo_key = {0};
 
     switch(e->type)
     {
@@ -845,6 +898,24 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             }
             break;
         }
+        case slpt_flex_lfo:
+            flex_lfo_key_decode(args, &flex_lfo_key);
+            switch(e->extra_int)
+            {
+            case sampler_flex_lfo_value_field_freq:
+                sampler_flex_lfo_unset_by_offset(l, e->offset, &flex_lfo_key, unset_local_value, 1 << sampler_flex_lfo_value_field_freq);
+                break;
+            case sampler_flex_lfo_value_field_delay:
+                sampler_flex_lfo_unset_by_offset(l, e->offset, &flex_lfo_key, unset_local_value, 1 << sampler_flex_lfo_value_field_delay);
+                break;
+            case sampler_flex_lfo_value_field_fade:
+                sampler_flex_lfo_unset_by_offset(l, e->offset, &flex_lfo_key, unset_local_value, 1 << sampler_flex_lfo_value_field_fade);
+                break;
+            case sampler_flex_lfo_value_field_wave:
+                sampler_flex_lfo_unset_by_offset(l, e->offset, &flex_lfo_key, unset_local_value, 1 << sampler_flex_lfo_value_field_wave);
+                break;
+            }
+            break;
         case slpt_invalid:
         case slpt_reserved:
         case slpt_alias:
@@ -1152,6 +1223,7 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
     dst->modulations = sampler_modulation_clone(src->modulations, copy_hasattr);
     dst->voice_nifs = sampler_noteinitfunc_clone(src->voice_nifs, copy_hasattr);
     dst->prevoice_nifs = sampler_noteinitfunc_clone(src->prevoice_nifs, copy_hasattr);
+    dst->flex_lfos = sampler_flex_lfo_clone(src->flex_lfos, copy_hasattr);
     dst->computed.eff_waveform = src->computed.eff_waveform;
     if (dst->computed.eff_waveform)
         cbox_waveform_ref(dst->computed.eff_waveform);
@@ -1596,6 +1668,26 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         else
             assert(0); // unknown NIF
     }
+    for(struct sampler_flex_lfo *flfo = l->flex_lfos; flfo; flfo = flfo->next)
+    {
+        if (flfo->value.has_freq || show_inherited)
+        {
+            g_ascii_dtostr(floatbuf, floatbufsize, flfo->value.freq);
+            g_string_append_printf(outstr, " lfo%d_freq=%s", (int)flfo->key.id, floatbuf);
+        }
+        if (flfo->value.has_delay || show_inherited)
+        {
+            g_ascii_dtostr(floatbuf, floatbufsize, flfo->value.delay);
+            g_string_append_printf(outstr, " lfo%d_delay=%s", (int)flfo->key.id, floatbuf);
+        }
+        if (flfo->value.has_fade || show_inherited)
+        {
+            g_ascii_dtostr(floatbuf, floatbufsize, flfo->value.fade);
+            g_string_append_printf(outstr, " lfo%d_fade=%s", (int)flfo->key.id, floatbuf);
+        }
+        if (flfo->value.has_wave || show_inherited)
+            g_string_append_printf(outstr, " lfo%d_wave=%d", (int)flfo->key.id, flfo->value.wave);
+    }
     for(struct sampler_modulation *md = l->modulations; md; md = md->next)
     {
         const struct sampler_modulation_key *mk = &md->key;
@@ -1747,6 +1839,7 @@ void sampler_layer_dump(struct sampler_layer *l, FILE *f)
 
 void sampler_layer_data_close(struct sampler_layer_data *l)
 {
+    sampler_flex_lfos_destroy(l->flex_lfos);
     sampler_cc_ranges_destroy(l->cc);
     sampler_cc_ranges_destroy(l->on_cc);
     sampler_cc_ranges_destroy(l->xfin_cc);

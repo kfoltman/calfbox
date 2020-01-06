@@ -172,6 +172,7 @@ params_to_test = [
     'amp_velcurve_5', 'amp_velcurve_127',
     'locc5', 'hicc5',
     'on_locc8', 'on_hicc8',
+    'lfo5_freq', 'lfo1_wave', 'lfo3_fade', 'lfo4_delay',
     ]
 for i in range(len(params_to_test)):
     param = params_to_test[0]
