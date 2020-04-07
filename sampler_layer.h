@@ -340,10 +340,41 @@ struct sampler_cc_range_value
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct sampler_flex_lfo_key
+{
+    uint32_t id;
+};
+
+struct sampler_flex_lfo_value
+{
+    // Note: layout/order must be identical to sampler_lfo_params
+    float freq;
+    float delay;
+    float fade;
+    int wave;
+
+    uint8_t has_freq:1;
+    uint8_t has_delay:1;
+    uint8_t has_fade:1;
+    uint8_t has_wave:1;
+};
+
+#define SAMPLER_COLL_FIELD_LIST_sampler_flex_lfo(MACRO, ...) \
+    MACRO(freq, has_freq, float, 0, ## __VA_ARGS__) \
+    MACRO(delay, has_delay, float, 0, ## __VA_ARGS__) \
+    MACRO(fade, has_fade, float, 0, ## __VA_ARGS__) \
+    MACRO(wave, has_wave, int, 0, ## __VA_ARGS__)
+
+#define SAMPLER_COLL_CHAIN_LIST_sampler_flex_lfo(MACRO, ...) \
+    MACRO(flex_lfos, flex_lfos, ## __VA_ARGS__)
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
 #define SAMPLER_COLL_LIST(MACRO) \
     MACRO(sampler_modulation) \
     MACRO(sampler_noteinitfunc) \
     MACRO(sampler_cc_range) \
+    MACRO(sampler_flex_lfo)
 
 #define SAMPLER_COLL_DEFINITION(sname) \
     struct sname \
@@ -628,6 +659,7 @@ struct sampler_layer_data
 
     struct sampler_modulation *modulations;
     struct sampler_noteinitfunc *voice_nifs, *prevoice_nifs;
+    struct sampler_flex_lfo *flex_lfos;
 
     struct sampler_layer_computed computed;
 };
