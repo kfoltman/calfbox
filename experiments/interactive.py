@@ -4,7 +4,7 @@
 This is a minimal calfbox python example. It is meant as a starting
 point to find bugs and test performance.
 
-Copyright 2019, Nils Hilbricht, Germany ( https://www.hilbricht.net )
+Copyright, Nils Hilbricht, Germany ( https://www.hilbricht.net )
 
 This code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
