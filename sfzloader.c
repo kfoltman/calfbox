@@ -128,7 +128,7 @@ static gboolean load_sfz_group(struct sfz_parser_client *client)
 static gboolean load_sfz_region(struct sfz_parser_client *client)
 {
     struct sfz_load_state *ls = client->user_data;
-    
+
     ls->target = ls->region = sampler_layer_new(ls->m, ls->program, ls->group);
     // g_warning("-- start region");
     return TRUE;
@@ -154,7 +154,7 @@ static gboolean load_sfz_curve(struct sfz_parser_client *client)
 static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char *key, const char *value)
 {
     struct sfz_load_state *ls = client->user_data;
-    
+
     if (ls->section_type == slst_curve)
     {
         if (key[0] == 'v' && isdigit(key[1]))
@@ -218,14 +218,14 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
             g_warning("Unrecognized SFZ key in control section: %s", key);
         return TRUE;
     }
-    
+
     struct sampler_layer *l = ls->target;
     if (!ls->target)
     {
         g_warning("Parameter '%s' entered outside of global, master, region or group", key);
         return TRUE;
     }
-    
+
     if (!sampler_layer_apply_param(l, key, value, ls->error))
         return FALSE;
 
@@ -275,7 +275,9 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
     if (is_from_string)
         status = load_sfz_from_string(sfz, strlen(sfz), &c, error);
     else
-        status = load_sfz(sfz, prg->tarfile, &c, error);
+    {
+        status = load_sfz(sfz, prg->tarfile, &c, error); //Loads the audio files but also sets fields, like prg->sample_dir. After this we cannot modify any values anymore.
+    }
     if (!status)
     {
         if (ls.region)
@@ -284,7 +286,7 @@ gboolean sampler_module_load_program_sfz(struct sampler_module *m, struct sample
     }
 
     end_token(&c);
-    
+
     prg->all_layers = g_slist_reverse(prg->all_layers);
     sampler_program_update_layers(prg);
     return TRUE;

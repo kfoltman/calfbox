@@ -1034,8 +1034,8 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
 
-        if (!((!layer->parent_program || cbox_execute_on(fb, NULL, "/parent_program", "o", error, layer->parent_program)) && 
-            (!layer->parent || cbox_execute_on(fb, NULL, "/parent", "o", error, layer->parent)) && 
+        if (!((!layer->parent_program || cbox_execute_on(fb, NULL, "/parent_program", "o", error, layer->parent_program)) &&
+            (!layer->parent || cbox_execute_on(fb, NULL, "/parent", "o", error, layer->parent)) &&
             CBOX_OBJECT_DEFAULT_STATUS(layer, fb, error)))
             return FALSE;
         return TRUE;
@@ -1148,7 +1148,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     memset(l, 0, sizeof(struct sampler_layer));
     CBOX_OBJECT_HEADER_INIT(l, sampler_layer, doc);
     cbox_command_target_init(&l->cmd_target, sampler_layer_process_cmd, l);
-    
+
     l->module = m;
     l->child_layers = g_hash_table_new(NULL, NULL);
     if (parent)
@@ -1205,7 +1205,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
 #define PROC_FIELDS_CLONE_dahdsr(name, parname, index) \
         DAHDSR_FIELDS(PROC_SUBSTRUCT_CLONE, name, dst, src) \
         if (!copy_hasattr) \
-            DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst) 
+            DAHDSR_FIELDS(PROC_SUBSTRUCT_RESET_HAS_FIELD, name, dst)
 #define PROC_FIELDS_CLONE_lfo(name, parname, index) \
         LFO_FIELDS(PROC_SUBSTRUCT_CLONE, name, dst, src) \
         if (!copy_hasattr) \
@@ -1291,11 +1291,11 @@ static inline int sampler_filter_num_stages(float cutoff, enum sampler_filter_ty
 #define END_VALUE_amp_velcurve (l->amp_veltrack < 0 ? dB2gain(l->amp_veltrack * 84.0 / 100.0) : 1)
 #define IS_QUADRATIC_amp_velcurve l->velcurve_quadratic
 
-#define PROC_FIELDS_FINALISER(type, name, def_value) 
+#define PROC_FIELDS_FINALISER(type, name, def_value)
 #define PROC_FIELDS_FINALISER_string(name)
 #define PROC_FIELDS_FINALISER_midicurve(name) \
     sampler_midi_curve_interpolate(&l->name, l->computed.eff_##name, START_VALUE_##name, END_VALUE_##name, IS_QUADRATIC_##name);
-#define PROC_FIELDS_FINALISER_enum(type, name, def_value) 
+#define PROC_FIELDS_FINALISER_enum(type, name, def_value)
 #define PROC_FIELDS_FINALISER_dBamp(type, name, def_value) \
     l->name##_linearized = dB2gain(l->name);
 #define PROC_FIELDS_FINALISER_dahdsr(name, parname, index) \
@@ -1319,7 +1319,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
             l->computed.eff_waveform = cbox_wavebank_get_waveform(p->name, p->tarfile, p->sample_dir, l->sample, &error);
             if (!l->computed.eff_waveform)
             {
-                g_warning("Cannot load waveform %s: %s", l->sample, error ? error->message : "unknown error");
+                g_warning("Cannot load waveform \"%s\" in sample_dir \"%s\" : \"%s\"", l->sample, p->sample_dir, error ? error->message : "unknown error");
                 g_error_free(error);
             }
         }
@@ -1330,7 +1330,7 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
         l->computed.eff_is_silent = !l->sample || !strcmp(l->sample, "*silence");
         l->sample_changed = FALSE;
     }
-    
+
     l->computed.eff_use_keyswitch = ((l->sw_down != -1) || (l->sw_up != -1) || (l->sw_last != -1) || (l->sw_previous != -1));
     l->computed.eff_use_simple_trigger_logic =
         (l->seq_length == 1 && l->seq_position == 1) &&
@@ -1457,7 +1457,7 @@ void sampler_layer_load_overrides(struct sampler_layer *l, const char *cfg_secti
     char *imp = cbox_config_get_string(cfg_section, "import");
     if (imp)
         sampler_layer_load_overrides(l, imp);
-    
+
     struct layer_foreach_struct lfs = {
         .layer = l,
         .cfg_section = cfg_section
@@ -1478,7 +1478,7 @@ static void sampler_layer_apply_unknown(struct sampler_layer *l, const char *key
 {
     if (!l->unknown_keys)
         l->unknown_keys = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
-    
+
     g_hash_table_insert(l->unknown_keys, g_strdup(key), g_strdup(value));
 }
 
@@ -1628,16 +1628,16 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
     char floatbuf[G_ASCII_DTOSTR_BUF_SIZE];
     int floatbufsize = G_ASCII_DTOSTR_BUF_SIZE;
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_TO_FILEPTR)
-    
+
     for(struct sampler_noteinitfunc *nd = l->voice_nifs; nd; nd = nd->next)
     {
         if (!nd->value.has_value && !nd->value.has_curve && !nd->value.has_step && !show_inherited)
             continue;
-        #define PROC_ENVSTAGE_NAME(name, index, def_value) #name, 
+        #define PROC_ENVSTAGE_NAME(name, index, def_value) #name,
         static const char *env_stages[] = { DAHDSR_FIELDS(PROC_ENVSTAGE_NAME) "start" };
         uint32_t v = nd->key.variant;
         g_ascii_dtostr(floatbuf, floatbufsize, nd->value.value);
-        
+
         if (nd->key.notefunc_voice == sampler_nif_addrandom && v >= 0 && v <= 2)
             g_string_append_printf(outstr, " %s_random=%s", addrandom_variants[v], floatbuf);
         else if (nd->key.notefunc_voice == sampler_nif_vel2pitch)
@@ -1825,7 +1825,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         while(g_hash_table_iter_next(&hti, (gpointer *)&key, (gpointer *)&value))
             g_string_append_printf(outstr, " %s=%s", key, value);
     }
-    
+
     gchar *res = outstr->str;
     g_string_free(outstr, FALSE);
     return res;
@@ -1935,7 +1935,7 @@ static int sampler_layer_update_cmd_prepare(void *data)
     struct sampler_layer_update_cmd *cmd = data;
     cmd->old_data = cmd->layer->runtime;
     cmd->new_data = calloc(1, sizeof(struct sampler_layer_data));
-    
+
     sampler_layer_data_clone(cmd->new_data, &cmd->layer->data, TRUE);
     sampler_layer_data_finalize(cmd->new_data, cmd->layer->parent ? &cmd->layer->parent->data : NULL, cmd->layer->parent_program);
     if (cmd->layer->runtime == NULL)
@@ -1952,7 +1952,7 @@ static int sampler_layer_update_cmd_prepare(void *data)
 static int sampler_layer_update_cmd_execute(void *data)
 {
     struct sampler_layer_update_cmd *cmd = data;
-    
+
     for (int i = 0; i < 16; i++)
     {
         FOREACH_VOICE(cmd->module->channels[i].voices_running, v)
@@ -1983,7 +1983,7 @@ static int sampler_layer_update_cmd_execute(void *data)
 static void sampler_layer_update_cmd_cleanup(void *data)
 {
     struct sampler_layer_update_cmd *cmd = data;
-    
+
     sampler_layer_data_destroy(cmd->old_data);
     free(cmd);
 }
@@ -2008,13 +2008,13 @@ void sampler_layer_update(struct sampler_layer *l)
         .execute = sampler_layer_update_cmd_execute,
         .cleanup = sampler_layer_update_cmd_cleanup,
     };
-    
+
     struct sampler_layer_update_cmd *lcmd = malloc(sizeof(struct sampler_layer_update_cmd));
     lcmd->module = l->module;
     lcmd->layer = l;
     lcmd->new_data = NULL;
     lcmd->old_data = NULL;
-    
+
     cbox_rt_execute_cmd_async(l->module->module.rt, &rtcmd, lcmd);
 }
 

@@ -38,7 +38,7 @@ struct cbox_tarfile
     int refs;
     GHashTable *items_byname;
     GHashTable *items_byname_nc;
-    char *file_pathname;
+    char *file_pathname; //full path to the .tar file with filename.ext
 };
 
 struct cbox_tarpool

@@ -70,7 +70,7 @@ static void my_fft_main(complex float output[STD_WAVEFORM_FRAMES])
         int invi = STD_WAVEFORM_BITS - i - 1;
         int disp = 1 << i;
         int mask = disp - 1;
-        
+
         for (int j = 0; j < STD_WAVEFORM_FRAMES / 2; j++)
         {
             int jj1 = (j & mask) + ((j & ~mask) << 1); // insert 0 at i'th bit to get the left arm of the butterfly
@@ -93,9 +93,9 @@ static void my_fft_r2c(complex float output[STD_WAVEFORM_FRAMES], int16_t input[
     // Copy + bit reversal addressing
     for (int i = 0; i < STD_WAVEFORM_FRAMES; i++)
         output[i] = input[map_table[i]] * (1.0 / STD_WAVEFORM_FRAMES);
-    
+
     my_fft_main(output);
-    
+
 }
 
 static void my_ifft_c2r(int16_t output[STD_WAVEFORM_FRAMES], complex float input[STD_WAVEFORM_FRAMES])
@@ -116,7 +116,7 @@ static void my_ifft_c2r(int16_t output[STD_WAVEFORM_FRAMES], complex float input
         if (fabs(value) > maxv)
             maxv = fabs(value);
         output[i] = (int16_t)value;
-    }    
+    }
 }
 
 struct wave_bank
@@ -168,7 +168,7 @@ void cbox_waveform_generate_levels(struct cbox_waveform *waveform, int levels, d
     complex float output[STD_WAVEFORM_FRAMES], bandlimited[STD_WAVEFORM_FRAMES];
     my_fft_r2c(output, waveform->data);
     int N = STD_WAVEFORM_FRAMES;
-    
+
     waveform->levels = calloc(levels, sizeof(struct cbox_waveform_level));
     double rate = 65536.0 * 65536.0; // / waveform->info.frames;
     double orig_rate = 65536.0 * 65536.0; // / waveform->info.frames;
@@ -176,7 +176,7 @@ void cbox_waveform_generate_levels(struct cbox_waveform *waveform, int levels, d
     {
         int harmonics = N / 2 / (rate / orig_rate);
         bandlimited[0] = 0;
-        
+
         if (harmonics > 0)
         {
             for (int j = 1; j <= harmonics; j++)
@@ -187,7 +187,7 @@ void cbox_waveform_generate_levels(struct cbox_waveform *waveform, int levels, d
             for (int j = harmonics; j <= N / 2; j++)
                 bandlimited[j] = bandlimited [N - j] = 0;
         }
-        
+
         waveform->levels[i].data = calloc(N + MAX_INTERPOLATION_ORDER, sizeof(int16_t));
         my_ifft_c2r(waveform->levels[i].data, bandlimited);
         memcpy(waveform->levels[i].data + N, waveform->levels[i].data, MAX_INTERPOLATION_ORDER * sizeof(int16_t));
@@ -204,11 +204,11 @@ void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, 
     for (int i = 0; i < nsize; i++)
     {
         float v = getfunc(i * 1.0 / nsize, user_data);
-        if (fabs(v) > 1) 
+        if (fabs(v) > 1)
             v = (v < 0) ? -1 : 1;
         // cannot use full scale here, because bandlimiting will introduce
         // some degree of overshoot
-        wave[i] = (int16_t)(25000 * v); 
+        wave[i] = (int16_t)(25000 * v);
     }
     struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
     waveform->data = wave;
@@ -225,10 +225,10 @@ void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, 
     waveform->loop_end = nsize;
     waveform->levels = NULL;
     waveform->level_count = 0;
-    
+
     if (levels)
         cbox_waveform_generate_levels(waveform, levels, 2);
-    
+
     g_hash_table_insert(bank.waveforms_by_name, waveform->canonical_name, waveform);
     g_hash_table_insert(bank.waveforms_by_id, &waveform->id, waveform);
     bank.std_waveforms = g_slist_prepend(bank.std_waveforms, waveform);
@@ -247,7 +247,7 @@ void cbox_wavebank_init()
     bank.waveforms_by_id = g_hash_table_new(g_int_hash, g_int_equal);
     bank.std_waveforms = NULL;
     bank.streaming_prefetch_size = cbox_config_get_int("streaming", "prefetch_size", 65536);
-    
+
     cbox_wavebank_add_std_waveform("*sine", func_sine, NULL, 0);
     // XXXKF this should not be a real waveform
     cbox_wavebank_add_std_waveform("*silence", func_silence, NULL, 0);
@@ -263,7 +263,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
         g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, "%s: no filename specified", context_name);
         return NULL;
     }
-    
+
     // Built in waveforms don't go through path canonicalization
     if (filename[0] == '*')
     {
@@ -275,7 +275,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
             return waveform;
         }
     }
-    
+
     gchar *value_copy = g_strdup(filename);
     for (int i = 0; value_copy[i]; i++)
     {
@@ -309,17 +309,35 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
     {
         g_free(pathname);
         g_free(canonical);
-        
+
         struct cbox_waveform *waveform = value;
         cbox_waveform_ref(waveform);
         return waveform;
     }
-    
+
     struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
     SNDFILE *sndfile = NULL;
     struct cbox_taritem *taritem = NULL;
     if (tarfile)
     {
+        if (strcmp(sample_dir, ".") == 0)
+        {
+            //Potential path lookup problem:
+
+            //This is a sample without sfz default_path opcode inside a tar.
+            //We need to set the sample dir to the position of the .sfz file within the .tar
+            //because we also assume that the sample paths in regions are relative to the .sfz path.
+
+            //If the sfz is in the tar root this is a redundant action, but if the sfz is itself
+            //in a subdirectoy we need to adjust the path now.
+            // XXXNH sample_dir will not be updated in the struct itself and thus reported as "." in python etc.
+
+            //context_name is the sfz file, filename the sample file without leading ./  and sample_dir just a dot.
+
+            gchar *sfz_dir = g_path_get_dirname(context_name); //take the path of the sfz file...
+            pathname = g_build_filename(sfz_dir, filename, NULL); //... and prefix the sample filename with it.
+            g_free(sfz_dir);
+        }
         taritem = cbox_tarfile_get_item_by_name(tarfile, pathname, TRUE);
         if (taritem)
             sndfile = cbox_tarfile_opensndfile(tarfile, taritem, &waveform->sndstream, &waveform->info);
@@ -339,7 +357,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
     uint32_t nshorts;
     if (waveform->info.channels != 1 && waveform->info.channels != 2)
     {
-        g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED, 
+        g_set_error(error, CBOX_WAVEFORM_ERROR, CBOX_WAVEFORM_ERROR_FAILED,
             "%s: cannot open file '%s': unsupported channel count %d", context_name, pathname, (int)waveform->info.channels);
         sf_close(sndfile);
         free(canonical);
@@ -364,7 +382,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
     waveform->preloaded_frames = preloaded_frames;
     waveform->tarfile = tarfile;
     waveform->taritem = taritem;
-    
+
     if (sf_command(sndfile, SFC_GET_INSTRUMENT, &instrument, sizeof(SF_INSTRUMENT)))
     {
         for (int i = 0; i < instrument.loop_count; i++)
@@ -389,7 +407,7 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
         bank.maxbytes = bank.bytes;
     g_hash_table_insert(bank.waveforms_by_name, waveform->canonical_name, waveform);
     g_hash_table_insert(bank.waveforms_by_id, &waveform->id, waveform);
-    
+
     return waveform;
 }
 
@@ -419,10 +437,10 @@ void cbox_wavebank_foreach(void (*cb)(void *, struct cbox_waveform *), void *use
     gpointer key, value;
 
     g_hash_table_iter_init (&iter, bank.waveforms_by_id);
-    while (g_hash_table_iter_next (&iter, &key, &value)) 
+    while (g_hash_table_iter_next (&iter, &key, &value))
     {
         (*cb)(user_data, value);
-    }    
+    }
 }
 
 void cbox_wavebank_close()
@@ -451,7 +469,7 @@ void cbox_waveform_unref(struct cbox_waveform *waveform)
 {
     if (--waveform->refcount > 0)
         return;
-    
+
     g_hash_table_remove(bank.waveforms_by_name, waveform->canonical_name);
     g_hash_table_remove(bank.waveforms_by_id, &waveform->id);
     bank.bytes -= waveform->bytes;
@@ -463,7 +481,7 @@ void cbox_waveform_unref(struct cbox_waveform *waveform)
     free(waveform->levels);
     free(waveform->data);
     free(waveform);
-    
+
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -478,7 +496,7 @@ struct waves_foreach_data
 void wave_list_cb(void *user_data, struct cbox_waveform *waveform)
 {
     struct waves_foreach_data *wfd = user_data;
-    
+
     wfd->success = wfd->success && cbox_execute_on(wfd->fb, NULL, "/waveform", "i", wfd->error, (int)waveform->id);
 }
 
@@ -488,7 +506,7 @@ static gboolean waves_process_cmd(struct cbox_command_target *ct, struct cbox_co
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        
+
         // XXXKF this only supports 4GB - not a big deal for now yet?
         return cbox_execute_on(fb, NULL, "/bytes", "i", error, (int)cbox_wavebank_get_bytes()) &&
             cbox_execute_on(fb, NULL, "/max_bytes", "i", error, (int)cbox_wavebank_get_maxbytes()) &&
@@ -499,7 +517,7 @@ static gboolean waves_process_cmd(struct cbox_command_target *ct, struct cbox_co
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        
+
         struct waves_foreach_data wfd = { fb, error, TRUE };
         cbox_wavebank_foreach(wave_list_cb, &wfd);
         return wfd.success;
@@ -508,7 +526,7 @@ static gboolean waves_process_cmd(struct cbox_command_target *ct, struct cbox_co
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
-        
+
         int id = CBOX_ARG_I(cmd, 0);
         struct cbox_waveform *waveform = cbox_wavebank_peek_waveform_by_id(id);
         if (waveform == NULL)

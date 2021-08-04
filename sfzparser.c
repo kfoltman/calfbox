@@ -434,6 +434,11 @@ restore:
     return ok;
 }
 
+/*
+ * This is not only called when literally constructing a sfz string
+ * but also when loading a null instrument e.g. to first create the jack ports and only later
+ * actually load the sfz and samples, which can be costly.
+ */
 gboolean load_sfz_from_string(const char *buf, int len, struct sfz_parser_client *c, GError **error)
 {
     struct sfz_parser_state s;
@@ -449,13 +454,17 @@ gboolean load_sfz_from_string(const char *buf, int len, struct sfz_parser_client
     return result;
 }
 
+/*
+ * Called once per sfz.
+ * Does not load samples, but only the sfz file.
+ */
 gboolean load_sfz_into_state(struct sfz_parser_state *s, const char *name)
 {
     g_clear_error(s->error);
     FILE *f;
     int len = -1;
     if (s->tarfile)
-    {
+    {   //This only extracts the .sfz file itself and will not attempt to load any sample waveforms, eventhough cbox_tarfile_get_item_by_name will later be used to extract the sample as well.
         struct cbox_taritem *item = cbox_tarfile_get_item_by_name(s->tarfile, name, TRUE);
         if (!item)
         {
@@ -479,14 +488,14 @@ gboolean load_sfz_into_state(struct sfz_parser_state *s, const char *name)
         g_set_error(s->error, G_FILE_ERROR, g_file_error_from_errno (errno), "Cannot open '%s'", name);
         return FALSE;
     }
-    
+
     if (len == -1)
     {
         fseek(f, 0, SEEK_END);
         len = ftell(f);
         fseek(f, 0, SEEK_SET);
     }
-    
+
     unsigned char *buf = malloc(len + 1);
     buf[len] = '\0';
     if (fread(buf, 1, len, f) != (size_t)len)
