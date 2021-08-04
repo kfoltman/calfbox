@@ -1041,6 +1041,8 @@ class DocScene(DocObj):
     def move_layer(self, old_pos, new_pos):
         self.cmd("/move_layer", None, int(old_pos + 1), int(new_pos + 1))
 
+    #Layer positions are 0 for "append" and other positions are 1...n which need to be unique
+
     def add_layer(self, aux, pos = None):
         if pos is None:
             return self.cmd_makeobj("/add_layer", 0, aux)
