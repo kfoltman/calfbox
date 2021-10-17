@@ -1159,11 +1159,12 @@ class SamplerLayer(DocObj):
         return self.__repr__()
 
     def get_children(self):
-        """Return all children SamplerLayer. Will be empty if this is
-        an sfz <region>, which has no further children.
+        """Return all children SamplerLayer.
 
-        Children can be of mixed type, e.g. regions or another level
-        of hierarchy.
+        The hierarchy is always global-master-group-region
+
+        Will be empty if this is
+        an sfz <region>, which has no further children.
         """
         return self.get_thing("/get_children", '/child', [SamplerLayer])
 
@@ -1171,10 +1172,14 @@ class SamplerLayer(DocObj):
         """Returns either a level of hierarchy, e.g. <global> or <group>
         or None, if this is a childless layer, such as a <region>.
 
+        The hierarchy is always global-master-group-region.
+        Regions alre always on the fourth level. But not all levels might have regions.
+
         Hint: Print with pprint during development."""
-        if self.get_children():
+        children = self.get_children()
+        if children:
             result = {}
-            for childLayer in self.get_children():
+            for childLayer in children:
                 result[childLayer] = childLayer.get_hierarchy()
         else:
             result = None
