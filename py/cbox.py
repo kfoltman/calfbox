@@ -1138,7 +1138,22 @@ class SamplerLayer(DocObj):
         parent_group = DocObj
 
     def __repr__(self):
-        return "%s<%s>" % (self.__class__.__name__, self.uuid,)
+        paramDict = self.get_params_full()
+        if "global_label" in paramDict:
+            label = paramDict["global_label"]
+        elif "master_label" in paramDict:
+            label = paramDict["master_label"]
+        elif "group_label" in paramDict:
+            label = paramDict["group_label"]
+        elif "region_label" in paramDict:
+            label = paramDict["region_label"]
+        else:
+            label = "Unlabeled"
+
+        return "%s: %s<%s>" % (label, self.__class__.__name__, self.uuid,)
+
+    def __str__(self):
+        return self.__repr__()
 
     def get_children(self):
         """Return all children SamplerLayer. Will be empty if this is
