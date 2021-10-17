@@ -1138,19 +1138,22 @@ class SamplerLayer(DocObj):
         parent_group = DocObj
 
     def __repr__(self):
+        """Attempt to use sfz labels when creating the representation.
+        This assumes a correct .sfz file: If somebody adds a master_label to <group> we will
+        show the master label. SamplerLayer does not know what kind it is"""
         paramDict = self.get_params_full()
         if "global_label" in paramDict:
-            label = paramDict["global_label"]
+            label = paramDict["global_label"] + ": "
         elif "master_label" in paramDict:
-            label = paramDict["master_label"]
+            label = paramDict["master_label"] + ": "
         elif "group_label" in paramDict:
-            label = paramDict["group_label"]
+            label = paramDict["group_label"] + ": "
         elif "region_label" in paramDict:
-            label = paramDict["region_label"]
+            label = paramDict["region_label"] + ": "
         else:
-            label = "Unlabeled"
+            label = ""
 
-        return "%s: %s<%s>" % (label, self.__class__.__name__, self.uuid,)
+        return "%s%s<%s>" % (label, self.__class__.__name__, self.uuid,)
 
     def __str__(self):
         return self.__repr__()
