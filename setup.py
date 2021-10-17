@@ -123,8 +123,7 @@ if support_ext_module:
         eargs.append('-mfpu=neon')
         eargs.append('-ffast-math')
 
-    ext_modules.append([
-
+    ext_modules.append(
         Extension('_cbox', csources,
             extra_compile_args = eargs,
             include_dirs=['.'],
@@ -133,7 +132,7 @@ if support_ext_module:
             undef_macros=['NDEBUG'],
             depends = ['setup.py'] + headers
         )
-    ])
+    )
 setup(name="CalfBox",
     version="0.0.0.2", description="Assorted music-related code",
     author="Krzysztof Foltman", author_email="wdev@foltman.com",
