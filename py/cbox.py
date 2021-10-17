@@ -1135,7 +1135,7 @@ Document.classmap['sampler_program'] = SamplerProgram
 class SamplerLayer(DocObj):
     class Status:
         parent_program = SamplerProgram
-        parent_group = DocObj
+        parent = DocObj
 
     def __repr__(self):
         """Attempt to use sfz labels when creating the representation.
