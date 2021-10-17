@@ -109,7 +109,7 @@ if test "$JACK_ENABLED" = "yes"; then
 fi
 
 if test "$PYTHON_ENABLED" = "yes"; then
-    PKG_CHECK_MODULES(PYTHON_DEPS, python3 >= 3.0, true, AC_MSG_ERROR([python 3.0 or newer is required (or use --without-python)]))
+    PKG_CHECK_MODULES(PYTHON_DEPS, python3-embed >= 3.0, true, AC_MSG_ERROR([python 3.0 or newer is required (or use --without-python)]))
 fi
 
 # Generate Automake conditionals
