@@ -1136,6 +1136,7 @@ class SamplerLayer(DocObj):
     class Status:
         parent_program = SamplerProgram
         parent = DocObj
+        level = str
 
     def __repr__(self):
         """Attempt to use sfz labels when creating the representation.
