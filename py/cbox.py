@@ -1187,10 +1187,15 @@ class SamplerLayer(DocObj):
         return result
 
     def as_string(self):
+        """A space separated string of all sampler values at this level
+        in the hierarchy, for example ampeg_decay.
+        This only includes non-default values, e.g. from the sfz file"""
         return self.get_thing("/as_string", '/value', str)
+
     def as_string_full(self):
         """A space separated string of all sampler values at this level
         in the hierarchy, for example ampeg_decay.
+        This includes all default values.
 
         To access the values as dict with number data types use
         get_params_full().
