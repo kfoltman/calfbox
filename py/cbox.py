@@ -1164,6 +1164,15 @@ class SamplerLayer(DocObj):
             result = None
         return result
 
+    def as_dict(self):
+        """Returns a dictionary of parameters set at this level of the
+        layer hierarchy."""
+        return self.get_thing("/as_list", '/value', {str: str})
+    def as_dict_full(self):
+        """Returns a dictionary of parameters set either at this level of the
+        layer hierarchy or at one of the ancestors."""
+        return self.get_thing("/as_list_full", '/value', {str: str})
+
     def as_string(self):
         """A space separated string of all sampler values at this level
         in the hierarchy, for example ampeg_decay.

@@ -88,7 +88,7 @@ recurse(globalHierarchy)
 print("\nShow all non-engine-default sfz opcodes and values in a global/master/group/region hierarchy.\n" + "=" * 80)
 def recurse2(item, level = 0):
     status = item.status()
-    data = item.as_string()
+    data = item.as_dict()
     children = item.get_children()
     if data or children:
         print ("  " * level + "<%s> %s" % (item.status().level, data))

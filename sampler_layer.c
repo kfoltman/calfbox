@@ -1090,6 +1090,53 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         g_free(res);
         return result;
     }
+    if ((!strcmp(cmd->command, "/as_list") || !strcmp(cmd->command, "/as_list_full")) && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        // Temporary, kludgy implementation
+        gchar *res = sampler_layer_to_string(layer, !strcmp(cmd->command, "/as_list_full"));
+        const gchar *iter = res;
+        gboolean result = TRUE;
+        while(iter) {
+            while(isspace(*iter))
+                ++iter;
+            const gchar *pkey = iter;
+            const gchar *eq = iter;
+            while(*eq && *eq != '=')
+                ++eq;
+            if (*eq == '=')
+            {
+                gchar *key = g_strndup(pkey, eq - pkey);
+                const gchar *pvalue = eq + 1;
+                while(*pvalue && isspace(*pvalue))
+                    ++pvalue;
+                const gchar *pend = pvalue;
+                while(*pend && *pend != '=')
+                    ++pend;
+                if (*pend == '=' )
+                {
+                    while(pend > pvalue && (isalnum(pend[-1]) || pend[-1] == '_'))
+                        pend--;
+                    iter = pend;
+                }
+                else
+                    iter = NULL;
+                while(pend > pvalue && isspace(pend[-1]))
+                    pend--;
+                gchar *value = g_strndup(pvalue, pend - pvalue);
+                result = cbox_execute_on(fb, NULL, "/value", "ss", error, key, value);
+                g_free(value);
+                g_free(key);
+                if (!result)
+                    break;
+            }
+            else
+                break;
+        }
+        g_free(res);
+        return result;
+    }
     if (!strcmp(cmd->command, "/set_param") && !strcmp(cmd->arg_types, "ss"))
     {
         const char *key = CBOX_ARG_S(cmd, 0);
