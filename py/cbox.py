@@ -1137,28 +1137,6 @@ class SamplerLayer(DocObj):
         parent_program = SamplerProgram
         parent = DocObj
         level = str
-
-    def __repr__(self):
-        """Attempt to use sfz labels when creating the representation.
-        This assumes a correct .sfz file: If somebody adds a master_label to <group> we will
-        show the master label. SamplerLayer does not know what kind it is"""
-        paramDict = self.get_params_full()
-        if "global_label" in paramDict:
-            label = paramDict["global_label"] + ": "
-        elif "master_label" in paramDict:
-            label = paramDict["master_label"] + ": "
-        elif "group_label" in paramDict:
-            label = paramDict["group_label"] + ": "
-        elif "region_label" in paramDict:
-            label = paramDict["region_label"] + ": "
-        else:
-            label = ""
-
-        return "%s%s<%s>" % (label, self.__class__.__name__, self.uuid,)
-
-    def __str__(self):
-        return self.__repr__()
-
     def get_children(self):
         """Return all children SamplerLayer.
 
@@ -1202,21 +1180,7 @@ class SamplerLayer(DocObj):
         '_oncc1' will be converted to '_cc1'
         """
         return self.get_thing("/as_string_full", '/value', str)
-    def get_params_full(self):
-        """
-        Dictionary version of as_string_full()
-        Returns a dict of all sampler values at this level
-        in the hierarchy, for example ampeg_decay.
-        All numbers are returned as floats.
-        """
-        result = {}
-        for paramPair in self.as_string_full().split(" "):
-            k, vStr = paramPair.split("=")
-            try:
-                result[k] = float(vStr)
-            except ValueError:
-                result[k] = vStr
-        return result
+
     def set_param(self, key, value):
         self.cmd("/set_param", None, key, str(value))
     def unset_param(self, key):
