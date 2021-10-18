@@ -804,8 +804,20 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
             return sampler_layer_param_entry_set_from_ptr(e, l, set_local_value, &number, args, error);
         }
         case slpt_nonfunctional:
-            sampler_layer_apply_unknown(l, e->name, value);
+        {
+            char *argptr = strchr(e->name, '#');
+            if (argptr)
+            {
+                int rootlen = argptr - e->name;
+                char buf[128];
+                strncpy(buf, e->name, rootlen);
+                sprintf(buf + rootlen, "%d", args[0]);
+                sampler_layer_apply_unknown(l, buf, value);
+            }
+            else
+                sampler_layer_apply_unknown(l, e->name, value);
             return TRUE;
+        }
         case slpt_float:
         case slpt_dBamp:
         default:
