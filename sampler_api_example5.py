@@ -65,6 +65,17 @@ def recurse(item, level = 0):
 
 recurse(globalHierarchy)
 
+def recurse2(item, level = 0):
+    status = item.status()
+    data = item.as_string()
+    children = item.get_children()
+    if data or children:
+        print ("  " * level + "<%s> %s" % (item.status().level, data))
+    for subitem in children:
+        recurse2(subitem, level + 1)
+
+recurse2(globalHierarchy)
+
 #print (globalHierarchy.get_params_full()["hallo"])  #This is a custom opcode, just <global>hallo=welt . It throws an error on load, but is saved nevertheless.
 #print ("Global Hierarchy:", globalHierarchy.get_children()) # -> SamplerLayer. Traverse the hierarchy. Why is there only one to start with?
 

@@ -274,6 +274,7 @@ enum sampler_layer_param_type
     slpt_voice_nif,
     slpt_prevoice_nif,
     slpt_flex_lfo,
+    slpt_nonfunctional,
     slpt_reserved,
 };
 
@@ -349,6 +350,8 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
     { name, LOFS(prevoice_nifs), slpt_prevoice_nif, 0, variant, nif, NULL, NULL },
 #define FIELD_ALIAS(alias, name) \
     { alias, -1, slpt_alias, 0, 0, name, NULL, NULL },
+#define FIELD_NONFUNCTIONAL(name) \
+    { name, -1, slpt_nonfunctional, 0, 0, NULL, NULL, NULL },
 
 #define PROC_SUBSTRUCT_FIELD_DESCRIPTOR(name, index, def_value, parent, parent_name, parent_index, parent_struct) \
     { #parent_name "_" #name, offsetof(struct sampler_layer_data, parent) + offsetof(struct parent_struct, name), slpt_float, def_value, parent_index * 100 + index, NULL, sampler_layer_data_##parent##_set_has_##name, sampler_layer_data_##parent##_get_has_##name }, \
@@ -473,9 +476,16 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_ALIAS("reloffset_oncc#", "reloffset_cc#")
     FIELD_ALIAS("delay_oncc#", "delay_cc#")
 
+    FIELD_NONFUNCTIONAL("region_label")
+    FIELD_NONFUNCTIONAL("group_label")
+    FIELD_NONFUNCTIONAL("master_label")
+    FIELD_NONFUNCTIONAL("global_label")
+
     { "genericmod_#_#_#_#", -1, slpt_generic_modulation, 0, 0, NULL, NULL, NULL },
 };
 #define NPARAMS (sizeof(sampler_layer_params) / sizeof(sampler_layer_params[0]))
+
+static void sampler_layer_apply_unknown(struct sampler_layer *l, const char *key, const char *value);
 
 static int compare_entries(const void *p1, const void *p2)
 {
@@ -700,6 +710,7 @@ gboolean sampler_layer_param_entry_set_from_ptr(const struct sampler_layer_param
         case slpt_reserved:
         case slpt_invalid:
         case slpt_alias:
+        case slpt_nonfunctional:
             printf("Unhandled parameter type of parameter %s\n", e->name);
             assert(0);
             return FALSE;
@@ -788,6 +799,9 @@ gboolean sampler_layer_param_entry_set_from_string(const struct sampler_layer_pa
             }
             return sampler_layer_param_entry_set_from_ptr(e, l, set_local_value, &number, args, error);
         }
+        case slpt_nonfunctional:
+            sampler_layer_apply_unknown(l, e->name, value);
+            return TRUE;
         case slpt_float:
         case slpt_dBamp:
         default:
