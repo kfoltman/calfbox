@@ -61,7 +61,18 @@ print ("Global:", globalHierarchy)
 
 hierarchy = pgm.get_hierarchy() #starts with global and dicts down with get_children(). First single entry layer is get_global()
 print ("Complete Hierarchy")
-pprint(hierarchy)
+#pprint(hierarchy)
+
+for k,v in hierarchy.items():  #Global
+    print (k.as_string())
+    for k1,v1 in v.items():  #Master
+        print (k1.as_string())
+        if v1:
+            for k2,v2 in v1.items():  #Group
+                print (k2.as_string())
+                if v2:
+                    for k3,v3 in v2.items():  #Regions
+                        print (k3.as_string())
 
 
 print("Ready!")
