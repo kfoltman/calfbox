@@ -56,6 +56,15 @@ print ("Control Inits:", pgm.get_control_inits())  #Empty . Is this <control> ? 
 globalHierarchy = pgm.get_global()  # -> Single SamplerLayer. Literally sfz <global>. But not the global scope, e.g. no under any <tag>.
 #If there is no <global> tag in the .sfz this will still create a root SamplerLayer
 print ("Global:", globalHierarchy)
+
+def recurse(item, level = 0):
+    status = item.status()
+    print ("  " * level + str(status))
+    for subitem in item.get_children():
+        recurse(subitem, level + 1)
+
+recurse(globalHierarchy)
+
 #print (globalHierarchy.get_params_full()["hallo"])  #This is a custom opcode, just <global>hallo=welt . It throws an error on load, but is saved nevertheless.
 #print ("Global Hierarchy:", globalHierarchy.get_children()) # -> SamplerLayer. Traverse the hierarchy. Why is there only one to start with?
 

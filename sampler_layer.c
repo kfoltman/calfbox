@@ -1026,16 +1026,27 @@ int sampler_layer_unapply_fixed_param(struct sampler_layer *l, const char *key, 
         return -1;
 }
 
+static int count_ancestors(struct sampler_layer *l)
+{
+    int ancestors = 0;
+    for (; l->parent; l = l->parent)
+        ++ancestors;
+    assert(ancestors < 4);
+    return ancestors;
+}
+
 static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct sampler_layer *layer = ct->user_data;
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
+        static const char *layer_types[] = { "global", "master", "group", "region" };
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
 
         if (!((!layer->parent_program || cbox_execute_on(fb, NULL, "/parent_program", "o", error, layer->parent_program)) &&
             (!layer->parent || cbox_execute_on(fb, NULL, "/parent", "o", error, layer->parent)) &&
+            cbox_execute_on(fb, NULL, "/level", "s", error, layer_types[count_ancestors(layer)]) &&
             CBOX_OBJECT_DEFAULT_STATUS(layer, fb, error)))
             return FALSE;
         return TRUE;
