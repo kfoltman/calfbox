@@ -16,11 +16,18 @@ instrument = scene.add_new_instrument_layer("test_sampler", "sampler").get_instr
 pgm_no = instrument.engine.get_unused_program()
 
 
+
+#A pseudo sfz file that features all kind of labels
 sfzString = """
 <region> region_label=Region-2a //This is put into implicitMaster0 and implicitGroup0
 
 <global> //One global per file
 global_label=Global1
+
+//Prepare keyswitches to test labels later
+sw_default=60
+sw_lokey=60
+sw_hikey=61
 
 //<control> //is not part of the hierarchy. control has no label.
 
@@ -31,7 +38,10 @@ group_label=ImplicitGroup0 //Not parsed? -> Unlabeled
 <group> group_label=Group0  //master_label=WrongLabel  //This is a label in the wrong place. It will override the group_label
 <region> region_label=Region0a
 
-<master> master_label=Master1
+<master> master_label=Master1 Label
+sw_last=60
+sw_label=Key 60: Keyswitch For Master 1
+
 
 group_label=ImplicitGroup1 //Not parsed? -> Unlabeled
 
@@ -41,12 +51,19 @@ group_label=ImplicitGroup1 //Not parsed? -> Unlabeled
 
 
 <master> master_label=Master2
+sw_last=61
+sw_label=Key 61: Keyswitch For Master 2
+
 group_label=ImplicitGroup2 //Not parsed? -> Unlabeled
 
 
 <group> group_label=Group2
 <region> region_label=Region2a
-<region> region_label=Region2b
+<region> wrongOpcode=hello world foo bar region_label=Region2b  //a wrong opcode. Will throw a warning on load but is nevertheless available in our python data
+
+<group> group_label=Group3
+<region> sample=*saw pitch_oncc1=40 label_cc1=Detune second oscillator
+<region> key=72 label_key72=A very special key
 """
 
 pgm = instrument.engine.load_patch_from_string(pgm_no, '.', sfzString, 'test_sampler_hierarchy')
@@ -57,6 +74,8 @@ globalHierarchy = pgm.get_global()  # -> Single SamplerLayer. Literally sfz <glo
 #If there is no <global> tag in the .sfz this will still create a root SamplerLayer
 print ("Global:", globalHierarchy)
 
+
+print("\nShow all SamplerLayer in their global/master/group/region hierarchy through indentations.\n" + "=" * 80)
 def recurse(item, level = 0):
     status = item.status()
     print ("  " * level + str(status))
@@ -65,6 +84,8 @@ def recurse(item, level = 0):
 
 recurse(globalHierarchy)
 
+
+print("\nShow all non-engine-default sfz opcodes and values in a global/master/group/region hierarchy.\n" + "=" * 80)
 def recurse2(item, level = 0):
     status = item.status()
     data = item.as_string()
@@ -76,12 +97,15 @@ def recurse2(item, level = 0):
 
 recurse2(globalHierarchy)
 
-#print (globalHierarchy.get_params_full()["hallo"])  #This is a custom opcode, just <global>hallo=welt . It throws an error on load, but is saved nevertheless.
-#print ("Global Hierarchy:", globalHierarchy.get_children()) # -> SamplerLayer. Traverse the hierarchy. Why is there only one to start with?
+print("\n\n" + "=" * 80)
 
+
+
+#The following were just stages during development, now handled by recurse and recurse2() above
+"""
 hierarchy = pgm.get_hierarchy() #starts with global and dicts down with get_children(). First single entry layer is get_global()
 print ("Complete Hierarchy")
-#pprint(hierarchy)
+pprint(hierarchy)
 
 for k,v in hierarchy.items():  #Global
     print (k.as_string())
@@ -93,7 +117,7 @@ for k,v in hierarchy.items():  #Global
                 if v2:
                     for k3,v3 in v2.items():  #Regions
                         print (k3.as_string())
-
+"""
 
 print("Ready!")
 while True:

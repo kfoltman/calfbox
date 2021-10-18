@@ -476,10 +476,14 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_ALIAS("reloffset_oncc#", "reloffset_cc#")
     FIELD_ALIAS("delay_oncc#", "delay_cc#")
 
-    FIELD_NONFUNCTIONAL("region_label")
-    FIELD_NONFUNCTIONAL("group_label")
-    FIELD_NONFUNCTIONAL("master_label")
-    FIELD_NONFUNCTIONAL("global_label")
+    //NONFUNCTIONAL Opcodes can still be looked up and used as strings in a GUI
+    FIELD_NONFUNCTIONAL("region_label") //ARIA
+    FIELD_NONFUNCTIONAL("group_label") //ARIA
+    FIELD_NONFUNCTIONAL("master_label") //ARIA
+    FIELD_NONFUNCTIONAL("global_label") //ARIA
+    FIELD_NONFUNCTIONAL("sw_label") //Keyswitch. ARIA
+    FIELD_NONFUNCTIONAL("label_cc#") //ARIA
+    FIELD_NONFUNCTIONAL("label_key#") //sfizz opcode
 
     { "genericmod_#_#_#_#", -1, slpt_generic_modulation, 0, 0, NULL, NULL, NULL },
 };
