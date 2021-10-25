@@ -27,7 +27,7 @@ global_label=Global1
 //Prepare keyswitches to test labels later
 sw_default=60
 sw_lokey=60
-sw_hikey=61
+sw_hikey=70
 
 //<control> //is not part of the hierarchy. control has no label.
 
@@ -40,19 +40,19 @@ group_label=ImplicitGroup0 //Not parsed? -> Unlabeled
 
 <master> master_label=Master1 Label
 sw_last=60
-sw_label=Key 60: Keyswitch For Master 1
+sw_label=Keyswitch For Master 1
 
 
 group_label=ImplicitGroup1 //Not parsed? -> Unlabeled
 
 <group> group_label=Group1
-<region> region_label=Region1a
-<region> region_label=Region1b
+<region> region_label=Region1a  sw_down=68
+<region> region_label=Region1b sw_last=67
 
 
 <master> master_label=Master2
 sw_last=61
-sw_label=Key 61: Keyswitch For Master 2
+sw_label=Keyswitch For Master 2
 
 group_label=ImplicitGroup2 //Not parsed? -> Unlabeled
 
@@ -97,8 +97,64 @@ def recurse2(item, level = 0):
 
 recurse2(globalHierarchy)
 
-print("\n\n" + "=" * 80)
+print("\nAs an example get all Keyswitch Labels and their keys.\n" + "=" * 80)
 
+def findKeyswitches(program):
+    """Returns a dict with key=keystring e.g. c#4
+    and value=(opcode,label). label can be empty.
+
+    Only existing keyswitches are included, not every number from 0-127.
+    Two special keys "sw_lokey" and "sw_hikeys" are added and show the total range of possible
+    keyswitches.
+
+    This is just a function to find the keyswitches in our example, not every advanced scenario
+    with sw_previous for context-sensitive-regions (which isn't really a keyswitch),
+    nor sw_lokey, sw_hikey and multiple parallel switches per key.
+
+    Specifically it just searches for sw_last, sw_down and sw_up and assumes that any level (master,
+    group, region) can only use one of the three.
+
+    sw_down and sw_up are implementation-dependent. We must assume that there are instruments that
+    use these opcodes without specifying sw_lokey and sw_hikey. sw_last requires the range.
+    For these reasons we cannot do sanity-checking here. We just report all single-key keyswitches.
+
+    Finally it assumes that there is one sw_lokey and one sw_hikey in the whole file, and it
+    must be in global. No actual keyswitches will be in global.
+    """
+    def findKS(data, writeInResult):
+        if "sw_label" in data:
+            label = data["sw_label"]
+        else:
+            label = ""
+
+        if "sw_last" in data:
+            writeInResult[data["sw_last"]] = "sw_last", label
+        elif "sw_down" in data:
+            writeInResult[data["sw_down"]] = "sw_down", label
+        elif "sw_up" in data:
+            writeInResult[data["sw_up"]] = "sw_up", label
+
+    result = {} # int:tuple(string)
+    hierarchy = program.get_hierarchy()
+    for k,v in hierarchy.items():  #Global
+        globalData = k.as_dict()
+        if "sw_lokey" in globalData: result["sw_lokey"] = globalData["sw_lokey"]
+        if "sw_hikey" in globalData: result["sw_hikey"] = globalData["sw_hikey"]
+
+        for k1,v1 in v.items():  #Master
+            findKS(k1.as_dict(), result)
+            if v1:
+                for k2,v2 in v1.items():  #Group
+                    findKS(k2.as_dict(), result)
+                    if v2:
+                        for k3,v3 in v2.items():  #Regions
+                            findKS(k3.as_dict(), result)
+
+    return result
+
+
+keyswitches = findKeyswitches(pgm)
+pprint(keyswitches)
 
 
 #The following were just stages during development, now handled by recurse and recurse2() above
