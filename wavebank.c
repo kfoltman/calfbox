@@ -252,8 +252,8 @@ void cbox_wavebank_init()
     // XXXKF this should not be a real waveform
     cbox_wavebank_add_std_waveform("*silence", func_silence, NULL, 0);
     cbox_wavebank_add_std_waveform("*saw", func_saw, NULL, 11);
-    cbox_wavebank_add_std_waveform("*sqr", func_sqr, NULL, 11);
-    cbox_wavebank_add_std_waveform("*tri", func_tri, NULL, 11);
+    cbox_wavebank_add_std_waveform("*square", func_sqr, NULL, 11);
+    cbox_wavebank_add_std_waveform("*triangle", func_tri, NULL, 11);
 }
 
 struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struct cbox_tarfile *tarfile, const char *sample_dir, const char *filename, GError **error)
@@ -267,6 +267,10 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
     // Built in waveforms don't go through path canonicalization
     if (filename[0] == '*')
     {
+        if (!strcmp(filename + 1, "sqr"))
+            filename = "*square";
+        else if (!strcmp(filename + 1, "tri"))
+            filename = "*triangle";
         gpointer value = g_hash_table_lookup(bank.waveforms_by_name, filename);
         if (value)
         {
