@@ -74,9 +74,11 @@ retry:
                  (l->sw_previous == -1 || l->sw_previous == c->previous_note)))
             {
                 gboolean play = lr->current_seq_position == 1;
-                lr->current_seq_position++;
+                lr->current_seq_position--;
                 if (lr->current_seq_position > l->seq_length)
                     lr->current_seq_position = 1;
+                else if (lr->current_seq_position < 1)
+                    lr->current_seq_position = l->seq_length;
                 if (play)
                     return lr;
             }
