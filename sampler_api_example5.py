@@ -100,11 +100,13 @@ recurse2(globalHierarchy)
 print("\nAs an example get all Keyswitch Labels and their keys.\n" + "=" * 80)
 
 def findKeyswitches(program):
-    """Returns a dict with key=keystring e.g. c#4
+    """Returns a tuple:  dict, sw_lokey, sw_highkey
+
+     dict with key=keystring e.g. c#4
     and value=(opcode,label). label can be empty.
 
     Only existing keyswitches are included, not every number from 0-127.
-    Two special keys "sw_lokey" and "sw_hikeys" are added and show the total range of possible
+    Two special keys "sw_lokey" and "sw_hikeys" are returned and show the total range of possible
     keyswitches.
 
     This is just a function to find the keyswitches in our example, not every advanced scenario
@@ -138,9 +140,8 @@ def findKeyswitches(program):
     hierarchy = program.get_hierarchy()
     for k,v in hierarchy.items():  #Global
         globalData = k.as_dict()
-        if "sw_lokey" in globalData: result["sw_lokey"] = globalData["sw_lokey"]
-        if "sw_hikey" in globalData: result["sw_hikey"] = globalData["sw_hikey"]
-
+        swlokeyValue = globalData["sw_lokey"] if "sw_lokey" in globalData else ""
+        swhikeyValue = globalData["sw_hikey"] if "sw_hikey" in globalData else ""
         for k1,v1 in v.items():  #Master
             findKS(k1.as_dict(), result)
             if v1:
@@ -150,11 +151,13 @@ def findKeyswitches(program):
                         for k3,v3 in v2.items():  #Regions
                             findKS(k3.as_dict(), result)
 
-    return result
+    return (result, swlokeyValue, swhikeyValue)
 
 
 keyswitches = findKeyswitches(pgm)
 pprint(keyswitches)
+
+scene.send_midi_event(0x80, 61 ,64) #Trigger Keyswitch c#4 . Default for this example is 60/c4
 
 
 #The following were just stages during development, now handled by recurse and recurse2() above
