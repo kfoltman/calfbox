@@ -10,10 +10,11 @@
 static void add_layers(struct sampler_rll *rll, GSList **layers_by_range, struct sampler_layer *l, uint32_t lokey, uint32_t hikey)
 {
     if (lokey >= 0 && lokey <= 127 &&
-        hikey >= 0 && hikey <= 127)
+        hikey >= 0 && hikey <= 127 && lokey <= hikey)
     {
         int start = rll->ranges_by_key[lokey];
         int end = rll->ranges_by_key[hikey];
+        assert(start != 255 && end != 255);
         for (int i = start; i <= end; ++i)
         {
             if (!layers_by_range[i] || layers_by_range[i]->data != l)
@@ -86,13 +87,15 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     uint16_t lo_count[129], hi_count[128], low = 127, high = 0;
     for (int i = 0; i < 128; i++)
         lo_count[i] = hi_count[i] = 0;
+    lo_count[128] = 0;
 
     // XXXKF handle 'key' field without relying on the existing ugly hack
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
         struct sampler_layer *l = p->data;
         if (l->data.lokey >= 0 && l->data.lokey <= 127 &&
-            l->data.hikey >= 0 && l->data.hikey <= 127)
+            l->data.hikey >= 0 && l->data.hikey <= 127 &&
+            l->data.lokey <= l->data.hikey)
         {
             lo_count[l->data.lokey]++;
             hi_count[l->data.hikey]++;
