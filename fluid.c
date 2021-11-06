@@ -180,12 +180,12 @@ MODULE_CREATE_FUNCTION(fluidsynth)
     fluid_settings_setnum(m->settings, "synth.sample-rate", m->module.srate);
     fluid_settings_setint(m->settings, "synth.audio-channels", m->output_pairs);
     fluid_settings_setint(m->settings, "synth.audio-groups", m->output_pairs);
+    fluid_settings_setint(m->settings, "synth.reverb.active", cbox_config_get_int(cfg_section, "reverb", 1));
+    fluid_settings_setint(m->settings, "synth.chorus.active", cbox_config_get_int(cfg_section, "chorus", 1));
     m->synth = new_fluid_synth(m->settings);
     fluid_set_log_function(FLUID_PANIC, cbox_fluidsynth_log_write, m);
     fluid_set_log_function(FLUID_ERR, cbox_fluidsynth_log_write, m);
     fluid_set_log_function(FLUID_WARN, cbox_fluidsynth_log_write, m);
-    fluid_synth_set_reverb_on(m->synth, cbox_config_get_int(cfg_section, "reverb", 1));
-    fluid_synth_set_chorus_on(m->synth, cbox_config_get_int(cfg_section, "chorus", 1));
     //fluid_synth_add_sfloader(m->synth, new_fluid_defsfloader(m->settings));
     m->error_log = NULL;
     m->bank_name = NULL;
