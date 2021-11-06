@@ -241,7 +241,9 @@ void fluidsynth_process_block(struct cbox_module *module, cbox_sample_t **inputs
         float *fx_outputs[4];
         for (int i = 0; i < 4; i++)
             fx_outputs[i] = outputs[2 * m->output_pairs + i];
-        fluid_synth_process(m->synth, CBOX_BLOCK_SIZE, 2, fx_outputs, m->output_pairs, outputs);
+        for (int i = 0; i < 2 + m->output_pairs; i++)
+            zerobf(outputs[i]);
+        fluid_synth_process(m->synth, CBOX_BLOCK_SIZE, 4, fx_outputs, 2 * m->output_pairs, outputs);
 #endif
     }
 }

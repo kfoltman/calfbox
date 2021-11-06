@@ -92,14 +92,19 @@ static inline float sanef(float v)
 
 static inline void sanebf(float *buf)
 {
-    int i;
-    for (i = 0; i < CBOX_BLOCK_SIZE; i++)
+    for (int i = 0; i < CBOX_BLOCK_SIZE; ++i)
         buf[i] = sanef(buf[i]);
 }
 
 static inline void copybf(float *to, float *from)
 {
     memcpy(to, from, sizeof(float) * CBOX_BLOCK_SIZE);
+}
+
+static inline void zerobf(float *to)
+{
+    for (int i = 0; i < CBOX_BLOCK_SIZE; ++i)
+        to[i] = 0.f;
 }
 
 static inline float cent2factor(float cent)
