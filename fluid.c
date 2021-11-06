@@ -176,6 +176,8 @@ MODULE_CREATE_FUNCTION(fluidsynth)
     m->module.process_event = fluidsynth_process_event;
     m->module.process_block = fluidsynth_process_block;
     m->module.aux_offset = 2 * m->output_pairs;
+    const char *audio_drivers[] = { NULL };
+    fluid_audio_driver_register(audio_drivers);
     m->settings = new_fluid_settings();
     fluid_settings_setnum(m->settings, "synth.sample-rate", m->module.srate);
     fluid_settings_setint(m->settings, "synth.audio-channels", m->output_pairs);
