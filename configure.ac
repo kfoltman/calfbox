@@ -1,9 +1,9 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.63)
+AC_PREREQ([2.71])
 AC_INIT([calfbox],[0.0.3],[wdev@foltman.com])
-AC_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 LT_INIT([])
 LT_LANG([C])
 
@@ -14,12 +14,14 @@ if test "x$prefix" = "xNONE"; then
 fi
 
 # Checks for programs.
-AC_PROG_CC_C99
+AC_PROG_CC
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 
 # Checks for headers.
-AC_HEADER_STDC
+AC_CHECK_INCLUDES_DEFAULT
+AC_PROG_EGREP
+
 
 # Set initial parameters
 PYTHON_ENABLED="yes"
@@ -35,49 +37,49 @@ NEON_ENABLED="no"
 
 AC_MSG_CHECKING([whether to enable Python embedding])
 AC_ARG_WITH(python,
-AC_HELP_STRING([--without-python],[disable Python embedding]),
+AS_HELP_STRING([--without-python],[disable Python embedding]),
   [if test "$withval" = "no"; then PYTHON_ENABLED="no"; fi],[])
 AC_MSG_RESULT($PYTHON_ENABLED)
 
 AC_MSG_CHECKING([whether to enable ncurses UI])
 AC_ARG_WITH(ncurses,
-AC_HELP_STRING([--without-ncurses],[disable ncurses ui]),
+AS_HELP_STRING([--without-ncurses],[disable ncurses ui]),
   [if test "$withval" = "no"; then NCURSES_ENABLED="no"; fi],[])
 AC_MSG_RESULT($NCURSES_ENABLED)
 
 AC_MSG_CHECKING([whether to enable JACK I/O])
 AC_ARG_WITH(jack,
-AC_HELP_STRING([--without-jack],[disable JACK audio and MIDI]),
+AS_HELP_STRING([--without-jack],[disable JACK audio and MIDI]),
   [if test "$withval" = "no"; then JACK_ENABLED="no"; fi],[])
 AC_MSG_RESULT($JACK_ENABLED)
 
 AC_MSG_CHECKING([whether to enable Fluidsynth])
 AC_ARG_WITH(fluidsynth,
-AC_HELP_STRING([--without-fluidsynth],[disable use of Fluidsynth]),
+AS_HELP_STRING([--without-fluidsynth],[disable use of Fluidsynth]),
   [if test "$withval" = "no"; then FLUIDSYNTH_ENABLED="no"; fi],[])
 AC_MSG_RESULT($FLUIDSYNTH_ENABLED)
 
 AC_MSG_CHECKING([whether to enable libsmf])
 AC_ARG_WITH(libsmf,
-AC_HELP_STRING([--without-libsmf],[disable use of libsmf]),
+AS_HELP_STRING([--without-libsmf],[disable use of libsmf]),
   [if test "$withval" = "no"; then LIBSMF_ENABLED="no"; fi],[])
 AC_MSG_RESULT($LIBSMF_ENABLED)
 
 AC_MSG_CHECKING([whether to enable libusb])
 AC_ARG_WITH(libusb,
-AC_HELP_STRING([--without-libusb],[disable use of libusb]),
+AS_HELP_STRING([--without-libusb],[disable use of libusb]),
   [if test "$withval" = "no"; then LIBUSB_ENABLED="no"; fi],[])
 AC_MSG_RESULT($LIBUSB_ENABLED)
 
 AC_MSG_CHECKING([whether to enable SSE (x86 family only)])
 AC_ARG_WITH(sse,
-AC_HELP_STRING([--with-sse],[enable use of SSE]),
+AS_HELP_STRING([--with-sse],[enable use of SSE]),
   [if test "$withval" = "yes"; then SSE_ENABLED="yes"; fi],[])
 AC_MSG_RESULT($SSE_ENABLED)
 
 AC_MSG_CHECKING([whether to enable NEON (ARM family only)])
 AC_ARG_WITH(neon,
-AC_HELP_STRING([--with-neon],[enable use of NEON]),
+AS_HELP_STRING([--with-neon],[enable use of NEON]),
   [if test "$withval" = "yes"; then NEON_ENABLED="yes"; fi],[])
 AC_MSG_RESULT($NEON_ENABLED)
 
