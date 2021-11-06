@@ -28,4 +28,4 @@ struct eq_band
 
 extern float cbox_eq_get_band_param(const char *cfg_section, int band, const char *param, float defvalue);
 extern float cbox_eq_get_band_param_db(const char *cfg_section, int band, const char *param, float defvalue);
-extern void cbox_eq_reset_bands(struct cbox_biquadf_state (*state)[2], int bands);
+extern void cbox_eq_reset_bands(struct cbox_biquadf_state state[1][2], int bands);
