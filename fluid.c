@@ -97,14 +97,14 @@ static gboolean select_patch_by_name(struct fluidsynth_module *m, int channel, c
         int len = strlen(pname);
         while (len > 0 && pname[len - 1] == ' ')
             len--;
-            
+
         if (!strncmp(pname, preset, len) && preset[len] == '\0')
         {
             fluid_synth_program_select(m->synth, channel, m->sfid, fluid_preset_get_banknum(tmp), fluid_preset_get_num(tmp));
             return TRUE;
         }
     }
-    
+
     g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Preset not found: %s", preset);
     return FALSE;
 }
@@ -145,7 +145,7 @@ MODULE_CREATE_FUNCTION(fluidsynth)
     {
         inited = 1;
     }
-    
+
     struct fluidsynth_module *m = malloc(sizeof(struct fluidsynth_module));
     int pairs = cbox_config_get_int(cfg_section, "output_pairs", 0);
     m->output_pairs = pairs ? pairs : 1;
@@ -219,7 +219,7 @@ MODULE_CREATE_FUNCTION(fluidsynth)
             g_free(key);
         }
     }
-    
+
     return &m->module;
 }
 
@@ -241,7 +241,7 @@ void fluidsynth_process_block(struct cbox_module *module, cbox_sample_t **inputs
         float *fx_outputs[4];
         for (int i = 0; i < 4; i++)
             fx_outputs[i] = outputs[2 * m->output_pairs + i];
-        for (int i = 0; i < 2 + m->output_pairs; i++)
+        for (int i = 0; i < 2 * (2 + m->output_pairs); i++)
             zerobf(outputs[i]);
         fluid_synth_process(m->synth, CBOX_BLOCK_SIZE, 4, fx_outputs, 2 * m->output_pairs, outputs);
 #endif
@@ -264,11 +264,11 @@ void fluidsynth_process_event(struct cbox_module *module, const uint8_t *data, u
             case 9:
                 fluid_synth_noteon(m->synth, chn, data[1], data[2]);
                 break;
-            
+
             case 10:
                 // polyphonic pressure not handled
                 break;
-            
+
             case 11:
                 fluid_synth_cc(m->synth, chn, data[1], data[2]);
                 break;
@@ -320,7 +320,7 @@ gboolean fluidsynth_process_load_patch(struct fluidsynth_module *m, const char *
 gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct fluidsynth_module *m = (struct fluidsynth_module *)ct->user_data;
-    
+
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
@@ -396,7 +396,7 @@ gboolean fluidsynth_process_cmd(struct cbox_command_target *ct, struct cbox_comm
 void fluidsynth_destroyfunc(struct cbox_module *module)
 {
     struct fluidsynth_module *m = (struct fluidsynth_module *)module;
-    
+
 #if OLD_FLUIDSYNTH
     if (m->output_pairs)
     {
@@ -405,7 +405,7 @@ void fluidsynth_destroyfunc(struct cbox_module *module)
     }
 #endif
     free(m->bank_name);
-    
+
     delete_fluid_synth(m->synth);
     delete_fluid_settings(m->settings);
 }
