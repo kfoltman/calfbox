@@ -245,18 +245,10 @@ static int process_cb(jack_nframes_t nframes, void *arg)
         cbox_midi_merger_render(&midiout->hdr.merger);
         if (midiout->hdr.buffer.count)
         {
-            uint8_t tmp_data[4];
             for (uint32_t i = 0; i < midiout->hdr.buffer.count; i++)
             {
                 const struct cbox_midi_event *event = cbox_midi_buffer_get_event(&midiout->hdr.buffer, i);
                 const uint8_t *pdata = cbox_midi_event_get_data(event);
-                if ((pdata[0] & 0xF0) == 0x90 && !pdata[2] && event->size == 3)
-                {
-                    tmp_data[0] = pdata[0] & ~0x10;
-                    tmp_data[1] = pdata[1];
-                    tmp_data[2] = pdata[2];
-                    pdata = tmp_data;
-                }
                 if (jack_midi_event_write(pbuf, event->time, pdata, event->size))
                 {
                     g_warning("MIDI buffer overflow on JACK output port '%s'", midiout->hdr.name);
