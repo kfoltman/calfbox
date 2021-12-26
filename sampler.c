@@ -432,6 +432,25 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
             CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
     else
+    if (!strcmp(cmd->command, "/keyswitch_state") && !strcmp(cmd->arg_types, "ii"))
+    {
+        int channel = CBOX_ARG_I(cmd, 0);
+        if (channel < 1 || channel > 16)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid channel %d", channel);
+            return FALSE;
+        }
+        int group = CBOX_ARG_I(cmd, 1);
+        if (group < 0 || group >= MAX_KEYSWITCH_GROUPS)
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Invalid keyswitch group %d", group);
+            return FALSE;
+        }
+        if (!cbox_execute_on(fb, NULL, "/last_key", "i", error, m->channels[channel - 1].keyswitch_lastkey[group]))
+            return FALSE;
+        return TRUE;
+    }
+    else
     if (!strcmp(cmd->command, "/patches") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
