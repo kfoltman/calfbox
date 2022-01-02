@@ -72,6 +72,7 @@ struct sampler_channel
     float floatcc[smsrc_perchan_count];
     uint8_t last_polyaft, last_chanaft;
     uint8_t keyswitch_state[MAX_KEYSWITCH_GROUPS];
+    uint8_t keyswitch_lastkey[MAX_KEYSWITCH_GROUPS];
 };
 
 struct sampler_lfo

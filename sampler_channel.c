@@ -53,13 +53,20 @@ void sampler_channel_reset_keyswitches(struct sampler_channel *c)
     if (c->program && c->program->rll)
     {
         memset(c->keyswitch_state, 255, sizeof(c->keyswitch_state));
+        memset(c->keyswitch_lastkey, 255, sizeof(c->keyswitch_lastkey));
         for (uint32_t i = 0; i < c->program->rll->keyswitch_group_count; ++i)
         {
             const struct sampler_keyswitch_group *ksg = c->program->rll->keyswitch_groups[i];
             if (ksg->def_value == 255)
+            {
                 c->keyswitch_state[i] = ksg->key_offsets[0];
+                c->keyswitch_lastkey[i] = ksg->lo;
+            }
             else
+            {
                 c->keyswitch_state[i] = ksg->key_offsets[ksg->def_value];
+                c->keyswitch_lastkey[i] = ksg->def_value + ksg->lo;
+            }
         }
     }
 }
@@ -257,7 +264,10 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
         {
             const struct sampler_keyswitch_group *ks = prg->rll->keyswitch_groups[i];
             if (note >= ks->lo && note <= ks->hi)
+            {
+                c->keyswitch_lastkey[i] = note;
                 c->keyswitch_state[i] = ks->key_offsets[note - ks->lo];
+            }
         }
     }
 

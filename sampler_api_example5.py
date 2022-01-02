@@ -73,7 +73,7 @@ print ("Control Inits:", pgm.get_control_inits())  #Empty . Is this <control> ? 
 globalHierarchy = pgm.get_global()  # -> Single SamplerLayer. Literally sfz <global>. But not the global scope, e.g. no under any <tag>.
 #If there is no <global> tag in the .sfz this will still create a root SamplerLayer
 print ("Global:", globalHierarchy)
-
+print ("Groups:", pgm.get_keyswitch_groups())
 
 print("\nShow all SamplerLayer in their global/master/group/region hierarchy through indentations.\n" + "=" * 80)
 def recurse(item, level = 0):
@@ -157,7 +157,10 @@ def findKeyswitches(program):
 keyswitches = findKeyswitches(pgm)
 pprint(keyswitches)
 
-scene.send_midi_event(0x80, 61 ,64) #Trigger Keyswitch c#4 . Default for this example is 60/c4
+instrument.engine.set_patch(1, pgm_no)
+print ("Group 0 lastkey before keyswitch:", instrument.engine.get_keyswitch_state(1, 0))
+scene.send_midi_event(0x90, 61 ,64) #Trigger Keyswitch c#4 . Default for this example is 60/c4
+print ("Group 0 lastkey after keyswitch:", instrument.engine.get_keyswitch_state(1, 0))
 
 
 #The following were just stages during development, now handled by recurse and recurse2() above

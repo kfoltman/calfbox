@@ -238,6 +238,18 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
             return FALSE;
         return cbox_execute_on(fb, NULL, "/data", "b", error, blob);
     }
+    if (!strcmp(cmd->command, "/keyswitch_groups") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (uint32_t i = 0; i < program->rll->keyswitch_group_count; ++i)
+        {
+            struct sampler_keyswitch_group *ksg = program->rll->keyswitch_groups[i];
+            if (!cbox_execute_on(fb, NULL, "/key_range", "ii", error, ksg->lo, ksg->hi))
+                return FALSE;
+        }
+        return TRUE;
+    }
     return cbox_object_default_process_cmd(ct, fb, cmd, error);
 }
 

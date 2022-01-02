@@ -952,6 +952,9 @@ class SamplerEngine(NonDocObj):
     def get_patches(self):
         """Return a map of program identifiers to program objects."""
         return self.get_thing("/patches", '/patch', {int : (str, SamplerProgram, int)})
+    def get_keyswitch_state(self, channel, group):
+        """Return a map of program identifiers to program objects."""
+        return self.get_thing("/keyswitch_state", '/last_key', int, channel, group)
 
 class FluidsynthEngine(NonDocObj):
     class Status:
@@ -1111,6 +1114,8 @@ class SamplerProgram(DocObj):
         return {self.get_global() : self.get_global().get_hierarchy()}
     def get_control_inits(self):
         return self.get_thing("/control_inits", '/control_init', [(int, int)])
+    def get_keyswitch_groups(self):
+        return self.get_thing("/keyswitch_groups", '/key_range', [(int, int)])
     def new_group(self):
         # Obsolete
         return self.cmd_makeobj("/new_group")
