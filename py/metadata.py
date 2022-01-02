@@ -7,6 +7,8 @@ This file implements the JackIO Python side of Jack Medata as described here:
 
 """
 
+import os.path
+
 #get_thing
 from calfbox._cbox2 import do_cmd
 
@@ -44,6 +46,20 @@ class Metadata:
         elif not type(value) is str:
             return TypeError("value {} must be int or str but was {}".format(value, type(value)))
         do_cmd("/io/set_property", None, [port, key, value, jackPropertyType])
+
+    @staticmethod
+    def client_set_property(key, value, jackPropertyType=""):
+        """empty jackPropertyType leads to UTF-8 string
+        for convenience we see if value is a python int and send the right jack_property_t::type
+
+        This is directly for our client, which we do not need to provide here.
+        """
+        if type(value) is int:
+            jackPropertyType = "http://www.w3.org/2001/XMLSchema#int"
+            value = str(value)
+        elif not type(value) is str:
+            return TypeError("value {} must be int or str but was {}".format(value, type(value)))
+        do_cmd("/io/client_set_property", None, [key, value, jackPropertyType])
 
     @staticmethod
     def remove_property(port, key):
@@ -91,9 +107,73 @@ class Metadata:
 
         for port, index in pDict.items():
             Metadata.set_port_order(port, index)
-            
+
     @staticmethod
     def set_pretty_name(port, name):
         """port is the portname as string including a client name System:out_1
         Name however is just the port name, without a client."""
         Metadata.set_property(port, "http://jackaudio.org/metadata/pretty-name", name)
+
+
+    @staticmethod
+    def _set_icon_name(freeDeskopIconName):
+        """Internal function used in set_icon_small and set_icon_large"""
+        if not os.path.splitext(freeDeskopIconName)[0] == freeDeskopIconName:
+            raise ValueEror(f"Icon name must not have a file extension. Expected {os.path.splitext(freeDeskopIconName)[0]} but was {freeDeskopIconName}")
+
+        if not os.path.basename(freeDeskopIconName) == freeDeskopIconName:
+            raise ValueError(f"Icon name must not be path. Expected {os.path.basename(freeDeskopIconName)} but was {freeDeskopIconName}")
+
+        Metadata.client_set_property("http://jackaudio.org/metadata/icon-name", freeDeskopIconName)
+
+
+    @staticmethod
+    def set_icon_small(freeDeskopIconName, base64png):
+        """ A value with a MIME type of "image/png;base64" that is an encoding of an
+        NxN (with 32 < N <= 128) image to be used when displaying a visual representation of that
+        client or port.
+
+        The name of the icon for the subject (typically client).
+        This is used for looking up icons on the system, possibly with many sizes or themes. Icons
+        should be searched for according to the freedesktop Icon
+        Theme Specification:
+        https://specifications.freedesktop.org/icon-theme-spec/icon-theme-spec-latest.html
+
+        The small icon of our JACK client.
+        Setting icons to ports seems to be technically possible, but this is not the function
+        for port-icons.
+
+        This function does not check if base64png has the correct format.
+
+        This also sets the name of the icon according to freedesktop specs.
+        The name is the basename without extension like so:
+        /usr/share/icons/hicolor/32x32/apps/patroneo.png -> "patroneo"
+        """
+
+        Metadata.client_set_property("http://jackaudio.org/metadata/icon-small", base64png, jackPropertyType="image/png;base64")
+        Metadata._set_icon_name(freeDeskopIconName)
+
+    @staticmethod
+    def set_icon_large(freeDeskopIconName, base64png):
+        """ A value with a MIME type of "image/png;base64" that is an encoding of an
+        NxN (with N <=32) image to be used when displaying a visual representation of that client
+        or port.
+
+        The name of the icon for the subject (typically client).
+        This is used for looking up icons on the system, possibly with many sizes or themes. Icons
+        should be searched for according to the freedesktop Icon
+        Theme Specification:
+        https://specifications.freedesktop.org/icon-theme-spec/icon-theme-spec-latest.html
+
+        The large icon of our JACK client.
+        Setting icons to ports seems to be technically possible, but this is not the function
+        for port-icons.
+
+        This function does not check if base64png has the correct format.
+
+        This also sets the name of the icon according to freedesktop specs.
+        The name is the basename without extension like so:
+        /usr/share/icons/hicolor/32x32/apps/patroneo.png -> "patroneo"
+        """
+        Metadata.client_set_property("http://jackaudio.org/metadata/icon-large", base64png, jackPropertyType="image/png;base64")
+        Metadata._set_icon_name(freeDeskopIconName)
