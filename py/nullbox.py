@@ -22,13 +22,13 @@ class NullCalfbox(str): #iterable
         self.frame_rate = 48000
         self.frame = 0
 
-    def __getattr__(self, *args, **kwargs):        
+    def __getattr__(self, *args, **kwargs):
         return __class__()
 
     def __call__(self, *args, **kwargs):
         return __class__()
 
-    def __getitem__(self, key):        
+    def __getitem__(self, key):
         return __class__()
 
     def serialize_event(self, *args, **kwargs):
@@ -39,11 +39,18 @@ class NullCalfbox(str): #iterable
         return {
             0 : "nullbox",
             }
-                
+
     def set_ignore_program_changes(self, state):
         self.ignore_program_changes = state
 
-    
+
+    #Operators
+
+    def __and__(self, *args):
+        return 1
+
+    __add__ = __sub__ = __mul__ = __floordiv__ = __div__ = __truediv__ = __mod__ = __divmod__ = __pow__ = __lshift__ = __rshift__ = __or__ = __xor__ = __ror__ = __ior__ = __rand__ = __iand__ = __rxor__ = __ixor__ = __invert__ = __and__
+
 
 import sys
 import calfbox.nullbox
