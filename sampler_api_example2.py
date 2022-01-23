@@ -14,6 +14,12 @@ scene.clear()
 instrument = scene.add_new_instrument_layer("test_sampler", "sampler").get_instrument()
 pgm_no = instrument.engine.get_unused_program()
 pgm = instrument.engine.load_patch_from_file(pgm_no, 'synthbass.sfz', 'SynthBass')
+
+# This is not needed, it's here to test for a bug where reloading a program at
+# the same slot didn't return the newly loaded program object.
+pgm = instrument.engine.load_patch_from_file(pgm_no, 'synthbass.sfz', 'SynthBass')
+assert pgm
+
 instrument.engine.set_patch(1, pgm_no)
 print (instrument.engine.get_patches())
 print (instrument.get_output_slot(0))

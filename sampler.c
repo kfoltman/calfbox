@@ -344,12 +344,10 @@ static gboolean load_program_at(struct sampler_module *m, const char *cfg_sectio
         return FALSE;
     
     if (index != -1)
-    {
         swap_program(m, index, pgm, TRUE);
-        return TRUE;
-    }
+    else
+        sampler_register_program(m, pgm);
 
-    sampler_register_program(m, pgm);
     if (ppgm)
         *ppgm = pgm;
     return TRUE;
