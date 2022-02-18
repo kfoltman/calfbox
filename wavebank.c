@@ -324,24 +324,6 @@ struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name, struc
     struct cbox_taritem *taritem = NULL;
     if (tarfile)
     {
-        if (strcmp(sample_dir, ".") == 0)
-        {
-            //Potential path lookup problem:
-
-            //This is a sample without sfz default_path opcode inside a tar.
-            //We need to set the sample dir to the position of the .sfz file within the .tar
-            //because we also assume that the sample paths in regions are relative to the .sfz path.
-
-            //If the sfz is in the tar root this is a redundant action, but if the sfz is itself
-            //in a subdirectoy we need to adjust the path now.
-            // XXXNH sample_dir will not be updated in the struct itself and thus reported as "." in python etc.
-
-            //context_name is the sfz file, filename the sample file without leading ./  and sample_dir just a dot.
-
-            gchar *sfz_dir = g_path_get_dirname(context_name); //take the path of the sfz file...
-            pathname = g_build_filename(sfz_dir, filename, NULL); //... and prefix the sample filename with it.
-            g_free(sfz_dir);
-        }
         taritem = cbox_tarfile_get_item_by_name(tarfile, pathname, TRUE);
         if (taritem)
             sndfile = cbox_tarfile_opensndfile(tarfile, taritem, &waveform->sndstream, &waveform->info);

@@ -309,7 +309,6 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         sfz = cfg_section + 6;
         if (!strncmp(sfz, "sbtar:", 6))
         {
-            sfz_path = ".";
             gchar *p = strchr(sfz + 6, ';');
             if (p)
             {
@@ -318,8 +317,11 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
                 g_free(tmp);
                 if (!tarfile)
                     return NULL;
-                sfz = p + 1;
+                sfz = strrchr(p + 1, '/');
+                if (!sfz)
+                    sfz = p + 1;
                 name2 = p + 1;
+                sfz_path = g_path_get_dirname(p + 1);
             }
             else
             {
