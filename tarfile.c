@@ -49,7 +49,7 @@ struct tar_record
     char padding[12];
 };
 
-static void remove_item_if(gpointer p);
+static void remove_item_if(gpointer p, struct cbox_tarfile *tf);
 
 struct cbox_tarfile *cbox_tarfile_open(const char *pathname, GError **error)
 {
@@ -118,8 +118,8 @@ struct cbox_tarfile *cbox_tarfile_open(const char *pathname, GError **error)
             ti->refs = 2;
             
             // Overwrite old items by the same name and/or same case-folded name
-            remove_item_if(g_hash_table_lookup(tf->items_byname, ti->filename));
-            remove_item_if(g_hash_table_lookup(tf->items_byname_nc, ti->filename_nc));
+            remove_item_if(g_hash_table_lookup(tf->items_byname, ti->filename), tf);
+            remove_item_if(g_hash_table_lookup(tf->items_byname_nc, ti->filename_nc), tf);
             
             g_hash_table_insert(tf->items_byname, ti->filename, ti);
             g_hash_table_insert(tf->items_byname_nc, ti->filename_nc, ti);
@@ -154,7 +154,7 @@ error:
     return NULL;
 }
 
-void remove_item_if(gpointer p)
+void remove_item_if(gpointer p, struct cbox_tarfile *tf)
 {
     if (!p)
         return;
@@ -163,6 +163,8 @@ void remove_item_if(gpointer p)
     // If all references (by name and by case-folded name) gone, remove the item
     if (!--ti->refs)
     {
+        g_hash_table_remove(tf->items_byname, ti->filename);
+        g_hash_table_remove(tf->items_byname_nc, ti->filename_nc);
         g_free(ti->filename);
         g_free(ti->filename_nc);
         free(ti);
