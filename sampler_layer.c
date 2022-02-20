@@ -482,8 +482,7 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_NONFUNCTIONAL("master_label") //ARIA
     FIELD_NONFUNCTIONAL("global_label") //ARIA
     FIELD_NONFUNCTIONAL("sw_label") //Keyswitch. ARIA
-    FIELD_NONFUNCTIONAL("label_cc#") //ARIA
-    FIELD_NONFUNCTIONAL("label_key#") //sfizz opcode
+    //label_cc and label_key are in sfzloader.c because they are under <control>
 
     { "genericmod_#_#_#_#", -1, slpt_generic_modulation, 0, 0, NULL, NULL, NULL },
 };
@@ -2105,4 +2104,3 @@ void sampler_layer_update(struct sampler_layer *l)
 
     cbox_rt_execute_cmd_async(l->module->module.rt, &rtcmd, lcmd);
 }
-

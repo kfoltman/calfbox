@@ -1114,6 +1114,8 @@ class SamplerProgram(DocObj):
         return {self.get_global() : self.get_global().get_hierarchy()}
     def get_control_inits(self):
         return self.get_thing("/control_inits", '/control_init', [(int, int)])
+    def get_control_labels(self):
+        return self.get_thing("/control_labels", '/control_label', [(int, str)])
     def get_keyswitch_groups(self):
         return self.get_thing("/keyswitch_groups", '/key_range', [(int, int)])
     def new_group(self):
