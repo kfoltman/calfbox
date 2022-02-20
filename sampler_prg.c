@@ -191,7 +191,7 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
             return FALSE;
         for (GSList *p = program->ctrl_label_list; p; p = p->next)
         {
-            const struct sampler_ctrllabel *cin = (const struct sampler_ctrllabel *)&p->data;
+            const struct sampler_ctrllabel *cin = (const struct sampler_ctrllabel *)p->data;
             if (!cbox_execute_on(fb, NULL, "/control_label", "is", error, (int)cin->controller, cin->label))
                 return FALSE;
         }
