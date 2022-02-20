@@ -197,6 +197,19 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
         }
         return TRUE;
     }
+    if (!strcmp(cmd->command, "/key_labels") && !strcmp(cmd->arg_types, ""))
+    //Because "key" is a programming keyword as well we use "pitch" instead internally
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (GSList *p = program->pitch_label_list; p; p = p->next)
+        {
+            const struct sampler_pitchlabel *cin = (const struct sampler_pitchlabel *)p->data;
+            if (!cbox_execute_on(fb, NULL, "/key_label", "is", error, (int)cin->pitch, cin->label))
+                return FALSE;
+        }
+        return TRUE;
+    }
     if (!strcmp(cmd->command, "/add_control_init") && !strcmp(cmd->arg_types, "ii"))
     {
         sampler_program_add_controller_init(program, CBOX_ARG_I(cmd, 0), CBOX_ARG_I(cmd, 1));
@@ -280,6 +293,7 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->rll = NULL;
     prg->ctrl_init_list = NULL;
     prg->ctrl_label_list = NULL;
+    prg->pitch_label_list = NULL;
     prg->global = sampler_layer_new(m, prg, NULL);
     prg->global->default_child = sampler_layer_new(m, prg, prg->global);
     prg->global->default_child->default_child = sampler_layer_new(m, prg, prg->global->default_child);
@@ -297,11 +311,11 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
 struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, const char *cfg_section, const char *name, int pgm_id, GError **error)
 {
     int i;
-    
+
     char *name2 = NULL, *sfz_path = NULL, *spath = NULL, *tar_name = NULL;
     const char *sfz = NULL;
     struct cbox_tarfile *tarfile = NULL;
-    
+
     g_clear_error(error);
     tar_name = cbox_config_get_string(cfg_section, "tar");
     if (!strncmp(cfg_section, "spgm:!", 6))
@@ -337,7 +351,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         }
     }
     else
-    { 
+    {
         if (tar_name)
         {
             tarfile = cbox_tarpool_get_tarfile(app.tarpool, tar_name, error);
@@ -357,7 +371,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         if (tarfile && !sfz_path)
             sfz_path = ".";
     }
-    
+
     if (sfz && !sfz_path && !spath && !tarfile)
     {
         char *lastslash = strrchr(sfz, '/');
@@ -380,7 +394,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
     );
     if (!prg)
         return NULL;
-    
+
     if (sfz)
     {
         if (sfz_path)
@@ -397,7 +411,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
     } else {
         prg->source_file = g_strdup_printf("config:%s", cfg_section);
     }
-    
+
     for (i = 0; ; i++)
     {
         gchar *s = g_strdup_printf("group%d", 1 + i);
@@ -405,7 +419,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         g_free(s);
         if (!group_section)
             break;
-        
+
         gchar *swhere = g_strdup_printf("sgroup:%s", group_section);
         struct sampler_layer *g = sampler_layer_new_from_section(m, prg, prg->global->default_child, swhere);
         if (!g)
@@ -426,7 +440,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
                 struct sampler_layer *l = sampler_layer_new_from_section(m, prg, g, where);
                 if (!l)
                     g_warning("Sample layer '%s' cannot be created - skipping", layer_section);
-                else 
+                else
                 {
                     sampler_layer_update(l);
                     if (!l->data.computed.eff_waveform)
@@ -451,11 +465,11 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         if (!layer_section)
             break;
         where = g_strdup_printf("slayer:%s", layer_section);
-        
+
         struct sampler_layer *l = sampler_layer_new_from_section(m, prg, NULL, where);
         if (!l)
             g_warning("Sample layer '%s' cannot be created - skipping", layer_section);
-        else 
+        else
         {
             sampler_layer_update(l);
             if (!l->data.computed.eff_waveform)
@@ -469,7 +483,7 @@ struct sampler_program *sampler_program_new_from_cfg(struct sampler_module *m, c
         g_free(where);
     }
     prg->all_layers = g_slist_reverse(prg->all_layers);
-    sampler_program_update_layers(prg);    
+    sampler_program_update_layers(prg);
     return prg;
 }
 
@@ -502,6 +516,21 @@ void sampler_program_add_controller_init(struct sampler_program *prg, uint16_t c
 static void sampler_ctrl_label_destroy(gpointer value)
 {
     struct sampler_ctrllabel *label = value;
+    free(label->label);
+    free(label);
+}
+
+void sampler_program_add_pitch_label(struct sampler_program *prg, uint16_t pitch, gchar *text)
+{
+    struct sampler_pitchlabel *label = calloc(1, sizeof(struct sampler_pitchlabel));
+    label->pitch = pitch;
+    label->label = text;
+    prg->pitch_label_list = g_slist_append(prg->pitch_label_list, label);
+}
+
+static void sampler_pitch_label_destroy(gpointer value)
+{
+    struct sampler_pitchlabel *label = value;
     free(label->label);
     free(label);
 }
@@ -576,6 +605,7 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
     g_slist_free(prg->all_layers);
     g_slist_free(prg->ctrl_init_list);
     g_slist_free_full(prg->ctrl_label_list, sampler_ctrl_label_destroy);
+    g_slist_free_full(prg->pitch_label_list, sampler_pitch_label_destroy);
     if (prg->tarfile)
         cbox_tarpool_release_tarfile(app.tarpool, prg->tarfile);
     free(prg);
@@ -605,7 +635,6 @@ struct sampler_program *sampler_program_clone(struct sampler_program *prg, struc
     sampler_program_update_layers(newprg);
     if (newprg->tarfile)
         newprg->tarfile->refs++;
-    
+
     return newprg;
 }
-
