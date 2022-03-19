@@ -100,9 +100,14 @@ def find_calfbox():
         cblib = os.environ["CALFBOXLIBABSPATH"]
     else:
         cblib = find_library('calfbox')
-    logging.info("Loading calfbox shared library: %s" % (cblib))
-    cb = cdll.LoadLibrary(cblib)
-    return cb
+
+    if cblib:
+        logging.info("Loading calfbox shared library: %s" % (cblib))
+        cb = cdll.LoadLibrary(cblib)
+        return cb
+    else:
+        raise FileNotFoundError("Calfbox shared library not found: %s" % (cblib))
+
 
 cb = find_calfbox()
 cb.cbox_embed_get_cmd_root.restype = CmdTargetPtr
@@ -120,7 +125,7 @@ class WrapCmdTarget(PyCmdTarget):
         self.fb = fb
     def process(self, cmd, args):
         self.fb(cmd, None, args)
-    
+
 def init_engine(config=None):
     gptr = GErrorPtr()
     if not cb.cbox_embed_init_engine(config, byref(gptr)):
@@ -182,6 +187,6 @@ def do_cmd_on(target, cmd, fb, args):
             raise Exception(gptr.contents.message.decode())
         else:
             raise Exception("Unknown error")
-        
+
 def do_cmd(cmd, fb, args):
     do_cmd_on(cb.cbox_embed_get_cmd_root(), cmd, fb, args)
