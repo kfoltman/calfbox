@@ -10,7 +10,10 @@ import base64 # for icons
 import os.path
 
 #get_thing
-from calfbox._cbox2 import do_cmd
+try:
+    from _cbox2 import do_cmd #local file _cbox2.py
+except ModuleNotFoundError:
+    from ._cbox2 import do_cmd
 
 def get_thing(): pass #overwritten by cbox.py after import
 

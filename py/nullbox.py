@@ -1,16 +1,23 @@
+#! /usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import importlib
+
 class NullCalfbox(str): #iterable
     """A drop-in replacement for calfboxs python module.
     Use this for testing and development.
 
     At the start of your program, first file, insert:
-        import calfbox.nullbox
+        import prefix.calfbox.nullbox
+     or
+        from SOMETHING import nullbox
 
     All further
-        from calfbox import cbox
+        from prefix.calfbox import cbox
     will use the null module.
 
     Even additional
-        import calfbox
+        import prefix.calfbox
     will use the nullbox module.
     """
 
@@ -53,8 +60,28 @@ class NullCalfbox(str): #iterable
 
 
 import sys
-import calfbox.nullbox
-sys.modules["calfbox"] = sys.modules["calfbox.nullbox"]
-import calfbox
 
+try:
+    import nullbox
+except ModuleNotFoundError:
+    from . import nullbox
+
+for key, value in sys.modules.items():
+    if "nullbox" in key:
+        r = key
+        break
+else:
+    raise ValueError("Nullbox Module not found")
+
+#r is the actual name of the calfbox parent modul. We cannot assume it to be "calfbox".
+calfboxModuleName = r[:-len(".nullbox")] #remove suffix
+sys.modules[calfboxModuleName] = sys.modules[r] #e.g. sys.modules["calfbox"] is now nullbox
+
+#Hack 'from prefix.calfbox import cbox'
+importlib.import_module(calfboxModuleName) #Imported once here, all modules will import this variant later.
+#import calfbox
 cbox = NullCalfbox("fake cbox null client")
+
+#Hack direct call 'import cbox'
+sys.modules["cbox"] = cbox
+import cbox #Imported once here, all modules will import this variant later.

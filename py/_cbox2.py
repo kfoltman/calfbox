@@ -96,8 +96,13 @@ class PyCmdTarget(CmdTarget):
 
 def find_calfbox():
     if "CALFBOXLIBABSPATH" in os.environ:
-        assert os.path.exists(os.environ["CALFBOXLIBABSPATH"])
+        logging.info("Searching for calfbox shared library with absolute path: %s", (os.environ["CALFBOXLIBABSPATH"]))
+        assert os.path.exists(os.environ["CALFBOXLIBABSPATH"]), os.environ["CALFBOXLIBABSPATH"]
         cblib = os.environ["CALFBOXLIBABSPATH"]
+    elif "CALFBOXLIBFILENAME" in os.environ:
+        #This should be just name of the lib, not a filename and no "lib"-prefix. For example "calfbox" if the real name is libcalfbox.so.1
+        logging.info("Searching for calfbox shared library with just the filename: %s", (os.environ["CALFBOXLIBFILENAME"]))
+        cblib = find_library(os.environ["CALFBOXLIBFILENAME"])
     else:
         cblib = find_library('calfbox')
 

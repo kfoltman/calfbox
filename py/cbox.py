@@ -1,9 +1,16 @@
-from calfbox._cbox2 import *
 from io import BytesIO
 import struct
 import sys
 import traceback
-import calfbox.metadata as metadata #local file metadata.py
+
+try:
+    from _cbox2 import * #local file _cbox2.py
+    import metadata #local file metadata.py
+except ModuleNotFoundError:
+    from ._cbox2 import *
+    from . import metadata #local file metadata.py
+
+
 type_wrapper_debug = False
 is_python3 = not sys.version.startswith("2")
 
