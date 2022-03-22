@@ -1,3 +1,6 @@
+#! /usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
 import sys
 import struct
@@ -7,6 +10,12 @@ import unittest
 sys.path = ["./py"] + sys.path
 
 import cbox
+
+def cmd_dumper(cmd, fb, args):
+    print ("%s(%s)" % (cmd, ",".join(list(map(repr,args)))))
+
+cbox.init_engine()
+cbox.start_audio(cmd_dumper)
 
 global Document
 Document = cbox.Document
@@ -56,4 +65,4 @@ print(instrument.engine.status())
 print("Ready!")
 
 while True:
-    cbox.call_on_idle()
+    cbox.call_on_idle(cmd_dumper)
