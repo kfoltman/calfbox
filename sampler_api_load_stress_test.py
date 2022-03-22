@@ -46,7 +46,7 @@ def stopSession():
     endtime = datetime.now() - starttime
     print (f"Shutdown took {endtime.seconds} seconds for {NUMBER_OF_INSTRUMENTS} instruments")
 
-cbox.init_engine()
+cbox.init_engine("") #empty string so cbox doesn't look for the .cboxrc file
 cbox.start_audio(cmd_dumper)
 atexit.register(stopSession) #this will handle all python exceptions, but not segfaults of C modules.
 

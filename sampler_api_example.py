@@ -14,7 +14,7 @@ import cbox
 def cmd_dumper(cmd, fb, args):
     print ("%s(%s)" % (cmd, ",".join(list(map(repr,args)))))
 
-cbox.init_engine()
+cbox.init_engine("") #empty string so cbox doesn't look for the .cboxrc file
 cbox.start_audio(cmd_dumper)
 
 global Document

@@ -70,7 +70,7 @@ class NovaBox:
     def on_button8_press(self):
         self.cur_pattern = None
         cbox.do_cmd("/master/stop", None, [])
-        
+
     def on_mixer_press(self):
         global quit
         quit = True
@@ -86,7 +86,7 @@ class NovaBox:
 
     def poll(self):
         self.nocturn.poll(self.handler)
-        
+
     def update(self):
         scene = cbox.Document.get_scene()
         cmds = nocturn.NocturnCommands()
@@ -96,7 +96,7 @@ class NovaBox:
         gain = scene.status().instruments[instr_name][1].get_things('/output/1/status', ['gain']).gain
         cmds.setEncoderMode(0, 0)
         cmds.setEncoderValue(0, clamp(int(gain * 2 + 64), 0, 127))
-        
+
         cmds.setModeButtonLight(7, self.cur_pattern is None)
         self.nocturn.execute(cmds)
 

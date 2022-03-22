@@ -1,3 +1,6 @@
+#! /usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
 import sys
 import struct
@@ -7,6 +10,11 @@ import unittest
 sys.path = ["./py"] + sys.path
 
 import cbox
+
+def cmd_dumper(cmd, fb, args):
+    print ("%s(%s)" % (cmd, ",".join(list(map(repr,args)))))
+cbox.init_engine("") #empty string so cbox doesn't look for the .cboxrc file
+cbox.start_audio(cmd_dumper)
 
 global Document
 Document = cbox.Document
@@ -156,7 +164,7 @@ params_to_test = [
     'amplfo_freqcc5', 'fillfo_freqcc10', 'pitchlfo_freqcc5',
     'cutoff_chanaft', 'resonance_chanaft',
     'cutoff_polyaft', 'resonance_polyaft',
-    'amplfo_depthpolyaft', 'fillfo_depthpolyaft', 'pitchlfo_depthpolyaft', 
+    'amplfo_depthpolyaft', 'fillfo_depthpolyaft', 'pitchlfo_depthpolyaft',
     'amplfo_freqpolyaft', 'fillfo_freqpolyaft', 'pitchlfo_freqpolyaft',
     'eq1_freqcc1', 'eq2_gaincc2', 'eq3_bwcc3',
     'eq1_freq_curvecc1', 'eq2_gain_curvecc2', 'eq3_bw_curvecc3',
@@ -232,7 +240,7 @@ for i in range(len(params_to_test)):
     verify_region(master, [], params_to_test)
     verify_region(g1, [], params_to_test)
     verify_region(r2, [], params_to_test)
-    
+
     params_to_test = params_to_test[1:] + params_to_test[0:1]
 
 old_names = [

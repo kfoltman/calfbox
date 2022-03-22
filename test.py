@@ -45,14 +45,14 @@ class TestCbox(unittest.TestCase):
         if path is not None:
             self.assertEqual(cbox.GetThings(path + "/status", ['uuid'], []).uuid, uuid)
         self.assertEqual(cbox.GetThings(Document.uuid_cmd(uuid, "/status"), ['uuid'], []).uuid, uuid)
-        
+
     def test_scene(self):
         scene = Document.get_scene()
         self.assertEqual(Document.get_engine().status().scenes[0], scene)
-        
+
         scene.clear()
         scene.add_new_instrument_layer("test_instr", "sampler")
-        
+
         scene_status = scene.status()
         layer = scene_status.layers[0]
         self.verify_uuid(scene.uuid, "cbox_scene", "/scene")
@@ -69,13 +69,13 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(layers[0].status().enable, 0)
         layers[0].set_enable(1)
         self.assertEqual(layers[0].status().enable, 1)
-        
+
         layer_status = layers[0].status()
         instr_uuid = layer_status.instrument.uuid
         iname = layer_status.instrument_name
         self.assertEqual(iname, 'test_instr')
         self.verify_uuid(instr_uuid, "cbox_instrument", "/scene/instr/%s" % iname)
-        
+
         aux = scene.load_aux("piano_reverb")
         module = aux.slot.engine
         self.verify_uuid(aux.uuid, "cbox_aux_bus", "/scene/aux/piano_reverb")
@@ -102,12 +102,12 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(layers[0].status().enable, 0)
         layers[0].set_enable(1)
         self.assertEqual(layers[0].status().enable, 1)
-        
+
         layer_status = layers[0].status()
         instr_uuid = layer_status.instrument.uuid
         iname = layer_status.instrument_name
         self.verify_uuid(instr_uuid, "cbox_instrument", scene.make_path("/instr/%s" % iname))
-        
+
         aux = scene.load_aux("piano_reverb")
         module = aux.slot.engine
         self.verify_uuid(aux.uuid, "cbox_aux_bus", scene.make_path("/aux/piano_reverb"))
@@ -137,7 +137,7 @@ class TestCbox(unittest.TestCase):
         self.verify_uuid(layer.uuid, "cbox_layer", scene.make_path("/layer/1"))
         instrument = layer.get_instrument()
         self.assertEqual(instrument.status().engine, "sampler")
-        
+
         program0 = instrument.engine.load_patch_from_file(0, 'synthbass.sfz', 'test_sampler_sfz_loader')
         self.assertNotEqual(program0, None)
         self.assertEqual(program0.status().in_use, 16)
@@ -224,7 +224,7 @@ class TestCbox(unittest.TestCase):
         print (program3.get_groups())
         print (instrument.engine.get_patches())
         program3.delete()
-        
+
     def test_rt(self):
         rt = Document.get_rt()
         self.assertEqual(cbox.GetThings(Document.uuid_cmd(rt.uuid, "/status"), ['uuid'], []).uuid, rt.uuid)
@@ -236,7 +236,7 @@ class TestCbox(unittest.TestCase):
         layer = scene.status().layers[0]
         instr = layer.status().instrument
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [])
-        
+
         meter_uuid = cbox.GetThings("/new_meter", ['uuid'], []).uuid
         instr.cmd('/output/1/rec_dry/attach', None, meter_uuid)
         self.assertEqual(instr.get_things("/output/1/rec_dry/status", ['*handler']).handler, [meter_uuid])
@@ -267,7 +267,7 @@ class TestCbox(unittest.TestCase):
         rec.delete()
         self.assertTrue(os.path.exists('test.wav'))
         self.assertTrue(os.path.getsize('test.wav') > 512 * 4 * 2)
-        
+
     def test_song(self):
         song = Document.get_song()
         song.clear()
@@ -275,36 +275,36 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(tp.tracks, [])
         self.assertEqual(tp.patterns, [])
         self.assertEqual(tp.mtis, [])
-        
+
         track = song.add_track()
         pattern = song.load_drum_pattern('pat1')
         track.add_clip(0, 0, 192, pattern)
-        
+
         song = Document.get_song()
         tp = song.status()
         self.assertEqual(tp.tracks[0].name, 'Unnamed')
         self.assertEqual(tp.patterns[0].name, 'pat1')
         track = tp.tracks[0].track
         pattern = tp.patterns[0].pattern
-        
+
         track.set_name("Now named")
         self.assertEqual(track.status().name, 'Now named')
         pattern.set_name("pat1alt")
         self.assertEqual(pattern.status().name, 'pat1alt')
-        
+
         tp = song.status()
         self.assertEqual(tp.tracks[0].name, 'Now named')
         self.assertEqual(tp.patterns[0].name, 'pat1alt')
-        
+
         clips = track.status().clips
         self.assertEqual(clips[0].pos, 0)
         self.assertEqual(clips[0].offset, 0)
         self.assertEqual(clips[0].length, 192)
         self.assertEqual(clips[0].pattern, pattern)
         clip1 = clips[0].clip
-        
+
         clip2 = track.add_clip(192, 96, 48, pattern)
-        
+
         clip2_data = clip2.status()
         self.assertEqual(clip2_data.pos, 192)
         self.assertEqual(clip2_data.offset, 96)
@@ -348,7 +348,7 @@ class TestCbox(unittest.TestCase):
         self.assertEqual(song.status().mtis, [MtiItem(0, 0, 0, 0), MtiItem(90, 180.0, 0, 0)])
         song.set_mti(90, 0.0, 0, 0)
         self.assertEqual(song.status().mtis, [MtiItem(0, 0, 0, 0)])
-        
+
     def test_error(self):
         thrown = False
         try:

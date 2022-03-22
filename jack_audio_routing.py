@@ -1,10 +1,13 @@
+#! /usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 from calfbox import cbox
 import time
 
 def cmd_dumper(cmd, fb, args):
     print ("%s(%s)" % (cmd, ",".join(list(map(repr,args)))))
 
-cbox.init_engine()
+cbox.init_engine("") #empty string so cbox doesn't look for the .cboxrc file
 cbox.Config.set("io", "use_usb", 0)
 cbox.start_audio(cmd_dumper)
 

@@ -23,6 +23,7 @@ config.status
 stamp-h1
 calfbox
 calfbox_tests
+test.wav
 
 __pycache__/
 *.py[cod]

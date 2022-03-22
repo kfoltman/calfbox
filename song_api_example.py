@@ -1,3 +1,6 @@
+#! /usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
 import sys
 import struct
@@ -7,6 +10,11 @@ import unittest
 sys.path = ["./py"] + sys.path
 
 import cbox
+
+def cmd_dumper(cmd, fb, args):
+    print ("%s(%s)" % (cmd, ",".join(list(map(repr,args)))))
+cbox.init_engine("") #empty string so cbox doesn't look for the .cboxrc file
+cbox.start_audio(cmd_dumper)
 
 global Document
 global Transport

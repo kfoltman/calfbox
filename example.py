@@ -1,3 +1,6 @@
+#! /usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import sys
 sys.argv  = []
 import gi
@@ -9,6 +12,12 @@ import math
 sys.path = ["./py"] + sys.path
 
 import cbox
+
+def cmd_dumper(cmd, fb, args):
+    print ("%s(%s)" % (cmd, ",".join(list(map(repr,args)))))
+cbox.init_engine("") #empty string so cbox doesn't look for the .cboxrc file
+cbox.start_audio(cmd_dumper)
+
 from gui_tools import *
 import fx_gui
 import instr_gui
@@ -82,7 +91,7 @@ for i in range(-60, 61):
 
 class SceneLayersModel(Gtk.ListStore):
     def __init__(self):
-        Gtk.ListStore.__init__(self, GObject.TYPE_STRING, GObject.TYPE_BOOLEAN, 
+        Gtk.ListStore.__init__(self, GObject.TYPE_STRING, GObject.TYPE_BOOLEAN,
             GObject.TYPE_INT, GObject.TYPE_INT, GObject.TYPE_BOOLEAN,
             GObject.TYPE_INT, GObject.TYPE_INT, GObject.TYPE_INT, GObject.TYPE_INT, GObject.TYPE_STRING)
     #def make_row_item(self, opath, tree_path):
@@ -171,7 +180,7 @@ class MainWindow(Gtk.Window):
 
     def create(self):
         self.menu_bar = Gtk.MenuBar()
-        
+
         self.menu_bar.append(create_menu("_Scene", [
             ("_Load", self.load_scene),
             ("_Quit", self.quit),
@@ -194,7 +203,7 @@ class MainWindow(Gtk.Window):
             ("_Object list", self.tools_object_list),
             ("_Wave bank dump", self.tools_wave_bank_dump),
         ]))
-        
+
         self.vbox.pack_start(self.menu_bar, False, False, 0)
         rt_status = cbox.Document.get_rt().status()
         scene = cbox.Document.get_scene()
@@ -209,11 +218,11 @@ class MainWindow(Gtk.Window):
         scene_status = scene.status()
         self.master_info = left_label("")
         self.timesig_info = left_label("")
-        
+
         t = Gtk.Grid()
         t.set_column_spacing(5)
         t.set_row_spacing(5)
-        
+
         t.attach(bold_label("Scene"), 0, 0, 1, 1)
         self.scene_label = left_label(scene_status.name)
         t.attach(self.scene_label, 1, 0, 2, 1)
@@ -221,10 +230,10 @@ class MainWindow(Gtk.Window):
         self.title_label = left_label(scene_status.title)
         t.attach(bold_label("Title"), 0, 1, 1, 1)
         t.attach(self.title_label, 1, 1, 2, 1)
-        
+
         t.attach(bold_label("Play pos"), 0, 2, 1, 1)
         t.attach(self.master_info, 1, 2, 2, 1)
-        
+
         t.attach(bold_label("Time sig"), 0, 3, 1, 1)
         t.attach(self.timesig_info, 1, 3, 2, 1)
         hb = Gtk.HButtonBox()
@@ -241,7 +250,7 @@ class MainWindow(Gtk.Window):
         b.connect('clicked', lambda w: cbox.Transport.panic())
         hb.pack_start(b, False, False, 5)
         t.attach(hb, 2, 3, 1, 1)
-        
+
         t.attach(bold_label("Tempo"), 0, 4, 1, 1)
         self.tempo_adj = Gtk.Adjustment(value=40, lower=40, upper=300, step_increment=1, page_increment=5, page_size=0)
         self.tempo_adj.connect('value_changed', adjustment_changed_float, cbox.VarPath("/master/set_tempo"))
@@ -251,36 +260,36 @@ class MainWindow(Gtk.Window):
         self.transpose_adj = Gtk.Adjustment(value=scene_status.transpose, lower=-24, upper=24, step_increment=1, page_increment=5, page_size=0)
         self.transpose_adj.connect('value_changed', adjustment_changed_int, cbox.VarPath('/scene/transpose'))
         t.attach(standard_align(Gtk.SpinButton(adjustment = self.transpose_adj), 0, 0, 0, 0), 1, 5, 2, 1)
-        
+
         self.layers_model = SceneLayersModel()
         self.layers_view = SceneLayersView(self.layers_model)
         t.attach(standard_vscroll_window(-1, 160, self.layers_view), 0, 7, 3, 1)
-        
+
         self.auxes_model = SceneAuxBusesModel()
         self.auxes_view = SceneAuxBusesView(self.auxes_model)
         t.attach(standard_vscroll_window(-1, 120, self.auxes_view), 0, 8, 3, 1)
 
         me = cbox.Document.get_engine().master_effect
         me_status = me.status()
-        
+
         hb = Gtk.HBox(spacing = 5)
         self.master_chooser = fx_gui.InsertEffectChooser(me.path, "slot", me_status.insert_engine, me_status.insert_preset, me_status.bypass, self)
         hb.pack_start(self.master_chooser.fx_engine, True, True, 0)
         hb.pack_start(self.master_chooser.fx_preset, True, True, 5)
         hb.pack_start(self.master_chooser.fx_edit, False, False, 5)
         hb.pack_start(self.master_chooser.fx_bypass, False, False, 5)
-        
+
         t.attach(bold_label("Master effect"), 0, 6, 1, 1)
         t.attach(standard_align(hb, 0, 0, 0, 0), 1, 6, 3, 1)
-        
+
         self.layers_model.refresh(scene_status)
         self.auxes_model.refresh(scene_status)
-        
+
         return t
-        
+
     def quit(self, w):
         self.destroy()
-        
+
     def load_scene(self, w):
         d = SceneDialog(self)
         response = d.run()
@@ -340,7 +349,7 @@ class MainWindow(Gtk.Window):
             pos = self.layers_view.get_cursor()[0][0]
             cbox.Document.get_scene().delete_layer(pos)
             self.refresh_instrument_pages()
-            
+
     def aux_bus_add(self, w):
         d = fx_gui.LoadEffectDialog(self)
         response = d.run()
@@ -355,7 +364,7 @@ class MainWindow(Gtk.Window):
             return
         cbox.do_cmd("/scene/delete_aux", None, [row[0]])
         self.refresh_instrument_pages()
-        
+
     def aux_bus_edit(self, w):
         rowid, row = self.auxes_view.get_current_row()
         if rowid is None:
@@ -364,7 +373,7 @@ class MainWindow(Gtk.Window):
         popup = wclass("Aux: %s" % row[0], self, "/scene/aux/%s/slot/engine" % row[0])
         popup.show_all()
         popup.present()
-        
+
     def tools_unzombify(self, w):
         cbox.do_cmd("/rt/cycle", None, [])
 
@@ -375,10 +384,10 @@ class MainWindow(Gtk.Window):
             self.drumkit_editor.connect('destroy', self.on_drumkit_editor_destroy)
             self.drumkit_editor.show_all()
         self.drumkit_editor.present()
-        
+
     def on_drumkit_editor_destroy(self, w):
         self.drumkit_editor = None
-        
+
     def tools_object_list(self, w):
         cbox.Document.dump()
 
@@ -425,7 +434,7 @@ class MainWindow(Gtk.Window):
             self.drum_pattern_editor.pattern.connect('changed', self.on_drum_pattern_changed)
             self.drum_pattern_editor.pattern.changed()
         self.drum_pattern_editor.present()
-        
+
     def on_drum_pattern_changed(self, pattern):
         data = bytearray()
         for i in pattern.items():
@@ -459,16 +468,16 @@ class MainWindow(Gtk.Window):
         self.path_widgets = {}
         self.path_popups = {}
         self.fx_choosers = {}
-        
+
         outputs_ls = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_INT)
         for out in range(0, rt_status.audio_channels[1]//2):
             outputs_ls.append(("Out %s/%s" % (out * 2 + 1, out * 2 + 2), out))
-            
+
         auxbus_ls = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_STRING)
         auxbus_ls.append(("", ""))
         for bus_name in scene_status.auxes.keys():
             auxbus_ls.append(("Aux: %s" % bus_name, bus_name))
-            
+
         for iname, (iengine, iobj) in scene_status.instruments.items():
             ipath = "/scene/instr/%s" % iname
             idata = iobj.status()
@@ -485,7 +494,7 @@ class MainWindow(Gtk.Window):
             t.attach(bold_label("Effect", 0.5), 3, 4, 0, 1, 0, Gtk.AttachOptions.SHRINK)
             t.attach(bold_label("Preset", 0.5), 4, 7, 0, 1, 0, Gtk.AttachOptions.SHRINK)
             b.pack_start(t, False, False, 5)
-            
+
             y = 1
             for o in range(1, idata.outputs + 1):
                 is_aux = o >= idata.aux_offset
@@ -499,9 +508,9 @@ class MainWindow(Gtk.Window):
                 engine = odata.insert_engine
                 preset = odata.insert_preset
                 bypass = odata.bypass
-                
+
                 t.attach(Gtk.Label(label=output_name), 0, 1, y, y + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
-                
+
                 if not is_aux:
                     cb = standard_combo(outputs_ls, odata.output - 1)
                     cb.connect('changed', combo_value_changed, cbox.VarPath(opath + '/output'), 1)
@@ -509,11 +518,11 @@ class MainWindow(Gtk.Window):
                     cb = standard_combo(auxbus_ls, ls_index(auxbus_ls, odata.bus, 1))
                     cb.connect('changed', combo_value_changed_use_column, cbox.VarPath(opath + '/bus'), 1)
                 t.attach(cb, 1, 2, y, y + 1, Gtk.AttachOptions.SHRINK, Gtk.AttachOptions.SHRINK)
-                                    
+
                 adj = Gtk.Adjustment(value=odata.gain, lower=-96, upper=24, step_increment=1, page_increment=6, page_size=0)
                 adj.connect('value_changed', adjustment_changed_float, cbox.VarPath(opath + '/gain'))
                 t.attach(standard_hslider(adj), 2, 3, y, y + 1, Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, Gtk.AttachOptions.SHRINK)
-                
+
                 chooser = fx_gui.InsertEffectChooser(opath, "%s: %s" % (iname, output_name), engine, preset, bypass, self)
                 self.fx_choosers[opath] = chooser
                 t.attach(chooser.fx_engine, 3, 4, y, y + 1, 0, Gtk.AttachOptions.SHRINK)
@@ -526,11 +535,11 @@ class MainWindow(Gtk.Window):
                 b.pack_start(instr_gui.instrument_window_map[iengine](iname, iobj), True, True, 5)
             self.nb.append_page(b, Gtk.Label(label=iname))
         self.update()
-        
+
     def delete_instrument_pages(self):
         while self.nb.get_n_pages() > 1:
             self.nb.remove_page(self.nb.get_n_pages() - 1)
-            
+
     def update(self):
         cbox.call_on_idle()
         master = cbox.Transport.status()
@@ -551,4 +560,3 @@ w.show_all()
 w.connect('destroy', do_quit)
 
 Gtk.main()
-
