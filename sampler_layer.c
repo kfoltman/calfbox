@@ -484,6 +484,9 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_NONFUNCTIONAL("sw_label") //Keyswitch. ARIA
     //label_cc and label_key are in sfzloader.c because they are under <control>
 
+    //Ignore List  #TODO
+    FIELD_NONFUNCTIONAL("ampeg_dynamic") //ARIA
+
     { "genericmod_#_#_#_#", -1, slpt_generic_modulation, 0, 0, NULL, NULL, NULL },
 };
 #define NPARAMS (sizeof(sampler_layer_params) / sizeof(sampler_layer_params[0]))
