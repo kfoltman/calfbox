@@ -3,7 +3,7 @@
 
 """
 This file implements the JackIO Python side of Jack Medata as described here:
-    http://www.jackaudio.org/files/docs/html/group__Metadata.html
+    https://jackaudio.org/api/metadata_8h.html
 
 """
 import base64 # for icons
@@ -63,6 +63,13 @@ class Metadata:
         elif not type(value) is str:
             return TypeError("value {} must be int or str but was {}".format(value, type(value)))
         do_cmd("/io/client_set_property", None, [key, value, jackPropertyType])
+
+    @staticmethod
+    def client_remove_property(key):
+        """
+        This is directly for our client, which we do not need to provide here.
+        """
+        do_cmd("/io/client_remove_property", None, [key])
 
     @staticmethod
     def remove_property(port, key):

@@ -34,6 +34,10 @@ cbox.start_audio()
 scene = cbox.Document.get_engine().new_scene()
 scene.clear()
 
+
+print("Setting a pretty name directly on our client")
+cbox.JackIO.Metadata.client_set_property("http://jackaudio.org/metadata/pretty-name", NAME+" Pretty Client Name")
+
 print("Setting nonsense meta data to our first two ports and midi port")
 cbox.JackIO.Metadata.set_property("Cbox Interactive:out_1", "foo", "bar")
 cbox.JackIO.Metadata.set_property("Cbox Interactive:out_1", "faz", "baz")
@@ -72,6 +76,16 @@ pprint (cbox.JackIO.Metadata.get_all_properties())
 print()
 print ("Now check your port order in QJackCtl or similar. Press [Return] to quit")
 input() #wait for key to confirm order visually in qjackctl
+
+print("Removing the pretty name from our client")
+cbox.JackIO.Metadata.client_remove_property("http://jackaudio.org/metadata/pretty-name")
+
+print("Second time. This will fail: Removing the pretty name from our client")
+try:
+    cbox.JackIO.Metadata.client_remove_property("http://jackaudio.org/metadata/pretty-name")
+except Exception as e:
+    print ("Caught expected error:", e)
+
 quit()
 
 def exit_handler():

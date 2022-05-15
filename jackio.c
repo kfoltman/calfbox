@@ -1204,6 +1204,35 @@ static gboolean cbox_jack_io_process_cmd(struct cbox_command_target *ct, struct 
         }
         return TRUE;
     }
+    else if (!strcmp(cmd->command, "/client_remove_property") && !strcmp(cmd->arg_types, "s"))
+    /*same as remove_property above, but works directly on our own jack client.
+    parameters: key
+    */
+    {
+        const char *key = CBOX_ARG_S(cmd, 0);
+
+        char* subject;
+        subject = jack_get_uuid_for_client_name(jii->client, jii->client_name); //lookup our own client
+        if (!subject) {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Cannot get string UUID for our jack client.");
+            return FALSE;
+        }
+
+        jack_uuid_t j_client_uuid_t;
+        if (jack_uuid_parse(subject, &j_client_uuid_t)) { //from jack/uuid.h  // 0 on success
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "jack_uuid_parse() couldn't parse our string client UUID %s as numerical jack_uuid_t %ld", subject, j_client_uuid_t);
+            return FALSE;
+        }
+
+        if (jack_remove_property(jii->client, j_client_uuid_t, key)) // 0 on success
+        {
+            g_set_error(error, CBOX_MODULE_ERROR, CBOX_MODULE_ERROR_FAILED, "Remove client property key:'%s' was not successful", key);
+            return FALSE;
+        }
+        return TRUE;
+    }
+
+
 
     else if (!strcmp(cmd->command, "/remove_properties") && !strcmp(cmd->arg_types, "s"))
     {
