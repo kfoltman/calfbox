@@ -152,8 +152,8 @@ MODULE_CREATE_FUNCTION(fluidsynth)
     m->is_multi = pairs > 0;
     if (m->output_pairs < 1 || m->output_pairs > 16)
     {
-        free(m);
         g_set_error(error, CBOX_FLUIDSYNTH_ERROR, CBOX_FLUIDSYNTH_ERROR_FAILED, "Invalid number of output pairs (found %d, supported range 1-16)", m->output_pairs);
+        free(m);
         return NULL;
     }
     if (pairs == 0)
