@@ -31,3 +31,5 @@ __pycache__/
 build/
 config.guess
 config.sub
+CalfBox.egg-info/
+dist/
