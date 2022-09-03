@@ -210,6 +210,18 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
         }
         return TRUE;
     }
+    if (!strcmp(cmd->command, "/output_labels") && !strcmp(cmd->arg_types, ""))
+    {
+        if (!cbox_check_fb_channel(fb, cmd->command, error))
+            return FALSE;
+        for (GSList *p = program->output_label_list; p; p = p->next)
+        {
+            const struct sampler_outputlabel *cin = (const struct sampler_outputlabel *)p->data;
+            if (!cbox_execute_on(fb, NULL, "/output_label", "is", error, (int)cin->pitch, cin->label))
+                return FALSE;
+        }
+        return TRUE;
+    }
     if (!strcmp(cmd->command, "/add_control_init") && !strcmp(cmd->arg_types, "ii"))
     {
         sampler_program_add_controller_init(program, CBOX_ARG_I(cmd, 0), CBOX_ARG_I(cmd, 1));
@@ -294,6 +306,7 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->ctrl_init_list = NULL;
     prg->ctrl_label_list = NULL;
     prg->pitch_label_list = NULL;
+    prg->output_label_list = NULL;
     prg->global = sampler_layer_new(m, prg, NULL);
     prg->global->default_child = sampler_layer_new(m, prg, prg->global);
     prg->global->default_child->default_child = sampler_layer_new(m, prg, prg->global->default_child);
@@ -535,6 +548,21 @@ static void sampler_pitch_label_destroy(gpointer value)
     free(label);
 }
 
+void sampler_program_add_output_label(struct sampler_program *prg, uint16_t pitch, gchar *text)
+{
+    struct sampler_outputlabel *label = calloc(1, sizeof(struct sampler_outputlabel));
+    label->pitch = pitch;
+    label->label = text;
+    prg->output_label_list = g_slist_append(prg->output_label_list, label);
+}
+
+static void sampler_output_label_destroy(gpointer value)
+{
+    struct sampler_outputlabel *label = value;
+    free(label->label);
+    free(label);
+}
+
 void sampler_program_add_controller_label(struct sampler_program *prg, uint16_t controller, gchar *text)
 {
     struct sampler_ctrllabel *label = calloc(1, sizeof(struct sampler_ctrllabel));
@@ -606,6 +634,7 @@ void sampler_program_destroyfunc(struct cbox_objhdr *hdr_ptr)
     g_slist_free(prg->ctrl_init_list);
     g_slist_free_full(prg->ctrl_label_list, sampler_ctrl_label_destroy);
     g_slist_free_full(prg->pitch_label_list, sampler_pitch_label_destroy);
+    g_slist_free_full(prg->output_label_list, sampler_output_label_destroy);
     if (prg->tarfile)
         cbox_tarpool_release_tarfile(app.tarpool, prg->tarfile);
     free(prg);

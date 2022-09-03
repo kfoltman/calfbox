@@ -83,6 +83,11 @@ struct sampler_pitchlabel {
     gchar *label;
 };
 
+struct sampler_outputlabel {
+    uint16_t pitch;
+    gchar *label;
+};
+
 struct sampler_program
 {
     CBOX_OBJECT_HEADER()
@@ -96,6 +101,7 @@ struct sampler_program
     GSList *ctrl_init_list;
     GSList *ctrl_label_list;
     GSList *pitch_label_list;
+    GSList *output_label_list;
     struct sampler_rll *rll;
     gchar *sample_dir; // can be empty, cannot be NULL
     gchar *source_file; // can be empty, cannot be NULL
@@ -120,6 +126,7 @@ extern void sampler_program_add_group(struct sampler_program *prg, struct sample
 extern void sampler_program_add_controller_init(struct sampler_program *prg, uint16_t controller, uint8_t value);
 extern void sampler_program_add_controller_label(struct sampler_program *prg, uint16_t controller, gchar *label); // keeps ownership
 extern void sampler_program_add_pitch_label(struct sampler_program *prg, uint16_t pitch, gchar *label); // keeps ownership
+extern void sampler_program_add_output_label(struct sampler_program *prg, uint16_t pitch, gchar *label); // keeps ownership
 extern void sampler_program_remove_controller_init(struct sampler_program *prg, uint16_t controller, int which);
 extern void sampler_program_update_layers(struct sampler_program *prg);
 extern struct sampler_program *sampler_program_clone(struct sampler_program *prg, struct sampler_module *m, int prog_no, GError **error);

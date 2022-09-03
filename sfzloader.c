@@ -197,6 +197,11 @@ static gboolean load_sfz_key_value(struct sfz_parser_client *client, const char 
             int pitch = atoi(key + 9);
             sampler_program_add_pitch_label(ls->program, pitch, g_strdup(value));
         }
+        else if (!strncmp(key, "label_output", 12))
+        {
+            int pitch = atoi(key + 12);
+            sampler_program_add_output_label(ls->program, pitch, g_strdup(value));
+        }
         else if (!strncmp(key, "set_cc", 6))
         {
             int ctrl = atoi(key + 6);
