@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <glib.h>
 #include <sndfile.h>
-#include <tarfile.h>
+#include "tarfile.h"
 
 #define MAX_INTERPOLATION_ORDER 3
 
@@ -53,7 +53,7 @@ struct cbox_waveform
     struct cbox_tarfile *tarfile;
     struct cbox_taritem *taritem;
     struct cbox_tarfile_sndstream sndstream;
-    
+
     struct cbox_waveform_level *levels;
     int level_count;
 };
