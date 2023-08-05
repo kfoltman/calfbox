@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CBOX_ENVELOPE_H
 
 #include <glib.h>
-#include <config-api.h>
+#include "config-api.h"
 
 struct cbox_envstage
 {

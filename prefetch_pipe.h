@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <pthread.h>
 #include <sndfile.h>
 #include <stdint.h>
-#include <tarfile.h>
+#include "tarfile.h"
 
 #define PIPE_MIN_PREFETCH_SIZE_FRAMES 2048
 
