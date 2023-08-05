@@ -442,6 +442,14 @@ class Transport:
     def samples_to_ppqn(pos_samples):
         return get_thing("/master/samples_to_ppqn", '/value', int, pos_samples)
 
+class WaveBank:
+    @staticmethod
+    def list():
+        return get_thing("/waves/list", '/waveform', [int])
+    @staticmethod
+    def info(sample_id):
+        return GetThings("/waves/info", ['filename', 'name', 'bytes', 'samples', 'sample_rate', 'channels', 'format', 'level_count'], [sample_id])
+
 # Currently responsible for both JACK and USB I/O - not all functionality is
 # supported by both.
 class JackIO:

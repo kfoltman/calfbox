@@ -134,27 +134,27 @@ GQuark cbox_waveform_error_quark(void)
     return g_quark_from_string("cbox-waveform-error-quark");
 }
 
-float func_sine(float v, void *user_data)
+float func_sine(struct cbox_waveform_generate_data *generate, float v)
 {
     return sin(2 * M_PI * v);
 }
 
-float func_silence(float v, void *user_data)
+float func_silence(struct cbox_waveform_generate_data *generate, float v)
 {
     return 0.f;
 }
 
-float func_sqr(float v, void *user_data)
+float func_sqr(struct cbox_waveform_generate_data *generate, float v)
 {
     return v < 0.5 ? -1 : 1;
 }
 
-float func_saw(float v, void *user_data)
+float func_saw(struct cbox_waveform_generate_data *generate, float v)
 {
     return 2 * v - 1;
 }
 
-float func_tri(float v, void *user_data)
+float func_tri(struct cbox_waveform_generate_data *generate, float v)
 {
     if (v <= 0.25f)
         return v * 4;
@@ -197,43 +197,64 @@ void cbox_waveform_generate_levels(struct cbox_waveform *waveform, int levels, d
     waveform->level_count = levels;
 }
 
-void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(float v, void *user_data), void *user_data, int levels)
+struct cbox_waveform *cbox_wavebank_add_mem_waveform(const char *name, void *data, uint32_t frames, int sample_rate, int channels, gboolean looped, uint32_t loop_start, uint32_t loop_end)
 {
-    int nsize = STD_WAVEFORM_FRAMES;
+    struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
+    waveform->data = data;
+    waveform->info.channels = channels;
+    waveform->preloaded_frames = waveform->info.frames = frames;
+    waveform->info.samplerate = sample_rate;
+    waveform->id = ++bank.serial_no;
+    waveform->bytes = waveform->info.channels * 2 * (waveform->info.frames + 1);
+    waveform->refcount = 1;
+    waveform->canonical_name = g_strdup(name);
+    waveform->display_name = g_strdup(name);
+    waveform->has_loop = looped;
+    waveform->loop_start = looped ? loop_start : frames;
+    waveform->loop_end = looped ? loop_end : frames;
+    waveform->levels = NULL;
+    waveform->level_count = 0;
+    waveform->is_static = 1;
+
+    g_hash_table_insert(bank.waveforms_by_name, waveform->canonical_name, waveform);
+    g_hash_table_insert(bank.waveforms_by_id, &waveform->id, waveform);
+    bank.std_waveforms = g_slist_prepend(bank.std_waveforms, waveform);
+    return waveform;
+}
+
+void cbox_waveform_generate(struct cbox_waveform *waveform)
+{
+    uint32_t nsize = waveform->info.frames;
     int16_t *wave = calloc(nsize, sizeof(int16_t));
-    for (int i = 0; i < nsize; i++)
+    struct cbox_waveform_generate_data *generate = waveform->generate;
+    float (*getfunc)(struct cbox_waveform_generate_data *, float) = generate->getfunc;
+    for (uint32_t i = 0; i < nsize; i++)
     {
-        float v = getfunc(i * 1.0 / nsize, user_data);
+        float v = getfunc(generate, i * 1.0 / nsize);
         if (fabs(v) > 1)
             v = (v < 0) ? -1 : 1;
         // cannot use full scale here, because bandlimiting will introduce
         // some degree of overshoot
         wave[i] = (int16_t)(25000 * v);
     }
-    struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
     waveform->data = wave;
-    waveform->info.channels = 1;
-    waveform->preloaded_frames = waveform->info.frames = nsize;
-    waveform->info.samplerate = (int)(nsize * 261.6255);
-    waveform->id = ++bank.serial_no;
-    waveform->bytes = waveform->info.channels * 2 * (waveform->info.frames + 1);
-    waveform->refcount = 1;
-    waveform->canonical_name = g_strdup(name);
-    waveform->display_name = g_strdup(name);
-    waveform->has_loop = TRUE;
-    waveform->loop_start = 0;
-    waveform->loop_end = nsize;
-    waveform->levels = NULL;
-    waveform->level_count = 0;
+    if (generate->levels)
+        cbox_waveform_generate_levels(waveform, generate->levels, 2);
+    bank.bytes += waveform->bytes * (1 + waveform->level_count);
+    free(waveform->generate);
+    waveform->generate = NULL;
+}
 
-    if (levels)
-        cbox_waveform_generate_levels(waveform, levels, 2);
-
-    g_hash_table_insert(bank.waveforms_by_name, waveform->canonical_name, waveform);
-    g_hash_table_insert(bank.waveforms_by_id, &waveform->id, waveform);
-    bank.std_waveforms = g_slist_prepend(bank.std_waveforms, waveform);
-    // These waveforms are not included in the bank size, I don't think it has
-    // much value for the user.
+void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(struct cbox_waveform_generate_data *generate, float v), void *user_data, int levels)
+{
+    int nsize = STD_WAVEFORM_FRAMES;
+    struct cbox_waveform *waveform = cbox_wavebank_add_mem_waveform(name, NULL, nsize, (int)(nsize * 261.6255), 1, TRUE, 0, nsize);
+    struct cbox_waveform_generate_data *generate = calloc(1, sizeof(struct cbox_waveform_generate_data));
+    waveform->is_static = 0;
+    generate->getfunc = getfunc;
+    generate->user_data = user_data;
+    generate->levels = levels;
+    waveform->generate = generate;
 }
 
 void cbox_wavebank_init()
@@ -431,13 +452,13 @@ void cbox_wavebank_foreach(void (*cb)(void *, struct cbox_waveform *), void *use
 
 void cbox_wavebank_close()
 {
-    if (bank.bytes > 0)
-        g_warning("Warning: %lld bytes in unfreed samples", (long long int)bank.bytes);
     while(bank.std_waveforms)
     {
         cbox_waveform_unref((struct cbox_waveform *)bank.std_waveforms->data);
         bank.std_waveforms = g_slist_delete_link(bank.std_waveforms, bank.std_waveforms);
     }
+    if (bank.bytes > 0)
+        g_warning("Warning: %lld bytes in unfreed samples", (long long int)bank.bytes);
     g_hash_table_destroy(bank.waveforms_by_id);
     g_hash_table_destroy(bank.waveforms_by_name);
     bank.waveforms_by_id = NULL;
@@ -449,6 +470,8 @@ void cbox_wavebank_close()
 void cbox_waveform_ref(struct cbox_waveform *waveform)
 {
     ++waveform->refcount;
+    if (!waveform->data && waveform->generate)
+        cbox_waveform_generate(waveform);
 }
 
 void cbox_waveform_unref(struct cbox_waveform *waveform)
@@ -458,14 +481,17 @@ void cbox_waveform_unref(struct cbox_waveform *waveform)
 
     g_hash_table_remove(bank.waveforms_by_name, waveform->canonical_name);
     g_hash_table_remove(bank.waveforms_by_id, &waveform->id);
-    bank.bytes -= waveform->bytes;
+    if (waveform->data)
+        bank.bytes -= waveform->bytes * (1 + waveform->level_count);
 
     g_free(waveform->display_name);
     g_free(waveform->canonical_name);
-    for (int i = 0; i < waveform->level_count; i++)
-        free(waveform->levels[i].data);
-    free(waveform->levels);
-    free(waveform->data);
+    if (!waveform->is_static) {
+        for (int i = 0; i < waveform->level_count; i++)
+            free(waveform->levels[i].data);
+        free(waveform->levels);
+        free(waveform->data);
+    }
     free(waveform);
 
 }
@@ -526,6 +552,16 @@ static gboolean waves_process_cmd(struct cbox_command_target *ct, struct cbox_co
         if (!cbox_execute_on(fb, NULL, "/name", "s", error, waveform->display_name))
             return FALSE;
         if (!cbox_execute_on(fb, NULL, "/bytes", "i", error, (int)waveform->bytes))
+            return FALSE;
+        if (!cbox_execute_on(fb, NULL, "/samples", "i", error, (int)waveform->info.frames))
+            return FALSE;
+        if (!cbox_execute_on(fb, NULL, "/sample_rate", "i", error, (int)waveform->info.samplerate))
+            return FALSE;
+        if (!cbox_execute_on(fb, NULL, "/channels", "i", error, (int)waveform->info.channels))
+            return FALSE;
+        if (!cbox_execute_on(fb, NULL, "/format", "i", error, (int)waveform->info.format))
+            return FALSE;
+        if (!cbox_execute_on(fb, NULL, "/levels", "i", error, (int)waveform->level_count))
             return FALSE;
         if (waveform->has_loop && !cbox_execute_on(fb, NULL, "/loop", "ii", error, (int)waveform->loop_start, (int)waveform->loop_end))
             return FALSE;
