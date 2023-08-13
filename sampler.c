@@ -100,7 +100,7 @@ void sampler_create_voice_from_prevoice(struct sampler_module *m, struct sampler
 void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs)
 {
     struct sampler_module *m = (struct sampler_module *)module;
-    
+
     int active_prevoices[16];
     uint32_t active_prevoices_mask = 0;
     FOREACH_PREVOICE(m->prevoices_running, pv)
@@ -122,7 +122,7 @@ void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, c
         for (int i = 0; i < CBOX_BLOCK_SIZE; i++)
             outputs[oo][i] = outputs[oo + 1][i] = 0.f;
     }
-    
+
     int vcount = 0, vrel = 0, pvcount = 0;
     for (int i = 0; i < 16; i++)
     {
@@ -171,7 +171,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 else
                     sampler_channel_stop_note(c, data[1], data[2], FALSE);
                 break;
-            
+
             case 10:
                 c->last_polyaft = data[2];
                 // Lazy clearing
@@ -186,7 +186,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
                 // if (data[2] == 127)
                 //    sampler_channel_stop_note(c, data[1], data[2], TRUE);
                 break;
-            
+
             case 11:
                 sampler_channel_process_cc(c, data[1], data[2]);
                 break;
@@ -211,7 +211,7 @@ static int get_first_free_program_no(struct sampler_module *m)
 {
     int prog_no = -1;
     gboolean found;
-    
+
     // XXXKF this has a N-squared complexity - but I'm not seeing
     // this being used with more than 10 programs at the same time
     // in the near future
@@ -225,9 +225,9 @@ static int get_first_free_program_no(struct sampler_module *m)
                 found = TRUE;
                 break;
             }
-        }        
+        }
     } while(found);
-    
+
     return prog_no;
 }
 
@@ -244,7 +244,7 @@ static int find_program(struct sampler_module *m, int prog_no)
 struct release_program_voices_data
 {
     struct sampler_module *module;
-    
+
     struct sampler_program *old_pgm, *new_pgm;
     uint16_t channels_to_wait_for;
 };
@@ -254,13 +254,13 @@ static int release_program_voices_execute(void *data)
     struct release_program_voices_data *rpv = data;
     struct sampler_module *m = rpv->module;
     int finished = 1;
-    
+
     FOREACH_PREVOICE(m->prevoices_running, pv)
     {
         if (pv->channel->program == rpv->old_pgm)
         {
             sampler_prevoice_unlink(&m->prevoices_running, pv);
-            sampler_prevoice_link(&m->prevoices_free, pv);            
+            sampler_prevoice_link(&m->prevoices_free, pv);
         }
     }
     for (int i = 0; i < 16; i++)
@@ -296,14 +296,14 @@ static int release_program_voices_execute(void *data)
             }
         }
     }
-    
+
     return finished;
 }
 
 static void swap_program(struct sampler_module *m, int index, struct sampler_program *pgm, gboolean delete_old)
 {
     static struct cbox_rt_cmd_definition release_program_voices = { NULL, release_program_voices_execute, NULL };
-    
+
     struct sampler_program *old_program = NULL;
     if (pgm)
         old_program = cbox_rt_swap_pointers(m->module.rt, (void **)&m->programs[index], pgm);
@@ -313,7 +313,7 @@ static void swap_program(struct sampler_module *m, int index, struct sampler_pro
     struct release_program_voices_data data = {m, old_program, pgm, 0};
 
     cbox_rt_execute_cmd_sync(m->module.rt, &release_program_voices, &data);
-    
+
     if (delete_old && old_program)
         CBOX_DELETE(old_program);
 }
@@ -335,14 +335,14 @@ void sampler_register_program(struct sampler_module *m, struct sampler_program *
         select_initial_program(m);
 }
 
-static gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, struct sampler_program **ppgm, GError **error)
+gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, struct sampler_program **ppgm, GError **error)
 {
     struct sampler_program *pgm = NULL;
     int index = find_program(m, prog_no);
     pgm = sampler_program_new_from_cfg(m, cfg_section, name, prog_no, error);
     if (!pgm)
         return FALSE;
-    
+
     if (index != -1)
         swap_program(m, index, pgm, TRUE);
     else
@@ -385,13 +385,13 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
             *ppgm = pgm;
         return TRUE;
     }
-    
+
     struct sampler_program **programs = calloc((m->program_count + 1), sizeof(struct sampler_program *));
     memcpy(programs, m->programs, sizeof(struct sampler_program *) * m->program_count);
     programs[m->program_count] = pgm;
     if (ppgm)
         *ppgm = pgm;
-    free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));    
+    free(cbox_rt_swap_pointers_and_update_count(m->module.rt, (void **)&m->programs, programs, &m->program_count, m->program_count + 1));
     if (m->program_count == 1)
         select_initial_program(m);
     return TRUE;
@@ -400,7 +400,7 @@ static gboolean load_from_string(struct sampler_module *m, const char *sample_di
 gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command_target *fb, struct cbox_osc_command *cmd, GError **error)
 {
     struct sampler_module *m = (struct sampler_module *)ct->user_data;
-    
+
     if (!strcmp(cmd->command, "/status") && !strcmp(cmd->arg_types, ""))
     {
         if (!cbox_check_fb_channel(fb, cmd->command, error))
@@ -422,11 +422,11 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
                 cbox_execute_on(fb, NULL, "/pan", "ii", error, i + 1, sampler_channel_addcc(channel, 10))))
                 return FALSE;
         }
-        
+
         return cbox_execute_on(fb, NULL, "/active_voices", "i", error, m->active_voices) &&
             cbox_execute_on(fb, NULL, "/active_prevoices", "i", error, m->active_prevoices) &&
             cbox_execute_on(fb, NULL, "/active_pipes", "i", error, cbox_prefetch_stack_get_active_pipe_count(m->pipe_stack)) &&
-            cbox_execute_on(fb, NULL, "/polyphony", "i", error, m->max_voices) && 
+            cbox_execute_on(fb, NULL, "/polyphony", "i", error, m->max_voices) &&
             CBOX_OBJECT_DEFAULT_STATUS(&m->module, fb, error);
     }
     else
@@ -531,7 +531,7 @@ gboolean sampler_process_cmd(struct cbox_command_target *ct, struct cbox_command
     }
     else if (!strcmp(cmd->command, "/load_patch_from_string") && !strcmp(cmd->arg_types, "isss"))
     {
-        struct sampler_program *pgm = NULL; 
+        struct sampler_program *pgm = NULL;
         if (!load_from_string(m, CBOX_ARG_S(cmd, 1), CBOX_ARG_S(cmd, 2), CBOX_ARG_S(cmd, 3), CBOX_ARG_I(cmd, 0), &pgm, error))
             return FALSE;
         if (fb && pgm)
@@ -581,7 +581,7 @@ MODULE_CREATE_FUNCTION(sampler)
             sampler_sine_wave[i] = sin(i * M_PI / 1024.0);
         inited = 1;
     }
-    
+
     int max_voices = cbox_config_get_int(cfg_section, "polyphony", MAX_SAMPLER_VOICES);
     if (max_voices < 1 || max_voices > MAX_SAMPLER_VOICES)
     {
@@ -600,7 +600,7 @@ MODULE_CREATE_FUNCTION(sampler)
         g_set_error(error, CBOX_SAMPLER_ERROR, CBOX_SAMPLER_ERROR_INVALID_LAYER, "%s: invalid aux pairs value", cfg_section);
         return NULL;
     }
-    
+
     struct sampler_module *m = calloc(1, sizeof(struct sampler_module));
     CALL_MODULE_INIT(m, 0, (output_pairs + aux_pairs) * 2, sampler);
     m->output_pairs = output_pairs;
@@ -637,7 +637,7 @@ MODULE_CREATE_FUNCTION(sampler)
         gchar *s = g_strdup_printf("program%d", i);
         char *p = cbox_config_get_string(cfg_section, s);
         g_free(s);
-        
+
         if (!p)
         {
             m->program_count = i;
@@ -666,7 +666,7 @@ MODULE_CREATE_FUNCTION(sampler)
             pgm_id = i;
             pgm_section = g_strdup_printf("spgm:%s", pgm_name);
         }
-        
+
         m->programs[i] = sampler_program_new_from_cfg(m, pgm_section, pgm_section + 5, pgm_id, error);
         g_free(pgm_section);
         if (!m->programs[i])
@@ -699,7 +699,7 @@ MODULE_CREATE_FUNCTION(sampler)
         struct sampler_prevoice *v = &m->prevoices_all[i];
         sampler_prevoice_link(&m->prevoices_free, v);
     }
-    
+
     for (i = 0; i < 16; i++)
         sampler_channel_init(&m->channels[i], m);
 
@@ -720,7 +720,7 @@ MODULE_CREATE_FUNCTION(sampler)
         m->channels[i].output_shift = cbox_config_get_int(cfg_section, key, 1) - 1;
         g_free(key);
     }
-    
+
 
     return &m->module;
 }
@@ -730,7 +730,7 @@ void sampler_destroyfunc(struct cbox_module *module)
     struct sampler_module *m = (struct sampler_module *)module;
     uint32_t i;
     m->deleting = TRUE;
-    
+
     for (i = 0; i < m->program_count;)
     {
         if (m->programs[i])
@@ -778,4 +778,3 @@ struct cbox_module_keyrange_metadata sampler_keyranges[] = {
 };
 
 DEFINE_MODULE(sampler, 0, 2)
-
