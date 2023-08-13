@@ -88,7 +88,7 @@ struct sampler_gen
     enum sampler_player_type mode;
     int16_t *sample_data;
     int16_t *scratch;
-    
+
     uint64_t bigpos, bigdelta;
     uint64_t virtpos, virtdelta;
     uint32_t loop_start, loop_end;
@@ -105,7 +105,7 @@ struct sampler_gen
     float stretching_crossfade;
     uint32_t play_count, loop_count;
     int16_t scratch_bandlimited[2 * MAX_INTERPOLATION_ORDER * 2];
-    
+
     // Streaming mode only
     int16_t *streaming_buffer;
     uint32_t consumed, consumed_credit, streaming_buffer_frames;
@@ -391,5 +391,7 @@ static inline gboolean sampler_cc_range_is_in(const struct sampler_cc_range *ran
             var = _tmp->next; \
         _tmp->prev = _tmp->next = NULL; \
     }
+
+gboolean load_program_at(struct sampler_module *m, const char *cfg_section, const char *name, int prog_no, struct sampler_program **ppgm, GError **error);
 
 #endif
