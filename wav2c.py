@@ -44,7 +44,7 @@ print ("static short sample_data[] = {")
 for i in range(0, frames, 16):
     print (repr(data[i : i + 16])[1:-1] + ",")
 
-args = f'"{name}", sample_data, {frames}, {rate}, {channels}, 0, 0, 0'
+args = f'"{name}", sample_data, {frames}, {rate}, {channels}, 0, -1, {frames}'
 
 print ("""\
 };
