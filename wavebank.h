@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CBOX_WAVEBANK_H
 #define CBOX_WAVEBANK_H
 
+#include <stdbool.h>
 #include <glib.h>
 #include <sndfile.h>
 #include "tarfile.h"
@@ -74,7 +75,7 @@ extern struct cbox_waveform *cbox_wavebank_get_waveform(const char *context_name
 extern struct cbox_waveform *cbox_wavebank_peek_waveform_by_id(int id);
 extern void cbox_wavebank_foreach(void (*cb)(void *user_data, struct cbox_waveform *waveform), void *user_data);
 extern void cbox_wavebank_add_std_waveform(const char *name, float (*getfunc)(struct cbox_waveform_generate_data *generate, float v), void *user_data, int levels);
-extern struct cbox_waveform *cbox_wavebank_add_mem_waveform(const char *name, void *data, uint32_t frames, int sample_rate, int channels, gboolean looped, uint32_t loop_start, uint32_t loop_end);
+extern struct cbox_waveform *cbox_wavebank_add_mem_waveform(const char *name, void *data, uint32_t frames, int sample_rate, int channels, bool looped, uint32_t loop_start, uint32_t loop_end);
 extern int cbox_wavebank_get_count(void);
 extern int64_t cbox_wavebank_get_bytes(void);
 extern int64_t cbox_wavebank_get_maxbytes(void);

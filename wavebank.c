@@ -197,7 +197,7 @@ void cbox_waveform_generate_levels(struct cbox_waveform *waveform, int levels, d
     waveform->level_count = levels;
 }
 
-struct cbox_waveform *cbox_wavebank_add_mem_waveform(const char *name, void *data, uint32_t frames, int sample_rate, int channels, gboolean looped, uint32_t loop_start, uint32_t loop_end)
+struct cbox_waveform *cbox_wavebank_add_mem_waveform(const char *name, void *data, uint32_t frames, int sample_rate, int channels, bool looped, uint32_t loop_start, uint32_t loop_end)
 {
     struct cbox_waveform *waveform = calloc(1, sizeof(struct cbox_waveform));
     waveform->data = data;

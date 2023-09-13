@@ -36,19 +36,21 @@ else:
 
 data = list(data)
 
+print ('#include <stdbool.h>')
+print ('#include <stdint.h>')
+print ('struct cbox_waveform;')
+print ('extern struct cbox_waveform *cbox_wavebank_add_mem_waveform(const char *name, void *data, uint32_t frames, int sample_rate, int channels, bool looped, uint32_t loop_start, uint32_t loop_end);')
 print ("static short sample_data[] = {")
 for i in range(0, frames, 16):
     print (repr(data[i : i + 16])[1:-1] + ",")
 
-# extern struct cbox_waveform *cbox_wavebank_add_mem_waveform(const char *name, void *data, uint32_t frames, int sample_rate, int channels, gboolean looped, uint32_t loop_start, uint32_t loop_end);
-
-args = f'{repr(name)}, sample_data, {frames}, {rate}, {channels}, 0, 0, 0'
+args = f'"{name}", sample_data, {frames}, {rate}, {channels}, 0, 0, 0'
 
 print ("""\
-}
+};
 
 struct cbox_waveform *FUNCTION(void) {
-    cbox_wavebank_add_mem_waveform(ARGS);
+    return cbox_wavebank_add_mem_waveform(ARGS);
 }
 """.replace("ARGS", args).replace("FUNCTION", funcname))
 
