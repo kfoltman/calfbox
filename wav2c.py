@@ -41,7 +41,7 @@ print ('#include <stdint.h>')
 print ('struct cbox_waveform;')
 print ('extern struct cbox_waveform *cbox_wavebank_add_mem_waveform(const char *name, void *data, uint32_t frames, int sample_rate, int channels, bool looped, uint32_t loop_start, uint32_t loop_end);')
 print ("static short sample_data[] = {")
-for i in range(0, frames, 16):
+for i in range(0, frames * channels, 16):
     print (repr(data[i : i + 16])[1:-1] + ",")
 
 args = f'"{name}", sample_data, {frames}, {rate}, {channels}, 0, -1, {frames}'
