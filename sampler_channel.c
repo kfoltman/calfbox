@@ -153,7 +153,7 @@ void sampler_channel_process_cc(struct sampler_channel *c, int cc, int val)
                         break;
                     struct sampler_released_groups exgroups;
                     sampler_released_groups_init(&exgroups);
-                    sampler_voice_start(v, c, layer->runtime, layer->runtime->pitch_keycenter, 127, &exgroups);
+                    sampler_voice_start(v, c, layer->runtime, layer->runtime->computed.eff_pitch_keycenter, 127, &exgroups);
                     sampler_channel_release_groups(c, -1, &exgroups);
                 }
             }

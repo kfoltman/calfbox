@@ -439,9 +439,9 @@ typedef int midi_note_t;
     MACRO(float, lorand, 0) \
     MACRO(float, hirand, 1) \
     MACRO(midi_note_t, key, -1) \
-    MACRO(midi_note_t, lokey, 0) \
-    MACRO(midi_note_t, hikey, 127) \
-    MACRO(midi_note_t, pitch_keycenter, 60) \
+    MACRO(midi_note_t, lokey, -1) \
+    MACRO(midi_note_t, hikey, -1) \
+    MACRO(midi_note_t, pitch_keycenter, -1) \
     MACRO(int, pitch_keytrack, 100) \
     MACRO(midi_note_t, fil_keycenter, 60) \
     MACRO(int, fil_keytrack, 0) \
@@ -651,6 +651,7 @@ struct sampler_layer_computed
     float logcutoff, logcutoff2;
     uint32_t eq_bitmask, mod_bitmask;
     int eff_num_stages, eff_num_stages2;
+    uint8_t eff_lokey, eff_hikey, eff_pitch_keycenter;
 
     float eff_amp_velcurve[128];
 };
@@ -719,3 +720,4 @@ extern void sampler_midi_curve_init(struct sampler_midi_curve *curve);
 extern void sampler_midi_curve_interpolate(const struct sampler_midi_curve *curve, float dest[128], float def_start, float def_end, gboolean is_quadratic);
 
 #endif
+

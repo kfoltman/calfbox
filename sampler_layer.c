@@ -1462,10 +1462,10 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
     if (l->off_mode == som_unknown)
         l->off_mode = l->off_by != 0 ? som_fast : som_normal;
 
-    // XXXKF this is dodgy, needs to convert to use 'programmed vs effective' values pattern
-    if (l->key >= 0 && l->key <= 127)
-        l->lokey = l->hikey = l->pitch_keycenter = l->key;
-
+    l->computed.eff_lokey = l->lokey >= 0 && l->lokey <= 127 ? l->lokey : (l->key >= 0 && l->key <= 127 ? l->key : 0);
+    l->computed.eff_hikey = l->hikey >= 0 && l->hikey <= 127 ? l->hikey : (l->key >= 0 && l->key <= 127 ? l->key : 127);
+    l->computed.eff_pitch_keycenter = (l->pitch_keycenter >= 0 && l->pitch_keycenter <= 127) ? l->pitch_keycenter 
+        : ((l->key >= 0 && l->key <= 127) ? l->key : 60);
     // 'linearize' the virtual circular buffer - write 3 (or N) frames before end of the loop
     // and 3 (N) frames at the start of the loop, and play it; in rare cases this will need to be
     // repeated twice if output write pointer is close to CBOX_BLOCK_SIZE or playback rate is very low,
@@ -2101,6 +2101,7 @@ void sampler_layer_update(struct sampler_layer *l)
         .cleanup = sampler_layer_update_cmd_cleanup,
     };
 
+    sampler_layer_data_finalize(&l->data, l->parent ? &l->parent->data : NULL, l->parent_program);
     struct sampler_layer_update_cmd *lcmd = malloc(sizeof(struct sampler_layer_update_cmd));
     lcmd->module = l->module;
     lcmd->layer = l;

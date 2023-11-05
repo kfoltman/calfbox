@@ -39,24 +39,25 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
         struct sampler_layer *l = p->data;
-        if (l->data.trigger == stm_release)
+        struct sampler_layer_data *ld = &l->data;
+        if (ld->trigger == stm_release)
             rll->num_release_layers++;
-        if (l->data.trigger == stm_release_key)
+        if (ld->trigger == stm_release_key)
             rll->num_key_release_layers++;
-        if (l->data.sw_last >= 0 && l->data.sw_last <= 127 &&
-            l->data.sw_lokey >= 0 && l->data.sw_lokey <= 127 &&
-            l->data.sw_hikey >= 0 && l->data.sw_hikey <= 127 &&
-            l->data.sw_last >= l->data.sw_lokey && l->data.sw_last <= l->data.sw_hikey)
+        if (ld->sw_last >= 0 && ld->sw_last <= 127 &&
+            ld->sw_lokey >= 0 && ld->sw_lokey <= 127 &&
+            ld->sw_hikey >= 0 && ld->sw_hikey <= 127 &&
+            ld->sw_last >= ld->sw_lokey && ld->sw_last <= ld->sw_hikey)
         {
-            int width = l->data.sw_hikey - l->data.sw_lokey + 1;
-            gpointer key = GINT_TO_POINTER(l->data.sw_lokey + (l->data.sw_hikey << 8));
-            uint8_t value = l->data.sw_last - l->data.sw_lokey;
+            int width = ld->sw_hikey - ld->sw_lokey + 1;
+            gpointer key = GINT_TO_POINTER(ld->sw_lokey + (ld->sw_hikey << 8));
+            uint8_t value = ld->sw_last - ld->sw_lokey;
             struct sampler_keyswitch_group *ks = g_hash_table_lookup(keyswitch_groups, key);
             if (!ks)
             {
                 ks = g_malloc(sizeof(struct sampler_keyswitch_group) + width);
-                ks->lo = l->data.sw_lokey;
-                ks->hi = l->data.sw_hikey;
+                ks->lo = ld->sw_lokey;
+                ks->hi = ld->sw_hikey;
                 ks->num_used = 0;
                 ks->def_value = 255;
                 memset(ks->key_offsets, 255, width);
@@ -65,8 +66,8 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
                 g_ptr_array_add(keyswitch_group_array, ks);
                 keyswitch_group_count++;
             }
-            if (l->data.sw_default >= ks->lo && l->data.sw_default <= ks->hi && ks->def_value == 255)
-                ks->def_value = l->data.sw_default - ks->lo;
+            if (ld->sw_default >= ks->lo && ld->sw_default <= ks->hi && ks->def_value == 255)
+                ks->def_value = ld->sw_default - ks->lo;
             if (ks->key_offsets[value] == 255)
             {
                 ks->key_offsets[value] = ks->num_used;
@@ -92,20 +93,20 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
         lo_count[i] = hi_count[i] = 0;
     lo_count[128] = 0;
 
-    // XXXKF handle 'key' field without relying on the existing ugly hack
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
         struct sampler_layer *l = p->data;
-        if (l->data.lokey >= 0 && l->data.lokey <= 127 &&
-            l->data.hikey >= 0 && l->data.hikey <= 127 &&
-            l->data.lokey <= l->data.hikey)
+        uint8_t lokey = l->data.computed.eff_lokey, hikey = l->data.computed.eff_hikey;
+        if (lokey >= 0 && lokey <= 127 &&
+            hikey >= 0 && hikey <= 127 &&
+            lokey <= hikey)
         {
-            lo_count[l->data.lokey]++;
-            hi_count[l->data.hikey]++;
-            if (l->data.lokey < low)
-                low = l->data.lokey;
-            if (l->data.hikey > high)
-                high = l->data.hikey;
+            lo_count[lokey]++;
+            hi_count[hikey]++;
+            if (lokey < low)
+                low = lokey;
+            if (hikey > high)
+                high = hikey;
         }
     }
     rll->lokey = low;
@@ -150,12 +151,13 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
                 oncc = oncc->next;
             }
         }
+        uint8_t lokey = l->data.computed.eff_lokey, hikey = l->data.computed.eff_hikey;
         if (l->data.trigger == stm_release_key)
-            add_layers(rll, rll->key_release_layers_by_range + ks_offset * range_count, l, l->data.lokey, l->data.hikey);
+            add_layers(rll, rll->key_release_layers_by_range + ks_offset * range_count, l, lokey, hikey);
         else if (l->data.trigger == stm_release)
-            add_layers(rll, rll->release_layers_by_range + ks_offset * range_count, l, l->data.lokey, l->data.hikey);
+            add_layers(rll, rll->release_layers_by_range + ks_offset * range_count, l, lokey, hikey);
         else
-            add_layers(rll, rll->layers_by_range + ks_offset * range_count, l, l->data.lokey, l->data.hikey);
+            add_layers(rll, rll->layers_by_range + ks_offset * range_count, l, lokey, hikey);
     }
     g_hash_table_unref(keyswitch_groups);
     return rll;

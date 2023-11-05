@@ -45,7 +45,7 @@ retry:
 
         if (l->computed.eff_use_simple_trigger_logic)
         {
-            if (iter->note >= l->lokey && iter->note <= l->hikey &&
+            if (iter->note >= l->computed.eff_lokey && iter->note <= l->computed.eff_hikey &&
                 iter->vel >= l->lovel && iter->vel <= l->hivel)
                 return lr;
             else
@@ -59,7 +59,7 @@ retry:
             continue;
         struct sampler_channel *c = iter->channel;
         struct sampler_module *m = c->module;
-        if (iter->note >= l->lokey && iter->note <= l->hikey &&
+        if (iter->note >= l->computed.eff_lokey && iter->note <= l->computed.eff_hikey &&
             iter->vel >= l->lovel && iter->vel <= l->hivel &&
             c >= &m->channels[l->lochan - 1] && c <= &m->channels[l->hichan - 1] &&
             iter->random >= l->lorand && iter->random < l->hirand &&
