@@ -34,12 +34,15 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     uint32_t keyswitch_group_count = 0, keyswitch_key_count = 0;
     GPtrArray *keyswitch_group_array = g_ptr_array_new();
     memset(rll->ranges_by_key, 255, sizeof(rll->ranges_by_key));
-    rll->has_release_layers = FALSE;
+    rll->num_release_layers = 0;
+    rll->num_key_release_layers = 0;
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
         struct sampler_layer *l = p->data;
         if (l->data.trigger == stm_release)
-            rll->has_release_layers = TRUE;
+            rll->num_release_layers++;
+        if (l->data.trigger == stm_release_key)
+            rll->num_key_release_layers++;
         if (l->data.sw_last >= 0 && l->data.sw_last <= 127 &&
             l->data.sw_lokey >= 0 && l->data.sw_lokey <= 127 &&
             l->data.sw_hikey >= 0 && l->data.sw_hikey <= 127 &&
@@ -116,7 +119,8 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
     }
     rll->ranges_by_key[high] = range_count - 1;
     rll->layers_by_range = g_malloc0_n(range_count * (1 + keyswitch_key_count), sizeof(GSList *));
-    rll->release_layers_by_range = rll->has_release_layers ? g_malloc0_n(range_count * (1 + keyswitch_key_count), sizeof(GSList *)) : NULL;
+    rll->release_layers_by_range = rll->num_release_layers ? g_malloc0_n(range_count * (1 + keyswitch_key_count), sizeof(GSList *)) : NULL;
+    rll->key_release_layers_by_range = rll->num_key_release_layers ? g_malloc0_n(range_count * (1 + keyswitch_key_count), sizeof(GSList *)) : NULL;
     rll->layers_by_range_count = range_count;
     for (GSList *p = prg->all_layers; p; p = g_slist_next(p))
     {
@@ -146,7 +150,9 @@ struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg)
                 oncc = oncc->next;
             }
         }
-        if (l->data.trigger == stm_release)
+        if (l->data.trigger == stm_release_key)
+            add_layers(rll, rll->key_release_layers_by_range + ks_offset * range_count, l, l->data.lokey, l->data.hikey);
+        else if (l->data.trigger == stm_release)
             add_layers(rll, rll->release_layers_by_range + ks_offset * range_count, l, l->data.lokey, l->data.hikey);
         else
             add_layers(rll, rll->layers_by_range + ks_offset * range_count, l, l->data.lokey, l->data.hikey);
@@ -160,8 +166,10 @@ void sampler_rll_destroy(struct sampler_rll *rll)
     g_slist_free(rll->layers_oncc);
     for (uint32_t i = 0; i < rll->layers_by_range_count * (1 + rll->keyswitch_key_count); ++i)
     {
-        if (rll->has_release_layers)
+        if (rll->num_release_layers)
             g_slist_free(rll->release_layers_by_range[i]);
+        if (rll->num_key_release_layers)
+            g_slist_free(rll->key_release_layers_by_range[i]);
         g_slist_free(rll->layers_by_range[i]);
     }
     for (uint32_t i = 0; i < rll->keyswitch_group_count; ++i)

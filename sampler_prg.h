@@ -44,11 +44,11 @@ struct sampler_rll
     uint8_t lokey, hikey;
     uint8_t ranges_by_key[128];
     uint32_t layers_by_range_count;
-    GSList **layers_by_range, **release_layers_by_range;
+    GSList **layers_by_range, **release_layers_by_range, **key_release_layers_by_range;
     struct sampler_keyswitch_group **keyswitch_groups;
     uint32_t keyswitch_group_count;
     uint32_t keyswitch_key_count;
-    gboolean has_release_layers;
+    uint32_t num_release_layers, num_key_release_layers;
 };
 
 struct sampler_rll_iterator
@@ -56,7 +56,8 @@ struct sampler_rll_iterator
     struct sampler_channel *channel;
     int note, vel;
     float random;
-    gboolean is_first, is_release;
+    gboolean is_first;
+    enum sampler_trigger release_mode;
     GSList *next_layer;
     struct sampler_rll *rll;
     uint32_t next_keyswitch_index;
@@ -108,6 +109,7 @@ struct sampler_program
     int in_use;
     struct cbox_tarfile *tarfile;
     gboolean deleting;
+    gboolean auto_update_layers;
     struct sampler_midi_curve *curves[MAX_MIDI_CURVES];
     float *interpolated_curves[MAX_MIDI_CURVES];
 };
@@ -115,7 +117,7 @@ struct sampler_program
 extern struct sampler_rll *sampler_rll_new_from_program(struct sampler_program *prg);
 extern void sampler_rll_destroy(struct sampler_rll *rll);
 
-extern void sampler_rll_iterator_init(struct sampler_rll_iterator *iter, struct sampler_rll *rll, struct sampler_channel *c, int note, int vel, float random, gboolean is_first, gboolean is_release);
+extern void sampler_rll_iterator_init(struct sampler_rll_iterator *iter, struct sampler_rll *rll, struct sampler_channel *c, int note, int vel, float random, gboolean is_first, enum sampler_trigger release_mode);
 extern struct sampler_layer *sampler_rll_iterator_next(struct sampler_rll_iterator *iter);
 
 extern struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_no, const char *name, struct cbox_tarfile *tarfile, const char *sample_dir, GError **error);

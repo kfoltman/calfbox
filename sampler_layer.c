@@ -1146,7 +1146,8 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         if (sampler_layer_apply_param(layer, key, value, error))
         {
             sampler_layer_update(layer);
-            sampler_program_update_layers(layer->parent_program);
+            if (layer->parent_program->auto_update_layers)
+                sampler_program_update_layers(layer->parent_program);
             return TRUE;
         }
         return FALSE;
@@ -1157,7 +1158,8 @@ static gboolean sampler_layer_process_cmd(struct cbox_command_target *ct, struct
         if (sampler_layer_unapply_param(layer, key, error))
         {
             sampler_layer_update(layer);
-            sampler_program_update_layers(layer->parent_program);
+            if (layer->parent_program->auto_update_layers)
+                sampler_program_update_layers(layer->parent_program);
             return TRUE;
         }
         return FALSE;

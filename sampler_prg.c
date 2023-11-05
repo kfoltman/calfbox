@@ -54,7 +54,8 @@ retry:
 
         if ((l->trigger == stm_first && !iter->is_first) ||
             (l->trigger == stm_legato && iter->is_first) ||
-            (l->trigger == stm_release && !iter->is_release)) // sw_last keyswitches are still added to the note-on list in RLL
+            (l->trigger == stm_release && iter->release_mode != l->trigger) ||
+            (l->trigger == stm_release_key && iter->release_mode != l->trigger)) // sw_last keyswitches are still added to the note-on list in RLL
             continue;
         struct sampler_channel *c = iter->channel;
         struct sampler_module *m = c->module;
@@ -96,7 +97,10 @@ retry:
         uint8_t key_range = rll->ranges_by_key[iter->note];
         if (key_range != 255)
         {
-            GSList **layers_by_range = iter->is_release ? rll->release_layers_by_range : rll->layers_by_range;
+            GSList **layers_by_range = iter->release_mode == stm_release ? rll->release_layers_by_range : rll->layers_by_range;
+            if (iter->release_mode == stm_release_key)
+                layers_by_range = rll->key_release_layers_by_range;
+            assert(layers_by_range);
             layers_by_range += (rll->keyswitch_groups[ks_group]->group_offset + ks_state) * rll->layers_by_range_count;
             iter->next_layer = layers_by_range[key_range];
             if (iter->next_layer)
@@ -106,21 +110,23 @@ retry:
     return NULL;
 }
 
-void sampler_rll_iterator_init(struct sampler_rll_iterator *iter, struct sampler_rll *rll, struct sampler_channel *c, int note, int vel, float random, gboolean is_first, gboolean is_release)
+void sampler_rll_iterator_init(struct sampler_rll_iterator *iter, struct sampler_rll *rll, struct sampler_channel *c, int note, int vel, float random, gboolean is_first, enum sampler_trigger release_mode)
 {
     iter->channel = c;
     iter->note = note;
     iter->vel = vel;
     iter->random = random;
     iter->is_first = is_first;
-    iter->is_release = is_release;
+    iter->release_mode = release_mode;
     iter->rll = rll;
     iter->next_keyswitch_index = 0;
 
     if (note >= rll->lokey && note <= rll->hikey)
     {
         assert(note >= 0 && note <= 127);
-        GSList **layers_by_range = is_release ? rll->release_layers_by_range : rll->layers_by_range;
+        GSList **layers_by_range = release_mode == stm_release ? rll->release_layers_by_range : rll->layers_by_range;
+        if (release_mode == stm_release_key)
+            layers_by_range = rll->key_release_layers_by_range;
         if (layers_by_range)
         {
             uint8_t key_range = rll->ranges_by_key[note];
@@ -172,6 +178,16 @@ static gboolean sampler_program_process_cmd(struct cbox_command_target *ct, stru
         if (!cbox_check_fb_channel(fb, cmd->command, error))
             return FALSE;
         return cbox_execute_on(fb, NULL, "/uuid", "o", error, program->global);
+    }
+    if (!strcmp(cmd->command, "/auto_update_layers") && !strcmp(cmd->arg_types, "i"))
+    {
+        program->auto_update_layers = CBOX_ARG_I(cmd, 0);
+        return TRUE;
+    }
+    if (!strcmp(cmd->command, "/update_layers") && !strcmp(cmd->arg_types, ""))
+    {
+        sampler_program_update_layers(program);
+        return TRUE;
     }
     if (!strcmp(cmd->command, "/control_inits") && !strcmp(cmd->arg_types, ""))
     {
@@ -312,6 +328,7 @@ struct sampler_program *sampler_program_new(struct sampler_module *m, int prog_n
     prg->global->default_child->default_child = sampler_layer_new(m, prg, prg->global->default_child);
     prg->deleting = FALSE;
     prg->in_use = 0;
+    prg->auto_update_layers = 1;
     for (int i = 0; i < MAX_MIDI_CURVES; ++i)
     {
         prg->curves[i] = NULL;

@@ -230,7 +230,7 @@ void sampler_channel_release_groups(struct sampler_channel *c, int note, struct 
     }
 }
 
-void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gboolean is_release_trigger)
+void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, enum sampler_trigger release_mode)
 {
     struct sampler_module *m = c->module;
     float random = rand() * 1.0 / (RAND_MAX + 1.0);
@@ -239,7 +239,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
     set_cc_float(c, smsrc_random_unipolar, random); // is that a per-voice or per-channel value? is it generated per region or per note?
 
     gboolean is_first = FALSE;
-    if (!is_release_trigger)
+    if (release_mode == stm_attack)
     {
         c->switchmask[note >> 5] |= 1 << (note & 31);
         c->prev_note_velocity[note] = vel;
@@ -258,7 +258,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
     if (!prg || !prg->rll || prg->deleting)
         return;
 
-    if (!is_release_trigger)
+    if (!release_mode)
     {
         for (uint32_t i = 0; i < prg->rll->keyswitch_group_count; ++i)
         {
@@ -272,12 +272,12 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
     }
 
     struct sampler_rll_iterator iter;
-    sampler_rll_iterator_init(&iter, prg->rll, c, note, vel, random, is_first, is_release_trigger);
+    sampler_rll_iterator_init(&iter, prg->rll, c, note, vel, random, is_first, release_mode);
 
     struct sampler_layer *layer = sampler_rll_iterator_next(&iter);
     if (!layer)
     {
-        if (!is_release_trigger)
+        if (release_mode == stm_attack)
             c->previous_note = note;
         return;
     }
@@ -339,7 +339,7 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
             sampler_prevoice_start(m->prevoices_free, c, l, note, velc);
         }
     }
-    if (!is_release_trigger)
+    if (release_mode == stm_attack)
         c->previous_note = note;
     if (is_first)
         c->first_note_vel = vel;
@@ -348,14 +348,27 @@ void sampler_channel_start_note(struct sampler_channel *c, int note, int vel, gb
 
 void sampler_channel_start_release_triggered_voices(struct sampler_channel *c, int note)
 {
-    if (c->program && c->program->rll && c->program->rll->has_release_layers)
+    if (c->program && c->program->rll && c->program->rll->num_release_layers)
     {
         if (c->prev_note_velocity[note])
         {
-            sampler_channel_start_note(c, note, c->prev_note_velocity[note], TRUE);
+            sampler_channel_start_note(c, note, c->prev_note_velocity[note], stm_release);
             c->prev_note_velocity[note] = 0;
         }
     }    
+}
+
+void sampler_channel_start_key_release_triggered_voices(struct sampler_channel *c, int note)
+{
+    if (c->program && c->program->rll && c->program->rll->num_key_release_layers)
+    {
+        // XXXKF might have a separate value to allow using both release layers and key release layers
+        if (c->prev_note_velocity[note])
+        {
+            sampler_channel_start_note(c, note, c->prev_note_velocity[note], stm_release_key);
+            c->prev_note_velocity[note] = 0;
+        }
+    }
 }
 
 void sampler_channel_stop_note(struct sampler_channel *c, int note, int vel, gboolean is_polyaft)
@@ -380,6 +393,7 @@ void sampler_channel_stop_note(struct sampler_channel *c, int note, int vel, gbo
                 
         }
     }
+    sampler_channel_start_key_release_triggered_voices(c, note);
     if (c->intcc[64] < 64)
         sampler_channel_start_release_triggered_voices(c, note);
     else
@@ -397,7 +411,7 @@ void sampler_channel_stop_sustained(struct sampler_channel *c)
         }
     }
     // Start release layers for the newly released keys
-    if (c->program && c->program->rll && c->program->rll->has_release_layers)
+    if (c->program && c->program->rll && c->program->rll->num_release_layers)
     {
         for (int i = 0; i < 128; i++)
         {
@@ -421,7 +435,7 @@ void sampler_channel_stop_sostenuto(struct sampler_channel *c)
         }
     }
     // Start release layers for the newly released keys
-    if (c->program && c->program->rll && c->program->rll->has_release_layers)
+    if (c->program && c->program->rll && c->program->rll->num_release_layers)
     {
         for (int i = 0; i < 128; i++)
         {

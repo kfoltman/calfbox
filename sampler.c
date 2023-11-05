@@ -167,7 +167,7 @@ void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint
 
             case 9:
                 if (data[2] > 0)
-                    sampler_channel_start_note(c, data[1], data[2], FALSE);
+                    sampler_channel_start_note(c, data[1], data[2], stm_attack);
                 else
                     sampler_channel_stop_note(c, data[1], data[2], FALSE);
                 break;

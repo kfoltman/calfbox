@@ -271,7 +271,7 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     sampler_gen_reset(&v->gen);
     
     v->age = 0;
-    if (l->trigger == stm_release)
+    if (l->trigger == stm_release || l->trigger == stm_release_key)
     {
         // time since last 'note on' for that note
         v->age = m->current_time - c->prev_note_start_time[note];
@@ -689,7 +689,7 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     moddests[smdest_fillfo_freq] = 0;
     moddests[smdest_amplfo_freq] = 0;
 #endif
-    if (__builtin_expect(l->trigger == stm_release, 0))
+    if (__builtin_expect(l->trigger == stm_release || l->trigger == stm_release_key, 0))
     {
         moddests[smdest_gain] = -v->age * l->rt_decay * m->module.srate_inv;
         modmask |= (1 << smdest_gain);

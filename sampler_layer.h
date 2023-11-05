@@ -90,17 +90,20 @@ enum sampler_trigger
     stm_release,
     stm_first,
     stm_legato,
+    stm_release_key,
 };
 
 #define ENUM_VALUES_sampler_trigger(MACRO) \
     MACRO("attack", stm_attack) \
     MACRO("release", stm_release) \
+    MACRO("release_key", stm_release_key) \
     MACRO("first", stm_first) \
     MACRO("legato", stm_legato)
 
 enum sampler_filter_type
 {
     sft_unknown,
+
     sft_lp12,
     sft_hp12,
     sft_bp6,
