@@ -167,6 +167,10 @@ static int process_cb(jack_nframes_t nframes, void *arg)
     struct cbox_jack_io_impl *jii = arg;
     struct cbox_io *io = jii->ioi.pio;
     struct cbox_io_callbacks *cb = io->cb;
+    // Workaround for JACK bug? jack_deactivate or set_process_callback
+    // does not guarantee the process_cb not being called until client close.
+    if (!cb)
+        return 0;
 
     io->io_env.buffer_size = nframes;
     for (uint32_t i = 0; i < io->io_env.input_count; i++)
