@@ -1004,7 +1004,7 @@ struct cbox_scene *cbox_scene_new(struct cbox_document *document, struct cbox_en
     if (!engine->io_env.buffer_size)
         return NULL;
 
-    struct cbox_scene *s = malloc(sizeof(struct cbox_scene));
+    struct cbox_scene *s = calloc(1, sizeof(struct cbox_scene));
     if (!s)
         return NULL;
 

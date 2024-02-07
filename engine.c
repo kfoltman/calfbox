@@ -183,7 +183,7 @@ void cbox_engine_process(struct cbox_engine *engine, struct cbox_io *io, uint32_
         cbox_midi_buffer_clear(&engine->midibuf_jack);
     
     // Copy MIDI input to the app-sink
-    cbox_midi_appsink_supply(&engine->appsink, &engine->midibuf_jack, io->free_running_frame_counter);
+    cbox_midi_appsink_supply(&engine->appsink, &engine->midibuf_jack, io ? io->free_running_frame_counter : 0);
     
     // Clear external track outputs
     if (engine->spb)

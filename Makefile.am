@@ -2,7 +2,10 @@ AM_CPPFLAGS = -I$(srcdir) -Wall -Wsign-compare -D_GNU_SOURCE
 
 AM_CFLAGS = $(JACK_DEPS_CFLAGS) $(GLIB_DEPS_CFLAGS) $(FLUIDSYNTH_DEPS_CFLAGS) $(PYTHON_DEPS_CFLAGS) $(LIBSMF_DEPS_CFLAGS) $(LIBSNDFILE_DEPS_CFLAGS) $(LIBUSB_DEPS_CFLAGS) $(ARCH_OPT_CFLAGS) $(NCURSES_DEPS_CFLAGS)
 
-lib_LTLIBRARIES = libcalfbox.la
+lib_LTLIBRARIES = libcalfbox.la libclapcrap.la
+
+libclapcrap_la_SOURCES = clapcrap.c
+libclapcrap_la_LIBADD = libcalfbox.la
 
 bin_PROGRAMS = calfbox
 noinst_PROGRAMS = calfbox_tests

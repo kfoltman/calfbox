@@ -44,7 +44,7 @@ GQuark cbox_sampler_error_quark()
 }
 
 static void sampler_process_block(struct cbox_module *module, cbox_sample_t **inputs, cbox_sample_t **outputs);
-static void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
+void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 static void sampler_destroyfunc(struct cbox_module *module);
 
 void sampler_steal_voice(struct sampler_module *m)
