@@ -1,6 +1,4 @@
-#include <clap/entry.h>
-#include <clap/plugin.h>
-#include <clap/factory/plugin-factory.h>
+#include <clap/clap.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +40,33 @@ static clap_plugin_descriptor_t plugin_descriptor = {
 
 void sampler_process_event(struct cbox_module *module, const uint8_t *data, uint32_t len);
 
+//////////////////////////////////// Plugin Audio Port ////////////////////////////////////
+
+uint32_t CLAP_ABI plugin_audio_port_count(const clap_plugin_t *plugin, bool is_input)
+{
+    return is_input ? 0 : 1;
+}
+
+bool plugin_audio_port_get(const clap_plugin_t *plugin, uint32_t index, bool is_input, clap_audio_port_info_t *info)
+{
+    if (index || is_input)
+        return FALSE;
+    info->id = 0;
+    strcpy(info->name, "Output");
+    info->flags = CLAP_AUDIO_PORT_IS_MAIN;
+    info->channel_count = 2;
+    info->port_type = CLAP_PORT_STEREO;
+    info->in_place_pair = CLAP_INVALID_ID;
+    return TRUE;
+}
+
+struct clap_plugin_audio_ports plugin_ext_audio_ports = {
+    .count = plugin_audio_port_count,
+    .get = plugin_audio_port_get,
+};
+
+//////////////////////////////////// Plugin ////////////////////////////////////
+
 bool CLAP_ABI plugin_init(const clap_plugin_t *plugin)
 {
     struct plugin_instance *pinst = plugin->plugin_data;
@@ -67,7 +92,7 @@ bool CLAP_ABI plugin_init(const clap_plugin_t *plugin)
     if (!load_program_at((struct sampler_module *)instr->module, "spgm:!synthbass.sfz", "synthbass", 0, &pgm, &error)) {
         printf("%s\n", error->message);
     }
-    sampler_process_event(instr->module, "\x90\x24\x7F", 3);
+    sampler_process_event(instr->module, (const uint8_t *)"\x90\x24\x7F", 3);
     return instr != NULL;
 }
 
@@ -103,7 +128,7 @@ void CLAP_ABI plugin_reset(const clap_plugin_t *plugin)
 {
 }
 
-clap_process_status plugin_process(const struct clap_plugin *plugin, const clap_process_t *process)
+clap_process_status CLAP_ABI plugin_process(const struct clap_plugin *plugin, const clap_process_t *process)
 {
     struct plugin_instance *pinst = plugin->plugin_data;
     cbox_rt_handle_rt_commands(pinst->rt);
@@ -114,6 +139,14 @@ clap_process_status plugin_process(const struct clap_plugin *plugin, const clap_
     cbox_engine_process(pinst->engine, NULL, process->frames_count, buffers, 2);
     return CLAP_PROCESS_CONTINUE;
 }
+
+const void *CLAP_ABI plugin_get_extension(const struct clap_plugin *plugin, const char *id)
+{
+    if (!strcmp(id, CLAP_EXT_AUDIO_PORTS))
+        return &plugin_ext_audio_ports;
+    return NULL;
+}
+
 
 clap_plugin_t plugin = {
     .desc = &plugin_descriptor,
@@ -126,10 +159,11 @@ clap_plugin_t plugin = {
     .stop_processing = plugin_stop_processing,
     .reset = plugin_reset,
     .process = plugin_process,
-    .get_extension = NULL,
+    .get_extension = plugin_get_extension,
     .on_main_thread = NULL,
 };
 
+//////////////////////////////////// Factory ////////////////////////////////////
 
 uint32_t CLAP_ABI get_plugin_count(const struct clap_plugin_factory *factory) {
     return 1;
@@ -156,11 +190,7 @@ clap_plugin_factory_t plugin_factory = {
     .create_plugin = create_plugin,
 };
 
-const void *CLAP_ABI get_factory(const char *factory_id) {
-    if (!strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID))
-        return &plugin_factory;
-    return NULL;
-}
+//////////////////////////////////// Entry ////////////////////////////////////
 
 bool CLAP_ABI clap_init(const char *plugin_path) {
     fprintf(stderr, "clap_init %s\n", plugin_path);
@@ -180,6 +210,12 @@ bool CLAP_ABI clap_init(const char *plugin_path) {
 }
 
 void CLAP_ABI clap_deinit() {
+}
+
+const void *CLAP_ABI get_factory(const char *factory_id) {
+    if (!strcmp(factory_id, CLAP_PLUGIN_FACTORY_ID))
+        return &plugin_factory;
+    return NULL;
 }
 
 CLAP_EXPORT const clap_plugin_entry_t clap_entry = {
