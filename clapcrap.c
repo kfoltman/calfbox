@@ -16,6 +16,7 @@
 struct plugin_instance {
     struct cbox_rt *rt;
     struct cbox_engine *engine;
+    struct cbox_midi_buffer midibuf_clap;
 };
 
 static const char *const plugin_features[] = {
@@ -65,6 +66,29 @@ struct clap_plugin_audio_ports plugin_ext_audio_ports = {
     .get = plugin_audio_port_get,
 };
 
+//////////////////////////////////// Plugin Note Port ////////////////////////////////////
+
+uint32_t CLAP_ABI plugin_note_port_count(const clap_plugin_t *plugin, bool is_input)
+{
+    return is_input ? 1 : 0;
+}
+
+bool plugin_note_port_get(const clap_plugin_t *plugin, uint32_t index, bool is_input, clap_note_port_info_t *info)
+{
+    if (index || !is_input)
+        return FALSE;
+    info->id = 0;
+    strcpy(info->name, "MIDI");
+    info->supported_dialects = CLAP_NOTE_DIALECT_MIDI;
+    info->preferred_dialect = CLAP_NOTE_DIALECT_MIDI;
+    return TRUE;
+}
+
+struct clap_plugin_note_ports plugin_ext_note_ports = {
+    .count = plugin_note_port_count,
+    .get = plugin_note_port_get,
+};
+
 //////////////////////////////////// Plugin ////////////////////////////////////
 
 bool CLAP_ABI plugin_init(const clap_plugin_t *plugin)
@@ -92,7 +116,7 @@ bool CLAP_ABI plugin_init(const clap_plugin_t *plugin)
     if (!load_program_at((struct sampler_module *)instr->module, "spgm:!synthbass.sfz", "synthbass", 0, &pgm, &error)) {
         printf("%s\n", error->message);
     }
-    sampler_process_event(instr->module, (const uint8_t *)"\x90\x24\x7F", 3);
+    cbox_midi_merger_connect(&scene->scene_input_merger, &pinst->midibuf_clap, scene->rt, NULL);
     return instr != NULL;
 }
 
@@ -106,7 +130,10 @@ bool CLAP_ABI plugin_activate(const struct clap_plugin *plugin,
                         uint32_t                  max_frames_count)
 {
     struct plugin_instance *pinst = plugin->plugin_data;
-    printf("%d..%d\n", (int)min_frames_count, (int)max_frames_count);
+    if (min_frames_count != max_frames_count)
+        return 0;
+    if (min_frames_count % CBOX_BLOCK_SIZE)
+        return 0;
     cbox_rt_set_offline(pinst->rt, sample_rate, max_frames_count);
     return 1;
 }
@@ -136,6 +163,26 @@ clap_process_status CLAP_ABI plugin_process(const struct clap_plugin *plugin, co
     float *buffers[2] = {process->audio_outputs[0].data32[0], process->audio_outputs[0].data32[1]};
     for (uint32_t i = 0; i < process->frames_count; ++i)
         buffers[0][i] = buffers[1][i] = 0.f;
+    cbox_midi_buffer_clear(&pinst->midibuf_clap);
+    const clap_input_events_t  *in_events = process->in_events;
+    uint32_t in_events_size = in_events->size(in_events);
+    for (uint32_t i = 0; i < in_events_size; ++i) {
+        const clap_event_header_t *event = in_events->get(in_events, i);
+        // printf("Event type %d\n", (int)event->type);
+        if (event->type == CLAP_EVENT_NOTE_ON) {
+            clap_event_note_t *nevent = (clap_event_note_t *)event;
+            // printf("Time %d ch %d key %d vel %f\n", (int)event->time, (int)nevent->channel, (int)nevent->key, nevent->velocity);
+            cbox_midi_buffer_write_inline(&pinst->midibuf_clap, event->time, 0x90 + nevent->channel, nevent->key, (int)(127 * nevent->velocity));
+        }
+        if (event->type == CLAP_EVENT_NOTE_OFF) {
+            clap_event_note_t *nevent = (clap_event_note_t *)event;
+            cbox_midi_buffer_write_inline(&pinst->midibuf_clap, event->time, 0x80 + nevent->channel, nevent->key, (int)(127 * nevent->velocity));
+        }
+        if (event->type == CLAP_EVENT_MIDI) {
+            clap_event_midi_t *mevent = (clap_event_midi_t *)event;
+            cbox_midi_buffer_write_event(&pinst->midibuf_clap, event->time, mevent->data, midi_cmd_size(mevent->data[0]));
+        }
+    }
     cbox_engine_process(pinst->engine, NULL, process->frames_count, buffers, 2);
     return CLAP_PROCESS_CONTINUE;
 }
@@ -144,6 +191,8 @@ const void *CLAP_ABI plugin_get_extension(const struct clap_plugin *plugin, cons
 {
     if (!strcmp(id, CLAP_EXT_AUDIO_PORTS))
         return &plugin_ext_audio_ports;
+    if (!strcmp(id, CLAP_EXT_NOTE_PORTS))
+        return &plugin_ext_note_ports;
     return NULL;
 }
 
@@ -193,7 +242,6 @@ clap_plugin_factory_t plugin_factory = {
 //////////////////////////////////// Entry ////////////////////////////////////
 
 bool CLAP_ABI clap_init(const char *plugin_path) {
-    fprintf(stderr, "clap_init %s\n", plugin_path);
     app.tarpool = cbox_tarpool_new();
     app.document = cbox_document_new();
     app.rt = NULL;
