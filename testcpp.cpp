@@ -47,6 +47,6 @@ extern "C" {
 
 int main() {
     // Example function call - replace this with actual usage
-    std::cout << "Hello World!";
+    std::cout << "Hello World!\n";
     return 0;
 }

@@ -24,6 +24,8 @@ stamp-h1
 calfbox
 calfbox_tests
 test.wav
+testcpp
+!testcpp.cpp
 
 __pycache__/
 *.py[cod]
