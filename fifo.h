@@ -69,7 +69,7 @@ static inline gboolean cbox_fifo_read_impl(struct cbox_fifo *fifo, void *dest, u
         assert(ofs >= 0 && ofs < fifo->size);
         if (ofs + bytes > fifo->size)
         {
-            uint8_t *dstb = dest;
+            uint8_t *dstb = (uint8_t *)dest;
             uint32_t firstpart = fifo->size - ofs;
             memcpy(dstb, fifo->data + ofs, firstpart);
             memcpy(dstb + firstpart, fifo->data, bytes - firstpart);
@@ -115,7 +115,7 @@ static inline gboolean cbox_fifo_write_atomic(struct cbox_fifo *fifo, const void
     assert(ofs >= 0 && ofs < fifo->size);
     if (ofs + bytes > fifo->size)
     {
-        const uint8_t *srcb = src;
+        const uint8_t *srcb = (const uint8_t *)src;
         uint32_t firstpart = fifo->size - ofs;
         memcpy(fifo->data + ofs, srcb, firstpart);
         memcpy(fifo->data, srcb + firstpart, bytes - firstpart);

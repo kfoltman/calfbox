@@ -27,7 +27,6 @@ struct cbox_command_target;
 struct cbox_osc_command;
 struct cbox_objhdr;
 struct cbox_document;
-struct GList;
 
 struct cbox_uuid
 {

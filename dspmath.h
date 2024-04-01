@@ -142,10 +142,12 @@ static inline float rad2deg(float rad)
     return rad * (float)(180.f / M_PI);
 }
 
+typedef _Complex float cfloat;
+
 // Do a butterfly operation:
 // dst1 = src1 + e^iw_1*src2
 // dst2 = src1 + e^iw_2*src2 (w = phase * 2pi / ANALYSIS_BUFFER_SIZE)
-static inline void butterfly(complex float *dst1, complex float *dst2, complex float src1, complex float src2, complex float eiw1, complex float eiw2)
+static inline void butterfly(cfloat *dst1, cfloat *dst2, cfloat src1, cfloat src2, cfloat eiw1, cfloat eiw2)
 {
     *dst1 = src1 + eiw1 * src2;
     *dst2 = src1 + eiw2 * src2;
