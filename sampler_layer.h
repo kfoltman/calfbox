@@ -378,9 +378,9 @@ struct sampler_flex_lfo_value
     MACRO(freq, has_freq, float, 0, ## __VA_ARGS__) \
     MACRO(delay, has_delay, float, 0, ## __VA_ARGS__) \
     MACRO(fade, has_fade, float, 0, ## __VA_ARGS__) \
-    MACRO(wave, has_wave, int, 0, ## __VA_ARGS__) \
+    MACRO(wave, has_wave, int, 1, ## __VA_ARGS__) \
     MACRO(phase, has_phase, float, 0, ## __VA_ARGS__) \
-    MACRO(count, has_count, int, 1, ## __VA_ARGS__)
+    MACRO(count, has_count, int, 0, ## __VA_ARGS__)
 
 #define SAMPLER_COLL_CHAIN_LIST_sampler_flex_lfo(MACRO, ...) \
     MACRO(flex_lfos, flex_lfos, ## __VA_ARGS__)
