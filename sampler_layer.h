@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define NO_HI_BPM_VALUE 10000
 #define CC_COUNT 128
 #define EXT_CC_COUNT 143
+#define MAX_FLEX_LFOS 32
 
 struct sampler_program;
 struct sampler_voice;
@@ -190,8 +191,10 @@ enum sampler_modsrc
     smsrc_fillfo,
     smsrc_amplfo,
     smsrc_none,
+    smsrc_lfo00,
+    smsrc_lfoend = smsrc_lfo00 + MAX_FLEX_LFOS,
     
-    smsrccount,
+    smsrccount = smsrc_lfoend,
     smsrc_perchan_offset = 0,
     smsrc_perchan_count = smsrc_vel,
     smsrc_pernote_offset = smsrc_vel,
@@ -201,6 +204,10 @@ enum sampler_modsrc
     smsrc_fileg = smsrc_filenv,
     smsrc_pitcheg = smsrc_pitchenv,
 };
+
+#define IS_SMSRC_FLEXLFO(src) ((src) >= smsrc_lfo00 && (src) < smsrc_lfoend)
+#define SMSRC_FLEXLFO_NUM(src) ((src) - smsrc_lfo00)
+#define SMSRC_FLEXLFO_BY_NUM(src) ((src) + smsrc_lfo00)
 
 enum sampler_moddest
 {
@@ -360,13 +367,20 @@ struct sampler_flex_lfo_value
     uint8_t has_delay:1;
     uint8_t has_fade:1;
     uint8_t has_wave:1;
+    uint8_t has_phase:1;
+    uint8_t has_count:1;
+    
+    float phase;
+    int count;
 };
 
 #define SAMPLER_COLL_FIELD_LIST_sampler_flex_lfo(MACRO, ...) \
     MACRO(freq, has_freq, float, 0, ## __VA_ARGS__) \
     MACRO(delay, has_delay, float, 0, ## __VA_ARGS__) \
     MACRO(fade, has_fade, float, 0, ## __VA_ARGS__) \
-    MACRO(wave, has_wave, int, 0, ## __VA_ARGS__)
+    MACRO(wave, has_wave, int, 0, ## __VA_ARGS__) \
+    MACRO(phase, has_phase, float, 0, ## __VA_ARGS__) \
+    MACRO(count, has_count, int, 1, ## __VA_ARGS__)
 
 #define SAMPLER_COLL_CHAIN_LIST_sampler_flex_lfo(MACRO, ...) \
     MACRO(flex_lfos, flex_lfos, ## __VA_ARGS__)

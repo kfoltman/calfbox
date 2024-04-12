@@ -78,7 +78,7 @@ struct sampler_channel
 struct sampler_lfo
 {
     uint32_t phase, delta, xdelta;
-    uint32_t age, delay, fade;
+    uint32_t delay, fade;
     int32_t wave;
     float random_value;
 };
@@ -118,7 +118,7 @@ struct sampler_prevoice
     struct sampler_layer_data *layer_data;
     struct sampler_channel *channel;
     int note, vel;
-    int age;
+    uint32_t age;
     double sync_trigger_time, sync_initial_time, sync_beats;
     float delay_computed;
 };
@@ -143,7 +143,7 @@ struct sampler_voice
     int vel;
     int released, released_with_sustain, released_with_sostenuto, captured_sostenuto;
     int off_by;
-    int age;
+    uint32_t age;
     float pitch_shift;
     float cutoff_shift, cutoff2_shift;
     float gain_shift, gain_fromvel;
@@ -168,6 +168,7 @@ struct sampler_voice
     float reloffset;
     uint32_t offset;
     int off_vel;
+    uint64_t flexlfo_phase[MAX_FLEX_LFOS];
 };
 
 struct sampler_module

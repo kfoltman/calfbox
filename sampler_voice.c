@@ -49,69 +49,62 @@ static void lfo_init(struct sampler_lfo *lfo, struct sampler_lfo_params *lfop, i
 {
     lfo->phase = 0;
     lfo->xdelta = 0;
-    lfo->age = 0;
     lfo->random_value = 0; // safe, less CPU intensive value
     lfo_update_freq(lfo, lfop, srate, srate_inv);
 }
 
-static inline float lfo_run(struct sampler_lfo *lfo)
+static inline float lfo_wave_calculate(int wave, uint32_t phase)
 {
-    if (lfo->age < lfo->delay)
-    {
-        lfo->age += CBOX_BLOCK_SIZE;
-        return 0.f;
-    }
-    uint32_t delta = lfo->delta + lfo->xdelta;
-
     const int FRAC_BITS = 32 - 11;
 
-    float v = 0;
-    switch(lfo->wave) {
+    switch(wave) {
         case 0: // triangle
         {
-            uint32_t ph = lfo->phase + 0x40000000;
+            uint32_t ph = phase + 0x40000000;
             uint32_t tri = (ph & 0x7FFFFFFF) ^ (((ph >> 31) - 1) & 0x7FFFFFFF);
-            v = -1.0 + tri * (2.0 / (1U << 31));
-            break;
+            return -1.0 + tri * (2.0 / (1U << 31));
         }
         case 1: // sine (default)
         default:
         {
-            uint32_t iphase = lfo->phase >> FRAC_BITS;
-            float frac = (lfo->phase & ((1 << FRAC_BITS) - 1)) * (1.0 / (1 << FRAC_BITS));
-            v = sampler_sine_wave[iphase] + (sampler_sine_wave[iphase + 1] - sampler_sine_wave[iphase]) * frac;
-            break;
+            uint32_t iphase = phase >> FRAC_BITS;
+            float frac = (phase & ((1 << FRAC_BITS) - 1)) * (1.0 / (1 << FRAC_BITS));
+            return sampler_sine_wave[iphase] + (sampler_sine_wave[iphase + 1] - sampler_sine_wave[iphase]) * frac;
         }
         case 2:
-            v = lfo->phase < 0xC0000000 ? 1 : -1;
-            break;
+            return phase < 0xC0000000 ? 1 : -1;
         case 3:
-            v = lfo->phase < 0x80000000 ? 1 : -1;
-            break;
+            return phase < 0x80000000 ? 1 : -1;
         case 4:
-            v = lfo->phase < 0x40000000 ? 1 : -1;
+            return phase < 0x40000000 ? 1 : -1;
             break;
         case 5:
-            v = lfo->phase < 0x20000000 ? 1 : -1;
+            return phase < 0x20000000 ? 1 : -1;
             break;
         case 6:
-            v = -1 + lfo->phase * (1.0 / (1U << 31));
-            break;
+            return -1 + phase * (1.0 / (1U << 31));
         case 7:
-            v = 1 - lfo->phase * (1.0 / (1U << 31));
-            break;
-        case 12:
-            if ((lfo->phase & 0x80000000) != ((lfo->phase + delta) & 0x80000000))
-                lfo->random_value = -1 + 2 * rand() / (1.0 * RAND_MAX);
-            v = lfo->random_value;
-            break;
+            return 1 - phase * (1.0 / (1U << 31));
+    }
+}
+
+static inline float sampler_voice_lfo_process(struct sampler_voice *voice, struct sampler_lfo *lfo)
+{
+    if (voice->age < lfo->delay)
+        return 0.f;
+    uint32_t delta = lfo->delta + lfo->xdelta;
+
+    float v;
+    if (lfo->wave == 12) {
+        if ((lfo->phase & 0x80000000) != ((lfo->phase + lfo->delta) & 0x80000000))
+            lfo->random_value = -1 + 2 * rand() / (1.0 * RAND_MAX);
+        v = lfo->random_value;
+    } else {
+        v = lfo_wave_calculate(lfo->wave, lfo->delta);
     }
     lfo->phase += delta;
-    if (lfo->fade && lfo->age < lfo->delay + lfo->fade)
-    {
-        v *= (lfo->age - lfo->delay) * 1.0 / lfo->fade;
-        lfo->age += CBOX_BLOCK_SIZE;
-    }
+    if (lfo->fade && voice->age < lfo->delay + lfo->fade)
+        v *= (voice->age - lfo->delay) * 1.0 / lfo->fade;
 
     return v;
 }
@@ -416,6 +409,12 @@ void sampler_voice_start(struct sampler_voice *v, struct sampler_channel *c, str
     
     if (v->current_pipe && v->gen.bigpos)
         cbox_prefetch_pipe_consumed(v->current_pipe, v->gen.bigpos >> 32);
+
+    for (struct sampler_flex_lfo *p = v->layer->flex_lfos; p; p = p->next) {
+        if (p->key.id < MAX_FLEX_LFOS) {
+            v->flexlfo_phase[p->key.id] = p->value.phase * 65536.0 * 65536.0;
+        }
+    }
     v->layer_changed = TRUE;
 }
 
@@ -583,6 +582,32 @@ static inline uint32_t sampler_gen_sample_playback_with_pipe(struct sampler_gen 
 
 static const float gain_for_num_stages[] = { 1, 1, 0.5, 0.33f };
 
+static inline float sampler_voice_flexlfo_process(struct sampler_voice *v, uint32_t lfo_num, float *lfo_state, uint32_t *mask)
+{
+    if (*mask & (1 << lfo_num))
+        return lfo_state[lfo_num];
+    // Extremely crude implementation
+    float value = 0;
+    for (struct sampler_flex_lfo *p = v->layer->flex_lfos; p; p = p->next) {
+        if (p->key.id == lfo_num) {
+            double srate_inv = 1.0 / v->program->module->module.srate;
+            float age_sec = v->age * srate_inv;
+            if (age_sec >= p->value.delay) {
+                age_sec -= p->value.delay;
+                value = lfo_wave_calculate(p->value.wave, v->flexlfo_phase[lfo_num]);
+                if (age_sec < p->value.fade)
+                    value *= age_sec / p->value.fade;
+                v->flexlfo_phase[lfo_num] += p->value.freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE * srate_inv;
+            }
+            break;
+        }
+    }
+    
+    *mask |= 1 << lfo_num;
+    lfo_state[lfo_num] = value;
+    return value;
+}
+
 void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cbox_sample_t **outputs)
 {
     struct sampler_layer_data *l = v->layer;
@@ -670,9 +695,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
     modsrcs[smsrc_filenv - smsrc_pernote_offset] = l->computed.eff_use_filter_mods ? cbox_envelope_get_value(&v->filter_env, fileg_shape) * 0.01f : 0;
     modsrcs[smsrc_ampenv - smsrc_pernote_offset] = cbox_envelope_get_value(&v->amp_env, ampeg_shape) * 0.01f;
 
-    modsrcs[smsrc_amplfo - smsrc_pernote_offset] = lfo_run(&v->amp_lfo);
-    modsrcs[smsrc_fillfo - smsrc_pernote_offset] = l->computed.eff_use_filter_mods ? lfo_run(&v->filter_lfo) : 0;
-    modsrcs[smsrc_pitchlfo - smsrc_pernote_offset] = lfo_run(&v->pitch_lfo);
+    modsrcs[smsrc_amplfo - smsrc_pernote_offset] = sampler_voice_lfo_process(v, &v->amp_lfo);
+    modsrcs[smsrc_fillfo - smsrc_pernote_offset] = l->computed.eff_use_filter_mods ? sampler_voice_lfo_process(v, &v->filter_lfo) : 0;
+    modsrcs[smsrc_pitchlfo - smsrc_pernote_offset] = sampler_voice_lfo_process(v, &v->pitch_lfo);
 
     float moddests[smdestcount];
     moddests[smdest_pitch] = pitch;
@@ -707,6 +732,8 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
             pw = (pw / l->bend_step) * l->bend_step;
         moddests[smdest_pitch] += pw;
     }
+    float flexlfo_state[MAX_FLEX_LFOS];
+    uint32_t flexlfo_mask = 0;
     
     for (struct sampler_modulation *sm = l->modulations; sm; sm = sm->next)
     {
@@ -716,7 +743,9 @@ void sampler_voice_process(struct sampler_voice *v, struct sampler_module *m, cb
         float value = 0.f, value2 = 1.f;
         if (src < smsrc_pernote_offset)
             value = sampler_channel_getcc_mod(c, v, src, sm->value.curve_id, sm->value.step);
-        else
+        else if (IS_SMSRC_FLEXLFO(src)) {
+            value = sampler_voice_flexlfo_process(v, SMSRC_FLEXLFO_NUM(src), flexlfo_state, &flexlfo_mask);
+        } else
             value = modsrcs[src - smsrc_pernote_offset];
 
         if (src2 != smsrc_none)

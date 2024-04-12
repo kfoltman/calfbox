@@ -274,6 +274,7 @@ enum sampler_layer_param_type
     slpt_voice_nif,
     slpt_prevoice_nif,
     slpt_flex_lfo,
+    slpt_flex_lfo_dest,
     slpt_nonfunctional,
     slpt_reserved,
 };
@@ -407,6 +408,9 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
 #define FIELD_FLEX_LFO(name, field) \
     { name, LOFS(flex_lfos), slpt_flex_lfo, 0, sampler_flex_lfo_value_field_##field, NULL, NULL, NULL },
 
+#define FIELD_FLEX_LFO_DEST(name, dest) \
+    { name, LOFS(modulations), slpt_flex_lfo_dest, 0, smdest_##dest, NULL, NULL, NULL },
+
 #define NIF_VARIANT_CC 0x01000000
 #define NIF_VARIANT_CURVECC 0x02000000
 #define NIF_VARIANT_STEPCC 0x03000000
@@ -463,6 +467,19 @@ struct sampler_layer_param_entry sampler_layer_params[] = {
     FIELD_FLEX_LFO("lfo#_delay", delay)
     FIELD_FLEX_LFO("lfo#_fade", fade)
     FIELD_FLEX_LFO("lfo#_wave", wave)
+    FIELD_FLEX_LFO("lfo#_phase", phase)
+    FIELD_FLEX_LFO("lfo#_count", count)
+
+    FIELD_FLEX_LFO_DEST("lfo#_cutoff", cutoff)
+    FIELD_FLEX_LFO_DEST("lfo#_resonance", resonance)
+    FIELD_FLEX_LFO_DEST("lfo#_cutoff2", cutoff2)
+    FIELD_FLEX_LFO_DEST("lfo#_resonance2", resonance2)
+    FIELD_FLEX_LFO_DEST("lfo#_pitch", pitch)
+    FIELD_FLEX_LFO_DEST("lfo#_tune", pitch)
+    FIELD_FLEX_LFO_DEST("lfo#_tonectl", tonectl)
+    FIELD_FLEX_LFO_DEST("lfo#_pan", pan)
+    FIELD_FLEX_LFO_DEST("lfo#_amplitude", amplitude)
+    FIELD_FLEX_LFO_DEST("lfo#_gain", gain)
 
     FIELD_ALIAS("hilev", "hivel")
     FIELD_ALIAS("lolev", "lovel")
@@ -711,7 +728,21 @@ gboolean sampler_layer_param_entry_set_from_ptr(const struct sampler_layer_param
             case sampler_flex_lfo_value_field_wave:
                 sampler_flex_lfo_set_wave_by_offset(l, e->offset, &flex_lfo_key, set_local_value, (int)fvalue);
                 break;
+            case sampler_flex_lfo_value_field_phase:
+                sampler_flex_lfo_set_phase_by_offset(l, e->offset, &flex_lfo_key, set_local_value, fvalue);
+                break;
+            case sampler_flex_lfo_value_field_count:
+                sampler_flex_lfo_set_count_by_offset(l, e->offset, &flex_lfo_key, set_local_value, (int)fvalue);
+                break;
             }
+            break;
+        case slpt_flex_lfo_dest:
+            CAST_FLOAT_VALUE;
+            flex_lfo_key_decode(args, &flex_lfo_key);
+            mod_key.src = SMSRC_FLEXLFO_BY_NUM(flex_lfo_key.id);
+            mod_key.src2 = smsrc_none;
+            mod_key.dest = e->extra_int;
+            sampler_modulation_set_amount_by_offset(l, e->offset, &mod_key, set_local_value, fvalue);
             break;
         case slpt_reserved:
         case slpt_invalid:
@@ -930,6 +961,13 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             }
             break;
         }
+        case slpt_flex_lfo_dest:
+            flex_lfo_key_decode(args, &flex_lfo_key);
+            mod_key.src = SMSRC_FLEXLFO_BY_NUM(flex_lfo_key.id);
+            mod_key.src2 = smsrc_none;
+            mod_key.dest = e->extra_int;
+            sampler_modulation_unset_by_offset(l, e->offset, &mod_key, unset_local_value, 1 << sampler_modulation_value_field_amount);
+            break;
         case slpt_flex_lfo:
             flex_lfo_key_decode(args, &flex_lfo_key);
             switch(e->extra_int)
@@ -1661,8 +1699,12 @@ static const char *moddest_names[] = { "gain", "pitch", "cutoff", "resonance", "
     "eq3_freq", "eq3_bw", "eq3_gain",
     };
 
-static void mod_cc_attrib_to_string(GString *outstr, const char *attrib, const struct sampler_modulation_key *md, const char *floatbuf)
+static void mod_cc_attrib_to_string(GString *outstr, const char *attrib, const struct sampler_modulation_key *md, double floatvalue)
 {
+    char floatbuf[G_ASCII_DTOSTR_BUF_SIZE];
+    int floatbufsize = G_ASCII_DTOSTR_BUF_SIZE;
+    g_ascii_dtostr(floatbuf, floatbufsize, floatvalue);
+    
     if (md->dest >= smdest_eg_stage_start && md->dest <= smdest_eg_stage_end)
     {
         uint32_t param = md->dest - smdest_eg_stage_start;
@@ -1779,26 +1821,24 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         }
         if (flfo->value.has_wave || show_inherited)
             g_string_append_printf(outstr, " lfo%d_wave=%d", (int)flfo->key.id, flfo->value.wave);
+        if (flfo->value.has_phase || show_inherited)
+        {
+            g_ascii_dtostr(floatbuf, floatbufsize, flfo->value.phase);
+            g_string_append_printf(outstr, " lfo%d_phase=%s", (int)flfo->key.id, floatbuf);
+        }
+        if (flfo->value.has_count || show_inherited)
+            g_string_append_printf(outstr, " lfo%d_count=%d", (int)flfo->key.id, flfo->value.count);
     }
     for(struct sampler_modulation *md = l->modulations; md; md = md->next)
     {
         const struct sampler_modulation_key *mk = &md->key;
         const struct sampler_modulation_value *mv = &md->value;
         if (mv->has_curve || show_inherited)
-        {
-            g_ascii_dtostr(floatbuf, floatbufsize, mv->curve_id);
-            mod_cc_attrib_to_string(outstr, "_curvecc", mk, floatbuf);
-        }
+            mod_cc_attrib_to_string(outstr, "_curvecc", mk, mv->curve_id);
         if (mv->has_smooth || show_inherited)
-        {
-            g_ascii_dtostr(floatbuf, floatbufsize, mv->smooth);
-            mod_cc_attrib_to_string(outstr, "_smoothcc", mk, floatbuf);
-        }
+            mod_cc_attrib_to_string(outstr, "_smoothcc", mk, mv->smooth);
         if (mv->has_step || show_inherited)
-        {
-            g_ascii_dtostr(floatbuf, floatbufsize, mv->step);
-            mod_cc_attrib_to_string(outstr, "_stepcc", mk, floatbuf);
-        }
+            mod_cc_attrib_to_string(outstr, "_stepcc", mk, mv->step);
         if (mv->has_amount || show_inherited)
         {
             gboolean is_egcc = mk->dest >= smdest_eg_stage_start && mk->dest <= smdest_eg_stage_end;
@@ -1822,7 +1862,7 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                         g_string_append_printf(outstr, " %s_cc%d=%s", moddest_names[mk->dest], mk->src, floatbuf);
                     continue;
                 }
-                if (mk->src < smsrc_perchan_count + sizeof(modsrc_names) / sizeof(modsrc_names[0]))
+                else if (mk->src < smsrc_perchan_count + sizeof(modsrc_names) / sizeof(modsrc_names[0]))
                 {
                     if ((mk->src == smsrc_filenv && mk->dest == smdest_cutoff) ||
                         (mk->src == smsrc_pitchenv && mk->dest == smdest_pitch) ||
@@ -1837,6 +1877,10 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                         g_string_append_printf(outstr, " %s%s=%s", moddest_names[mk->dest], modsrc_names[mk->src - smsrc_perchan_count], floatbuf);
                     else
                         g_string_append_printf(outstr, " %s_%s=%s", moddest_names[mk->dest], modsrc_names[mk->src - smsrc_perchan_count], floatbuf);
+                    continue;
+                }
+                else if (IS_SMSRC_FLEXLFO(mk->src)) {
+                    g_string_append_printf(outstr, " lfo%02d_%s=%s", SMSRC_FLEXLFO_NUM(mk->src), moddest_names[mk->dest], floatbuf);
                     continue;
                 }
             }
