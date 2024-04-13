@@ -275,6 +275,7 @@ enum sampler_layer_param_type
     slpt_prevoice_nif,
     slpt_flex_lfo,
     slpt_flex_lfo_dest,
+    slpt_flex_lfo_dest_cc,
     slpt_nonfunctional,
     slpt_reserved,
 };
@@ -405,11 +406,17 @@ SAMPLER_FIXED_FIELDS(PROC_FIELD_SETHASFUNC)
     { #parname "locc#", LOFS(field), slpt_ccrange, 0, 0, NULL, NULL, NULL }, \
     { #parname "hicc#", LOFS(field), slpt_ccrange, 127, 1, NULL, NULL, NULL },
 
+#define FLEX_LFO_MOD(dest,param) (smdest_##dest | ((uint64_t)sampler_modulation_value_field_##param << 32))
+
 #define FIELD_FLEX_LFO(name, field) \
     { name, LOFS(flex_lfos), slpt_flex_lfo, 0, sampler_flex_lfo_value_field_##field, NULL, NULL, NULL },
 
 #define FIELD_FLEX_LFO_DEST(name, dest) \
-    { name, LOFS(modulations), slpt_flex_lfo_dest, 0, smdest_##dest, NULL, NULL, NULL },
+    { name, LOFS(modulations), slpt_flex_lfo_dest, 0, smdest_##dest, NULL, NULL, NULL }, \
+    { name "_oncc#", LOFS(modulations), slpt_flex_lfo_dest_cc, 0, FLEX_LFO_MOD(dest, amount), NULL, NULL, NULL }, \
+    { name "_curvecc#", LOFS(modulations), slpt_flex_lfo_dest_cc, 0, FLEX_LFO_MOD(dest, curve_id), NULL, NULL, NULL }, \
+    { name "_smoothcc#", LOFS(modulations), slpt_flex_lfo_dest_cc, 0, FLEX_LFO_MOD(dest, smooth), NULL, NULL, NULL }, \
+    { name "_stepcc#", LOFS(modulations), slpt_flex_lfo_dest_cc, 0, FLEX_LFO_MOD(dest, step), NULL, NULL, NULL }, \
 
 #define NIF_VARIANT_CC 0x01000000
 #define NIF_VARIANT_CURVECC 0x02000000
@@ -583,6 +590,12 @@ static inline void flex_lfo_key_decode(const uint32_t *args, struct sampler_flex
     flex_lfo_key->id = args[0];
 }
 
+static inline void flex_lfo_key_and_cc_decode(const uint32_t *args, struct sampler_flex_lfo_key *flex_lfo_key, uint32_t *cc)
+{
+    flex_lfo_key->id = args[0];
+    *cc = args[1];
+}
+
 #define OVERRIDE_LOGIC(type) override_logic(!memcmp(p, data_ptr, sizeof(type)), e->get_has_value(&l->data), set_local_value)
 
 #define CAST_FLOAT_VALUE fvalue = *(double *)data_ptr
@@ -743,6 +756,30 @@ gboolean sampler_layer_param_entry_set_from_ptr(const struct sampler_layer_param
             mod_key.src2 = smsrc_none;
             mod_key.dest = e->extra_int;
             sampler_modulation_set_amount_by_offset(l, e->offset, &mod_key, set_local_value, fvalue);
+            break;
+        case slpt_flex_lfo_dest_cc:
+            CAST_FLOAT_VALUE;
+            flex_lfo_key_and_cc_decode(args, &flex_lfo_key, &cc);
+            mod_key.src = SMSRC_FLEXLFO_BY_NUM(flex_lfo_key.id);
+            mod_key.src2 = cc;
+            mod_key.dest = e->extra_int & 0xFFFFFFFF;
+            switch(e->extra_int >> 32) {
+            case sampler_modulation_value_field_amount:
+                sampler_modulation_set_amount_by_offset(l, e->offset, &mod_key, set_local_value, fvalue);
+                break;
+            case sampler_modulation_value_field_smooth:
+                sampler_modulation_set_smooth_by_offset(l, e->offset, &mod_key, set_local_value, fvalue);
+                break;
+            case sampler_modulation_value_field_step:
+                sampler_modulation_set_step_by_offset(l, e->offset, &mod_key, set_local_value, fvalue);
+                break;
+            case sampler_modulation_value_field_curve_id:
+                sampler_modulation_set_curve_id_by_offset(l, e->offset, &mod_key, set_local_value, fvalue);
+                break;
+            default:
+                assert(false);
+                break;
+            }
             break;
         case slpt_reserved:
         case slpt_invalid:
@@ -967,6 +1004,13 @@ gboolean sampler_layer_param_entry_unset(const struct sampler_layer_param_entry 
             mod_key.src2 = smsrc_none;
             mod_key.dest = e->extra_int;
             sampler_modulation_unset_by_offset(l, e->offset, &mod_key, unset_local_value, 1 << sampler_modulation_value_field_amount);
+            break;
+        case slpt_flex_lfo_dest_cc:
+            flex_lfo_key_and_cc_decode(args, &flex_lfo_key, &cc);
+            mod_key.src = SMSRC_FLEXLFO_BY_NUM(flex_lfo_key.id);
+            mod_key.src2 = cc;
+            mod_key.dest = e->extra_int & 0xFFFFFFFF;
+            sampler_modulation_unset_by_offset(l, e->offset, &mod_key, unset_local_value, 1 << (e->extra_int >> 32));
             break;
         case slpt_flex_lfo:
             flex_lfo_key_decode(args, &flex_lfo_key);
