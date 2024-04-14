@@ -31,6 +31,7 @@ global_label=Global1
 sw_default=60
 sw_lokey=60
 sw_hikey=70
+lfo1_freq=3 lfo1_cutoff_curvecc5=0 lfo01_cutoff_oncc1=2400 lfo01_cutoff_stepcc1=2
 
 //<control> //is not part of the hierarchy. control has no label.
 
