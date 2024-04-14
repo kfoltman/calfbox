@@ -668,6 +668,7 @@ struct sampler_layer_computed
     uint8_t eff_lokey, eff_hikey, eff_pitch_keycenter;
 
     float eff_amp_velcurve[128];
+    struct sampler_flex_lfo **eff_flex_lfo_by_num; // For O(1) lookup
 };
 
 struct sampler_layer_data

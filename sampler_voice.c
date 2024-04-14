@@ -584,22 +584,21 @@ static const float gain_for_num_stages[] = { 1, 1, 0.5, 0.33f };
 
 static inline float sampler_voice_flexlfo_process(struct sampler_voice *v, uint32_t lfo_num, float *lfo_state, uint32_t *mask)
 {
+    if (lfo_num >= MAX_FLEX_LFOS)
+        return 0;
     if (*mask & (1 << lfo_num))
         return lfo_state[lfo_num];
-    // Extremely crude implementation
     float value = 0;
-    for (struct sampler_flex_lfo *p = v->layer->flex_lfos; p; p = p->next) {
-        if (p->key.id == lfo_num) {
-            double srate_inv = 1.0 / v->program->module->module.srate;
-            float age_sec = v->age * srate_inv;
-            if (age_sec >= p->value.delay) {
-                age_sec -= p->value.delay;
-                value = lfo_wave_calculate(p->value.wave, v->flexlfo_phase[lfo_num]);
-                if (age_sec < p->value.fade)
-                    value *= age_sec / p->value.fade;
-                v->flexlfo_phase[lfo_num] += p->value.freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE * srate_inv;
-            }
-            break;
+    struct sampler_flex_lfo *p = v->layer->computed.eff_flex_lfo_by_num[lfo_num];
+    if (p) {
+        double srate_inv = 1.0 / v->program->module->module.srate;
+        float age_sec = v->age * srate_inv;
+        if (age_sec >= p->value.delay) {
+            age_sec -= p->value.delay;
+            value = lfo_wave_calculate(p->value.wave, v->flexlfo_phase[lfo_num]);
+            if (age_sec < p->value.fade)
+                value *= age_sec / p->value.fade;
+            v->flexlfo_phase[lfo_num] += p->value.freq * 65536.0 * 65536.0 * CBOX_BLOCK_SIZE * srate_inv;
         }
     }
     

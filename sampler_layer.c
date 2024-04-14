@@ -1340,6 +1340,7 @@ struct sampler_layer *sampler_layer_new(struct sampler_module *m, struct sampler
     struct sampler_layer_data *ld = &l->data;
     SAMPLER_FIXED_FIELDS(PROC_FIELDS_INITIALISER)
 
+    ld->computed.eff_flex_lfo_by_num = NULL;
     ld->computed.eff_waveform = NULL;
     ld->computed.eff_freq = 44100;
     ld->modulations = NULL;
@@ -1399,6 +1400,7 @@ void sampler_layer_data_clone(struct sampler_layer_data *dst, const struct sampl
     dst->prevoice_nifs = sampler_noteinitfunc_clone(src->prevoice_nifs, copy_hasattr);
     dst->flex_lfos = sampler_flex_lfo_clone(src->flex_lfos, copy_hasattr);
     dst->computed.eff_waveform = src->computed.eff_waveform;
+    dst->computed.eff_flex_lfo_by_num = NULL;
     if (dst->computed.eff_waveform)
         cbox_waveform_ref(dst->computed.eff_waveform);
 }
@@ -1591,6 +1593,16 @@ void sampler_layer_data_finalize(struct sampler_layer_data *l, struct sampler_la
 
     l->computed.resonance_scaled = pow(l->resonance_linearized, 1.f / l->computed.eff_num_stages);
     l->computed.resonance2_scaled = pow(l->resonance2_linearized, 1.f / l->computed.eff_num_stages2);
+    
+    if (l->computed.eff_flex_lfo_by_num)
+        memset(l->computed.eff_flex_lfo_by_num, 0, sizeof(struct sampler_flex_lfo *) * MAX_FLEX_LFOS);
+
+    if (l->flex_lfos) {
+        if (!l->computed.eff_flex_lfo_by_num)
+            l->computed.eff_flex_lfo_by_num = calloc(sizeof(struct sampler_flex_lfo *), MAX_FLEX_LFOS);
+        for (struct sampler_flex_lfo *p = l->flex_lfos; p; p = p->next)
+            l->computed.eff_flex_lfo_by_num[p->key.id] = p;
+    }
 }
 
 void sampler_layer_reset_switches(struct sampler_layer *l, struct sampler_module *m)
@@ -2040,6 +2052,10 @@ void sampler_layer_data_close(struct sampler_layer_data *l)
     {
         cbox_waveform_unref(l->computed.eff_waveform);
         l->computed.eff_waveform = NULL;
+    }
+    if (l->computed.eff_flex_lfo_by_num) {
+        free(l->computed.eff_flex_lfo_by_num);
+        l->computed.eff_flex_lfo_by_num = NULL;
     }
     g_free(l->sample);
 }
