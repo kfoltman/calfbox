@@ -1778,6 +1778,11 @@ static void mod_cc_attrib_to_string(GString *outstr, const char *attrib, const s
         if (md->src2 < EXT_CC_COUNT)
             g_string_append_printf(outstr, " %s_depth2%s%d=%s", modsrc_names[md->src - smsrc_perchan_count], attrib, md->src2, floatbuf);
     }
+    else if (IS_SMSRC_FLEXLFO(md->src) && md->src2 < EXT_CC_COUNT)
+    {
+        if (md->src2 < EXT_CC_COUNT)
+            g_string_append_printf(outstr, " lfo%02d%s%d=%s", SMSRC_FLEXLFO_NUM(md->src), attrib, md->src2, floatbuf);
+    }
     else
         assert(md->src2 >= EXT_CC_COUNT);
 }
@@ -1851,27 +1856,27 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
         if (flfo->value.has_freq || show_inherited)
         {
             g_ascii_dtostr(floatbuf, floatbufsize, flfo->value.freq);
-            g_string_append_printf(outstr, " lfo%d_freq=%s", (int)flfo->key.id, floatbuf);
+            g_string_append_printf(outstr, " lfo%02d_freq=%s", (int)flfo->key.id, floatbuf);
         }
         if (flfo->value.has_delay || show_inherited)
         {
             g_ascii_dtostr(floatbuf, floatbufsize, flfo->value.delay);
-            g_string_append_printf(outstr, " lfo%d_delay=%s", (int)flfo->key.id, floatbuf);
+            g_string_append_printf(outstr, " lfo%02d_delay=%s", (int)flfo->key.id, floatbuf);
         }
         if (flfo->value.has_fade || show_inherited)
         {
             g_ascii_dtostr(floatbuf, floatbufsize, flfo->value.fade);
-            g_string_append_printf(outstr, " lfo%d_fade=%s", (int)flfo->key.id, floatbuf);
+            g_string_append_printf(outstr, " lfo%02d_fade=%s", (int)flfo->key.id, floatbuf);
         }
         if (flfo->value.has_wave || show_inherited)
-            g_string_append_printf(outstr, " lfo%d_wave=%d", (int)flfo->key.id, flfo->value.wave);
+            g_string_append_printf(outstr, " lfo%02d_wave=%d", (int)flfo->key.id, flfo->value.wave);
         if (flfo->value.has_phase || show_inherited)
         {
             g_ascii_dtostr(floatbuf, floatbufsize, flfo->value.phase);
-            g_string_append_printf(outstr, " lfo%d_phase=%s", (int)flfo->key.id, floatbuf);
+            g_string_append_printf(outstr, " lfo%02d_phase=%s", (int)flfo->key.id, floatbuf);
         }
         if (flfo->value.has_count || show_inherited)
-            g_string_append_printf(outstr, " lfo%d_count=%d", (int)flfo->key.id, flfo->value.count);
+            g_string_append_printf(outstr, " lfo%02d_count=%d", (int)flfo->key.id, flfo->value.count);
     }
     for(struct sampler_modulation *md = l->modulations; md; md = md->next)
     {
@@ -1992,6 +1997,10 @@ gchar *sampler_layer_to_string(struct sampler_layer *lr, gboolean show_inherited
                     g_string_append_printf(outstr, " %s_depth2cc%d=%s", modsrc_names[mk->src - smsrc_perchan_count], mk->src2, floatbuf);
                     continue;
                 }
+            }
+            if (IS_SMSRC_FLEXLFO(mk->src) && mk->src2 < EXT_CC_COUNT) {
+                mod_cc_attrib_to_string(outstr, "_oncc", mk, mv->amount);
+                continue;
             }
             g_string_append_printf(outstr, " genericmod_%d_%d_%d_%d=%s", mk->src, mk->src2, mk->dest, mv->curve_id, floatbuf);
         }
